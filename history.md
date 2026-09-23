@@ -26,10 +26,11 @@ Repair desktop settings and composer, Android compilation, and iOS navigation wh
 - Applied the four formatting changes requested by Biome in the scheduled-task, Hooks, and native-settings routes.
 - Updated two existing native presentation tests to assert the requested full-page iOS More route and in-stack composer layout instead of their obsolete menu/inset behavior.
 - Replaced mobile SSH shell invocation and credential temp files with a native `russh` session; wired authentication, known-host trust, bounded output, timeout, duplicate-run protection, and cancellation. Reviewed and formatted the integration; native CI validation remains pending.
+- Added a mobile-only libgit2 backend for local repository status, history, diffs, commit details, stage, unstage, discard, init, and commit. Rewired SwiftUI/Astryx mobile Git review to native commands. Added HTTPS fetch/push and clean fast-forward pull using the native GitHub token vault. Missing Git author identity now shows name/email fields. Mutations reject worktree path escapes and empty commits; updated the old shell-dependent hint.
 
 ## Evidence and decisions
 - Started from clean `main` at `3175331`; inspected prior history, screenshots, `xx`, `yy`, Astryx 0.6 source/MCP/CLI, Swift documentation, and release logs.
-- Latest CI passed, while release failed in Android Kotlin compilation and macOS Intel DMG packaging; iOS IPA and Windows packages succeeded.
+- CI at `83e621a` and `da80012` passed. Unsigned release `35888070327` at `83e621a` passed Android, iOS, Windows, Linux, and both macOS builds; the earlier Android Kotlin and macOS Intel packaging failures no longer reproduce.
 - Installed Windows client saved, read, and deleted a temporary global memory; the list returned to zero. Its window restored the persisted 561×1085 client size and position from `main-window-size.json`. No storage or geometry change is justified by this reproduction.
 - `xx` provider persistence differs from this repository only by an unconditional auto-sync call; the current desktop guard is required because that service is desktop-only.
 - Installed Windows client: compact language selection saved; in wide settings dialog, the visible option did not highlight on hover and clicking it only dismissed the menu. The dialog's popover animation applies a persistent transform, so modal menus now use their measured position without that transform.
@@ -39,11 +40,11 @@ Repair desktop settings and composer, Android compilation, and iOS navigation wh
 ## Remaining
 - Verify the desktop selector fix in a new package; inspect other memory entry points and wipe behavior only when a safe reproduction is available.
 - Inspect and complete mobile SSH, Git review, resource library, files, MCP/Skills store, permissions, and routing against `yy`.
-- Verify and correct the new native SSH channel in mobile CI.
-- Run one consolidated non-build verification, inspect the final diff, push, and track CI/release workflows.
+- Verify native SSH and Git in a new Android/iOS release build; correct compile or runtime failures.
+- Inspect the final diff, push the Git implementation, and track CI/release workflows. The consolidated local checks passed: `pnpm check`, `pnpm native:check`, `pnpm lint`, and `pnpm test:non-native` (1211/1211).
 
 ## Touched files
-- Prior files above, plus `crates/fronted/src-tauri/{Cargo.toml,src/commands/runtime/{mod.rs,mobile_ssh.rs,shell.rs}}`; `history.md`.
+- Prior files above, plus `crates/fronted/src-tauri/{Cargo.toml,src/{lib.rs,commands/{mod.rs,runtime/{mod.rs,mobile_ssh.rs,shell.rs},workspace/{mod.rs,mobile_git.rs}}}}`, `crates/fronted/src/{i18n/config.ts,pages/chat/mobile/MobileGitReviewPanel.tsx}`; `history.md`.
 
 ## Verification/CI
 - TypeScript and native mapping checks passed; lint passed after four formatting corrections. The non-Cargo suite found two obsolete presentation assertions, now updated; focused rerun and new GitHub workflows remain.

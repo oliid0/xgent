@@ -12,7 +12,7 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
 import { invoke } from "@xgent/runtime";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   FileText,
@@ -34,14 +34,6 @@ import type {
 } from "../../../presentation/types";
 import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import { MobileFullscreenPanel } from "./MobilePanelScaffold";
-
-type ShellRunResponse = {
-  exit_code?: number;
-  exitCode?: number;
-  stdout: string;
-  stderr: string;
-  cancelled: boolean;
-};
 
 type GitChange = {
   path: string;
@@ -69,77 +61,14 @@ type GitHistoryEntry = {
   subject: string;
 };
 
+type GitIdentity = { name: string; email: string };
+
 type MobileGitReviewPanelProps = {
   open: boolean;
   workdir: string;
   settings: AppSettings;
   onClose: () => void;
 };
-
-function shellQuote(value: string) {
-  return `'${value.replaceAll("'", `'\\''`)}'`;
-}
-
-function runId() {
-  return `mobile-git-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
-}
-
-function exitCode(response: ShellRunResponse) {
-  return response.exitCode ?? response.exit_code ?? 1;
-}
-
-function gitCommand(args: string) {
-  return `if command -v git >/dev/null 2>&1; then git ${args}; else lg2 ${args}; fi`;
-}
-
-function parseStatus(output: string): GitSnapshot {
-  const lines = output.replaceAll("\r\n", "\n").split("\n");
-  const header = lines[0]?.startsWith("## ") ? (lines.shift()?.slice(3) ?? "") : "";
-  const branchPart = header.split("...")[0]?.trim() ?? "";
-  const upstreamMatch = header.match(/\.\.\.([^\s[]+)/);
-  const aheadMatch = header.match(/ahead (\d+)/);
-  const behindMatch = header.match(/behind (\d+)/);
-  const changes = lines.flatMap<GitChange>((line) => {
-    if (line.length < 4) return [];
-    const indexStatus = line[0] ?? " ";
-    const worktreeStatus = line[1] ?? " ";
-    const rawPath = line.slice(3).trim();
-    if (!rawPath) return [];
-    const renameParts = rawPath.split(" -> ");
-    const path = renameParts.at(-1)?.replace(/^"|"$/g, "") ?? rawPath;
-    const oldPath = renameParts.length > 1 ? renameParts[0]?.replace(/^"|"$/g, "") : undefined;
-    const untracked = indexStatus === "?" && worktreeStatus === "?";
-    return [
-      {
-        path,
-        oldPath,
-        indexStatus,
-        worktreeStatus,
-        staged: !untracked && indexStatus !== " ",
-        working: untracked || worktreeStatus !== " ",
-        untracked,
-      },
-    ];
-  });
-  return {
-    branch: branchPart === "No commits yet on" ? "" : branchPart,
-    upstream: upstreamMatch?.[1] ?? "",
-    ahead: Number(aheadMatch?.[1] ?? 0),
-    behind: Number(behindMatch?.[1] ?? 0),
-    changes,
-  };
-}
-
-function parseHistory(output: string): GitHistoryEntry[] {
-  return output
-    .replaceAll("\r\n", "\n")
-    .split("\n")
-    .flatMap((line) => {
-      const [sha, shortSha, author, date, ...subject] = line.split("\u001f");
-      if (!sha || !shortSha) return [];
-      return [{ sha, shortSha, author, date, subject: subject.join("\u001f") }];
-    });
-}
 
 function changeBadge(change: GitChange) {
   if (change.untracked) return "?";
@@ -156,38 +85,22 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
   const [selectedCommit, setSelectedCommit] = useState<GitHistoryEntry | null>(null);
   const [detail, setDetail] = useState("");
   const [commitMessage, setCommitMessage] = useState("");
+  const [identity, setIdentity] = useState<GitIdentity | null>(null);
+  const [authorName, setAuthorName] = useState("");
+  const [authorEmail, setAuthorEmail] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notRepository, setNotRepository] = useState(false);
   const [notice, setNotice] = useState("");
   const [discardPath, setDiscardPath] = useState("");
-  const activeRunIdRef = useRef("");
-
   const run = useCallback(
-    async (label: string, command: string, allowNonZero = false) => {
+    async <T,>(label: string, action: () => Promise<T>): Promise<T> => {
       if (!workdir.trim()) throw new Error(t("chat.mobileTerminal.noWorkspace"));
-      const id = runId();
-      activeRunIdRef.current = id;
       setBusy(label);
       setError("");
       try {
-        const response = await invoke<ShellRunResponse>("shell_run", {
-          workdir,
-          command,
-          cwd: null,
-          timeout_ms: 120_000,
-          max_timeout_ms: 600_000,
-          provider_id: null,
-          run_id: id,
-          sandbox: false,
-          sandbox_allow_network: true,
-        });
-        if (!allowNonZero && exitCode(response) !== 0) {
-          throw new Error(response.stderr.trim() || response.stdout.trim() || label);
-        }
-        return response.stdout;
+        return await action();
       } finally {
-        if (activeRunIdRef.current === id) activeRunIdRef.current = "";
         setBusy("");
       }
     },
@@ -196,12 +109,14 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
 
   const refreshStatus = useCallback(async () => {
     try {
-      const output = await run(
-        "status",
-        gitCommand("status --porcelain=v1 --branch --untracked-files=all"),
+      const [next, nextIdentity] = await run("status", () =>
+        Promise.all([
+          invoke<GitSnapshot>("mobile_git_status", { workdir }),
+          invoke<GitIdentity>("mobile_git_identity", { workdir }),
+        ]),
       );
-      const next = parseStatus(output);
       setSnapshot(next);
+      setIdentity(nextIdentity);
       setNotRepository(false);
       setSelectedPath((current) =>
         current && next.changes.some((change) => change.path === current) ? current : "",
@@ -210,24 +125,23 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       setSnapshot(null);
+      setIdentity(null);
       setNotRepository(message.toLowerCase().includes("not a git repository"));
       setError(message);
     }
-  }, [run]);
+  }, [run, workdir]);
 
   const refreshHistory = useCallback(async () => {
     try {
-      const output = await run(
-        "history",
-        gitCommand("log -n 60 --date=iso-strict --pretty=format:'%H%x1f%h%x1f%an%x1f%ad%x1f%s'"),
+      setHistory(
+        await run("history", () => invoke<GitHistoryEntry[]>("mobile_git_history", { workdir })),
       );
-      setHistory(parseHistory(output));
       setError("");
     } catch (cause) {
       setHistory([]);
       setError(cause instanceof Error ? cause.message : String(cause));
     }
-  }, [run]);
+  }, [run, workdir]);
 
   useEffect(() => {
     if (!open) return;
@@ -237,6 +151,8 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
     setSelectedCommit(null);
     setNotice("");
     setNotRepository(false);
+    setAuthorName("");
+    setAuthorEmail("");
     void refreshStatus();
   }, [open, refreshStatus]);
 
@@ -250,6 +166,11 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
     [selectedPath, snapshot?.changes],
   );
   const stagedCount = snapshot?.changes.filter((change) => change.staged).length ?? 0;
+  const needsIdentity = stagedCount > 0 && (!identity?.name || !identity.email);
+  const canCommit =
+    stagedCount > 0 &&
+    !!commitMessage.trim() &&
+    (!needsIdentity || (!!authorName.trim() && !!authorEmail.trim()));
 
   const openChange = useCallback(
     async (change: GitChange) => {
@@ -257,35 +178,48 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
       setSelectedCommit(null);
       setDiscardPath("");
       try {
-        const path = shellQuote(change.path);
-        const commands = [
-          change.staged ? gitCommand(`diff --cached --no-ext-diff -- ${path}`) : "",
-          change.working && !change.untracked ? gitCommand(`diff --no-ext-diff -- ${path}`) : "",
-          change.untracked ? `${gitCommand(`diff --no-index -- /dev/null ${path}`)} || true` : "",
-        ].filter(Boolean);
-        const output = await run("diff", commands.join("\n"), true);
+        const output = await run("diff", () =>
+          invoke<string>("mobile_git_diff", { workdir, path: change.path }),
+        );
         setDetail(output.trim() || t("projectTools.gitReview.noDiff"));
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : String(cause));
       }
     },
-    [run, t],
+    [run, t, workdir],
   );
 
   const mutate = useCallback(
-    async (label: string, command: string, success: string) => {
+    async (
+      label: string,
+      operation: string,
+      path: string | null,
+      success: string,
+      message?: string,
+    ): Promise<boolean> => {
       try {
-        await run(label, command);
+        await run(label, () =>
+          invoke<string>("mobile_git_mutate", {
+            workdir,
+            operation,
+            path,
+            message: message ?? null,
+            author_name: operation === "commit" ? authorName.trim() || null : null,
+            author_email: operation === "commit" ? authorEmail.trim() || null : null,
+          }),
+        );
         setNotice(success);
         setDetail("");
         setSelectedPath("");
         setDiscardPath("");
         await refreshStatus();
+        return true;
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : String(cause));
+        return false;
       }
     },
-    [refreshStatus, run],
+    [authorEmail, authorName, refreshStatus, run, workdir],
   );
 
   const openCommit = useCallback(
@@ -294,27 +228,31 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
       setSelectedPath("");
       try {
         setDetail(
-          await run(
-            "commit-detail",
-            gitCommand(`show --stat --patch --format=fuller ${shellQuote(entry.sha)} --`),
+          await run("commit-detail", () =>
+            invoke<string>("mobile_git_commit_detail", { workdir, sha: entry.sha }),
           ),
         );
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : String(cause));
       }
     },
-    [run],
+    [run, workdir],
   );
 
   const commitNow = async () => {
     const message = commitMessage.trim();
-    if (!message || stagedCount === 0) return;
-    await mutate(
-      "commit",
-      gitCommand(`commit -m ${shellQuote(message)}`),
-      t("projectTools.gitReview.commitSuccessMessage"),
-    );
-    setCommitMessage("");
+    if (!canCommit) return;
+    if (
+      await mutate(
+        "commit",
+        "commit",
+        null,
+        t("projectTools.gitReview.commitSuccessMessage"),
+        message,
+      )
+    ) {
+      setCommitMessage("");
+    }
   };
   const commit = async (event: FormEvent) => {
     event.preventDefault();
@@ -323,7 +261,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
 
   const remoteOperation = async (operation: "fetch" | "pull" | "push") => {
     try {
-      await run(operation, gitCommand(operation));
+      await run(operation, () => invoke("mobile_git_remote", { workdir, operation }));
       setNotice(t(`projectTools.gitReview.${operation}SuccessMessage`));
       await refreshStatus();
       if (view === "history") await refreshHistory();
@@ -334,14 +272,10 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
   };
 
   const initializeRepository = async () => {
-    await mutate("init", gitCommand("init"), t("projectTools.gitReview.initSuccessMessage"));
+    await mutate("init", "init", null, t("projectTools.gitReview.initSuccessMessage"));
   };
 
-  const close = () => {
-    const id = activeRunIdRef.current;
-    if (id) void invoke("shell_cancel", { run_id: id }).catch(() => undefined);
-    onClose();
-  };
+  const close = () => onClose();
 
   if (!open) return null;
 
@@ -403,7 +337,8 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
             () =>
               mutate(
                 "stage",
-                gitCommand(`add -- ${shellQuote(selectedChange.path)}`),
+                "stage",
+                selectedChange.path,
                 t("projectTools.gitReview.stageChanges"),
               ),
             { enabled: !busy },
@@ -418,7 +353,8 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
             () =>
               mutate(
                 "unstage",
-                gitCommand(`restore --staged -- ${shellQuote(selectedChange.path)}`),
+                "unstage",
+                selectedChange.path,
                 t("projectTools.gitReview.unstageChanges"),
               ),
             { enabled: !busy },
@@ -434,9 +370,8 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
               () =>
                 mutate(
                   "discard",
-                  selectedChange.untracked
-                    ? `rm -f -- ${shellQuote(selectedChange.path)}`
-                    : gitCommand(`restore --worktree -- ${shellQuote(selectedChange.path)}`),
+                  "discard",
+                  selectedChange.path,
                   t("projectTools.gitReview.discardSuccessMessage"),
                 ),
               { enabled: !busy, destructive: true },
@@ -522,6 +457,40 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
           })),
         });
       }
+      if (needsIdentity) {
+        content.push({
+          id: "git-identity",
+          kind: "VStack",
+          children: [
+            {
+              id: "git-author-name",
+              kind: "TextInput",
+              label: t("chat.mobileGit.authorName"),
+              value: authorName,
+              disabled: !!busy,
+              action: bind(
+                "git-author-name",
+                (value) => setAuthorName(value as string),
+                (value) => typeof value === "string",
+                !busy,
+              ),
+            },
+            {
+              id: "git-author-email",
+              kind: "TextInput",
+              label: t("chat.mobileGit.authorEmail"),
+              value: authorEmail,
+              disabled: !!busy,
+              action: bind(
+                "git-author-email",
+                (value) => setAuthorEmail(value as string),
+                (value) => typeof value === "string",
+                !busy,
+              ),
+            },
+          ],
+        });
+      }
       content.push({
         id: "git-commit-row",
         kind: "HStack",
@@ -541,7 +510,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
             ),
           },
           button("git-commit", t("projectTools.gitReview.commit"), commitNow, {
-            enabled: !busy && stagedCount > 0 && !!commitMessage.trim(),
+            enabled: !busy && canCommit,
             prominent: true,
           }),
         ],
@@ -778,7 +747,8 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
                     onClick={() =>
                       void mutate(
                         "stage",
-                        gitCommand(`add -- ${shellQuote(selectedChange.path)}`),
+                        "stage",
+                        selectedChange.path,
                         t("projectTools.gitReview.stageChanges"),
                       )
                     }
@@ -791,7 +761,8 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
                     onClick={() =>
                       void mutate(
                         "unstage",
-                        gitCommand(`restore --staged -- ${shellQuote(selectedChange.path)}`),
+                        "unstage",
+                        selectedChange.path,
                         t("projectTools.gitReview.unstageChanges"),
                       )
                     }
@@ -807,11 +778,8 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
                         onClick={() =>
                           void mutate(
                             "discard",
-                            selectedChange.untracked
-                              ? `rm -f -- ${shellQuote(selectedChange.path)}`
-                              : gitCommand(
-                                  `restore --worktree -- ${shellQuote(selectedChange.path)}`,
-                                ),
+                            "discard",
+                            selectedChange.path,
                             t("projectTools.gitReview.discardSuccessMessage"),
                           )
                         }
@@ -938,38 +906,57 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
               )}
             </VStack>
           </StackItem>
-          <HStack
+          <VStack
             as="form"
             gap={2}
-            vAlign="end"
             padding={3}
             onSubmit={(event) => void commit(event)}
             className="shrink-0 border-t border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)] pb-[calc(var(--spacing-3)+env(safe-area-inset-bottom,0px))]"
           >
-            <StackItem size="fill">
-              <TextInput
-                label={t("projectTools.gitReview.commitMessagePlaceholder")}
-                isLabelHidden
-                value={commitMessage}
-                onChange={setCommitMessage}
-                isDisabled={Boolean(busy) || stagedCount === 0}
-                disabledMessage={
-                  stagedCount === 0 ? t("projectTools.gitReview.noStagedChanges") : undefined
-                }
-                placeholder={t("projectTools.gitReview.commitMessagePlaceholder")}
+            {needsIdentity ? (
+              <VStack gap={2}>
+                <TextInput
+                  label={t("chat.mobileGit.authorName")}
+                  value={authorName}
+                  onChange={setAuthorName}
+                  isDisabled={Boolean(busy)}
+                  size="sm"
+                />
+                <TextInput
+                  label={t("chat.mobileGit.authorEmail")}
+                  value={authorEmail}
+                  onChange={setAuthorEmail}
+                  isDisabled={Boolean(busy)}
+                  size="sm"
+                />
+              </VStack>
+            ) : null}
+            <HStack gap={2} vAlign="end" width="100%">
+              <StackItem size="fill">
+                <TextInput
+                  label={t("projectTools.gitReview.commitMessagePlaceholder")}
+                  isLabelHidden
+                  value={commitMessage}
+                  onChange={setCommitMessage}
+                  isDisabled={Boolean(busy) || stagedCount === 0}
+                  disabledMessage={
+                    stagedCount === 0 ? t("projectTools.gitReview.noStagedChanges") : undefined
+                  }
+                  placeholder={t("projectTools.gitReview.commitMessagePlaceholder")}
+                  size="lg"
+                  width="100%"
+                />
+              </StackItem>
+              <Button
+                type="submit"
+                label={t("projectTools.gitReview.commit")}
+                variant="primary"
                 size="lg"
-                width="100%"
+                isLoading={busy === "commit"}
+                isDisabled={Boolean(busy) || !canCommit}
               />
-            </StackItem>
-            <Button
-              type="submit"
-              label={t("projectTools.gitReview.commit")}
-              variant="primary"
-              size="lg"
-              isLoading={busy === "commit"}
-              isDisabled={Boolean(busy) || stagedCount === 0 || !commitMessage.trim()}
-            />
-          </HStack>
+            </HStack>
+          </VStack>
         </>
       ) : (
         <StackItem size="fill" isScrollable>

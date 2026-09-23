@@ -5,6 +5,8 @@ pub mod chat_file_links;
 pub mod checkpoint;
 #[cfg(desktop)]
 pub mod git;
+#[cfg(mobile)]
+pub mod mobile_git;
 #[cfg(desktop)]
 pub mod root_grants;
 #[cfg(desktop)]

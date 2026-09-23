@@ -61,6 +61,8 @@ pub use workspace_commands::chat_file_links;
 pub use workspace_commands::checkpoint;
 #[cfg(desktop)]
 pub use workspace_commands::git;
+#[cfg(mobile)]
+pub use workspace_commands::mobile_git;
 #[cfg(desktop)]
 pub use workspace_commands::root_grants;
 #[cfg(desktop)]
