@@ -1,4 +1,5 @@
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
+import { generateDiffFile } from "@git-diff-view/file";
 import { invoke } from "@xgent/runtime";
 import {
   type MutableRefObject,
@@ -123,16 +124,16 @@ function toolEvidenceNodes(
   const details = result.details;
   if (details && typeof details === "object" && "kind" in details && details.kind === "edit") {
     const edit = details as EditResultDetails;
-    const removed = edit.oldPreview?.split(/\r?\n/).map((line) => `- ${line}`) ?? [];
-    const added = edit.newPreview?.split(/\r?\n/).map((line) => `+ ${line}`) ?? [];
-    if (removed.length || added.length) {
+    if (edit.oldPreview || edit.newPreview) {
       const path = edit.displayPath || edit.path;
+      const diff = generateDiffFile(path, edit.oldPreview, path, edit.newPreview, "txt", "txt");
+      diff.initRaw();
       nodes.push({
         id: `${prefix}:diff`,
         kind: "CodeBlock",
         label: path,
         language: "diff",
-        text: [`--- ${path}`, `+++ ${path}`, ...removed, ...added].join("\n"),
+        text: diff._diffList.join("\n"),
       });
     }
   } else if (

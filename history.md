@@ -53,6 +53,20 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Enabled resumable Bash sessions on paired LAN desktops so package installs and other long commands use desktop session start/wait/stop rather than a single request capped by the LAN RPC timeout.
 - Linked the iOS app target with SDK zlib and iconv for the vendored libgit2 static archive after release CI reached final Xcode linking and reported undefined `_crc32`, `_deflate`, and `_iconv` symbols.
 - Added a release template assertion for the iOS final-linker flags so future Tauri template regeneration retains the libgit2 system libraries.
+- Added desktop-only Cua Driver install preview, manifest/path probe, and bounded streaming installer commands based on the `xx` service and the current official installer locations; registered them with Tauri while keeping the built-in engine separate.
+- Connected the existing CUA driver install action to an exact-command confirmation, live installer progress, manifest validation, and automatic stdio MCP configuration; installation errors remain visible in the existing settings section.
+- Localized the CUA installation confirmation and outcome text in Chinese and English without changing the settings layout.
+- Kept iOS Skills opened from settings in the settings sheet, and made MCP add/edit/store configuration replace the current presentation document instead of mounting nested sheets; chat MCP stays full-screen.
+- Made the iOS Skills detail dismissal return to its list within the same settings sheet, and limited the external CUA installer module to desktop targets.
+- Applied the installed Biome formatter to the CUA settings, mobile MCP presentation, and new translations after the first local lint pass reported formatting changes; TypeScript and native mapping checks passed.
+- Allowed the mobile settings MCP editor to offer stdio only when the same paired LAN PC command host used by the chat MCP hub is ready; network MCP remains available locally without a host.
+- Gave iOS MCP and Skills pages in the settings sheet the existing back navigation action at both list and detail levels, so child forms return within the same sheet instead of relying on a close affordance.
+- Kept the chat MCP full-screen editor's existing close control while reserving the new Back action for settings-sheet routes, avoiding a duplicate button in root content.
+- Applied Biome's one requested line wrap to the Skills back action after the final lint pass; TypeScript and native component mapping had passed, and the non-native suite is still running.
+- Updated the existing mobile navigation regression after the full non-native suite exposed its obsolete literal `mode: "root"` assertion; it now checks chat root, settings sheet, and a single MCP native surface.
+- Replaced the iOS Edit detail's whole-snippet remove/add display with the actual unified line diff produced by the same installed `@git-diff-view/file` engine used in the desktop transcript; the existing SwiftUI CodeBlock remains the renderer.
+- Extended the native chat evidence test with unchanged context lines, so it rejects the previous false whole-snippet deletion/addition while checking that activity and transcript share the same diff.
+- Adjusted the diff assertion to the library's actual unified patch format (`-old`/`+new`) and applied Biome's compact call formatting after the focused check revealed only those mismatches.
 - Applied Biome's two import/format corrections after TypeScript and native presentation checks passed; remaining consolidated checks continue after this fix.
 
 ## Evidence and decisions
@@ -79,12 +93,12 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 ## Remaining
 - Verify the desktop selector fix in a new package; inspect other memory entry points and wipe behavior only when a safe reproduction is available.
 - Inspect and complete mobile SSH, Git review, resource library, files, MCP/Skills store, permissions, and routing against `yy`.
-- Verify native SSH, Git, SwiftUI Quick Look, and file import in a new Android/iOS release build and on devices; correct compile or runtime failures.
-- Push this follow-up and track CI/release; continue deeper `xx`/`yy` function review, MCP/Skills store validation, and rendered/mobile runtime checks. The desktop selector fix still needs a new client package after the existing running process can be safely closed.
+- Verify native SSH, Git, SwiftUI Quick Look, and file import on devices; Android/iOS compilation now passes in release `35910177777`, but device behavior still needs runtime evidence.
+- Continue deeper `xx`/`yy` function review, MCP/Skills store validation, and rendered/mobile runtime checks. The desktop selector fix still needs a new client package after the existing running process can be safely closed. Push only once the entire goal is complete, per the user's latest instruction.
 - Audit the user's compound mobile workflow end to end: browser research, health/nearby-device permissions and data, MCP/Skill execution, workspace file writes/diffs, optional shell package installation, LAN PC/cloud delegation, and chat/activity traces. Repair concrete missing edges without importing reference UI/gateway code.
 
 ## Touched files
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
-- CI passed at `a76d1e2`, `7f8838b`, `035f7cf`, and `e9c2d37`. This batch passed `pnpm check`, `pnpm native:check`, `pnpm lint`, and `pnpm test:non-native` (1215/1215). After the iOS template/prompt edits, the release workflow test passed 11/11 and targeted mobile/LAN/native chat tests passed 16/16; TypeScript and lint also passed again. Release `35907503074` passed Windows, Linux, and macOS Apple Silicon, failed iOS final link on zlib/iconv (fix pending CI), and still runs Android/macOS Intel.
+- CI passed at `a76d1e2`, `7f8838b`, `035f7cf`, `e9c2d37`, and `4d01a27`. Current unpushed batch: `pnpm check`, `pnpm native:check`, and `pnpm lint` passed; the full non-native suite had one obsolete presentation assertion, now corrected, and the focused native/chat tests pass 14/14. Release `35910177777` passed Android, iOS, Windows, Linux, and macOS Apple Silicon; macOS Intel was still running at the last poll. No Cargo or build commands were run locally.

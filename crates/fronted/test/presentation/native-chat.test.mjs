@@ -209,7 +209,11 @@ test("native chat and activity preserve file edit evidence from tool results", a
         toolResult: {
           role: "toolResult", toolCallId: "edit-1", toolName: "Edit",
           content: [{ type: "text", text: "File edited successfully" }],
-          details: { kind: "edit", path: "report.md", oldPreview: "old line", newPreview: "new line" },
+          details: {
+            kind: "edit", path: "report.md",
+            oldPreview: "unchanged\nold line\ncontext",
+            newPreview: "unchanged\nnew line\ncontext",
+          },
           isError: false, timestamp: 1,
         },
       },
@@ -220,8 +224,10 @@ test("native chat and activity preserve file edit evidence from tool results", a
   assert.equal(tool.kind, "ToolCall");
   assert.equal(tool.children.find((node) => node.language === "text").text, "File edited successfully");
   const diff = tool.children.find((node) => node.language === "diff");
-  assert.match(diff.text, /- old line/);
-  assert.match(diff.text, /\+ new line/);
+  assert.match(diff.text, /-old line/);
+  assert.match(diff.text, /\+new line/);
+  assert.match(diff.text, / unchanged/);
+  assert.doesNotMatch(diff.text, /[-+] unchanged/);
   assert.equal((await h.dispatch("activity-preview")).ok, true);
   h.render();
   const activity = h.documents().find((document) => document.title === "chat.activity.title");

@@ -7,7 +7,7 @@ import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MoreHorizontal, Plug, Plus, Server } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import {
@@ -36,6 +36,7 @@ type MobileMcpPageProps = {
   setSettings: (updater: (prev: AppSettings) => AppSettings) => void;
   onOpenSidebar: () => void;
   allowStdio: boolean;
+  presentationMode?: "root" | "sheet";
 };
 
 type EditingState = { mode: "add" } | { mode: "edit"; index: number; server: McpServerConfig };
@@ -233,6 +234,13 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
 
   if (isApplePresentationRuntime()) {
     const root = presentationControls();
+    if (props.presentationMode === "sheet") {
+      root.handlers.set("close", {
+        enabled: true,
+        accepts: (value) => value === null,
+        run: props.onOpenSidebar,
+      });
+    }
     const installedNodes: PresentationNode[] = visibleServers.map(({ server, index }) => ({
       id: `mcp-card:${index}`,
       kind: "Card",
@@ -325,6 +333,9 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
       prominent: true,
     };
     const rootNodes: PresentationNode[] = [
+      ...(props.presentationMode === "sheet"
+        ? [root.action("back", t("settings.close"), props.onOpenSidebar)]
+        : []),
       {
         id: "mcp-hub-layout",
         kind: "VStack",
@@ -458,7 +469,11 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
       },
     ];
 
-    let editor: ReactNode = null;
+    let activeNodes = rootNodes;
+    let activeHandlers = root.handlers;
+    let activeTitle = "MCP";
+    let dismissAction: string | undefined =
+      props.presentationMode === "sheet" ? "close" : undefined;
     if (editing && nativeDraft) {
       const sheet = presentationControls();
       const patchDraft = (patch: Partial<McpServerConfig>) =>
@@ -577,24 +592,17 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
           ],
         },
       ];
-      editor = (
-        <NativeSurface
-          document={{
-            mode: "sheet",
-            title: editing.mode === "add" ? t("mcpHub.add") : nativeDraft.id,
-            appearance: props.settings.theme,
-            formFactor: "mobile",
-            theme: createNativePresentationTheme(props.settings, true, "workspaceTools"),
-            nodes: editorNodes,
-            dismissAction: "close",
-          }}
-          handlers={sheet.handlers}
-          onError={(error) => setNativeError(String(error))}
-        />
-      );
+      activeNodes = [
+        ...(props.presentationMode === "sheet"
+          ? [sheet.action("back", t("settings.close"), closeEditor)]
+          : []),
+        ...editorNodes,
+      ];
+      activeHandlers = sheet.handlers;
+      activeTitle = editing.mode === "add" ? t("mcpHub.add") : nativeDraft.id;
+      dismissAction = "close";
     }
 
-    let configEditor: ReactNode = null;
     if (configuring) {
       const sheet = presentationControls();
       const patchServer = (patch: Partial<McpServerConfig>) =>
@@ -615,91 +623,79 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
         accepts: (value) => value === null,
         run: close,
       });
-      configEditor = (
-        <NativeSurface
-          document={{
-            mode: "sheet",
-            title: t("mcpHub.storeConfigureTitle"),
-            appearance: props.settings.theme,
-            formFactor: "mobile",
-            theme: createNativePresentationTheme(props.settings, true, "workspaceTools"),
-            dismissAction: "close",
-            nodes: [
-              sheet.group("mcp-store-connection", t("mcpHub.storeConfigureTitle"), [
-                sheet.input(
-                  "mcp-store-id",
-                  t("mcpHub.serverName"),
-                  configuring.draft.server.id,
-                  (id) => patchServer({ id }),
-                ),
-                configuring.draft.server.transport === "stdio"
-                  ? sheet.input(
-                      "mcp-store-command",
-                      t("mcpHub.command"),
-                      configuring.draft.server.command || "",
-                      (command) => patchServer({ command }),
-                    )
-                  : sheet.input("mcp-store-url", "URL", configuring.draft.server.url || "", (url) =>
-                      patchServer({ url }),
-                    ),
-              ]),
-              ...configuring.draft.requiredConfig.map((input) =>
-                sheet.input(
-                  `mcp-store-config:${mcpRegistryConfigInputKey(input)}`,
-                  input.label || input.name,
-                  configValues[mcpRegistryConfigInputKey(input)] || "",
-                  (value) =>
-                    setConfigValues((current) => ({
-                      ...current,
-                      [mcpRegistryConfigInputKey(input)]: value,
-                    })),
-                  input.secret,
-                ),
+      activeNodes = [
+        ...(props.presentationMode === "sheet"
+          ? [sheet.action("back", t("settings.close"), close)]
+          : []),
+        sheet.group("mcp-store-connection", t("mcpHub.storeConfigureTitle"), [
+          sheet.input("mcp-store-id", t("mcpHub.serverName"), configuring.draft.server.id, (id) =>
+            patchServer({ id }),
+          ),
+          configuring.draft.server.transport === "stdio"
+            ? sheet.input(
+                "mcp-store-command",
+                t("mcpHub.command"),
+                configuring.draft.server.command || "",
+                (command) => patchServer({ command }),
+              )
+            : sheet.input("mcp-store-url", "URL", configuring.draft.server.url || "", (url) =>
+                patchServer({ url }),
               ),
-              ...(registryError
-                ? [
-                    {
-                      id: "mcp-store-config-error",
-                      kind: "Banner" as const,
-                      label: registryError,
-                      status: "error" as const,
-                    },
-                  ]
-                : []),
+        ]),
+        ...configuring.draft.requiredConfig.map((input) =>
+          sheet.input(
+            `mcp-store-config:${mcpRegistryConfigInputKey(input)}`,
+            input.label || input.name,
+            configValues[mcpRegistryConfigInputKey(input)] || "",
+            (value) =>
+              setConfigValues((current) => ({
+                ...current,
+                [mcpRegistryConfigInputKey(input)]: value,
+              })),
+            input.secret,
+          ),
+        ),
+        ...(registryError
+          ? [
               {
-                ...sheet.action(
-                  "mcp-store-config-save",
-                  t("mcpHub.storeConfigureSubmit"),
-                  commitRegistryConfig,
-                ),
-                prominent: true,
+                id: "mcp-store-config-error",
+                kind: "Banner" as const,
+                label: registryError,
+                status: "error" as const,
               },
-              sheet.action("mcp-store-config-cancel", t("settings.cancel"), close),
-            ],
-          }}
-          handlers={sheet.handlers}
-          onError={(error) => setRegistryError(String(error))}
-        />
-      );
+            ]
+          : []),
+        {
+          ...sheet.action(
+            "mcp-store-config-save",
+            t("mcpHub.storeConfigureSubmit"),
+            commitRegistryConfig,
+          ),
+          prominent: true,
+        },
+        sheet.action("mcp-store-config-cancel", t("settings.cancel"), close),
+      ];
+      activeHandlers = sheet.handlers;
+      activeTitle = t("mcpHub.storeConfigureTitle");
+      dismissAction = "close";
     }
 
     return (
-      <>
-        <NativeSurface
-          document={{
-            mode: "root",
-            title: "MCP",
-            appearance: props.settings.theme,
-            formFactor: "mobile",
-            theme: createNativePresentationTheme(props.settings, true, "workspaceTools"),
-            nodes: rootNodes,
-          }}
-          handlers={root.handlers}
-          onError={(error) => setNativeError(String(error))}
-        />
-        {editor}
-        {configEditor}
-      </>
+      <NativeSurface
+        document={{
+          mode: props.presentationMode ?? "root",
+          title: activeTitle,
+          appearance: props.settings.theme,
+          formFactor: "mobile",
+          theme: createNativePresentationTheme(props.settings, true, "workspaceTools"),
+          nodes: activeNodes,
+          dismissAction,
+        }}
+        handlers={activeHandlers}
+        onError={(error) =>
+          configuring ? setRegistryError(String(error)) : setNativeError(String(error))
+        }
+      />
     );
   }
 

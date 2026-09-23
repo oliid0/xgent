@@ -70,6 +70,7 @@ import {
 import { SoulSection } from "../pages/settings/SoulSection";
 import { SshSettingsSection } from "../pages/settings/SshSettingsSection";
 import type { SectionId, SettingsPageProps } from "../pages/settings/types";
+import { isLanPcCommandHostReady } from "../runtime/lanPcCommandHost";
 import { presentationControls } from "./controls";
 import { NativeSurface } from "./NativeSurface";
 import { createNativePresentationTheme } from "./nativeTheme";
@@ -349,7 +350,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         settings={settings}
         setSettings={setSettings}
         onOpenSidebar={returnToSettings}
-        presentationMode={nativeMobile ? "root" : "sheet"}
+        presentationMode="sheet"
       />
     );
   if (page === "mcp" && nativeMobile)
@@ -358,7 +359,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         settings={settings}
         setSettings={setSettings}
         onOpenSidebar={returnToSettings}
-        allowStdio={false}
+        allowStdio={isLanPcCommandHostReady()}
+        presentationMode="sheet"
       />
     );
   if (page === "ssh")

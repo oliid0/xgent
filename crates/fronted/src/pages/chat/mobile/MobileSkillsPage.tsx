@@ -307,7 +307,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
     c.handlers.set("close", {
       enabled: true,
       accepts: (value) => value === null,
-      run: props.onOpenSidebar,
+      run: selected ? () => setSelected(null) : props.onOpenSidebar,
     });
     const contentNodes: PresentationNode[] = selected
       ? [
@@ -562,7 +562,14 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
           appearance: props.settings.theme,
           formFactor: "mobile",
           theme: createNativePresentationTheme(props.settings, true, "workspaceTools"),
-          nodes: contentNodes,
+          nodes: [
+            c.action(
+              "back",
+              t("settings.close"),
+              selected ? () => setSelected(null) : props.onOpenSidebar,
+            ),
+            ...contentNodes,
+          ],
           dismissAction: "close",
         }}
         handlers={c.handlers}

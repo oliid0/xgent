@@ -50,7 +50,12 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
       "外部方式使用已安装的 CUA driver 或已配置的 MCP 服务。选择后直接使用该服务提供的工具，不会自动切回内置引擎。",
     "settings.cua.driverPath": "外部 cua-driver 可执行文件路径",
     "settings.cua.addDriver": "配置并选择外部 driver",
-    "settings.cua.installDriver": "打开外部 driver 安装指南",
+    "settings.cua.installDriver": "安装外部 driver",
+    "settings.cua.installConfirmTitle": "安装 CUA driver",
+    "settings.cua.installConfirmDescription":
+      "确认后将从以下官方地址下载并执行安装脚本。请先检查完整命令：",
+    "settings.cua.installProbeFailed": "安装已结束，但未能验证 driver 或其 MCP 启动方式。",
+    "settings.cua.installComplete": "已安装并配置 CUA driver",
     "settings.cua.androidPermissions":
       "请在 Android 设置 > 无障碍中启用 Xgent Computer Use，然后刷新状态。",
     "settings.cua.openPermissions": "打开无障碍设置",
@@ -2924,7 +2929,13 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
       "Use an installed CUA driver or configured MCP service. Its native tools are exposed directly; failures do not silently switch to the built-in engine.",
     "settings.cua.driverPath": "External cua-driver executable path",
     "settings.cua.addDriver": "Configure and select external driver",
-    "settings.cua.installDriver": "Open external driver installation guide",
+    "settings.cua.installDriver": "Install external driver",
+    "settings.cua.installConfirmTitle": "Install CUA driver",
+    "settings.cua.installConfirmDescription":
+      "The official installer will be downloaded and run after confirmation. Review the full command:",
+    "settings.cua.installProbeFailed":
+      "Installation finished, but the driver or its MCP launch command could not be verified.",
+    "settings.cua.installComplete": "CUA driver installed and configured",
     "settings.cua.androidPermissions":
       "Enable Xgent Computer Use in Android Settings > Accessibility, then refresh status.",
     "settings.cua.openPermissions": "Open accessibility settings",
