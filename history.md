@@ -69,6 +69,11 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Applied Biome's requested proxy-port expression wrap; the TypeScript check passed after the proxy activation change.
 - Marked malformed proxy port input as invalid in the existing field feedback, matching the strict activation check.
 - Kept valid MCP servers available to chat when a separate enabled server has incomplete configuration; report that server through the existing load-error channel while preserving strict failure for scheduled runs.
+- Split paired-mobile MCP listing by transport: HTTP/SSE stays on the phone, stdio runs on the PC, and calls/cancellation follow the server's registered host.
+- Kept MCP run routing active until the awaited call settles and registered test/restart server routes for later status/stop actions.
+- Added a runtime transport regression covering mixed local/PC MCP listing, tool execution, cancellation, and test/status routing.
+- Corrected the route guard's TypeScript narrowing after the consolidated check identified the dynamic invocation argument as `object`.
+- Applied the installed Biome formatter to the MCP loader and LAN routing sources after the lint pass reported only formatting differences.
 - Extended the native chat evidence test with unchanged context lines, so it rejects the previous false whole-snippet deletion/addition while checking that activity and transcript share the same diff.
 - Adjusted the diff assertion to the library's actual unified patch format (`-old`/`+new`) and applied Biome's compact call formatting after the focused check revealed only those mismatches.
 - Applied Biome's two import/format corrections after TypeScript and native presentation checks passed; remaining consolidated checks continue after this fix.
@@ -105,4 +110,4 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
-- CI passed at `a76d1e2`, `7f8838b`, `035f7cf`, `e9c2d37`, and `4d01a27`. Current unpushed batch: `pnpm check`, `pnpm native:check`, and `pnpm lint` passed; the full non-native suite had one obsolete presentation assertion, now corrected, and the focused native/chat tests pass 14/14. Release `35910177777` passed Android, iOS, Windows, Linux, and macOS Apple Silicon; macOS Intel was still running at the last poll. No Cargo or build commands were run locally.
+- CI passed at `a76d1e2`, `7f8838b`, `035f7cf`, `e9c2d37`, and `4d01a27`. Current local batch: `pnpm check`, `pnpm native:check`, `pnpm lint`, and `pnpm test:non-native` passed (1,218 tests; Cargo suite skipped); MCP transport and loader tests passed 5/5. Release `35910177777` passed Android, iOS, Windows, Linux, and macOS Apple Silicon; macOS Intel was still running at the last poll. No Cargo or build commands were run locally. Push only after the whole goal is complete.

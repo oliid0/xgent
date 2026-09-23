@@ -143,8 +143,7 @@ export async function createMcpTools(params: {
 
   if (invalid.length > 0) {
     const lines = invalid.map((it) => `- ${it.label}: ${it.reason}`).join("\n");
-    const message =
-      `The following MCP server configurations are incomplete:\n${lines}\n\nPlease complete them in Settings -> MCP.`;
+    const message = `The following MCP server configurations are incomplete:\n${lines}\n\nPlease complete them in Settings -> MCP.`;
     if (params.loadFailureMode === "throw") throw new Error(message);
     params.onLoadError?.(message);
   }

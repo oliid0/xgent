@@ -54,6 +54,8 @@ const DELEGATED_EVENTS = new Set([
 ]);
 
 let commandHostConfig = DISABLED_CONFIG;
+const mcpServerOnPc = new Map<string, boolean>();
+const mcpRunOnPc = new Map<string, boolean>();
 
 function normalizePath(value: string) {
   return value.trim().replace(/[\\/]+$/, "");
@@ -90,6 +92,27 @@ function normalizeConfig(config?: LanPcCommandHostConfig): NormalizedLanPcComman
  */
 export function configureLanPcCommandHost(config?: LanPcCommandHostConfig) {
   commandHostConfig = normalizeConfig(config);
+  mcpServerOnPc.clear();
+  mcpRunOnPc.clear();
+}
+
+export function registerMcpServerRoutes(servers: Array<{ id: string; transport?: string }>) {
+  mcpServerOnPc.clear();
+  for (const server of servers) {
+    registerMcpServerRoute(server);
+  }
+}
+
+export function registerMcpServerRoute(server: { id: string; transport?: string }) {
+  mcpServerOnPc.set(server.id, !server.transport || server.transport === "stdio");
+}
+
+export function registerMcpRunRoute(runId: string, delegated: boolean) {
+  if (runId) mcpRunOnPc.set(runId, delegated);
+}
+
+export function clearMcpRunRoute(runId: string) {
+  mcpRunOnPc.delete(runId);
 }
 
 export function getLanPcCommandHostConfig() {
@@ -108,6 +131,34 @@ export function shouldDelegateCommandToLanPc(command: string, args?: RuntimeInvo
   if (!commandHostConfig.enabled || !commandHostConfig.remoteWorkdir) return false;
   const normalized = command.trim();
   if (!normalized || normalized.startsWith("lan_pc_") || normalized.startsWith("local_access_")) {
+    return false;
+  }
+  if (normalized.startsWith("mcp_")) {
+    if (normalized === "mcp_list_tools" && Array.isArray(args?.servers)) {
+      return (
+        args.servers.length > 0 &&
+        args.servers.every(
+          (server) =>
+            typeof server === "object" &&
+            server !== null &&
+            (server.transport === undefined || server.transport === "stdio"),
+        )
+      );
+    }
+    if (
+      (normalized === "mcp_test_server" || normalized === "mcp_restart_server") &&
+      typeof args?.server === "object" &&
+      args.server !== null
+    ) {
+      const server = args.server as { transport?: string };
+      return server.transport === undefined || server.transport === "stdio";
+    }
+    if (normalized === "mcp_cancel_tool" && typeof args?.run_id === "string") {
+      return mcpRunOnPc.get(args.run_id) === true;
+    }
+    if (typeof args?.server_id === "string") {
+      return mcpServerOnPc.get(args.server_id) === true;
+    }
     return false;
   }
   if (normalized.startsWith("fs_") && typeof args?.workdir === "string") {

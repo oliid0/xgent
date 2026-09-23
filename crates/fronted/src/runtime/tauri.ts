@@ -8,9 +8,14 @@ import {
 } from "@tauri-apps/plugin-opener";
 
 import {
+  clearMcpRunRoute,
   getLanPcCommandHostConfig,
+  isLanPcCommandHostReady,
   LAN_PC_RELAY_EVENT,
   prepareLanPcInvokeArgs,
+  registerMcpRunRoute,
+  registerMcpServerRoute,
+  registerMcpServerRoutes,
   shouldDelegateCommandToLanPc,
   shouldDelegateEventToLanPc,
 } from "./lanPcCommandHost";
@@ -32,16 +37,59 @@ export async function listenNativePlugin<T>(
 }
 
 export const tauriRuntime: XgentRuntime = {
-  invoke<T>(command: string, args?: RuntimeInvokeArgs) {
-    if (shouldDelegateCommandToLanPc(command, args)) {
-      const host = getLanPcCommandHostConfig();
-      return tauriInvoke<T>("lan_pc_invoke", {
-        base_url: host.baseUrl,
-        command,
-        args: prepareLanPcInvokeArgs(args),
-      });
+  async invoke<T>(command: string, args?: RuntimeInvokeArgs) {
+    if (command === "mcp_list_tools" && isLanPcCommandHostReady() && Array.isArray(args?.servers)) {
+      const servers = args.servers as Array<{ id: string; transport?: string }>;
+      registerMcpServerRoutes(servers);
+      const local = servers.filter(
+        (server) => server.transport !== undefined && server.transport !== "stdio",
+      );
+      const remote = servers.filter((server) => !server.transport || server.transport === "stdio");
+      if (local.length > 0 && remote.length > 0) {
+        const host = getLanPcCommandHostConfig();
+        const outcomes = await Promise.allSettled([
+          tauriInvoke<unknown[]>(command, { servers: local }),
+          tauriInvoke<unknown[]>("lan_pc_invoke", {
+            base_url: host.baseUrl,
+            command,
+            args: { servers: remote },
+          }),
+        ]);
+        const tools: unknown[] = [];
+        const errors: string[] = [];
+        for (const outcome of outcomes) {
+          if (outcome.status === "fulfilled") tools.push(...outcome.value);
+          else errors.push(String(outcome.reason));
+        }
+        if (errors.length === outcomes.length) throw new Error(errors.join("\n"));
+        if (errors.length > 0) console.warn("[MCP] one command host could not list tools", errors);
+        return tools as T;
+      }
     }
-    return tauriInvoke<T>(command, args);
+    if (
+      (command === "mcp_test_server" || command === "mcp_restart_server") &&
+      typeof args?.server === "object" &&
+      args.server !== null
+    ) {
+      registerMcpServerRoute(args.server as { id: string; transport?: string });
+    }
+    const delegated = shouldDelegateCommandToLanPc(command, args);
+    const runId =
+      command === "mcp_call_tool" && typeof args?.run_id === "string" ? args.run_id : "";
+    if (runId) registerMcpRunRoute(runId, delegated);
+    try {
+      if (delegated) {
+        const host = getLanPcCommandHostConfig();
+        return await tauriInvoke<T>("lan_pc_invoke", {
+          base_url: host.baseUrl,
+          command,
+          args: prepareLanPcInvokeArgs(args),
+        });
+      }
+      return await tauriInvoke<T>(command, args);
+    } finally {
+      if (runId) clearMcpRunRoute(runId);
+    }
   },
 
   async listen<T>(event: string, handler: (event: RuntimeEvent<T>) => void) {
