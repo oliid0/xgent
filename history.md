@@ -25,9 +25,15 @@ Repair desktop settings and composer, Android compilation, and iOS navigation wh
 - Replaced the mobile file header's sandbox absolute path with the workspace folder name and removed the root row's repeated absolute path; file operations still use the original cwd and relative paths.
 - Applied the four formatting changes requested by Biome in the scheduled-task, Hooks, and native-settings routes.
 - Updated two existing native presentation tests to assert the requested full-page iOS More route and in-stack composer layout instead of their obsolete menu/inset behavior.
-- Replaced mobile SSH shell invocation and credential temp files with a native `russh` session; wired authentication, known-host trust, bounded output, timeout, duplicate-run protection, and cancellation. Reviewed and formatted the integration; native CI validation remains pending.
+- Replaced mobile SSH shell invocation and credential temp files with a native `russh` session; wired authentication, known-host trust, bounded output, timeout, duplicate-run protection, and cancellation. Mobile builds compile the SSH implementation up to the later Git source errors.
 - Added a mobile-only libgit2 backend for local repository status, history, diffs, commit details, stage, unstage, discard, init, and commit. Rewired SwiftUI/Astryx mobile Git review to native commands. Added HTTPS fetch/push and clean fast-forward pull using the native GitHub token vault. Missing Git author identity now shows name/email fields. Mutations reject worktree path escapes and empty commits; updated the old shell-dependent hint.
 - Bound Android's vendored OpenSSL cross-build to the NDK `llvm-ranlib` after release CI failed because its inferred `aarch64-linux-android-ranlib` executable does not exist.
+- Added a workspace-scoped, atomic native file import command for mobile Files: validates the selected filename and destination, caps decoded content, avoids overwrites with numbered names, and writes bytes without shell access.
+- Exposed the existing iOS SwiftUI picker as a file-only option for Files and added an Android Astryx file-tree import action with a post-import refresh hook.
+- Wired both mobile file pickers to the native atomic import command, with 9-file/20 MB limits, selected-folder targeting, duplicate-safe names, visible errors, and refreshed tree selection.
+- Added a focused Rust test proving binary imports preserve existing files and reject traversal through both folder and filename inputs.
+- Fixed mobile `git2` return-type handling from Android/iOS compiler logs (`StatusEntry::path`, `Reference::name/shorthand`, `Commit::summary`); both mobile release jobs reached the same nine source errors after the NDK fix.
+- Applied Biome's two import/format corrections after TypeScript and native presentation checks passed; remaining consolidated checks continue after this fix.
 
 ## Evidence and decisions
 - Started from clean `main` at `3175331`; inspected prior history, screenshots, `xx`, `yy`, Astryx 0.6 source/MCP/CLI, Swift documentation, and release logs.
@@ -41,11 +47,11 @@ Repair desktop settings and composer, Android compilation, and iOS navigation wh
 ## Remaining
 - Verify the desktop selector fix in a new package; inspect other memory entry points and wipe behavior only when a safe reproduction is available.
 - Inspect and complete mobile SSH, Git review, resource library, files, MCP/Skills store, permissions, and routing against `yy`.
-- Verify native SSH and Git in a new Android/iOS release build after the NDK archiver fix; correct compile or runtime failures.
-- Inspect the final diff, push the Git implementation, and track CI/release workflows. The consolidated local checks passed: `pnpm check`, `pnpm native:check`, `pnpm lint`, and `pnpm test:non-native` (1211/1211).
+- Verify native SSH and Git in a new Android/iOS release build after the `git2` type fixes; correct compile or runtime failures.
+- Push and track CI/release for mobile Git and file import; then continue deeper `xx`/`yy` function review and rendered/mobile runtime checks. Consolidated local checks passed: `pnpm check`, `pnpm native:check`, `pnpm lint`, `pnpm test:non-native` (1211/1211).
 
 ## Touched files
-- Prior files above, plus `crates/fronted/src-tauri/{Cargo.toml,src/{lib.rs,commands/{mod.rs,runtime/{mod.rs,mobile_ssh.rs,shell.rs},workspace/{mod.rs,mobile_git.rs}}}}`, `crates/fronted/src/{i18n/config.ts,pages/chat/mobile/MobileGitReviewPanel.tsx}`; `history.md`.
+- Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
-- `a76d1e2` CI passed frontend, diff, architecture, workflow checks and Rust tests. Android release `35891447482` failed at vendored OpenSSL's missing cross `ranlib`; iOS and desktop release jobs remain in progress. Consolidated local checks passed before the workflow edit.
+- CI passed at `a76d1e2` and `7f8838b`. Release `35892585519` passed all desktop targets but Android/iOS exposed nine `git2` return-type errors now fixed locally. Android passed the prior NDK `ranlib` step. Local TypeScript, native mapping, lint, and 1211 non-Cargo tests passed for the current source edits; new CI is pending.

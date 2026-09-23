@@ -3436,6 +3436,96 @@ pub async fn fs_write_binary(
     .await
 }
 
+/// Import a device-selected file into an existing workspace folder without
+/// replacing an existing entry. The native file picker only supplies bytes;
+/// this path is resolved and checked on the Rust side.
+fn fs_import_file_sync(
+    workdir: String,
+    directory: String,
+    file_name: String,
+    content_base64: String,
+) -> Result<WriteBinaryResponse, FsCommandError> {
+    let wd = canonicalize_workdir(&workdir)?;
+    let result = (|| -> Result<WriteBinaryResponse, FsError> {
+        let name = file_name.trim();
+        if name.is_empty()
+            || name == "."
+            || name == ".."
+            || name.chars().any(|character| matches!(character, '/' | '\\' | '\0'))
+        {
+            return Err(FsError::InvalidRelPath(file_name));
+        }
+        let rel_dir = sanitize_optional_rel_path(Some(directory))?.unwrap_or_default();
+        let parent = ensure_within_workdir_existing(&wd, &wd.join(&rel_dir))?;
+        if !parent.is_dir() {
+            return Err(FsError::NotADirectory {
+                path: logical_rel_path(&rel_dir),
+                entry_kind: "file".to_string(),
+            });
+        }
+        // Validate the name with the same reserved-component rules as all fs commands.
+        sanitize_rel_path(name)?;
+        let compact = compact_base64(&content_base64);
+        let bytes = BASE64_STANDARD
+            .decode(compact.as_bytes())
+            .map_err(|error| FsError::Other(format!("Imported content is not valid base64: {error}")))?;
+        if bytes.len() > READ_MAX_PREVIEW_BYTES {
+            return Err(FsError::TooLarge {
+                path: logical_rel_path(&rel_dir.join(name)),
+                message: format!("Imported file exceeds {READ_MAX_PREVIEW_BYTES} bytes"),
+            });
+        }
+
+        let source = Path::new(name);
+        let stem = source.file_stem().and_then(|part| part.to_str()).unwrap_or(name);
+        let extension = source.extension().and_then(|part| part.to_str());
+        for index in 0..=9999 {
+            let candidate = if index == 0 {
+                name.to_string()
+            } else if let Some(extension) = extension {
+                format!("{stem} ({index}).{extension}")
+            } else {
+                format!("{stem} ({index})")
+            };
+            let target = parent.join(&candidate);
+            let mut file = match fs::OpenOptions::new().write(true).create_new(true).open(&target) {
+                Ok(file) => file,
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(FsError::Io(error)),
+            };
+            if let Err(error) = file.write_all(&bytes) {
+                drop(file);
+                let _ = fs::remove_file(&target);
+                return Err(FsError::Io(error));
+            }
+            drop(file);
+            let metadata = fs::metadata(&target)?;
+            return Ok(WriteBinaryResponse {
+                path: logical_rel_path(&rel_dir.join(candidate)),
+                bytes_written: bytes.len(),
+                mtime_ms: metadata_mtime_ms(&metadata),
+                content_hash: hash_bytes(&bytes),
+                file_id: Some(file_identity(&metadata, &target)),
+            });
+        }
+        Err(FsError::Other("Too many files with the same name".to_string()))
+    })();
+    result.map_err(|error| FsCommandError::from(error).with_workdir(&wd))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn fs_import_file(
+    workdir: String,
+    directory: String,
+    file_name: String,
+    content_base64: String,
+) -> Result<WriteBinaryResponse, FsCommandError> {
+    run_blocking_fs("fs_import_file", move || {
+        fs_import_file_sync(workdir, directory, file_name, content_base64)
+    })
+    .await
+}
+
 #[tauri::command(rename_all = "snake_case")]
 pub async fn fs_write_docx_text(
     workdir: String,
@@ -5178,6 +5268,45 @@ mod tests {
             Ok(skills_root.to_path_buf())
         })
         .expect("scoped path should resolve")
+    }
+
+    #[test]
+    fn imported_files_keep_existing_bytes_and_reject_path_escape() {
+        let workdir = unique_test_workdir("mobile-file-import");
+        fs::create_dir_all(workdir.join("docs")).expect("create workspace folder");
+        let path = workdir.display().to_string();
+        let content = BASE64_STANDARD.encode([0, 1, 255]);
+
+        let first = fs_import_file_sync(
+            path.clone(),
+            "docs".to_string(),
+            "data.bin".to_string(),
+            content.clone(),
+        )
+        .expect("first import");
+        let second = fs_import_file_sync(
+            path.clone(),
+            "docs".to_string(),
+            "data.bin".to_string(),
+            content,
+        )
+        .expect("duplicate import");
+        assert_eq!(first.path, "docs/data.bin");
+        assert_eq!(second.path, "docs/data (1).bin");
+        assert_eq!(fs::read(workdir.join(&first.path)).unwrap(), [0, 1, 255]);
+        assert_eq!(fs::read(workdir.join(&second.path)).unwrap(), [0, 1, 255]);
+
+        for (directory, name) in [("../outside", "safe.bin"), ("docs", "../escape.bin")] {
+            let error = fs_import_file_sync(
+                path.clone(),
+                directory.to_string(),
+                name.to_string(),
+                BASE64_STANDARD.encode([1]),
+            )
+            .expect_err("path escape must fail");
+            assert_eq!(error.code, FsErrorCode::InvalidPath);
+        }
+        let _ = fs::remove_dir_all(workdir);
     }
 
     #[test]

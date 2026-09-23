@@ -54,8 +54,20 @@ type ContextMenuState = {
   path: string;
 };
 
-export function FileTreePanel(props: { active: boolean; touchActions?: boolean }) {
-  const { active, touchActions = false } = props;
+export function FileTreePanel(props: {
+  active: boolean;
+  touchActions?: boolean;
+  onImportFiles?: (directory: string) => void;
+  importBusy?: boolean;
+  importRevision?: number;
+}) {
+  const {
+    active,
+    touchActions = false,
+    onImportFiles,
+    importBusy = false,
+    importRevision = 0,
+  } = props;
   const context = useWorkspaceToolsContext();
   const { projectPathKey, cwd, fileTree } = context;
   const syncState = fileTree.state;
@@ -130,6 +142,12 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
   const selectedNode = nodes[syncState.selectedPath] ?? nodes[ROOT_PATH];
   const selectedPath = selectedNode?.path ?? ROOT_PATH;
   const canMutate = initialized && Boolean(projectPathKey && cwd);
+  const lastImportRevisionRef = useRef(importRevision);
+  useEffect(() => {
+    if (lastImportRevisionRef.current === importRevision) return;
+    lastImportRevisionRef.current = importRevision;
+    refreshVisible();
+  }, [importRevision, refreshVisible]);
 
   const selectPath = useCallback(
     (path: string) => {
@@ -567,6 +585,18 @@ export function FileTreePanel(props: { active: boolean; touchActions?: boolean }
               onClick={() => void deletePath(selectedPath)}
             />
           </Grid>
+          {onImportFiles ? (
+            <Button
+              label={t("projectTools.fileTree.importFile")}
+              variant="ghost"
+              size="sm"
+              width="100%"
+              isDisabled={!canMutate || busyAction || importBusy}
+              onClick={() =>
+                onImportFiles(selectedNode?.kind === "dir" ? selectedPath : dirname(selectedPath))
+              }
+            />
+          ) : null}
         </Section>
       ) : null}
 

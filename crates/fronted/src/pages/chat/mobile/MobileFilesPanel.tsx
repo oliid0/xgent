@@ -1,6 +1,7 @@
+import { Banner } from "@astryxdesign/core/Banner";
 import { StackItem } from "@astryxdesign/core/Layout";
 import { openUrl } from "@xgent/runtime";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HubHeader } from "../../../components/hub/HubChrome";
 import { FolderTree } from "../../../components/icons";
 import { FileTreePanel } from "../../../components/project-tools/file-tree";
@@ -29,8 +30,10 @@ import type {
   WorkspaceFileTreeStatePatch,
 } from "../../../lib/settings";
 import type { TerminalClient } from "../../../lib/terminal/types";
+import { invokeFs } from "../../../lib/tools/fsBackend";
 import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/types";
 import { NativeSurface } from "../../../presentation/NativeSurface";
+import { decodeNativeFiles } from "../../../presentation/nativeFiles";
 import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
 import type {
   PresentationHandler,
@@ -56,6 +59,33 @@ type MobileFilesPanelProps = {
 };
 
 type PendingAction = "file" | "folder" | "rename" | null;
+
+async function importDeviceFiles(
+  workdir: string,
+  directory: string,
+  files: File[],
+  messages: { tooMany: string; tooLarge: string },
+  onImported: (path: string) => void,
+) {
+  if (files.length > 9) throw new Error(messages.tooMany);
+  for (const file of files) {
+    if (file.size > 20 * 1024 * 1024) {
+      throw new Error(messages.tooLarge.replace("{file}", file.name));
+    }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = "";
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+    }
+    const imported = await invokeFs<{ path: string }>("fs_import_file", {
+      workdir,
+      directory,
+      file_name: file.name,
+      content_base64: window.btoa(binary),
+    });
+    onImported(imported.path);
+  }
+}
 
 function normalizeTreePath(path: string) {
   return path
@@ -88,6 +118,45 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
   } = props;
   const { t } = useLocale();
   const projectReady = Boolean(projectPathKey.trim() && cwd.trim());
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const importDirectoryRef = useRef(ROOT_PATH);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importRevision, setImportRevision] = useState(0);
+
+  const handleDeviceFiles = async (files: File[]) => {
+    if (!files.length || !projectReady || importBusy) return;
+    const directory = importDirectoryRef.current;
+    let lastPath = "";
+    setImportBusy(true);
+    setImportError(null);
+    try {
+      await importDeviceFiles(
+        cwd,
+        directory,
+        files,
+        {
+          tooMany: t("chat.upload.maxFiles").replace("{max}", "9"),
+          tooLarge: t("projectTools.fileTree.importTooLarge"),
+        },
+        (path) => {
+          lastPath = path;
+        },
+      );
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (lastPath) {
+        onFileTreeStateChange({
+          selectedPath: lastPath,
+          expandedPaths: addExpandedPaths(fileTreeState.expandedPaths, [directory]),
+          bumpRevision: true,
+        });
+        setImportRevision((revision) => revision + 1);
+      }
+      setImportBusy(false);
+    }
+  };
 
   const revealPath = useCallback(
     (path: string) => {
@@ -190,8 +259,31 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
           closeLabel={t("chat.cancel")}
         />
 
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          hidden
+          aria-label={t("projectTools.fileTree.importFile")}
+          onChange={(event) => {
+            const files = Array.from(event.currentTarget.files ?? []);
+            event.currentTarget.value = "";
+            void handleDeviceFiles(files);
+          }}
+        />
+        {importError ? <Banner status="error" title={importError} /> : null}
+
         <StackItem size="fill" className="mobile-panel-safe-content">
-          <FileTreePanel active touchActions />
+          <FileTreePanel
+            active
+            touchActions
+            importBusy={importBusy}
+            importRevision={importRevision}
+            onImportFiles={(directory) => {
+              importDirectoryRef.current = directory;
+              fileInputRef.current?.click();
+            }}
+          />
         </StackItem>
       </MobileFullscreenPanel>
     </WorkspaceToolsContext.Provider>
@@ -332,6 +424,39 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
     } catch (error) {
       setActionError(error instanceof Error ? error.message : String(error));
     } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const importFiles = async (payload: string) => {
+    if (!projectReady || busyAction) return;
+    const targetDir = selectedNode?.kind === "dir" ? selectedPath : dirname(selectedPath);
+    let lastPath = "";
+    setBusyAction(true);
+    setActionError(null);
+    try {
+      await importDeviceFiles(
+        props.cwd,
+        targetDir,
+        decodeNativeFiles(payload),
+        {
+          tooMany: t("chat.upload.maxFiles").replace("{max}", "9"),
+          tooLarge: t("projectTools.fileTree.importTooLarge"),
+        },
+        (path) => {
+          lastPath = path;
+        },
+      );
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (lastPath) {
+        props.onFileTreeStateChange({
+          selectedPath: lastPath,
+          expandedPaths: addExpandedPaths(expandedPaths, [targetDir]),
+        });
+        refreshVisible();
+      }
       setBusyAction(false);
     }
   };
@@ -488,6 +613,19 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
                     }),
                 ),
               ],
+            },
+            {
+              id: "files-import",
+              kind: "FilePicker",
+              label: t("projectTools.fileTree.importFile"),
+              options: [{ value: "files", label: t("chat.upload.files") }],
+              disabled: !projectReady || busyAction,
+              action: bind(
+                "files-import",
+                (value) => importFiles(value as string),
+                (value) => typeof value === "string",
+                projectReady && !busyAction,
+              ),
             },
             {
               ...button("files-close", t("chat.cancel"), "xmark", props.onClose),

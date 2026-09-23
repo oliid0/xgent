@@ -132,7 +132,7 @@ fn snapshot(workdir: &str) -> Result<MobileGitSnapshot, String> {
     let changes = statuses
         .iter()
         .filter_map(|entry| {
-            let path = entry.path()?.to_string();
+            let path = entry.path().ok()?.to_string();
             let status = entry.status();
             let index_status = status_code(status, true).to_string();
             let worktree_status = status_code(status, false).to_string();
@@ -154,7 +154,7 @@ fn snapshot(workdir: &str) -> Result<MobileGitSnapshot, String> {
     let branch = repo
         .head()
         .ok()
-        .and_then(|head| head.shorthand().map(str::to_string))
+        .and_then(|head| head.shorthand().ok().map(str::to_string))
         .unwrap_or_default();
     let mut upstream = String::new();
     let (mut ahead, mut behind) = (0, 0);
@@ -224,7 +224,7 @@ pub async fn mobile_git_history(workdir: String) -> Result<Vec<MobileGitHistoryE
                     sha,
                     author: commit.author().name().unwrap_or_default().to_string(),
                     date,
-                    subject: commit.summary().unwrap_or_default().to_string(),
+                    subject: commit.summary().ok().flatten().unwrap_or_default().to_string(),
                 })
             })
             .collect()
@@ -388,7 +388,7 @@ fn fetch_origin(repo: &Repository, token: Option<String>) -> Result<(), String> 
 
 fn pull_fast_forward(repo: &Repository) -> Result<(), String> {
     let head = repo.head().map_err(|error| error.to_string())?;
-    let branch_name = head.shorthand().ok_or("Pull requires a local branch")?.to_string();
+    let branch_name = head.shorthand().map_err(|error| error.to_string())?.to_string();
     let local_oid = head.target().ok_or("Pull requires a local commit")?;
     let local_branch = repo.find_branch(&branch_name, git2::BranchType::Local)
         .map_err(|error| error.to_string())?;
@@ -431,7 +431,7 @@ pub async fn mobile_git_remote(
             }
             "push" => {
                 let head = repo.head().map_err(|error| error.to_string())?;
-                let refname = head.name().ok_or("Push requires a local branch")?;
+                let refname = head.name().map_err(|error| error.to_string())?;
                 if !refname.starts_with("refs/heads/") {
                     return Err("Push requires a local branch".to_string());
                 }

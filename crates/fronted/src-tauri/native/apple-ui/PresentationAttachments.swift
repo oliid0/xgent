@@ -48,15 +48,23 @@ struct XgentAttachmentPicker: View {
         node.options?.first { $0.value == value }?.label ?? fallback
     }
 
+    private func includes(_ value: String) -> Bool {
+        node.options?.contains { $0.value == value } ?? true
+    }
+
     var body: some View {
         Menu {
             #if os(iOS)
-            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            if includes("camera") && UIImagePickerController.isSourceTypeAvailable(.camera) {
                 Button { requestCamera() } label: { Label(label("camera", "Camera"), systemImage: "camera") }
             }
             #endif
-            Button { pickingPhotos = true } label: { Label(label("photos", "Photos"), systemImage: "photo.on.rectangle") }
-            Button { pickingFiles = true } label: { Label(label("files", "Files"), systemImage: "folder") }
+            if includes("photos") {
+                Button { pickingPhotos = true } label: { Label(label("photos", "Photos"), systemImage: "photo.on.rectangle") }
+            }
+            if includes("files") {
+                Button { pickingFiles = true } label: { Label(label("files", "Files"), systemImage: "folder") }
+            }
         } label: {
             if importing { ProgressView().frame(width: controlSize, height: controlSize) }
             else {
@@ -66,7 +74,7 @@ struct XgentAttachmentPicker: View {
                     .contentShape(Circle())
             }
         }
-        .menuStyle(.borderlessButton).disabled(importing)
+        .menuStyle(.borderlessButton).disabled(importing || node.disabled == true)
         .accessibilityLabel(node.label ?? "Attach files")
         .fileImporter(isPresented: $pickingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
             importing = true
