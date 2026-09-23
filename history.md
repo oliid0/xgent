@@ -39,6 +39,20 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Fixed the remaining mobile Git history lifetime error reported by Android release CI by owning the commit author's name before constructing the history entry.
 - Routed iOS spreadsheet and presentation previews to an inline SwiftUI Quick Look controller backed by a bounded temporary file; converted HTML documents use that route too, and unsupported types show a visible error. Kept platform-specific rendering branches syntactically independent.
 - Applied Biome's requested formatting and import order for the provider usage script change after the consolidated checks; TypeScript and native mapping checks passed.
+- Kept phone-native personal data/actions and local environment inspection registered when a paired LAN PC supplies command execution; added a registry check for that mixed host state.
+- Routed Shell run/cancel/session commands through the authenticated LAN PC when paired, and read the desktop platform during capability probing so shell instructions follow the actual command host.
+- Added a focused runtime transport check covering paired Shell execution/wait/cancel, workspace path translation, and phone-local assistant plugin routing.
+- Rendered existing bounded file edit previews as actual removed/added lines and file write content in iOS native chat and activity details; reused the same evidence nodes for images and text results.
+- Added a native chat regression check that inspects the edit evidence in both the transcript and the opened activity sheet.
+- Corrected the active tool execution prompt for Android/iOS native Shell constraints and paired desktop platform selection; removed the ineffective edit to the commented legacy prompt.
+- Kept dependency installation advice conditional on the actual command host, so a phone-local tool catalog no longer implies desktop package managers are present.
+- Added a prompt regression check for iOS local Shell and Windows LAN PC Shell with the same mobile tool catalog.
+- Extended the prompt check to distinguish mobile package availability from desktop project installs.
+- Applied import grouping in the touched native chat and LAN host modules before the consolidated checks.
+- Formatted the two touched prompt/native chat files and normalized two existing CRLF-only mobile assistant sources after Biome identified those four paths; the latter had no intended semantic changes.
+- Enabled resumable Bash sessions on paired LAN desktops so package installs and other long commands use desktop session start/wait/stop rather than a single request capped by the LAN RPC timeout.
+- Linked the iOS app target with SDK zlib and iconv for the vendored libgit2 static archive after release CI reached final Xcode linking and reported undefined `_crc32`, `_deflate`, and `_iconv` symbols.
+- Added a release template assertion for the iOS final-linker flags so future Tauri template regeneration retains the libgit2 system libraries.
 - Applied Biome's two import/format corrections after TypeScript and native presentation checks passed; remaining consolidated checks continue after this fix.
 
 ## Evidence and decisions
@@ -51,6 +65,13 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - `xx` keeps separate usage-query scripts for general, New API, and custom modes; current mode switching changed only `mode`, so one mode's script leaked into the next. The provider storage preserves additional JSON fields, and Rust reads only the active `script`.
 - Release `35905392293` reached mobile Rust compilation; Android exposed one `git2::Signature` temporary lifetime error in `mobile_git_history`, now addressed.
 - `yy` uses Quick Look for Office files; Apple documents `QLPreviewController` support for Microsoft Office and RTF and recommends `canPreview`. The native file page previously fell through to an empty state for spreadsheets and presentations.
+- The mobile registry used the selected command host to decide whether to expose phone-native tools. Pairing a LAN PC selected `lan-desktop` and silently removed health/Bluetooth/calendar tools, blocking the user's mixed phone/PC task.
+- The LAN routing prefix list omitted `shell_` even though the desktop authorization layer explicitly permits it. A paired mobile client therefore exposed Bash but executed it on the phone; the PC platform probe now also prevents iOS/Android shell syntax from being applied to desktop commands.
+- iOS native chat marked the plain success message as `diff` and dropped `EditResultDetails.oldPreview/newPreview`; activity details also dropped image previews. The shared tool result details already contain bounded evidence, so both surfaces can show it without a new UI element.
+- `agentRunner.buildToolsSuffix` delegates to `toolExecutionPrompt.ts`; its old inline prompt is commented out. The active module previously described any non-Windows/macOS Bash as Linux and unconditionally suggested ManagedProcess, so mobile Shell instructions were wrong even before pairing.
+- LAN RPC waits at most five minutes, while `shell_run` returns only at completion. The existing desktop `shell_session_*` commands return a session and bounded output pages; the paired chat registry can expose them through the same authenticated route.
+- iOS unsigned release `35907503074` compiled the new native Git code, then Xcode failed when linking `libapp.a` due to missing zlib/iconv. Apple's Xcode build settings documentation identifies `OTHER_LDFLAGS` as the final-linker flag channel, and the checked-in `ios.project.yml` is the Tauri iOS project template used by CI.
+- The health/CGM prompt is a representative multi-tool task, not a request to prioritize one health API. The partial health-sample contract was removed before handoff; focus stays on general tool availability, delegation, execution fallback, and observable results.
 - Installed Windows client: compact language selection saved; in wide settings dialog, the visible option did not highlight on hover and clicking it only dismissed the menu. The dialog's popover animation applies a persistent transform, so modal menus now use their measured position without that transform.
 - iOS screenshots 1125/1128 show the chat composer painted over the open sidebar. The SwiftUI chat view had placed it in a `safeAreaInset` outside the chat stack; it is now a sibling of the transcript within that stack.
 - New visual references 0386–0406 show pale grouped settings cards, circular navigation buttons, and a simple sidebar. They guide styling of existing controls only.
@@ -66,4 +87,4 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
-- CI passed at `a76d1e2`, `7f8838b`, and `035f7cf`. Release `35905392293` reached Android/iOS Rust compilation; both failed on the same history-author lifetime error now fixed locally. Desktop release jobs are still finishing. Current `pnpm check`, `pnpm native:check`, `pnpm lint`, and `pnpm test:non-native` pass (1212/1212). A new CI/release run is pending.
+- CI passed at `a76d1e2`, `7f8838b`, `035f7cf`, and `e9c2d37`. This batch passed `pnpm check`, `pnpm native:check`, `pnpm lint`, and `pnpm test:non-native` (1215/1215). After the iOS template/prompt edits, the release workflow test passed 11/11 and targeted mobile/LAN/native chat tests passed 16/16; TypeScript and lint also passed again. Release `35907503074` passed Windows, Linux, and macOS Apple Silicon, failed iOS final link on zlib/iconv (fix pending CI), and still runs Android/macOS Intel.

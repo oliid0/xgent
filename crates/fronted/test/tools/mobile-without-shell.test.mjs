@@ -72,7 +72,13 @@ test("verified Shell is added on the next turn and failures revoke only Shell", 
   assert.equal(next.hasTool("Bash"), false);
   assert.equal(next.hasTool("Write"), true);
   assert.equal((await h.build({ nativeMobileRuntime: false })).hasTool("Bash"), true);
-  assert.equal((await h.build({ lanPcCommandHostReady: true })).hasTool("Bash"), true);
+  const paired = await h.build({ lanPcCommandHostReady: true });
+  assert.equal(paired.hasTool("Bash"), true);
+  assert.equal(paired.hasTool("ProcessWait"), true);
+  assert.equal(paired.hasTool("ProcessStop"), true);
+  assert.equal(paired.hasTool("MobilePersonalData"), true);
+  assert.equal(paired.hasTool("MobilePersonalActions"), true);
+  assert.equal(paired.hasTool("MobileEnvironment"), true);
 });
 
 test("out-of-order status results and pre-install probes cannot revive stale Shell capability", async () => {
@@ -89,4 +95,18 @@ test("out-of-order status results and pre-install probes cannot revive stale She
   h.statusRequests[2].resolve(ready);
   await beforeInstall;
   assert.equal(h.mobile.isMobileShellAvailable(), false);
+});
+
+test("mobile Shell instructions follow the actual command host", () => {
+  const { buildToolsSuffix } = harness().loader.loadModule("src/lib/chat/runner/toolExecutionPrompt.ts");
+  const tools = ["Bash", "MobileEnvironment"];
+  const ios = buildToolsSuffix("/phone/workspace", tools, "ios");
+  assert.match(ios, /a-Shell-compatible/);
+  assert.match(ios, /Inspect MobileEnvironment/);
+  assert.doesNotMatch(ios, /Use ManagedProcess instead of Bash/);
+  assert.doesNotMatch(ios, /npm\/pnpm installs/);
+  const paired = buildToolsSuffix("C:\\Users\\owner\\workspace", tools, "windows");
+  assert.match(paired, /native PowerShell/);
+  assert.match(paired, /npm\/pnpm installs/);
+  assert.doesNotMatch(paired, /Inspect MobileEnvironment before the first mobile Bash call/);
 });

@@ -199,6 +199,10 @@ test("iOS project template preserves the pre-build script YAML boundary", () => 
   );
 });
 
+test("iOS app target links vendored libgit2 system dependencies", () => {
+  assert.match(iosProjectTemplate, /OTHER_LDFLAGS:.*\$\(inherited\).*\-lz.*\-liconv/);
+});
+
 test("iOS release prepares host tools and every target before Tauri initialization", () => {
   const ios = jobSource("ios", "publish");
   const macos = jobSource("macos", "windows");

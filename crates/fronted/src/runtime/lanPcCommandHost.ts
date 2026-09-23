@@ -1,3 +1,4 @@
+import type { RuntimePlatform } from "../lib/runtimePlatform";
 import type { RuntimeInvokeArgs } from "./types";
 
 export const LAN_PC_SESSION_CHANGED_EVENT = "xgent:lan-pc-session-changed";
@@ -9,6 +10,7 @@ export type LanPcCommandHostConfig = {
   localWorkdir?: string;
   remoteWorkdir?: string;
   remoteHomeDir?: string;
+  remotePlatform?: RuntimePlatform;
 };
 
 type NormalizedLanPcCommandHostConfig = {
@@ -17,6 +19,7 @@ type NormalizedLanPcCommandHostConfig = {
   localWorkdir: string;
   remoteWorkdir: string;
   remoteHomeDir: string;
+  remotePlatform?: RuntimePlatform;
 };
 
 const DISABLED_CONFIG: NormalizedLanPcCommandHostConfig = {
@@ -31,6 +34,7 @@ const DELEGATED_COMMAND_PREFIXES = [
   "fs_",
   "git_",
   "terminal_",
+  "shell_",
   "ssh_",
   "sftp_",
   "managed_process_",
@@ -72,6 +76,7 @@ function normalizeConfig(config?: LanPcCommandHostConfig): NormalizedLanPcComman
     localWorkdir: normalizePath(config.localWorkdir ?? ""),
     remoteWorkdir: normalizePath(config.remoteWorkdir ?? ""),
     remoteHomeDir: normalizePath(config.remoteHomeDir ?? ""),
+    remotePlatform: config.remotePlatform,
   };
 }
 

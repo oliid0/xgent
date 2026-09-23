@@ -222,6 +222,8 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
             skillsRootDir: params.skillsRootDir,
             skillAccessPolicy: params.skillAccessPolicy,
             managedProcessEnabled: capabilities.managedProcess && params.runtimeScope === "chat",
+            resumableShellEnabled:
+              runtimeToolHost === "lan-desktop" && params.runtimeScope === "chat",
             sandbox: params.sandbox,
             resolveHomeDir,
           }),
@@ -270,8 +272,8 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       workdir: params.workdir,
       mode: params.memoryToolMode ?? "rw",
     }),
-    ...(runtimeToolHost === "native-mobile" ? [createMobileExecutionTools()] : []),
-    ...(runtimeToolHost === "native-mobile" ? [createMobilePersonalAssistantTools()] : []),
+    ...(params.nativeMobileRuntime === true ? [createMobileExecutionTools()] : []),
+    ...(params.nativeMobileRuntime === true ? [createMobilePersonalAssistantTools()] : []),
     ...(runtimeToolHost === "native-mobile" && params.runtimeScope === "chat"
       ? [
           createMobilePreviewTools({

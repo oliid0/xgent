@@ -198,6 +198,37 @@ test("native iPhone exposes execution mode and live context usage in the chat ch
   h.unmount();
 });
 
+test("native chat and activity preserve file edit evidence from tool results", async () => {
+  const h = harness({}, { mobile: true });
+  h.props.historyItems = [{
+    kind: "assistant", key: "answer", segmentIndex: 0, timestamp: 1,
+    isFromCompactedSegment: false,
+    rounds: [{ round: 1, key: "r1", blocks: [{
+      kind: "tool", item: {
+        toolCall: { id: "edit-1", name: "Edit", arguments: { path: "report.md" } },
+        toolResult: {
+          role: "toolResult", toolCallId: "edit-1", toolName: "Edit",
+          content: [{ type: "text", text: "File edited successfully" }],
+          details: { kind: "edit", path: "report.md", oldPreview: "old line", newPreview: "new line" },
+          isError: false, timestamp: 1,
+        },
+      },
+    }] }],
+  }];
+  const transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
+  const tool = transcript.children.find((node) => node.id === "answer").children[0];
+  assert.equal(tool.kind, "ToolCall");
+  assert.equal(tool.children.find((node) => node.language === "text").text, "File edited successfully");
+  const diff = tool.children.find((node) => node.language === "diff");
+  assert.match(diff.text, /- old line/);
+  assert.match(diff.text, /\+ new line/);
+  assert.equal((await h.dispatch("activity-preview")).ok, true);
+  h.render();
+  const activity = h.documents().find((document) => document.title === "chat.activity.title");
+  assert.equal(activity.nodes[0].children.find((node) => node.language === "diff").text, diff.text);
+  h.unmount();
+});
+
 test("native Apple documents declare desktop shape and shared visual tokens", () => {
   const h = harness();
   const document = h.render();

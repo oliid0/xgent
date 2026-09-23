@@ -243,15 +243,28 @@ export function buildToolsSuffix(
             `- Current platform: ${platformLabel}. Bash runs through POSIX shells.`,
             runtimePlatform === "macos"
               ? "- macOS prefers zsh, then Bash, then sh. Use POSIX/zsh-compatible commands."
-              : "- Linux prefers Bash, then zsh, then sh. Use POSIX/bash-compatible commands.",
-            "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xgent-task.log 2>&1 < /dev/null &`.",
+              : runtimePlatform === "android"
+                ? "- Android runs commands in the installed Alpine PRoot environment. Use POSIX syntax and inspect MobileEnvironment before assuming a package manager or toolchain is available."
+                : runtimePlatform === "ios"
+                  ? "- iOS/iPadOS uses a restricted a-Shell-compatible native command set. Do not assume Linux process APIs, Node.js/npm, arbitrary native packages, or unrestricted WASI execution."
+                  : "- Linux prefers Bash, then zsh, then sh. Use POSIX/bash-compatible commands.",
+            runtimePlatform === "android" || runtimePlatform === "ios"
+              ? "- Mobile systems may suspend the app. Keep commands bounded and in the foreground."
+              : "- Background commands using `&` must redirect stdout and stderr before detaching, for example `nohup command > /tmp/xgent-task.log 2>&1 < /dev/null &`.",
           ];
     sections.push(
       [
         "## Bash",
         "- Bash.cwd follows the path rules in **Workspace & Paths**.",
         ...bashPlatformLines,
-        "- Install dependencies in the active project: npm/pnpm installs must use project node_modules. For Python create/use .venv and invoke its Python explicitly. Never use pip --user, global installs, or unrelated working directories unless the user requests that scope.",
+        ...(has("MobileEnvironment") && (runtimePlatform === "android" || runtimePlatform === "ios")
+          ? [
+              "- Inspect MobileEnvironment before the first mobile Bash call to confirm the installed backend and available toolchains.",
+            ]
+          : []),
+        runtimePlatform === "android" || runtimePlatform === "ios"
+          ? "- Install only dependencies supported by the verified mobile environment. Keep them in the active workspace, and use the same project interpreter on later calls."
+          : "- Install dependencies in the active project: npm/pnpm installs must use project node_modules. For Python create/use .venv and invoke its Python explicitly. Never use pip --user, global installs, or unrelated working directories unless the user requests that scope.",
         "- Environment assignments apply to the current command and its children, not future tool calls. Use the same project interpreter on subsequent calls; inspect tools and versions before installing.",
         '- To run installed Skill scripts, use cwd="skill://<enabled-skill>/scripts" plus a relative command.',
         "- Passing an absolute Skill script path inside the command is also accepted as long as the referenced Skill is enabled in this conversation.",
@@ -271,7 +284,11 @@ export function buildToolsSuffix(
               "- ProcessWait session_id values come from Bash/ProcessWait, not from ManagedProcess.process_id.",
             ]
           : []),
-        "- Use ManagedProcess instead of Bash for dev servers, watchers, preview servers, or anything that should keep running.",
+        ...(has("ManagedProcess")
+          ? [
+              "- Use ManagedProcess instead of Bash for dev servers, watchers, preview servers, or anything that should keep running.",
+            ]
+          : []),
         "- For reading, listing, or searching Skill content, always use Read/List/Glob/Grep with skill:// paths — Bash cat/ls/find/grep/rg/sed/awk against ~/.xgent/skills is still routed back to the file tools.",
         "- Do not guess `skills/` paths inside the workspace; if a Skill is needed, enable it in the chat Skills selector first.",
         "- Do not cd into ~/.xgent/skills or workspace skills/ guesses.",

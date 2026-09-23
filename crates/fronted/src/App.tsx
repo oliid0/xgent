@@ -35,6 +35,7 @@ import { trackMobileViewport } from "./lib/mobileViewport";
 import { setRetryErrorExtension } from "./lib/providers/runtime/streamRetry";
 import {
   inferRuntimePlatform,
+  normalizeRuntimePlatform,
   type RuntimePlatform,
   resolveRuntimePlatform,
 } from "./lib/runtimePlatform";
@@ -336,7 +337,7 @@ export default function App() {
     };
     const probe = async () => {
       try {
-        const [snapshot, remoteHomeDir] = await Promise.all([
+        const [snapshot, remoteHomeDir, remotePlatformResponse] = await Promise.all([
           invoke<{ defaultWorkdir?: unknown }>("lan_pc_invoke", {
             base_url: baseUrl,
             command: "settings_load_all",
@@ -347,11 +348,23 @@ export default function App() {
             command: "system_home_dir",
             args: {},
           }),
+          invoke<{ platform?: unknown }>("lan_pc_invoke", {
+            base_url: baseUrl,
+            command: "app_runtime_platform",
+            args: {},
+          }),
         ]);
         if (cancelled) return;
         const remoteWorkdir =
           typeof snapshot.defaultWorkdir === "string" ? snapshot.defaultWorkdir.trim() : "";
-        if (!remoteWorkdir || !remoteHomeDir.trim()) {
+        const remotePlatform = normalizeRuntimePlatform(remotePlatformResponse?.platform);
+        if (
+          !remoteWorkdir ||
+          !remoteHomeDir.trim() ||
+          !remotePlatform ||
+          remotePlatform === "android" ||
+          remotePlatform === "ios"
+        ) {
           throw new Error("LAN computer did not return its workspace capabilities");
         }
         consecutiveFailures = 0;
@@ -361,6 +374,7 @@ export default function App() {
           localWorkdir: settings.system.workdir,
           remoteWorkdir,
           remoteHomeDir: remoteHomeDir.trim(),
+          remotePlatform,
         });
         setLanPcCommandHostReady(true);
         scheduleProbe(20_000);

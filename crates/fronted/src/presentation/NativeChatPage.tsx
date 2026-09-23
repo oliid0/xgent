@@ -1,3 +1,4 @@
+import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import { invoke } from "@xgent/runtime";
 import {
   type MutableRefObject,
@@ -38,7 +39,11 @@ import { isNativeMobileRuntime } from "../lib/runtimePlatform";
 import type { AppSettings, SelectedModel, WorkspaceProject } from "../lib/settings";
 import type { SidebarStore } from "../lib/sidebar/store";
 import { type DesktopSttCapture, startDesktopSttCapture } from "../lib/stt/desktopAudioCapture";
-import type { TaskListState } from "../lib/tools/builtinTypes";
+import type {
+  EditResultDetails,
+  TaskListState,
+  WriteResultDetails,
+} from "../lib/tools/builtinTypes";
 import type { PendingToolApprovalSummary, ToolApprovalDecision } from "../lib/tools/toolApproval";
 import {
   desktopLiveTrajectoryEvents,
@@ -96,6 +101,58 @@ function toolResultPreviewNodes(result: unknown, prefix: string): PresentationNo
       },
     ];
   });
+}
+
+function toolEvidenceNodes(
+  result: ToolResultMessage | undefined,
+  prefix: string,
+  pendingText: string,
+): PresentationNode[] {
+  const text = result ? toolResultMessageToText(result) : pendingText;
+  const nodes = toolResultPreviewNodes(result, prefix);
+  if (text) {
+    nodes.push({
+      id: `${prefix}:result`,
+      kind: "CodeBlock",
+      label: result?.toolName,
+      language: "text",
+      text,
+    });
+  }
+  if (!result || result.isError) return nodes;
+  const details = result.details;
+  if (details && typeof details === "object" && "kind" in details && details.kind === "edit") {
+    const edit = details as EditResultDetails;
+    const removed = edit.oldPreview?.split(/\r?\n/).map((line) => `- ${line}`) ?? [];
+    const added = edit.newPreview?.split(/\r?\n/).map((line) => `+ ${line}`) ?? [];
+    if (removed.length || added.length) {
+      const path = edit.displayPath || edit.path;
+      nodes.push({
+        id: `${prefix}:diff`,
+        kind: "CodeBlock",
+        label: path,
+        language: "diff",
+        text: [`--- ${path}`, `+++ ${path}`, ...removed, ...added].join("\n"),
+      });
+    }
+  } else if (
+    details &&
+    typeof details === "object" &&
+    "kind" in details &&
+    details.kind === "write"
+  ) {
+    const write = details as WriteResultDetails;
+    if (write.preview) {
+      nodes.push({
+        id: `${prefix}:content`,
+        kind: "CodeBlock",
+        label: write.displayPath || write.path,
+        language: "text",
+        text: write.preview,
+      });
+    }
+  }
+  return nodes;
 }
 
 export type NativeChatPageProps = {
@@ -209,9 +266,6 @@ function roundNodes(
           "runningToolCallIds" in round &&
           Array.isArray(round.runningToolCallIds) &&
           round.runningToolCallIds.includes(block.item.toolCall.id);
-        const resultText = block.item.toolResult
-          ? toolResultMessageToText(block.item.toolResult)
-          : safeStringify(block.item.toolCall.arguments);
         return [
           {
             id: `${id}:tool:${block.item.toolCall.id}`,
@@ -225,23 +279,11 @@ function roundNodes(
                 : block.item.toolResult
                   ? "completed"
                   : "pending",
-            children: [
-              ...toolResultPreviewNodes(
-                block.item.toolResult,
-                `${id}:tool:${block.item.toolCall.id}`,
-              ),
-              ...(resultText
-                ? [
-                    {
-                      id: `${id}:tool:${block.item.toolCall.id}:result`,
-                      kind: "CodeBlock" as const,
-                      label: block.item.toolCall.name,
-                      language: /edit|write/i.test(block.item.toolCall.name) ? "diff" : "text",
-                      text: resultText,
-                    },
-                  ]
-                : []),
-            ],
+            children: toolEvidenceNodes(
+              block.item.toolResult,
+              `${id}:tool:${block.item.toolCall.id}`,
+              safeStringify(block.item.toolCall.arguments),
+            ),
           },
         ];
       }
@@ -1101,16 +1143,11 @@ export function NativeChatPage(props: NativeChatPageProps) {
             : item.toolResult
               ? "completed"
               : "pending",
-        children: [
-          {
-            id: `activity:${item.toolCall.id}:detail`,
-            kind: "CodeBlock",
-            language: item.toolCall.name.toLowerCase().includes("edit") ? "diff" : "text",
-            text: item.toolResult
-              ? toolResultMessageToText(item.toolResult)
-              : safeStringify(item.toolCall.arguments),
-          },
-        ],
+        children: toolEvidenceNodes(
+          item.toolResult,
+          `activity:${item.toolCall.id}`,
+          safeStringify(item.toolCall.arguments),
+        ),
       }))
     : [
         {

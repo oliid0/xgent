@@ -570,8 +570,11 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
   };
   const fileState = createFileToolState();
   const subagentScheduler = createSubagentScheduler();
-  const runtimePlatform = await resolveRuntimePlatform();
   const lanPcCommandHost = getLanPcCommandHostConfig();
+  const runtimePlatform =
+    lanPcCommandHostReady && lanPcCommandHost.remotePlatform
+      ? lanPcCommandHost.remotePlatform
+      : await resolveRuntimePlatform();
   const toolWorkdir =
     lanPcCommandHostReady && lanPcCommandHost.remoteWorkdir
       ? lanPcCommandHost.remoteWorkdir
