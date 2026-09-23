@@ -54,6 +54,7 @@ function harness(overrides = {}, options = {}) {
     onNewConversation() {}, onOpenSettings() {}, onOpenRemote() {}, onOpenBrowser() {},
     onOpenSkillsHub() {}, onOpenMcpHub() {},
     onOpenBrowserSettings() {}, onOpenGitReview() {}, onOpenBackgroundTasks() {}, onOpenFiles() {},
+    onOpenWorkspaceFile() {},
     onLoadEarlierHistory() {},
     onDecide: () => ({ ok: true }), onImportFiles: async () => {}, onCreateProject() {}, onOpenTerminal() {}, onChangeMode() {}, onRemoveUpload() {},
     ...overrides,
@@ -235,7 +236,8 @@ test("native iPhone exposes execution mode and live context usage in the chat ch
 });
 
 test("native chat and activity preserve file edit evidence from tool results", async () => {
-  const h = harness({}, { mobile: true });
+  const opened = [];
+  const h = harness({ onOpenWorkspaceFile: (path) => opened.push(path) }, { mobile: true });
   h.props.historyItems = [{
     kind: "assistant", key: "answer", segmentIndex: 0, timestamp: 1,
     isFromCompactedSegment: false,
@@ -264,6 +266,12 @@ test("native chat and activity preserve file edit evidence from tool results", a
   assert.match(diff.text, /\+new line/);
   assert.match(diff.text, / unchanged/);
   assert.doesNotMatch(diff.text, /[-+] unchanged/);
+  const fileAction = transcript.children.find((node) => node.id === "answer").children.find(
+    (node) => node.id === "answer:changed-file:edit-1",
+  );
+  assert.equal(fileAction.label, "report.md");
+  assert.equal((await h.dispatch(fileAction.action)).ok, true);
+  assert.deepEqual(opened, ["report.md"]);
   assert.equal((await h.dispatch("activity-preview")).ok, true);
   h.render();
   const activity = h.documents().find((document) => document.title === "chat.activity.title");

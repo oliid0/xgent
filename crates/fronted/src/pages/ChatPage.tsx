@@ -6273,6 +6273,7 @@ export function ChatPage(props: ChatPageProps) {
           onOpenGitReview={() => setMobileWorkspaceDestination({ kind: "git-review" })}
           onOpenBackgroundTasks={() => setMobileWorkspaceDestination({ kind: "background-tasks" })}
           onOpenFiles={() => setMobileWorkspaceDestination({ kind: "files" })}
+          onOpenWorkspaceFile={handleOpenMobileWorkspaceFile}
           onLoadEarlierHistory={handleLoadEarlierHistory}
           onDecide={(toolCallId, decision) =>
             answerToolApproval(toolCallId, decision, { conversationId: currentConversationId })

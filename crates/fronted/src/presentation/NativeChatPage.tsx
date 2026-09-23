@@ -21,6 +21,7 @@ import {
   readChatLayoutPreferences,
   saveChatLayoutPreferences,
 } from "../lib/chat/layoutPreferences";
+import { collectChangedFiles } from "../lib/chat/messages/changedFiles";
 import { collectCloudArtifacts } from "../lib/chat/messages/cloudArtifacts";
 import {
   safeStringify,
@@ -201,6 +202,7 @@ export type NativeChatPageProps = {
   onOpenGitReview: () => void;
   onOpenBackgroundTasks: () => void;
   onOpenFiles: () => void;
+  onOpenWorkspaceFile: (path: string) => void;
   onChangeMode: (mode: "text" | "tools") => void;
   onLoadEarlierHistory: () => Promise<unknown> | void;
   onDecide: (id: string, decision: ToolApprovalDecision) => { ok: boolean; message?: string };
@@ -498,6 +500,8 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const messages: PresentationNode[] = props.historyItems.flatMap((item): PresentationNode[] => {
     if (item.kind === "assistant") {
       const artifacts = collectCloudArtifacts(item.rounds);
+      const changedFiles =
+        collectChangedFiles(item.rounds)?.files.filter((file) => !file.deleted) ?? [];
       return [
         {
           id: item.key,
@@ -505,6 +509,19 @@ export function NativeChatPage(props: NativeChatPageProps) {
           role: "assistant",
           children: [
             ...roundNodes(item.rounds, item.key, showThinking, contentLabels),
+            ...changedFiles.map((file): PresentationNode => {
+              const id = `${item.key}:changed-file:${file.lastToolCallId}`;
+              return {
+                id,
+                kind: "Button",
+                label: file.path,
+                icon: "doc",
+                variant: "secondary",
+                size: "small",
+                accessibilityHint: t("projectTools.fileTree.openFile"),
+                action: action(id, () => props.onOpenWorkspaceFile(file.path)),
+              };
+            }),
             ...artifacts.map((artifact): PresentationNode => {
               const id = `${item.key}:cloud-artifact:${artifact.taskId}:${artifact.artifactId}`;
               const name =
