@@ -114,7 +114,7 @@ export function NativeWorkspaceFilePage(props: {
       setLoading(true);
       setFailure(null);
       try {
-        if (mode === "editor") {
+        if (mode === "editor" || isWorkspaceEditablePreviewPath(request.path)) {
           const response = await invokeFs<ReadEditableTextResponse>("fs_read_editable_text", {
             workdir: request.workdir,
             path: request.path,
@@ -295,7 +295,12 @@ export function NativeWorkspaceFilePage(props: {
   });
   const previewKind = loaded ? getWorkspacePreviewKind(loaded.path) : null;
   const mediaPreview = Boolean(
-    loaded && ["image", "pdf", "audio", "video"].includes(previewKind ?? ""),
+    loaded &&
+      (["image", "pdf", "audio", "video"].includes(previewKind ?? "") ||
+        (compact &&
+          (previewKind === "spreadsheet" ||
+            previewKind === "presentation" ||
+            (previewKind === "document" && workspacePathExtension(loaded.path) !== "docx")))),
   );
   const contentNode: PresentationNode = loading
     ? {

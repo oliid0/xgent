@@ -76,6 +76,19 @@ test("custom provider routing strips endpoint suffixes and filters inactive mode
   assert.deepEqual(provider.activeModels, ["gpt-a"]);
 });
 
+test("provider usage scripts survive switching query modes and settings normalization", () => {
+  const general = settings.normalizeUsageQueryConfig({ mode: "general", script: "general script" });
+  const newapi = settings.switchUsageQueryMode(general, "newapi");
+  assert.equal(newapi.script, "");
+  const updated = settings.normalizeUsageQueryConfig({ ...newapi, script: "newapi script" });
+  const restored = settings.switchUsageQueryMode(
+    settings.normalizeUsageQueryConfig(settings.switchUsageQueryMode(updated, "balance")),
+    "general",
+  );
+  assert.equal(restored.script, "general script");
+  assert.equal(settings.switchUsageQueryMode(restored, "newapi").script, "newapi script");
+});
+
 test("provider reasoning is clamped to a model's supported level", () => {
   const value = settings.normalizeChatRuntimeControlsForProvider(
     { reasoning: "high", reasoningByProvider: { codex_openai_responses: "high" } },

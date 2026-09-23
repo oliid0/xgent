@@ -84,6 +84,7 @@ import {
   type ProviderId,
   type ProviderModelConfig,
   type ProviderRetryPolicy,
+  switchUsageQueryMode,
   type UsageQueryConfig,
   type UsageQueryMode,
   updateCustomProviders,
@@ -1998,7 +1999,11 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                 <Selector
                   label={t("settings.usage.mode")}
                   value={usageQuery.mode}
-                  onChange={(mode) => patchUsageQuery({ mode: mode as UsageQueryMode })}
+                  onChange={(mode) =>
+                    setUsageQuery((previous) =>
+                      switchUsageQueryMode(previous, mode as UsageQueryMode),
+                    )
+                  }
                   options={USAGE_QUERY_MODES.map((mode) => ({
                     value: mode,
                     label: t(`settings.usage.mode.${mode}`),

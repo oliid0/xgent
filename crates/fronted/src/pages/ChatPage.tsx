@@ -2031,7 +2031,7 @@ export function ChatPage(props: ChatPageProps) {
         path,
         imagePaths,
       };
-      setMobileWorkspaceDestination(null);
+      if (!isApplePresentationRuntime()) setMobileWorkspaceDestination(null);
       if (isWorkspacePreviewPath(path)) {
         openWorkspaceFilePreview(request);
         return;

@@ -219,10 +219,11 @@ pub async fn mobile_git_history(workdir: String) -> Result<Vec<MobileGitHistoryE
                     .single()
                     .map(|date| date.to_rfc3339())
                     .unwrap_or_default();
+                let author = commit.author().name().unwrap_or_default().to_string();
                 Ok(MobileGitHistoryEntry {
                     short_sha: sha.chars().take(7).collect(),
                     sha,
-                    author: commit.author().name().unwrap_or_default().to_string(),
+                    author,
                     date,
                     subject: commit.summary().ok().flatten().unwrap_or_default().to_string(),
                 })

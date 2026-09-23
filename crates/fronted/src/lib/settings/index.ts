@@ -344,11 +344,13 @@ export type SshSettings = {
 };
 
 export type UsageQueryMode = "coding-plan" | "balance" | "general" | "newapi" | "custom";
+type UsageQueryScriptMode = Extract<UsageQueryMode, "general" | "newapi" | "custom">;
 
 export type UsageQueryConfig = {
   enabled: boolean;
   mode: UsageQueryMode;
   script: string;
+  scripts?: Partial<Record<UsageQueryScriptMode, string>>;
   baseUrl: string;
   apiKey: string;
   accessToken: string;
@@ -1797,12 +1799,25 @@ export function normalizeUsageQueryConfig(input: unknown): UsageQueryConfig {
       ? obj.mode
       : "balance";
   const text = (field: string) => (typeof obj[field] === "string" ? obj[field].trim() : "");
+  const rawScripts =
+    obj.scripts && typeof obj.scripts === "object" ? (obj.scripts as Record<string, unknown>) : {};
+  const scripts: Partial<Record<UsageQueryScriptMode, string>> = {};
+  for (const key of ["general", "newapi", "custom"] as const) {
+    if (typeof rawScripts[key] === "string") scripts[key] = rawScripts[key];
+  }
+  if (
+    (mode === "general" || mode === "newapi" || mode === "custom") &&
+    typeof obj.script === "string"
+  ) {
+    scripts[mode] = obj.script;
+  }
   const timeout = Number(obj.timeoutSecs);
   return {
     ...defaults,
     enabled: obj.enabled === true,
     mode,
     script: typeof obj.script === "string" ? obj.script : "",
+    scripts,
     baseUrl: text("baseUrl"),
     apiKey: text("apiKey"),
     accessToken: text("accessToken"),
@@ -1817,6 +1832,23 @@ export function normalizeUsageQueryConfig(input: unknown): UsageQueryConfig {
     secretAccessKeyConfigured: obj.secretAccessKeyConfigured === true,
     timeoutSecs: Number.isFinite(timeout) ? Math.min(30, Math.max(2, timeout)) : 10,
   };
+}
+
+export function switchUsageQueryMode(
+  previous: UsageQueryConfig,
+  mode: UsageQueryMode,
+): UsageQueryConfig {
+  const scripts = { ...previous.scripts };
+  if (previous.mode === "general" || previous.mode === "newapi" || previous.mode === "custom") {
+    scripts[previous.mode] = previous.script;
+  }
+  return normalizeUsageQueryConfig({
+    ...previous,
+    mode,
+    script:
+      mode === "general" || mode === "newapi" || mode === "custom" ? (scripts[mode] ?? "") : "",
+    scripts,
+  });
 }
 
 export function normalizeAgentPromptTemplate(input: unknown): AgentPromptTemplate {
