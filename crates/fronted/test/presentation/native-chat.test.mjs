@@ -11,6 +11,7 @@ function harness(overrides = {}, options = {}) {
   let cursor = 0;
   let mounted = false;
   const loader = createTsModuleLoader({ mocks: {
+    ...(options.invoke ? { "@tauri-apps/api/core": { invoke: options.invoke } } : {}),
     react: {
       useState(initial) {
         const index = cursor++;
@@ -98,6 +99,41 @@ test("native edits reach the shared composer used by send and conversation draft
   h.unmount();
   assert.equal(h.props.composerRef.current, null);
   assert.equal((await h.dispatch("send")).ok, false);
+});
+
+test("native chat exposes downloaded cloud artifacts as working file actions", async () => {
+  const calls = [];
+  const h = harness({}, { mobile: true, invoke: async (command, args) => {
+    calls.push({ command, args });
+  } });
+  h.props.historyItems = [{
+    kind: "assistant", key: "answer", segmentIndex: 0, timestamp: 1,
+    isFromCompactedSegment: false,
+    rounds: [{ round: 1, key: "r1", blocks: [{
+      kind: "tool", item: {
+        toolCall: { id: "download-1", name: "CloudTaskManager", arguments: {} },
+        toolResult: {
+          role: "toolResult", toolCallId: "download-1", toolName: "CloudTaskManager",
+          content: [{ type: "text", text: "Downloaded report.pptx" }],
+          details: { action: "download_artifact", taskId: "task-1", artifactId: 3,
+            artifactName: "report.pptx", localPath: "/mobile/workspace/report.pptx", sizeBytes: 42 },
+          isError: false, timestamp: 1,
+        },
+      },
+    }] }],
+  }];
+  const transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
+  const attachment = transcript.children.find((node) => node.id === "answer").children.find(
+    (node) => node.id === "answer:cloud-artifact:task-1:3",
+  );
+  assert.equal(attachment.kind, "Button");
+  assert.equal(attachment.label, "report.pptx");
+  assert.equal((await h.dispatch(attachment.action)).ok, true);
+  assert.deepEqual(calls, [{
+    command: "cloud_task_open_artifact",
+    args: { localPath: "/mobile/workspace/report.pptx" },
+  }]);
+  h.unmount();
 });
 
 test("native iPhone opens More as a full-page tool list and keeps compact sidebar routes", async () => {

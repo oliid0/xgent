@@ -70,6 +70,8 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Marked malformed proxy port input as invalid in the existing field feedback, matching the strict activation check.
 - Kept valid MCP servers available to chat when a separate enabled server has incomplete configuration; report that server through the existing load-error channel while preserving strict failure for scheduled runs.
 - Split paired-mobile MCP listing by transport: HTTP/SSE stays on the phone, stdio runs on the PC, and calls/cancellation follow the server's registered host.
+- Exposed successfully downloaded cloud artifacts as openable file actions in the iOS native transcript, reusing the existing artifact collector and native open command.
+- Applied Biome's import order and line formatting to the native artifact action; TypeScript and native mapping checks passed before formatting, and its focused interaction test passed 12/12.
 - Kept MCP run routing active until the awaited call settles and registered test/restart server routes for later status/stop actions.
 - Added a runtime transport regression covering mixed local/PC MCP listing, tool execution, cancellation, and test/status routing.
 - Corrected the route guard's TypeScript narrowing after the consolidated check identified the dynamic invocation argument as `object`.
@@ -111,3 +113,4 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 
 ## Verification/CI
 - CI passed at `a76d1e2`, `7f8838b`, `035f7cf`, `e9c2d37`, and `4d01a27`. Current local batch: `pnpm check`, `pnpm native:check`, `pnpm lint`, and `pnpm test:non-native` passed (1,218 tests; Cargo suite skipped); MCP transport and loader tests passed 5/5. Release `35910177777` passed Android, iOS, Windows, Linux, and both macOS builds for the earlier pushed `4d01a27`; publish was skipped in package-only mode. No Cargo or build commands were run locally. Push only after the whole goal is complete.
+- CI passed at `a76d1e2`, `7f8838b`, `035f7cf`, `e9c2d37`, and `4d01a27`. Prior local batch: `pnpm check`, `pnpm native:check`, `pnpm lint`, and `pnpm test:non-native` passed (1,218 tests; Cargo suite skipped). Current native artifact change: focused tests 12/12, `pnpm check`, `pnpm native:check`, and `pnpm lint` passed; rendered device behavior remains unverified. Release `35910177777` passed Android, iOS, Windows, Linux, and both macOS builds for the earlier pushed `4d01a27`; publish was skipped in package-only mode. No Cargo or build commands were run locally. Push only after the whole goal is complete.

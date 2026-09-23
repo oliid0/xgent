@@ -21,6 +21,7 @@ import {
   readChatLayoutPreferences,
   saveChatLayoutPreferences,
 } from "../lib/chat/layoutPreferences";
+import { collectCloudArtifacts } from "../lib/chat/messages/cloudArtifacts";
 import {
   safeStringify,
   summarizeToolCall,
@@ -496,12 +497,32 @@ export function NativeChatPage(props: NativeChatPageProps) {
   };
   const messages: PresentationNode[] = props.historyItems.flatMap((item): PresentationNode[] => {
     if (item.kind === "assistant") {
+      const artifacts = collectCloudArtifacts(item.rounds);
       return [
         {
           id: item.key,
           kind: "ChatMessage",
           role: "assistant",
-          children: roundNodes(item.rounds, item.key, showThinking, contentLabels),
+          children: [
+            ...roundNodes(item.rounds, item.key, showThinking, contentLabels),
+            ...artifacts.map((artifact): PresentationNode => {
+              const id = `${item.key}:cloud-artifact:${artifact.taskId}:${artifact.artifactId}`;
+              const name =
+                artifact.localPath.replaceAll("\\", "/").split("/").pop() || artifact.artifactName;
+              return {
+                id,
+                kind: "Button",
+                label: name,
+                icon: "doc",
+                variant: "secondary",
+                size: "small",
+                accessibilityHint: t("chat.cloudArtifacts.inline"),
+                action: action(id, () =>
+                  invoke("cloud_task_open_artifact", { localPath: artifact.localPath }),
+                ),
+              };
+            }),
+          ],
         },
       ];
     }
