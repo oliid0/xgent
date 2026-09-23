@@ -72,6 +72,7 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Split paired-mobile MCP listing by transport: HTTP/SSE stays on the phone, stdio runs on the PC, and calls/cancellation follow the server's registered host.
 - Exposed successfully downloaded cloud artifacts as openable file actions in the iOS native transcript, reusing the existing artifact collector and native open command.
 - Connected successful native-chat Write/Edit file results to the existing mobile workspace preview action using the desktop's changed-file collector; deleted files have no open control.
+- Preserved the phone's PreviewFile tool after LAN PC pairing; its existing fs_path_status and preview reads follow the paired workspace route while the preview action remains in the phone app.
 - Applied Biome's import order and line formatting to the native artifact action; TypeScript and native mapping checks passed before formatting, and its focused interaction test passed 12/12.
 - Kept MCP run routing active until the awaited call settles and registered test/restart server routes for later status/stop actions.
 - Added a runtime transport regression covering mixed local/PC MCP listing, tool execution, cancellation, and test/status routing.
@@ -113,4 +114,4 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
-- Prior local batch passed `pnpm test:non-native` (1,218 tests; Cargo skipped), `pnpm check`, `pnpm native:check`, and `pnpm lint`. Current native file-action change passed focused tests 12/12, `pnpm check`, `pnpm native:check`, and `pnpm lint`; rendered device behavior remains unverified. Release `35910177777` passed Android, iOS, Windows, Linux, and both macOS builds for pushed `4d01a27`; unpushed changes have no CI yet. No local Cargo/build commands. Push only after the whole goal is complete.
+- Prior local batch passed `pnpm test:non-native` (1,218 tests; Cargo skipped); native file actions passed 12/12 focused tests. Current paired PreviewFile change passed 6/6 focused tests, `pnpm check`, `pnpm native:check`, and `pnpm lint`; device behavior remains unverified. Release `35910177777` passed Android, iOS, Windows, Linux, and both macOS builds for pushed `4d01a27`; unpushed changes have no CI yet. No local Cargo/build commands. Push only after the whole goal is complete.

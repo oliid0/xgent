@@ -41,7 +41,7 @@ test("a pending Shell probe does not block native file and network MCP tool exec
   const pendingStatus = h.mobile.mobileExecutionStatus();
   const registry = await h.build();
   const names = registry.tools.map((tool) => tool.name);
-  for (const name of ["Read", "Write", "Edit", "List", "SkillsManager", "McpManager", "browser_use", "MobilePersonalData", "MobilePersonalActions", "MobileEnvironment"]) {
+  for (const name of ["Read", "Write", "Edit", "List", "SkillsManager", "McpManager", "browser_use", "PreviewFile", "MobilePersonalData", "MobilePersonalActions", "MobileEnvironment"]) {
     assert.ok(names.includes(name), name);
   }
   assert.ok(!names.includes("Bash"));
@@ -79,6 +79,7 @@ test("verified Shell is added on the next turn and failures revoke only Shell", 
   assert.equal(paired.hasTool("MobilePersonalData"), true);
   assert.equal(paired.hasTool("MobilePersonalActions"), true);
   assert.equal(paired.hasTool("MobileEnvironment"), true);
+  assert.equal(paired.hasTool("PreviewFile"), true);
 });
 
 test("out-of-order status results and pre-install probes cannot revive stale Shell capability", async () => {
