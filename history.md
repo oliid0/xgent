@@ -25,6 +25,7 @@ Repair desktop settings and composer, Android compilation, and iOS navigation wh
 - Replaced the mobile file header's sandbox absolute path with the workspace folder name and removed the root row's repeated absolute path; file operations still use the original cwd and relative paths.
 - Applied the four formatting changes requested by Biome in the scheduled-task, Hooks, and native-settings routes.
 - Updated two existing native presentation tests to assert the requested full-page iOS More route and in-stack composer layout instead of their obsolete menu/inset behavior.
+- Replaced mobile SSH shell invocation and credential temp files with a native `russh` session; wired authentication, known-host trust, bounded output, timeout, duplicate-run protection, and cancellation. Reviewed and formatted the integration; native CI validation remains pending.
 
 ## Evidence and decisions
 - Started from clean `main` at `3175331`; inspected prior history, screenshots, `xx`, `yy`, Astryx 0.6 source/MCP/CLI, Swift documentation, and release logs.
@@ -38,10 +39,11 @@ Repair desktop settings and composer, Android compilation, and iOS navigation wh
 ## Remaining
 - Verify the desktop selector fix in a new package; inspect other memory entry points and wipe behavior only when a safe reproduction is available.
 - Inspect and complete mobile SSH, Git review, resource library, files, MCP/Skills store, permissions, and routing against `yy`.
+- Verify and correct the new native SSH channel in mobile CI.
 - Run one consolidated non-build verification, inspect the final diff, push, and track CI/release workflows.
 
 ## Touched files
-- `crates/fronted/src-tauri/src/{lib.rs,services/skills/{clawhub,sources,tests}.rs}`, `crates/mobile-assistant/android/src/main/java/com/ohi/xgent/mobileassistant/BluetoothDiscovery.kt`, `crates/fronted/src-tauri/native/apple-ui/{PresentationMobile,PresentationMobileNode}.swift`, `crates/fronted/src-tauri/LaunchScreen.storyboard`, `crates/fronted/src/presentation/{NativeChatPage,NativeSettingsPage}.tsx`, `crates/fronted/src/pages/chat/mobile/{MobileFilesPanel,MobileSshPanel,MobileBackgroundTasksPanel}.tsx`, `crates/fronted/src/pages/settings/{CronSection,CronTaskModal,CronTaskViewModal,HooksSection}.tsx`, `crates/fronted/src/lib/skills/clawHub.ts`, `crates/fronted/src/index.css`, `crates/fronted/test/presentation/native-settings-flow.test.mjs`, `history.md`.
+- Prior files above, plus `crates/fronted/src-tauri/{Cargo.toml,src/commands/runtime/{mod.rs,mobile_ssh.rs,shell.rs}}`; `history.md`.
 
 ## Verification/CI
 - TypeScript and native mapping checks passed; lint passed after four formatting corrections. The non-Cargo suite found two obsolete presentation assertions, now updated; focused rerun and new GitHub workflows remain.

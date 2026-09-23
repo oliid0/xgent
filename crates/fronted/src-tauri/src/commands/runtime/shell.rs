@@ -13,8 +13,6 @@ use tauri_plugin_mobile_execution::{
 #[cfg(mobile)]
 use serde_json::json;
 #[cfg(mobile)]
-use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
-#[cfg(mobile)]
 use std::path::{Path, PathBuf};
 
 #[cfg(desktop)]
@@ -48,12 +46,10 @@ pub(crate) struct MobileShellRunInput {
 }
 
 #[cfg(mobile)]
-fn mobile_shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\\''"))
-}
-
-#[cfg(mobile)]
-fn read_mobile_ssh_private_key(workdir: &str, configured_path: &str) -> Result<String, String> {
+pub(super) fn read_mobile_ssh_private_key(
+    workdir: &str,
+    configured_path: &str,
+) -> Result<String, String> {
     let configured_path = configured_path.trim();
     if configured_path.is_empty() {
         return Ok(String::new());
@@ -66,174 +62,6 @@ fn read_mobile_ssh_private_key(workdir: &str, configured_path: &str) -> Result<S
     };
     std::fs::read_to_string(&resolved)
         .map_err(|error| format!("read SSH private key {} failed: {error}", resolved.display()))
-}
-
-#[cfg(mobile)]
-fn encoded_shell_file(path: &str, content: &str, executable: bool) -> String {
-    let encoded = BASE64_STANDARD.encode(content.as_bytes());
-    let chmod = if executable { "chmod 700" } else { "chmod 600" };
-    format!(
-        "printf %s {} | base64 -d > {}; {} {}",
-        mobile_shell_quote(&encoded),
-        path,
-        chmod,
-        path,
-    )
-}
-
-#[cfg(mobile)]
-fn build_mobile_ssh_command(
-    workdir: &str,
-    host: &crate::commands::settings::RuntimeSshHostConfig,
-    remote_command: &str,
-    run_id: &str,
-    keyboard_response: Option<&str>,
-) -> Result<String, String> {
-    let endpoint = if host.username.trim().is_empty() {
-        host.host.trim().to_string()
-    } else {
-        format!("{}@{}", host.username.trim(), host.host.trim())
-    };
-    if endpoint.trim().is_empty() {
-        return Err("SSH host is empty".to_string());
-    }
-    let remote_command = remote_command.trim();
-    if remote_command.is_empty() {
-        return Err("A remote command is required for mobile SSH execution".to_string());
-    }
-    if remote_command.len() > 128 * 1024 {
-        return Err("The remote SSH command is too large".to_string());
-    }
-
-    let safe_run_id: String = run_id
-        .chars()
-        .filter(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
-        .take(96)
-        .collect();
-    let temp_root = format!("$PWD/.xgent-tmp/ssh-{}", safe_run_id);
-    let temp_dir = format!("\"{temp_root}\"");
-    let key_path = format!("\"{temp_root}/key\"");
-    let askpass_path = format!("\"{temp_root}/askpass\"");
-    let known_hosts_dir = "\"$PWD/.xgent-ssh\"";
-    let known_hosts = "\"$PWD/.xgent-ssh/known_hosts\"";
-    let mut setup = vec![
-        "umask 077".to_string(),
-        format!("mkdir -p {temp_dir} {known_hosts_dir}"),
-        format!("trap 'rm -rf {temp_dir}' EXIT HUP INT TERM"),
-    ];
-    let mut options = vec![
-        "-o ConnectTimeout=15".to_string(),
-        "-o ServerAliveInterval=15".to_string(),
-        "-o ServerAliveCountMax=2".to_string(),
-        "-o StrictHostKeyChecking=accept-new".to_string(),
-        format!("-o UserKnownHostsFile={known_hosts}"),
-        format!("-p {}", host.port),
-    ];
-
-    let proxy_url = host.proxy.url.trim();
-    if !proxy_url.is_empty() || host.proxy.port > 0 {
-        let proxy = crate::services::ssh_proxy::resolve_ssh_proxy_endpoint(
-            proxy_url,
-            &host.proxy.proxy_type,
-            host.proxy.port,
-        )?;
-        if host.proxy.password_configured || !host.proxy.password.trim().is_empty() {
-            return Err("Password-authenticated SSH proxies are not supported by the mobile command runner".to_string());
-        }
-        let proxy_kind = match proxy.kind {
-            crate::services::ssh_proxy::SshProxyKind::Http => "connect",
-            crate::services::ssh_proxy::SshProxyKind::Socks5 => "5",
-        };
-        let proxy_user = if host.proxy.username.trim().is_empty() {
-            String::new()
-        } else {
-            format!(" -P {}", mobile_shell_quote(host.proxy.username.trim()))
-        };
-        let proxy_command = format!(
-            "nc -X {proxy_kind} -x {}:{}{proxy_user} %h %p",
-            proxy.host, proxy.port
-        );
-        options.push(format!("-o ProxyCommand={}", mobile_shell_quote(&proxy_command)));
-    }
-
-    let mut environment = String::new();
-    match host.auth_type.as_str() {
-        "privateKey" => {
-            let key = if host.private_key.trim().is_empty() {
-                read_mobile_ssh_private_key(workdir, &host.private_key_path)?
-            } else {
-                host.private_key.clone()
-            };
-            if key.trim().is_empty() {
-                return Err("The selected SSH host has no private key".to_string());
-            }
-            setup.push(encoded_shell_file(&key_path, &key, false));
-            options.push("-o IdentitiesOnly=yes".to_string());
-            options.push(format!("-i {key_path}"));
-            if !host.private_key_passphrase.is_empty() {
-                let askpass = format!(
-                    "#!/bin/sh\nprintf '%s\\n' {}\n",
-                    mobile_shell_quote(&host.private_key_passphrase)
-                );
-                setup.push(encoded_shell_file(
-                    &askpass_path,
-                    &askpass,
-                    true,
-                ));
-                environment = format!(
-                    "SSH_ASKPASS={askpass_path} SSH_ASKPASS_REQUIRE=force DISPLAY=x "
-                );
-            } else {
-                options.push("-o BatchMode=yes".to_string());
-            }
-        }
-        "password" => {
-            if host.password.is_empty() {
-                return Err("The selected SSH host has no saved password".to_string());
-            }
-            let askpass = format!(
-                "#!/bin/sh\nprintf '%s\\n' {}\n",
-                mobile_shell_quote(&host.password)
-            );
-            setup.push(encoded_shell_file(
-                &askpass_path,
-                &askpass,
-                true,
-            ));
-            options.push("-o PreferredAuthentications=password".to_string());
-            environment = format!(
-                "SSH_ASKPASS={askpass_path} SSH_ASKPASS_REQUIRE=force DISPLAY=x "
-            );
-        }
-        "keyboardInteractive" => {
-            let response = keyboard_response.map(str::trim).unwrap_or_default();
-            if response.is_empty() {
-                return Err("A keyboard-interactive response is required".to_string());
-            }
-            let askpass = format!(
-                "#!/bin/sh\nprintf '%s\\n' {}\n",
-                mobile_shell_quote(response)
-            );
-            setup.push(encoded_shell_file(&askpass_path, &askpass, true));
-            options.push(
-                "-o PreferredAuthentications=keyboard-interactive,password".to_string(),
-            );
-            options.push("-o KbdInteractiveAuthentication=yes".to_string());
-            environment = format!(
-                "SSH_ASKPASS={askpass_path} SSH_ASKPASS_REQUIRE=force DISPLAY=x "
-            );
-        }
-        other => return Err(format!("Unsupported SSH authentication method: {other}")),
-    }
-
-    let execute = format!(
-        "{environment}ssh {} -- {} {} </dev/null",
-        options.join(" "),
-        mobile_shell_quote(&endpoint),
-        mobile_shell_quote(remote_command),
-    );
-    setup.push(execute);
-    Ok(setup.join("\n"))
 }
 
 #[cfg(mobile)]
@@ -428,34 +256,20 @@ pub async fn mobile_ssh_exec(
     timeout_ms: Option<u64>,
     run_id: Option<String>,
 ) -> Result<ShellRunResponse, String> {
-    let lan_pc_client = app
-        .try_state::<Arc<LanPcClient>>()
-        .map(|state| Arc::clone(state.inner()));
+    let _ = app;
     let host = crate::commands::settings::load_runtime_ssh_host(&host_id)?
         .ok_or_else(|| format!("SSH host not found: {}", host_id.trim()))?;
     let normalized_run_id = run_id
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-    let command = build_mobile_ssh_command(
-        &workdir,
-        &host,
-        &remote_command,
-        &normalized_run_id,
-        keyboard_response.as_deref(),
-    )?;
-    run_mobile_shell(
-        app,
-        lan_pc_client.as_deref(),
-        MobileShellRunInput {
-            workdir,
-            command,
-            cwd: None,
-            timeout_ms,
-            max_timeout_ms: Some(MAX_SHELL_TIMEOUT_MS),
-            provider_id: None,
-            run_id: Some(normalized_run_id),
-        },
+    super::mobile_ssh::run(
+        host,
+        workdir,
+        remote_command,
+        keyboard_response,
+        timeout_ms,
+        normalized_run_id,
     )
     .await
 }
@@ -524,6 +338,7 @@ pub async fn shell_cancel(
         .try_state::<Arc<LanPcClient>>()
         .map(|state| Arc::clone(state.inner()));
     let run_id = run_id.trim().to_string();
+    let native_cancelled = super::mobile_ssh::cancel(&run_id);
     let settings = crate::commands::settings::open_db()
         .and_then(|connection| crate::commands::settings::load_access_settings(&connection))
         .ok();
@@ -544,14 +359,13 @@ pub async fn shell_cancel(
         false
     };
     Ok(ShellCancelResponse {
-        cancelled: remote_cancelled
+        cancelled: native_cancelled
+            || remote_cancelled
             || app
-            .mobile_execution()
-            .cancel(MobileCancelRequest {
-                run_id,
-            })
-            .map(|response| response.cancelled)
-            .unwrap_or(false),
+                .mobile_execution()
+                .cancel(MobileCancelRequest { run_id })
+                .map(|response| response.cancelled)
+                .unwrap_or(false),
     })
 }
 
