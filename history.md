@@ -27,6 +27,7 @@ Repair desktop settings and composer, Android compilation, and iOS navigation wh
 - Updated two existing native presentation tests to assert the requested full-page iOS More route and in-stack composer layout instead of their obsolete menu/inset behavior.
 - Replaced mobile SSH shell invocation and credential temp files with a native `russh` session; wired authentication, known-host trust, bounded output, timeout, duplicate-run protection, and cancellation. Reviewed and formatted the integration; native CI validation remains pending.
 - Added a mobile-only libgit2 backend for local repository status, history, diffs, commit details, stage, unstage, discard, init, and commit. Rewired SwiftUI/Astryx mobile Git review to native commands. Added HTTPS fetch/push and clean fast-forward pull using the native GitHub token vault. Missing Git author identity now shows name/email fields. Mutations reject worktree path escapes and empty commits; updated the old shell-dependent hint.
+- Bound Android's vendored OpenSSL cross-build to the NDK `llvm-ranlib` after release CI failed because its inferred `aarch64-linux-android-ranlib` executable does not exist.
 
 ## Evidence and decisions
 - Started from clean `main` at `3175331`; inspected prior history, screenshots, `xx`, `yy`, Astryx 0.6 source/MCP/CLI, Swift documentation, and release logs.
@@ -40,11 +41,11 @@ Repair desktop settings and composer, Android compilation, and iOS navigation wh
 ## Remaining
 - Verify the desktop selector fix in a new package; inspect other memory entry points and wipe behavior only when a safe reproduction is available.
 - Inspect and complete mobile SSH, Git review, resource library, files, MCP/Skills store, permissions, and routing against `yy`.
-- Verify native SSH and Git in a new Android/iOS release build; correct compile or runtime failures.
+- Verify native SSH and Git in a new Android/iOS release build after the NDK archiver fix; correct compile or runtime failures.
 - Inspect the final diff, push the Git implementation, and track CI/release workflows. The consolidated local checks passed: `pnpm check`, `pnpm native:check`, `pnpm lint`, and `pnpm test:non-native` (1211/1211).
 
 ## Touched files
 - Prior files above, plus `crates/fronted/src-tauri/{Cargo.toml,src/{lib.rs,commands/{mod.rs,runtime/{mod.rs,mobile_ssh.rs,shell.rs},workspace/{mod.rs,mobile_git.rs}}}}`, `crates/fronted/src/{i18n/config.ts,pages/chat/mobile/MobileGitReviewPanel.tsx}`; `history.md`.
 
 ## Verification/CI
-- TypeScript and native mapping checks passed; lint passed after four formatting corrections. The non-Cargo suite found two obsolete presentation assertions, now updated; focused rerun and new GitHub workflows remain.
+- `a76d1e2` CI passed frontend, diff, architecture, workflow checks and Rust tests. Android release `35891447482` failed at vendored OpenSSL's missing cross `ranlib`; iOS and desktop release jobs remain in progress. Consolidated local checks passed before the workflow edit.

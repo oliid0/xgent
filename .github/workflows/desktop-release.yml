@@ -520,6 +520,9 @@ jobs:
             "ndk;$ANDROID_NDK_VERSION"
           echo "NDK_HOME=$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" >> "$GITHUB_ENV"
+          ndk_ranlib="$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib"
+          test -x "$ndk_ranlib"
+          echo "RANLIB=$ndk_ranlib" >> "$GITHUB_ENV"
 
       - name: Install host archive tools
         run: |
