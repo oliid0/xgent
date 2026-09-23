@@ -22,6 +22,39 @@ function createServer(id) {
   };
 }
 
+test("chat keeps working MCP servers when another enabled server is incomplete", async () => {
+  const warnings = [];
+  const listed = [];
+  const loader = createTsModuleLoader({
+    mocks: {
+      "@tauri-apps/api/core": {
+        async invoke(command, args) {
+          assert.equal(command, "mcp_list_tools");
+          listed.push(...args.servers.map((server) => server.id));
+          return [{
+            serverId: "docs",
+            serverLabel: "Docs",
+            name: "search",
+            description: "Search docs",
+            inputSchema: { type: "object" },
+          }];
+        },
+      },
+    },
+  });
+  const { createMcpTools } = loader.loadModule("src/lib/tools/mcpTools.ts");
+  const servers = [createServer("docs"), { ...createServer("broken"), command: "" }];
+  const bundle = await createMcpTools({ servers, onLoadError: (message) => warnings.push(message) });
+
+  assert.deepEqual(listed, ["docs"]);
+  assert.deepEqual(bundle.tools.map((tool) => tool.name), ["mcp_docs_search"]);
+  assert.match(warnings[0], /broken: transport=stdio requires command/);
+  await assert.rejects(
+    createMcpTools({ servers, loadFailureMode: "throw" }),
+    /broken: transport=stdio requires command/,
+  );
+});
+
 test("MCP business tool calls are serialized per server", async () => {
   let activeCalls = 0;
   let maxActiveCalls = 0;

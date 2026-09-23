@@ -68,6 +68,7 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Fixed the desktop app-proxy settings deadlock: the initially invalid, disabled switch now opens the existing configuration fields; a later valid activation atomically saves current drafts, and port parsing rejects trailing garbage.
 - Applied Biome's requested proxy-port expression wrap; the TypeScript check passed after the proxy activation change.
 - Marked malformed proxy port input as invalid in the existing field feedback, matching the strict activation check.
+- Kept valid MCP servers available to chat when a separate enabled server has incomplete configuration; report that server through the existing load-error channel while preserving strict failure for scheduled runs.
 - Extended the native chat evidence test with unchanged context lines, so it rejects the previous false whole-snippet deletion/addition while checking that activity and transcript share the same diff.
 - Adjusted the diff assertion to the library's actual unified patch format (`-old`/`+new`) and applied Biome's compact call formatting after the focused check revealed only those mismatches.
 - Applied Biome's two import/format corrections after TypeScript and native presentation checks passed; remaining consolidated checks continue after this fix.

@@ -100,6 +100,7 @@ export async function createMcpTools(params: {
   const enabledServers = servers.filter((s) => s.enabled);
 
   const invalid: Array<{ label: string; reason: string }> = [];
+  const validServers: McpServerConfig[] = [];
   for (const s of enabledServers) {
     const label = s.id?.trim() || "(Unnamed Server)";
     const id = s.id?.trim() || "";
@@ -113,6 +114,8 @@ export async function createMcpTools(params: {
     if (transport === "stdio") {
       if (!s.command?.trim()) {
         invalid.push({ label, reason: "transport=stdio requires command" });
+      } else {
+        validServers.push(s);
       }
       continue;
     }
@@ -120,6 +123,8 @@ export async function createMcpTools(params: {
     if (transport === "http") {
       if (!s.url?.trim()) {
         invalid.push({ label, reason: "transport=http requires url" });
+      } else {
+        validServers.push(s);
       }
       continue;
     }
@@ -127,6 +132,8 @@ export async function createMcpTools(params: {
     if (transport === "sse") {
       if (!s.url?.trim()) {
         invalid.push({ label, reason: "transport=sse requires url (SSE endpoint)" });
+      } else {
+        validServers.push(s);
       }
       continue;
     }
@@ -136,12 +143,13 @@ export async function createMcpTools(params: {
 
   if (invalid.length > 0) {
     const lines = invalid.map((it) => `- ${it.label}: ${it.reason}`).join("\n");
-    throw new Error(
-      `The following MCP server configurations are incomplete:\n${lines}\n\nPlease complete them in Settings -> MCP.`,
-    );
+    const message =
+      `The following MCP server configurations are incomplete:\n${lines}\n\nPlease complete them in Settings -> MCP.`;
+    if (params.loadFailureMode === "throw") throw new Error(message);
+    params.onLoadError?.(message);
   }
 
-  if (enabledServers.length === 0) {
+  if (validServers.length === 0) {
     return {
       groupId: "mcp",
       tools: [],
@@ -163,7 +171,7 @@ export async function createMcpTools(params: {
   let toolInfos: McpToolInfo[] = [];
   try {
     toolInfos = await invoke<McpToolInfo[]>("mcp_list_tools", {
-      servers: enabledServers,
+      servers: validServers,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
