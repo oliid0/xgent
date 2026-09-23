@@ -4,6 +4,7 @@ import EventKit
 import Foundation
 import HealthKit
 import MessageUI
+import Network
 import Photos
 import Speech
 import Tauri
@@ -114,6 +115,8 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
     private let bluetooth = BluetoothDiscovery()
     private let healthStore = HKHealthStore()
     private let locationManager = CLLocationManager()
+    private let networkMonitor = NWPathMonitor()
+    private var networkStatus: [String: Any]?
     private var locationPermissionInvokes: [Invoke] = []
     private var locationReadInvoke: Invoke?
     private var locationTimeout: DispatchWorkItem?
@@ -127,7 +130,25 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
     override init() {
         super.init()
         locationManager.delegate = self
+        networkMonitor.pathUpdateHandler = { [weak self] path in
+            DispatchQueue.main.async {
+                let transport: String
+                if path.status != .satisfied { transport = "none" }
+                else if path.usesInterfaceType(.wifi) { transport = "wifi" }
+                else if path.usesInterfaceType(.cellular) { transport = "cellular" }
+                else if path.usesInterfaceType(.wiredEthernet) { transport = "ethernet" }
+                else { transport = "other" }
+                self?.networkStatus = [
+                    "transport": transport,
+                    "connected": path.status == .satisfied,
+                    "metered": path.isExpensive,
+                ]
+            }
+        }
+        networkMonitor.start(queue: .main)
     }
+
+    deinit { networkMonitor.cancel() }
 
     @objc func readClipboard(_ invoke: Invoke) {
         DispatchQueue.main.async { invoke.resolve(["text": UIPasteboard.general.string ?? ""]) }
@@ -161,31 +182,51 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
     }
 
     @objc func status(_ invoke: Invoke) {
-        var aliases = [
-            "bluetooth": "bluetooth",
-            "microphone": PermissionAlias.microphone,
-            "camera": PermissionAlias.camera,
-            "calendar": PermissionAlias.calendar,
-            "reminders": PermissionAlias.reminders,
-            "photos": PermissionAlias.photos,
-            "location": PermissionAlias.location,
-        ]
-        let healthAvailable = HKHealthStore.isHealthDataAvailable()
-        if healthAvailable { aliases["health"] = PermissionAlias.health }
-        invoke.resolve([
-            "backend": "ios-native",
-            "available": true,
-            "voiceInputAvailable": true,
-            // The mobile-execution plugin owns the security-scoped folder
-            // picker and keeps bookmark access alive for file tools, a-Shell
-            // and agent runs in this process.
-            "externalFolderMountAvailable": true,
-            "cloudSyncAvailable": false,
-            "healthAvailable": healthAvailable,
-            "homeAvailable": false,
-            "permissionAliases": aliases,
-            "detail": "iOS permissions are requested individually. HealthKit reads only step totals for user-requested time ranges.",
-        ])
+        DispatchQueue.main.async {
+            var aliases = [
+                "bluetooth": "bluetooth",
+                "microphone": PermissionAlias.microphone,
+                "camera": PermissionAlias.camera,
+                "calendar": PermissionAlias.calendar,
+                "reminders": PermissionAlias.reminders,
+                "photos": PermissionAlias.photos,
+                "location": PermissionAlias.location,
+            ]
+            let healthAvailable = HKHealthStore.isHealthDataAvailable()
+            if healthAvailable { aliases["health"] = PermissionAlias.health }
+            let audioOutputs: [[String: Any]] = AVAudioSession.sharedInstance().currentRoute.outputs.compactMap { port in
+                let transport: String
+                switch port.portType {
+                case .bluetoothA2DP, .bluetoothHFP, .bluetoothLE: transport = "bluetooth"
+                case .airPlay: transport = "airplay"
+                case .HDMI: transport = "hdmi"
+                case .headphones, .lineOut, .usbAudio: transport = "wired"
+                default: return nil
+                }
+                return [
+                    "id": port.uid,
+                    "name": port.portName,
+                    "transport": transport,
+                    "active": true,
+                ]
+            }
+            invoke.resolve([
+                "backend": "ios-native",
+                "available": true,
+                "voiceInputAvailable": true,
+                // The mobile-execution plugin owns the security-scoped folder
+                // picker and keeps bookmark access alive for file tools, a-Shell
+                // and agent runs in this process.
+                "externalFolderMountAvailable": true,
+                "cloudSyncAvailable": false,
+                "healthAvailable": healthAvailable,
+                "homeAvailable": false,
+                "network": self.networkStatus.map { $0 as Any } ?? NSNull(),
+                "audioOutputs": audioOutputs,
+                "permissionAliases": aliases,
+                "detail": "iOS permissions are requested individually. HealthKit reads only step totals for user-requested time ranges.",
+            ])
+        }
     }
 
     @objc override public func checkPermissions(_ invoke: Invoke) {

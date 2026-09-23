@@ -46,6 +46,8 @@ impl<R: Runtime> MobileAssistant<R> {
             cloud_sync_available: false,
             health_available: false,
             home_available: false,
+            network: None,
+            audio_outputs: Vec::new(),
             permission_aliases: Default::default(),
             detail: Some("Native assistant capabilities are available on Android and iOS.".into()),
         })

@@ -11,6 +11,7 @@ import {
 import type { MentionComposerHandle } from "../components/chat/MentionComposer";
 import { useLocale } from "../i18n";
 import { collectActivityItems } from "../lib/chat/activityTimeline";
+import { contextUsageRatio } from "../lib/chat/contextUsage";
 import type { RenderTimelineItem } from "../lib/chat/conversation/conversationState";
 import type { LiveTranscriptStore } from "../lib/chat/conversation/liveTranscriptStore";
 import { executionActivityStore } from "../lib/chat/executionActivityStore";
@@ -106,6 +107,11 @@ export type NativeChatPageProps = {
   liveTranscriptStore: LiveTranscriptStore;
   modelOptions: ModelOption[];
   selectedValue?: string;
+  contextUsageTokensSource: {
+    subscribe: (listener: () => void) => () => void;
+    getContextUsageTokens: () => number | undefined;
+  };
+  contextWindow?: number;
   inputDisabled: boolean;
   inputPlaceholder: string;
   isSending: boolean;
@@ -285,6 +291,11 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const live = useSyncExternalStore(
     props.liveTranscriptStore.subscribe,
     props.liveTranscriptStore.getSnapshot,
+  );
+  const contextUsedTokens = useSyncExternalStore(
+    props.contextUsageTokensSource.subscribe,
+    props.contextUsageTokensSource.getContextUsageTokens,
+    props.contextUsageTokensSource.getContextUsageTokens,
   );
   const activityFrames = useSyncExternalStore(
     executionActivityStore.subscribe,
@@ -602,6 +613,24 @@ export function NativeChatPage(props: NativeChatPageProps) {
         }
       : undefined;
   const draft = composer.handle.getDraft();
+  const contextWindow =
+    typeof props.contextWindow === "number" && Number.isFinite(props.contextWindow)
+      ? Math.max(0, Math.floor(props.contextWindow))
+      : 0;
+  const usedTokens = Math.max(0, contextUsedTokens ?? 0);
+  const contextRatio = contextUsageRatio(usedTokens, contextWindow);
+  const contextUsageNode: PresentationNode | null =
+    contextWindow > 0 && usedTokens > 0
+      ? {
+          id: "context-usage",
+          kind: "ProgressBar",
+          label: t("chat.contextUsage"),
+          current: usedTokens,
+          total: contextWindow,
+          status: contextRatio >= 0.8 ? "error" : contextRatio >= 0.5 ? "paused" : "completed",
+          accessibilityValue: `${usedTokens.toLocaleString()} / ${contextWindow.toLocaleString()} tokens (${Math.round(contextRatio * 100)}%)`,
+        }
+      : null;
   const nodes: PresentationNode[] = [
     {
       id: "chat",
@@ -620,6 +649,26 @@ export function NativeChatPage(props: NativeChatPageProps) {
               variant: compact ? "secondary" : undefined,
             },
             { id: "toolbar-space", kind: "Spacer" },
+            ...(compact
+              ? [
+                  {
+                    id: "execution-mode",
+                    kind: "Selector" as const,
+                    variant: "compact",
+                    label: t("settings.executionMode"),
+                    value: props.settings.system.executionMode === "text" ? "text" : "tools",
+                    options: [
+                      { value: "text", label: t("chat.mode.chat") },
+                      { value: "tools", label: t("chat.mode.agent") },
+                    ],
+                    action: change(
+                      "execution-mode",
+                      (value) => props.onChangeMode(value as "text" | "tools"),
+                      (value) => value === "text" || value === "tools",
+                    ),
+                  },
+                ]
+              : []),
             ...(compact
               ? [
                   {
@@ -800,6 +849,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                     props.modelOptions.length > 0,
                   ),
                 },
+                ...(contextUsageNode ? [contextUsageNode] : []),
                 { id: "composer-spacer", kind: "Spacer" },
                 ...(voiceAvailable
                   ? [
@@ -877,23 +927,34 @@ export function NativeChatPage(props: NativeChatPageProps) {
                       },
                     ]
                   : []),
-                {
-                  ...button(
-                    "send",
-                    t("chat.send"),
-                    props.onSend,
-                    !props.inputDisabled &&
-                      !props.isUploading &&
-                      props.modelOptions.length > 0 &&
-                      (!draft.isEmpty || props.uploads.length > 0),
-                  ),
-                  prominent: true,
-                  kind: "IconButton",
-                  icon: "arrow.up",
-                },
-                ...(props.isSending
-                  ? [button("stop", t("chat.stopGeneration"), props.onStop)]
-                  : []),
+                ...(compact && props.isSending
+                  ? [
+                      {
+                        ...button("stop", t("chat.stopGeneration"), props.onStop),
+                        prominent: true,
+                        kind: "IconButton" as const,
+                        icon: "stop.fill",
+                      },
+                    ]
+                  : [
+                      {
+                        ...button(
+                          "send",
+                          t("chat.send"),
+                          props.onSend,
+                          !props.inputDisabled &&
+                            !props.isUploading &&
+                            props.modelOptions.length > 0 &&
+                            (!draft.isEmpty || props.uploads.length > 0),
+                        ),
+                        prominent: true,
+                        kind: "IconButton" as const,
+                        icon: "arrow.up",
+                      },
+                      ...(props.isSending
+                        ? [button("stop", t("chat.stopGeneration"), props.onStop)]
+                        : []),
+                    ]),
               ],
             },
           ],

@@ -7,15 +7,27 @@ import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { MoreHorizontal, Plug, Plus, Server } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
+import {
+  applyMcpRegistryInstallConfig,
+  MCP_REGISTRY_SOURCE_OPTIONS,
+  type McpRegistryCard,
+  type McpRegistryInstallDraft,
+  type McpRegistrySource,
+  mcpRegistryConfigInputKey,
+  resolveMcpRegistryInstallDraft,
+  searchMcpRegistry,
+  withUniqueMcpServerId,
+} from "../../../lib/mcpRegistry";
 import { type AppSettings, type McpServerConfig, updateMcp } from "../../../lib/settings";
 import { presentationControls } from "../../../presentation/controls";
 import { NativeSurface } from "../../../presentation/NativeSurface";
 import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
 import type { PresentationNode } from "../../../presentation/types";
 import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
+import { McpRegistryBrowser } from "../../mcp-hub/McpRegistryBrowser";
 import { McpServerEditModal } from "../../mcp-hub/McpServersForm";
 import { MobileHubHeader, MobileHubSearch } from "./MobileHubChrome";
 
@@ -38,6 +50,18 @@ function serverSubtitle(server: McpServerConfig) {
 export function MobileMcpPage(props: MobileMcpPageProps) {
   const { t } = useLocale();
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<"installed" | "store">("installed");
+  const [registrySource, setRegistrySource] = useState<McpRegistrySource>("official");
+  const [registryItems, setRegistryItems] = useState<McpRegistryCard[]>([]);
+  const [registryLoading, setRegistryLoading] = useState(false);
+  const [registryError, setRegistryError] = useState("");
+  const [installingCardId, setInstallingCardId] = useState("");
+  const [addedCardIds, setAddedCardIds] = useState<string[]>([]);
+  const [configuring, setConfiguring] = useState<{
+    card: McpRegistryCard;
+    draft: McpRegistryInstallDraft;
+  } | null>(null);
+  const [configValues, setConfigValues] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [nativeDraft, setNativeDraft] = useState<McpServerConfig | null>(null);
   const [nativeError, setNativeError] = useState("");
@@ -53,6 +77,108 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
           .includes(needle),
       );
   }, [props.settings.mcp.servers, query]);
+
+  useEffect(() => {
+    if (view !== "store" || !isApplePresentationRuntime()) return;
+    let active = true;
+    const timer = window.setTimeout(
+      () => {
+        setRegistryLoading(true);
+        setRegistryError("");
+        void searchMcpRegistry({ source: registrySource, query: query.trim(), limit: 24 })
+          .then((result) => {
+            if (active) setRegistryItems(result.items);
+          })
+          .catch((cause) => {
+            if (active) setRegistryError(cause instanceof Error ? cause.message : String(cause));
+          })
+          .finally(() => {
+            if (active) setRegistryLoading(false);
+          });
+      },
+      query.trim() ? 250 : 0,
+    );
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [query, registrySource, view]);
+
+  const cardIsInstalled = (card: McpRegistryCard) =>
+    addedCardIds.includes(card.id) ||
+    props.settings.mcp.servers.some(
+      (server) =>
+        server.id === card.installDraft?.server.id || server.id === card.manualDraft?.server.id,
+    );
+
+  async function installRegistryCard(card: McpRegistryCard) {
+    if (installingCardId || cardIsInstalled(card)) return;
+    setInstallingCardId(card.id);
+    setRegistryError("");
+    try {
+      const resolved = await resolveMcpRegistryInstallDraft(card);
+      setRegistryItems((items) => items.map((item) => (item.id === card.id ? resolved : item)));
+      const draft = resolved.installDraft ?? resolved.manualDraft;
+      if (!draft)
+        throw new Error(resolved.installUnavailableReason || t("mcpHub.storeInstallUnavailable"));
+      if (!props.allowStdio && draft.server.transport === "stdio")
+        throw new Error(t("mcpHub.mobileNetworkOnly"));
+      if (!resolved.installDraft || draft.status === "needs_config") {
+        setConfiguring({
+          card: resolved,
+          draft: withUniqueMcpServerId(draft, props.settings.mcp.servers),
+        });
+        setConfigValues({});
+      } else {
+        const ready = withUniqueMcpServerId(draft, props.settings.mcp.servers);
+        props.setSettings((previous) =>
+          updateMcp(previous, { servers: [...previous.mcp.servers, ready.server] }),
+        );
+        setAddedCardIds((ids) => [...ids, card.id]);
+      }
+    } catch (cause) {
+      setRegistryError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setInstallingCardId("");
+    }
+  }
+
+  function commitRegistryConfig() {
+    if (!configuring) return;
+    const id = configuring.draft.server.id.trim();
+    if (!id || props.settings.mcp.servers.some((server) => server.id === id)) {
+      setRegistryError(!id ? t("mcpHub.storeConfigureNameRequired") : t("mcpHub.duplicateName"));
+      return;
+    }
+    const missing = configuring.draft.requiredConfig.find(
+      (input) => input.required && !configValues[mcpRegistryConfigInputKey(input)]?.trim(),
+    );
+    if (missing) {
+      setRegistryError(
+        t("mcpHub.storeConfigureRequiredMissing").replace("{name}", missing.label || missing.name),
+      );
+      return;
+    }
+    const configured = applyMcpRegistryInstallConfig(configuring.draft, configValues);
+    const endpoint =
+      configured.server.transport === "stdio" ? configured.server.command : configured.server.url;
+    if (!endpoint?.trim()) {
+      setRegistryError(
+        t(
+          configured.server.transport === "stdio"
+            ? "mcpHub.storeConfigureCommandRequired"
+            : "mcpHub.storeConfigureUrlRequired",
+        ),
+      );
+      return;
+    }
+    props.setSettings((previous) =>
+      updateMcp(previous, { servers: [...previous.mcp.servers, { ...configured.server, id }] }),
+    );
+    setAddedCardIds((ids) => [...ids, configuring.card.id]);
+    setConfiguring(null);
+    setRegistryError("");
+  }
 
   const patchServer = (index: number, patch: Partial<McpServerConfig>) => {
     props.setSettings((prev) =>
@@ -107,7 +233,7 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
 
   if (isApplePresentationRuntime()) {
     const root = presentationControls();
-    const mainNodes: PresentationNode[] = visibleServers.map(({ server, index }) => ({
+    const installedNodes: PresentationNode[] = visibleServers.map(({ server, index }) => ({
       id: `mcp-card:${index}`,
       kind: "Card",
       children: [
@@ -146,6 +272,52 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
         root.action(`mcp-card:${index}:edit`, t("settings.edit"), () => openEdit(index, server)),
       ],
     }));
+    const storeNodes: PresentationNode[] = registryItems.map((card): PresentationNode => {
+      const installed = cardIsInstalled(card);
+      const pending = installingCardId === card.id;
+      return {
+        id: `mcp-store:${card.id}`,
+        kind: "Card",
+        children: [
+          {
+            id: `mcp-store:${card.id}:row`,
+            kind: "HStack",
+            children: [
+              {
+                id: `mcp-store:${card.id}:copy`,
+                kind: "VStack",
+                fill: true,
+                children: [
+                  { id: `mcp-store:${card.id}:name`, kind: "Heading", text: card.displayName },
+                  {
+                    id: `mcp-store:${card.id}:description`,
+                    kind: "Text",
+                    text: card.description,
+                    secondary: true,
+                    maxLines: 2,
+                  },
+                  { id: `mcp-store:${card.id}:source`, kind: "Badge", label: card.source },
+                ],
+              },
+              {
+                ...root.action(
+                  `mcp-store:${card.id}:install`,
+                  installed
+                    ? t("mcpHub.storeInstalled")
+                    : pending
+                      ? t("mcpHub.storeInstalling")
+                      : t("mcpHub.storeInstall"),
+                  () => installRegistryCard(card),
+                  !installed && !pending && !installingCardId,
+                ),
+                kind: "IconButton",
+                icon: installed ? "checkmark" : "plus",
+              },
+            ],
+          },
+        ],
+      };
+    });
     const add = {
       ...root.action("mcp-add", t("mcpHub.add"), openAdd),
       kind: "IconButton" as const,
@@ -177,21 +349,57 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
                 fill: true,
                 alignment: "center",
               },
-              add,
+              view === "installed" ? add : { id: "mcp-toolbar-end", kind: "Spacer", width: 44 },
             ],
           },
           {
-            ...root.input("mcp-search", "Search MCP", query, setQuery),
+            ...root.select(
+              "mcp-view",
+              "MCP",
+              view,
+              [
+                { value: "installed", label: t("mcpHub.tabInstalled") },
+                { value: "store", label: t("mcpHub.tabStore") },
+              ],
+              (value) => setView(value as "installed" | "store"),
+            ),
+            kind: "SegmentedControl",
             padding: 12,
           },
+          {
+            ...root.input("mcp-search", t("mcpHub.storeSearchPlaceholder"), query, setQuery),
+            padding: 12,
+          },
+          ...(view === "store"
+            ? [
+                {
+                  ...root.select(
+                    "mcp-store-source",
+                    t("mcpHub.tabStore"),
+                    registrySource,
+                    MCP_REGISTRY_SOURCE_OPTIONS,
+                    (value) => setRegistrySource(value as McpRegistrySource),
+                  ),
+                  padding: 12,
+                },
+              ]
+            : []),
           {
             id: "mcp-hub-section",
             kind: "HStack",
             padding: 16,
             children: [
-              { id: "mcp-hub-section-title", kind: "Heading", text: t("mcpHub.tabInstalled") },
+              {
+                id: "mcp-hub-section-title",
+                kind: "Heading",
+                text: t(view === "store" ? "mcpHub.tabStore" : "mcpHub.tabInstalled"),
+              },
               { id: "mcp-hub-section-space", kind: "Spacer" },
-              { id: "mcp-hub-count", kind: "Badge", label: String(visibleServers.length) },
+              {
+                id: "mcp-hub-count",
+                kind: "Badge",
+                label: String(view === "store" ? registryItems.length : visibleServers.length),
+              },
             ],
           },
           {
@@ -200,18 +408,51 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
             fill: true,
             padding: 12,
             children:
-              mainNodes.length > 0
-                ? mainNodes
-                : [
-                    {
-                      id: "mcp-empty",
-                      kind: "EmptyState",
-                      icon: "ellipsis",
-                      label: t("mcpHub.statusEmpty"),
-                      text: t("mcpHub.statusEmptyDesc"),
-                      children: [root.action("mcp-empty-add", t("mcpHub.add"), openAdd)],
-                    },
-                  ],
+              view === "store"
+                ? [
+                    ...(registryLoading
+                      ? [
+                          {
+                            id: "mcp-store-loading",
+                            kind: "Progress" as const,
+                            label: t("app.loading"),
+                          },
+                        ]
+                      : []),
+                    ...(registryError
+                      ? [
+                          {
+                            id: "mcp-store-error",
+                            kind: "Banner" as const,
+                            label: registryError,
+                            status: "error" as const,
+                          },
+                        ]
+                      : []),
+                    ...storeNodes,
+                    ...(!registryLoading && !registryError && storeNodes.length === 0
+                      ? [
+                          {
+                            id: "mcp-store-empty",
+                            kind: "EmptyState" as const,
+                            label: t("mcpHub.storeEmptyTitle"),
+                            text: t("mcpHub.storeEmptyDesc"),
+                          },
+                        ]
+                      : []),
+                  ]
+                : installedNodes.length > 0
+                  ? installedNodes
+                  : [
+                      {
+                        id: "mcp-empty",
+                        kind: "EmptyState",
+                        icon: "ellipsis",
+                        label: t("mcpHub.statusEmpty"),
+                        text: t("mcpHub.statusEmptyDesc"),
+                        children: [root.action("mcp-empty-add", t("mcpHub.add"), openAdd)],
+                      },
+                    ],
           },
         ],
       },
@@ -353,6 +594,95 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
       );
     }
 
+    let configEditor: ReactNode = null;
+    if (configuring) {
+      const sheet = presentationControls();
+      const patchServer = (patch: Partial<McpServerConfig>) =>
+        setConfiguring((current) =>
+          current
+            ? {
+                ...current,
+                draft: { ...current.draft, server: { ...current.draft.server, ...patch } },
+              }
+            : current,
+        );
+      const close = () => {
+        setConfiguring(null);
+        setRegistryError("");
+      };
+      sheet.handlers.set("close", {
+        enabled: true,
+        accepts: (value) => value === null,
+        run: close,
+      });
+      configEditor = (
+        <NativeSurface
+          document={{
+            mode: "sheet",
+            title: t("mcpHub.storeConfigureTitle"),
+            appearance: props.settings.theme,
+            formFactor: "mobile",
+            theme: createNativePresentationTheme(props.settings, true, "workspaceTools"),
+            dismissAction: "close",
+            nodes: [
+              sheet.group("mcp-store-connection", t("mcpHub.storeConfigureTitle"), [
+                sheet.input(
+                  "mcp-store-id",
+                  t("mcpHub.serverName"),
+                  configuring.draft.server.id,
+                  (id) => patchServer({ id }),
+                ),
+                configuring.draft.server.transport === "stdio"
+                  ? sheet.input(
+                      "mcp-store-command",
+                      t("mcpHub.command"),
+                      configuring.draft.server.command || "",
+                      (command) => patchServer({ command }),
+                    )
+                  : sheet.input("mcp-store-url", "URL", configuring.draft.server.url || "", (url) =>
+                      patchServer({ url }),
+                    ),
+              ]),
+              ...configuring.draft.requiredConfig.map((input) =>
+                sheet.input(
+                  `mcp-store-config:${mcpRegistryConfigInputKey(input)}`,
+                  input.label || input.name,
+                  configValues[mcpRegistryConfigInputKey(input)] || "",
+                  (value) =>
+                    setConfigValues((current) => ({
+                      ...current,
+                      [mcpRegistryConfigInputKey(input)]: value,
+                    })),
+                  input.secret,
+                ),
+              ),
+              ...(registryError
+                ? [
+                    {
+                      id: "mcp-store-config-error",
+                      kind: "Banner" as const,
+                      label: registryError,
+                      status: "error" as const,
+                    },
+                  ]
+                : []),
+              {
+                ...sheet.action(
+                  "mcp-store-config-save",
+                  t("mcpHub.storeConfigureSubmit"),
+                  commitRegistryConfig,
+                ),
+                prominent: true,
+              },
+              sheet.action("mcp-store-config-cancel", t("settings.cancel"), close),
+            ],
+          }}
+          handlers={sheet.handlers}
+          onError={(error) => setRegistryError(String(error))}
+        />
+      );
+    }
+
     return (
       <>
         <NativeSurface
@@ -368,7 +698,33 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
           onError={(error) => setNativeError(String(error))}
         />
         {editor}
+        {configEditor}
       </>
+    );
+  }
+
+  if (view === "store") {
+    return (
+      <VStack as="section" gap={0} height="100%" minHeight={0} className="relative">
+        <MobileHubHeader title="MCP" onOpenSidebar={props.onOpenSidebar} />
+        <HStack gap={2} paddingInline={4} paddingBlock={2}>
+          <Button
+            label={t("mcpHub.tabInstalled")}
+            variant="secondary"
+            onClick={() => setView("installed")}
+          />
+          <Button label={t("mcpHub.tabStore")} variant="primary" onClick={() => setView("store")} />
+        </HStack>
+        <StackItem size="fill" isScrollable>
+          <VStack padding={3} minHeight={0}>
+            <McpRegistryBrowser
+              settings={props.settings}
+              setSettings={props.setSettings}
+              allowStdio={props.allowStdio}
+            />
+          </VStack>
+        </StackItem>
+      </VStack>
     );
   }
 
@@ -389,6 +745,14 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
         }
       />
       <MobileHubSearch value={query} onChange={setQuery} placeholder="Search MCP" />
+      <HStack gap={2} paddingInline={4} paddingBlock={2}>
+        <Button
+          label={t("mcpHub.tabInstalled")}
+          variant="primary"
+          onClick={() => setView("installed")}
+        />
+        <Button label={t("mcpHub.tabStore")} variant="secondary" onClick={() => setView("store")} />
+      </HStack>
 
       <HStack gap={2} hAlign="between" vAlign="center" paddingInline={5} paddingBlockStart={5}>
         <Heading level={2}>{t("mcpHub.tabInstalled")}</Heading>

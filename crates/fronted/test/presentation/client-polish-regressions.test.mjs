@@ -30,7 +30,8 @@ test("native mobile shell settings expose real install, cancellation and folder 
   ]) {
     assert.match(nativeSettings, new RegExp(`\\b${operation}\\b`));
   }
-  for (const group of ["shell", "shell-packs", "shell-workspaces"]) {
+  for (const group of ["shell-status", "shell-actions", "shell-toolchains", "shell-workspaces"]) {
     assert.match(nativeSettings, new RegExp(`c\\.group\\(\\"${group}\\"`));
   }
+  assert.match(nativeSettings, /installShellToolchains\(\["essentials"\]\)/);
 });

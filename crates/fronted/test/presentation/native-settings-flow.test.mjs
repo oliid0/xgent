@@ -29,6 +29,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
     "../pages/settings/HooksSection": { HooksSection: "HooksSection" },
     "../pages/settings/SoulSection": { SoulSection: "SoulSection" },
     "../pages/chat/mobile/MobileSkillsPage": { MobileSkillsPage: "MobileSkillsPage" },
+    "../pages/chat/mobile/MobileMcpPage": { MobileMcpPage: "MobileMcpPage" },
   } });
   const { NativeSettingsPage } = loader.loadModule("src/presentation/NativeSettingsPage.tsx");
   const { getDefaultSettings } = loader.loadModule("src/lib/settings/index.ts");
@@ -58,9 +59,9 @@ test("native settings mirrors compact navigation and persists shared system, pro
     ]),
     [
       ["mobile-appearance", "settings.mobile.appearanceGroup", ["nav:system", "nav:providers"]],
-      ["mobile-personal", "settings.mobile.personalGroup", ["nav:soul", "nav:memory", "nav:mobileAssistant"]],
+      ["mobile-personal", "settings.mobile.personalGroup", ["nav:soul", "nav:memory"]],
       ["mobile-capabilities", "settings.mobile.capabilitiesGroup", [
-        "nav:mobileExecution", "nav:toolPermissions", "nav:other", "nav:access", "nav:backup", "nav:about",
+        "nav:mobileAssistant", "nav:mobileExecution", "nav:other", "nav:access", "nav:backup", "nav:about",
       ]],
     ],
   );
@@ -92,7 +93,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.ok(provider.models.some((model) => model.id === "example-model"));
   await dispatch("back");
   await dispatch("back");
-  await dispatch("nav:toolPermissions");
+  await dispatch("nav:mobileAssistant");
   assert.equal((await dispatch("policy:Bash", "deny")).ok, true);
   assert.equal(settings.system.toolPolicies.Bash, "deny");
 });

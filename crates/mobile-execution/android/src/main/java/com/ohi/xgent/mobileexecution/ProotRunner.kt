@@ -163,7 +163,7 @@ internal class ProotRunner(
             "/usr/bin/env",
             "-i",
             "HOME=/root",
-            "PATH=$WORKSPACE_PATH/node_modules/.bin:$WORKSPACE_PATH/.xgent/npm/bin:$WORKSPACE_PATH/.xgent/python/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "PATH=$WORKSPACE_PATH/node_modules/.bin:$WORKSPACE_PATH/.xgent/npm/bin:$WORKSPACE_PATH/.xgent/python/bin:/usr/lib/jvm/java-21-openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "PYTHONUNBUFFERED=1",
             "PIP_USER=false",
             "npm_config_prefix=$WORKSPACE_PATH/.xgent/npm",

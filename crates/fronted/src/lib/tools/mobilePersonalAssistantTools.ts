@@ -21,9 +21,11 @@ import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes
 const listDataTool: Tool = {
   name: "MobilePersonalData",
   description:
-    "Read the user's authorized current location, clipboard text, system calendar, reminders, step total, or nearby Bluetooth LE advertisements on this Android/iOS device without requiring Shell. Bluetooth discovery returns device identifiers and advertised service UUIDs; it does not connect or control devices. Use privacy-sensitive reads only when the user's task requires them.",
+    "Read device connectivity, discover nearby BLE peripherals and currently routed devices, or access authorized location, clipboard, calendar, reminders, and health steps on this Android/iOS device without requiring Shell. Discovery reports only what the OS exposes; it does not imply arbitrary control of a device. Use privacy-sensitive reads only when the user's task requires them.",
   parameters: Type.Object({
     action: Type.Union([
+      Type.Literal("network_status"),
+      Type.Literal("discover_devices"),
       Type.Literal("scan_bluetooth"),
       Type.Literal("get_current_location"),
       Type.Literal("read_clipboard"),
@@ -132,6 +134,32 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
       const args = (toolCall.arguments ?? {}) as Record<string, unknown>;
       const action = text(args.action);
       if (toolCall.name === "MobilePersonalData") {
+        if (action === "network_status") {
+          const status = await mobileAssistantStatus();
+          if (!status.network)
+            throw new Error("Network path is still being detected on this device.");
+          return result(toolCall, { network: status.network });
+        }
+        if (action === "discover_devices") {
+          const status = await mobileAssistantStatus();
+          let nearbyBluetooth: Awaited<ReturnType<typeof scanMobileBluetooth>> = [];
+          let bluetoothError: string | undefined;
+          try {
+            await ensurePermission("bluetooth");
+            if (signal?.aborted) return result(toolCall, "Cancelled", true);
+            nearbyBluetooth = await scanMobileBluetooth(
+              typeof args.timeout_ms === "number" ? args.timeout_ms : 5_000,
+            );
+          } catch (cause) {
+            bluetoothError = cause instanceof Error ? cause.message : String(cause);
+          }
+          return result(toolCall, {
+            network: status.network ?? null,
+            connected: status.audioOutputs ?? [],
+            nearbyBluetooth,
+            ...(bluetoothError ? { bluetoothError } : {}),
+          });
+        }
         if (action === "scan_bluetooth") {
           await ensurePermission("bluetooth");
           if (signal?.aborted) return result(toolCall, "Cancelled", true);

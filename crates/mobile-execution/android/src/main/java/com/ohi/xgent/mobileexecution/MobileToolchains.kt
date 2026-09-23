@@ -44,6 +44,16 @@ internal object MobileToolchains {
             detail = "Node.js and npm inside Alpine PRoot",
         ),
         MobileToolchainDefinition(
+            id = "java",
+            label = "Java 21 JDK",
+            packages = listOf("openjdk21-jdk"),
+            probes = listOf(
+                "usr/lib/jvm/java-21-openjdk/bin/java",
+                "usr/lib/jvm/java-21-openjdk/bin/javac",
+            ),
+            detail = "OpenJDK 21 runtime and compiler inside Alpine PRoot",
+        ),
+        MobileToolchainDefinition(
             id = "go",
             label = "Go",
             packages = listOf("go"),

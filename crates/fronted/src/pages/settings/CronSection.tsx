@@ -65,10 +65,14 @@ function formatRemainingExecutionsLabel(t: (key: string) => string, task: CronTa
     : `${task.remainingExecutions} ${t("settings.cronRemainingExecutionsUnit")}`;
 }
 
-export function CronSection(props: SettingsSectionProps & { onBack?: () => void }) {
+export function CronSection(
+  props: SettingsSectionProps & { onBack?: () => void; openCreateImmediately?: boolean },
+) {
   const { settings } = props;
   const { t } = useLocale();
-  const [detail, setDetail] = useState<DetailState>({ open: false });
+  const [detail, setDetail] = useState<DetailState>(
+    props.openCreateImmediately ? { open: true, mode: "add" } : { open: false },
+  );
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const { cron } = useAutomation();
@@ -106,14 +110,12 @@ export function CronSection(props: SettingsSectionProps & { onBack?: () => void 
   async function handleAdd(data: CronTaskFormData) {
     setActionError(null);
     await applyCronOps([{ op: "create", item: { ...data, enabled: true } }]);
-    setDetail({ open: false });
   }
 
   async function handleEdit(data: CronTaskFormData) {
     if (!detail.open || detail.mode !== "edit" || !detail.task) return;
     setActionError(null);
     await applyCronOps([{ op: "update", id: detail.task.id, patch: { ...data } }]);
-    setDetail({ open: false });
   }
 
   async function pickWorkdirDirectory(initialWorkdir: string): Promise<string | null> {
@@ -141,7 +143,11 @@ export function CronSection(props: SettingsSectionProps & { onBack?: () => void 
         executionMode={settings.system.executionMode}
         onPickWorkdir={pickWorkdirDirectory}
         onSave={detail.mode === "add" ? handleAdd : handleEdit}
-        onClose={() => setDetail({ open: false })}
+        onClose={() => {
+          if (props.openCreateImmediately && detail.mode === "add")
+            window.setTimeout(() => props.onBack?.(), 0);
+          else setDetail({ open: false });
+        }}
       />
     );
   }

@@ -721,10 +721,12 @@ function SshImportCandidateRow(props: {
   );
 }
 
-export function SshSettingsSection(props: SettingsSectionProps & { onBack?: () => void }) {
+export function SshSettingsSection(
+  props: SettingsSectionProps & { onBack?: () => void; openCreateImmediately?: boolean },
+) {
   const { settings, setSettings } = props;
   const { t } = useLocale();
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(props.openCreateImmediately === true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingHost, setEditingHost] = useState<SshHostConfig | null>(null);
   const [knownHostResettingId, setKnownHostResettingId] = useState<string | null>(null);
@@ -764,6 +766,10 @@ export function SshSettingsSection(props: SettingsSectionProps & { onBack?: () =
   }
 
   function closeModal() {
+    if (props.openCreateImmediately && !editingHost) {
+      window.setTimeout(() => props.onBack?.(), 0);
+      return;
+    }
     setModalOpen(false);
     setEditingHost(null);
   }

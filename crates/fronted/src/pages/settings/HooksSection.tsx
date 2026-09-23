@@ -69,9 +69,11 @@ function getHookTypeColor(type: HookType): TokenColor {
   return type === "command" ? "blue" : "green";
 }
 
-export function HooksSection(_props: SettingsSectionProps & { onBack?: () => void }) {
+export function HooksSection(
+  _props: SettingsSectionProps & { onBack?: () => void; openCreateImmediately?: boolean },
+) {
   const { t } = useLocale();
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(_props.openCreateImmediately === true);
   const [editingHook, setEditingHook] = useState<HookDef | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -118,6 +120,10 @@ export function HooksSection(_props: SettingsSectionProps & { onBack?: () => voi
   );
 
   function closeModal() {
+    if (_props.openCreateImmediately && !editingHook) {
+      window.setTimeout(() => _props.onBack?.(), 0);
+      return;
+    }
     setModalOpen(false);
     setEditingHook(null);
   }

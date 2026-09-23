@@ -6228,6 +6228,8 @@ export function ChatPage(props: ChatPageProps) {
           liveTranscriptStore={liveTranscriptStore}
           modelOptions={modelOptions}
           selectedValue={selectedValue}
+          contextUsageTokensSource={contextUsageTokensSource}
+          contextWindow={currentModelContextWindow}
           inputDisabled={isComposerInputDisabled}
           inputPlaceholder={composerPlaceholder}
           isSending={isSending}

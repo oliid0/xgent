@@ -493,7 +493,6 @@ extension XgentNodeView {
                 .onChange(of: proxy.frame(in: .global)) { _, rect in
                     reportBrowserViewport(rect, visible: true)
                 }
-                .onDisappear { reportBrowserViewport(.zero, visible: false) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityLabel(node.label ?? "Browser content")

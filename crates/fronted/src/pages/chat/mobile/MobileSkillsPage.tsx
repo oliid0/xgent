@@ -1,5 +1,6 @@
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
@@ -8,17 +9,28 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, MoreHorizontal, RefreshCw, SkillIcon } from "../../../components/icons";
+import { ArrowLeft, MoreHorizontal, Plus, RefreshCw, SkillIcon } from "../../../components/icons";
 import { Markdown } from "../../../components/Markdown";
 import { useLocale } from "../../../i18n";
 import { type AppSettings, updateSkills } from "../../../lib/settings";
 import {
   discoverSkills,
+  getSkillInstallJobStatus,
   isAlwaysEnabledSkillName,
   isUserSelectableSkill,
   readSkillText,
+  type SkillInstallJobSnapshot,
   type SkillSummary,
+  startSkillInstallJob,
 } from "../../../lib/skills";
+import {
+  buildClawHubDownloadUrl,
+  buildClawHubSkillKey,
+  type ClawHubSkillCard,
+  listClawHubSkills,
+  resolveClawHubSkillOwner,
+  searchClawHubSkills,
+} from "../../../lib/skills/clawHub";
 import { presentationControls } from "../../../presentation/controls";
 import { NativeSurface } from "../../../presentation/NativeSurface";
 import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
@@ -44,6 +56,12 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
   const { t } = useLocale();
   const [skills, setSkills] = useState<SkillSummary[]>(props.initialSkills ?? []);
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<"installed" | "store">("installed");
+  const [storeItems, setStoreItems] = useState<ClawHubSkillCard[]>([]);
+  const [storeLoading, setStoreLoading] = useState(false);
+  const [storeError, setStoreError] = useState("");
+  const [storeJobs, setStoreJobs] = useState<Record<string, SkillInstallJobSnapshot>>({});
+  const [pendingStoreKeys, setPendingStoreKeys] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   const [selected, setSelected] = useState<SkillSummary | null>(null);
@@ -83,6 +101,145 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
       `${skill.name}\n${skill.description}`.toLocaleLowerCase().includes(needle),
     );
   }, [query, skills]);
+
+  useEffect(() => {
+    if (view !== "store") return;
+    let active = true;
+    const timer = window.setTimeout(
+      () => {
+        setStoreLoading(true);
+        setStoreError("");
+        const search = query.trim()
+          ? searchClawHubSkills({ query: query.trim(), limit: 24 })
+          : listClawHubSkills({ sort: "downloads", limit: 24 }).then((page) => page.items);
+        void search
+          .then((items) => {
+            if (active) setStoreItems(items);
+          })
+          .catch((cause) => {
+            if (active) setStoreError(cause instanceof Error ? cause.message : String(cause));
+          })
+          .finally(() => {
+            if (active) setStoreLoading(false);
+          });
+      },
+      query.trim() ? 250 : 0,
+    );
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [query, view]);
+
+  useEffect(() => {
+    const activeJobs = Array.from(
+      new Map(Object.values(storeJobs).map((job) => [job.jobId, job])).values(),
+    ).filter((job) => !["done", "error", "cancelled"].includes(job.phase));
+    if (activeJobs.length === 0) return;
+    const timer = window.setInterval(() => {
+      for (const job of activeJobs) {
+        void getSkillInstallJobStatus(job.jobId)
+          .then((next) => {
+            setStoreJobs((previous) =>
+              Object.fromEntries(
+                Object.entries(previous).map(([key, value]) => [
+                  key,
+                  value.jobId === next.jobId ? next : value,
+                ]),
+              ),
+            );
+            if (next.phase === "done") {
+              completeStoreJob(next);
+            }
+          })
+          .catch((cause) => {
+            const message = cause instanceof Error ? cause.message : String(cause);
+            setStoreJobs((previous) =>
+              Object.fromEntries(
+                Object.entries(previous).map(([key, value]) => [
+                  key,
+                  value.jobId === job.jobId ? { ...value, phase: "error", error: message } : value,
+                ]),
+              ),
+            );
+          });
+      }
+    }, 600);
+    return () => window.clearInterval(timer);
+  }, [props.setSettings, storeJobs]);
+
+  const installedStoreKeys = new Set(
+    skills
+      .filter((skill) => skill.source?.registry === "clawhub")
+      .map((skill) =>
+        buildClawHubSkillKey({
+          slug: skill.source!.slug,
+          ownerHandle: skill.source!.ownerHandle ?? null,
+        }),
+      ),
+  );
+
+  function completeStoreJob(job: SkillInstallJobSnapshot) {
+    const names = (job.installed ?? [])
+      .map((item) => item.name.trim())
+      .filter((name) => name && !isAlwaysEnabledSkillName(name));
+    if (names.length > 0) {
+      props.setSettings((previous) =>
+        updateSkills(previous, {
+          enabled: true,
+          selected: Array.from(new Set([...previous.skills.selected, ...names])),
+        }),
+      );
+    }
+    void discoverSkills({ force: true })
+      .then((result) => setSkills(result.skills))
+      .catch((cause) => setRefreshError(cause instanceof Error ? cause.message : String(cause)));
+  }
+
+  async function installStoreSkill(skill: ClawHubSkillCard) {
+    const key = buildClawHubSkillKey(skill);
+    if (
+      pendingStoreKeys.includes(key) ||
+      installedStoreKeys.has(key) ||
+      (storeJobs[key] && !["error", "cancelled"].includes(storeJobs[key].phase))
+    )
+      return;
+    setPendingStoreKeys((current) => [...current, key]);
+    setStoreError("");
+    try {
+      const resolved = await resolveClawHubSkillOwner(skill);
+      const job = await startSkillInstallJob({
+        source: buildClawHubDownloadUrl(resolved.slug, resolved.ownerHandle),
+        label: resolved.displayName,
+        slug: resolved.slug,
+        ownerHandle: resolved.ownerHandle,
+        version: resolved.latestVersion,
+        conflict: "backup",
+      });
+      setStoreJobs((current) => ({
+        ...current,
+        [key]: job,
+        [buildClawHubSkillKey(resolved)]: job,
+      }));
+      if (job.phase === "done") completeStoreJob(job);
+    } catch (cause) {
+      setStoreError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setPendingStoreKeys((current) => current.filter((item) => item !== key));
+    }
+  }
+
+  function storeItemState(skill: ClawHubSkillCard) {
+    const key = buildClawHubSkillKey(skill);
+    const job = storeJobs[key];
+    return {
+      job,
+      installed: installedStoreKeys.has(key) || job?.phase === "done",
+      pending:
+        pendingStoreKeys.includes(key) ||
+        Boolean(job && !["done", "error", "cancelled"].includes(job.phase)),
+    };
+  }
 
   const refresh = async () => {
     if (refreshing) return;
@@ -167,32 +324,128 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
             : []),
           { id: "preview", kind: "Text", text: preview.error || preview.content },
         ]
-      : [
-          c.toggle(
-            "skills-enabled",
-            t("settings.enable"),
-            props.settings.skills.enabled,
-            (enabled) => props.setSettings((previous) => updateSkills(previous, { enabled })),
-          ),
-          c.input("search", t("settings.searchPlaceholder"), query, setQuery),
-          c.action("refresh", t("settings.mobileAssistant.refresh"), refresh, !refreshing),
-          ...(refreshing
-            ? [{ id: "loading", kind: "Progress" as const, label: t("settings.skillsScanning") }]
-            : []),
-          ...(refreshError ? [{ id: "error", kind: "Text" as const, text: refreshError }] : []),
-          ...visibleSkills.map(
-            (skill): PresentationNode => ({
-              ...c.action(`${skill.baseDir}:${skill.name}`, skill.name, () => setSelected(skill)),
-              kind: "NavigationRow",
-              text: skill.description,
-              icon: "puzzlepiece.extension",
-              selected: isSelected(skill),
+      : view === "store"
+        ? [
+            {
+              id: "skills-store-heading",
+              kind: "HStack",
+              children: [
+                {
+                  id: "skills-store-popular",
+                  kind: "Heading",
+                  text: t("settings.skillsStoreSortMostDownloaded"),
+                },
+                { id: "skills-store-heading-space", kind: "Spacer" },
+                { id: "skills-store-count", kind: "Badge", label: String(storeItems.length) },
+              ],
+            },
+            ...(storeLoading
+              ? [{ id: "skills-store-loading", kind: "Progress" as const, label: t("app.loading") }]
+              : []),
+            ...(storeError
+              ? [
+                  {
+                    id: "skills-store-error",
+                    kind: "Banner" as const,
+                    label: storeError,
+                    status: "error" as const,
+                  },
+                ]
+              : []),
+            ...storeItems.map((skill): PresentationNode => {
+              const item = storeItemState(skill);
+              return {
+                id: `skills-store:${buildClawHubSkillKey(skill)}`,
+                kind: "Card",
+                children: [
+                  {
+                    id: `skills-store:${buildClawHubSkillKey(skill)}:row`,
+                    kind: "HStack",
+                    children: [
+                      {
+                        id: `skills-store:${buildClawHubSkillKey(skill)}:copy`,
+                        kind: "VStack",
+                        fill: true,
+                        children: [
+                          {
+                            id: `skills-store:${buildClawHubSkillKey(skill)}:name`,
+                            kind: "Heading",
+                            text: skill.displayName,
+                          },
+                          {
+                            id: `skills-store:${buildClawHubSkillKey(skill)}:summary`,
+                            kind: "Text",
+                            text: skill.summary,
+                            secondary: true,
+                            maxLines: 2,
+                          },
+                          ...(item.job?.phase === "error" && item.job.error
+                            ? [
+                                {
+                                  id: `skills-store:${buildClawHubSkillKey(skill)}:error`,
+                                  kind: "Text" as const,
+                                  text: item.job.error,
+                                },
+                              ]
+                            : []),
+                        ],
+                      },
+                      {
+                        ...c.action(
+                          `skills-store:${buildClawHubSkillKey(skill)}:install`,
+                          item.installed
+                            ? t("settings.skillsStoreInstalled")
+                            : item.pending
+                              ? t("settings.skillsStorePhaseInstalling")
+                              : t("settings.skillsStoreInstall"),
+                          () => installStoreSkill(skill),
+                          !item.installed && !item.pending,
+                        ),
+                        kind: "IconButton",
+                        icon: item.installed ? "checkmark" : "plus",
+                      },
+                    ],
+                  },
+                ],
+              };
             }),
-          ),
-          ...(visibleSkills.length || refreshing
-            ? []
-            : [{ id: "empty", kind: "Text" as const, text: t("settings.skillsNotFound") }]),
-        ];
+            ...(!storeItems.length && !storeLoading && !storeError
+              ? [
+                  {
+                    id: "skills-store-empty",
+                    kind: "EmptyState" as const,
+                    label: t("settings.skillsStoreEmptyTitle"),
+                    text: t("settings.skillsStoreEmptyDesc"),
+                  },
+                ]
+              : []),
+          ]
+        : [
+            c.toggle(
+              "skills-enabled",
+              t("settings.enable"),
+              props.settings.skills.enabled,
+              (enabled) => props.setSettings((previous) => updateSkills(previous, { enabled })),
+            ),
+            c.input("search", t("settings.searchPlaceholder"), query, setQuery),
+            c.action("refresh", t("settings.mobileAssistant.refresh"), refresh, !refreshing),
+            ...(refreshing
+              ? [{ id: "loading", kind: "Progress" as const, label: t("settings.skillsScanning") }]
+              : []),
+            ...(refreshError ? [{ id: "error", kind: "Text" as const, text: refreshError }] : []),
+            ...visibleSkills.map(
+              (skill): PresentationNode => ({
+                ...c.action(`${skill.baseDir}:${skill.name}`, skill.name, () => setSelected(skill)),
+                kind: "NavigationRow",
+                text: skill.description,
+                icon: "puzzlepiece.extension",
+                selected: isSelected(skill),
+              }),
+            ),
+            ...(visibleSkills.length || refreshing
+              ? []
+              : [{ id: "empty", kind: "Text" as const, text: t("settings.skillsNotFound") }]),
+          ];
     if (props.presentationMode === "root") {
       const rootContentNodes = contentNodes.filter(
         (node) => node.id !== "search" && node.id !== "refresh",
@@ -213,7 +466,12 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
       const trailing: PresentationNode = selected
         ? { id: "hub-toolbar-end", kind: "Spacer", width: 44 }
         : {
-            ...c.action("refresh", t("settings.mobileAssistant.refresh"), refresh, !refreshing),
+            ...c.action(
+              "refresh",
+              t("settings.mobileAssistant.refresh"),
+              refresh,
+              !refreshing && view === "installed",
+            ),
             kind: "IconButton",
             icon: "arrow.clockwise",
             variant: "secondary",
@@ -245,7 +503,28 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
             ...(!selected
               ? [
                   {
-                    ...c.input("search", t("settings.searchPlaceholder"), query, setQuery),
+                    ...c.select(
+                      "skills-view",
+                      t("sidebar.mobile.plugins"),
+                      view,
+                      [
+                        { value: "installed", label: t("settings.skillsHubInstalledTab") },
+                        { value: "store", label: t("settings.skillsHubStoreTab") },
+                      ],
+                      (value) => setView(value as "installed" | "store"),
+                    ),
+                    kind: "SegmentedControl" as const,
+                    padding: 12,
+                  },
+                  {
+                    ...c.input(
+                      "search",
+                      view === "store"
+                        ? t("settings.skillsHubStoreTab")
+                        : t("settings.searchPlaceholder"),
+                      query,
+                      setQuery,
+                    ),
                     padding: 12,
                   },
                 ]
@@ -369,22 +648,76 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
       <MobileHubSearch
         value={query}
         onChange={setQuery}
-        placeholder={t("sidebar.mobile.searchPlugins")}
+        placeholder={
+          view === "store" ? t("settings.skillsHubStoreTab") : t("sidebar.mobile.searchPlugins")
+        }
       />
-      {refreshError ? (
+      <HStack gap={2} paddingInline={4} paddingBlock={2}>
+        <Button
+          label={t("settings.skillsHubInstalledTab")}
+          variant={view === "installed" ? "primary" : "secondary"}
+          onClick={() => setView("installed")}
+        />
+        <Button
+          label={t("settings.skillsHubStoreTab")}
+          variant={view === "store" ? "primary" : "secondary"}
+          onClick={() => setView("store")}
+        />
+      </HStack>
+      {refreshError || storeError ? (
         <HStack paddingInline={5} paddingBlockStart={3}>
-          <Banner status="error" title={refreshError} collapsible={false} />
+          <Banner
+            status="error"
+            title={view === "store" ? storeError : refreshError}
+            collapsible={false}
+          />
         </HStack>
       ) : null}
 
       <HStack gap={2} hAlign="between" vAlign="center" paddingInline={5} paddingBlockStart={5}>
-        <Heading level={2}>{t("settings.skillsHubInstalledTab")}</Heading>
-        <Badge label={String(visibleSkills.length)} />
+        <Heading level={2}>
+          {view === "store"
+            ? t("settings.skillsStoreSortMostDownloaded")
+            : t("settings.skillsHubInstalledTab")}
+        </Heading>
+        <Badge label={String(view === "store" ? storeItems.length : visibleSkills.length)} />
       </HStack>
 
       <StackItem size="fill" isScrollable>
         <VStack gap={3} padding={3} className="mobile-hub-scroll-content">
-          {visibleSkills.length > 0 ? (
+          {view === "store" && storeItems.length > 0 ? (
+            <List density="spacious">
+              {storeItems.map((skill) => {
+                const item = storeItemState(skill);
+                return (
+                  <ListItem
+                    key={buildClawHubSkillKey(skill)}
+                    label={skill.displayName}
+                    description={item.job?.error || skill.summary}
+                    startContent={<SkillIcon />}
+                    endContent={
+                      <Button
+                        label={
+                          item.installed
+                            ? t("settings.skillsStoreInstalled")
+                            : item.pending
+                              ? t("settings.skillsStorePhaseInstalling")
+                              : t("settings.skillsStoreInstall")
+                        }
+                        variant="secondary"
+                        isDisabled={item.installed || item.pending}
+                        onClick={() => void installStoreSkill(skill)}
+                      />
+                    }
+                  />
+                );
+              })}
+            </List>
+          ) : view === "store" && storeLoading ? (
+            <Spinner label={t("app.loading")} size="md" />
+          ) : view === "store" ? (
+            <EmptyState icon={<Plus />} title={t("settings.skillsStoreEmptyTitle")} isCompact />
+          ) : visibleSkills.length > 0 ? (
             <List density="spacious">
               {visibleSkills.map((skill) => (
                 <ListItem

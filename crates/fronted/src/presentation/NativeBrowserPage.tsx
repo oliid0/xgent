@@ -109,58 +109,68 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
   handlers.set("close", {
     enabled: true,
     accepts: (value) => value === null,
-    run: () => browserSessionController.closePanel(),
+    run: () =>
+      compact
+        ? window.setTimeout(() => browserSessionController.closePanel(), 0)
+        : browserSessionController.closePanel(),
   });
   const busy = Boolean(active && state.busySessionIds.includes(active.sessionId));
-  const nodes: PresentationNode[] = [
+  const mobileChrome: PresentationNode[] = [
     {
-      id: "browser-layout",
-      kind: "BrowserLayout",
-      fill: true,
+      id: "browser-toolbar",
+      kind: "VStack",
+      spacing: 0,
       children: [
         {
-          id: "browser-header",
+          id: "browser-address-row-mobile",
           kind: "HStack",
-          minHeight: 68,
-          padding: 12,
+          spacing: 4,
+          padding: 6,
           children: [
+            button(
+              "browser-back-mobile",
+              t("browser.back"),
+              "chevron.left",
+              () => run("go_back"),
+              !!active && !busy,
+            ),
+            button(
+              "browser-forward-mobile",
+              t("browser.forward"),
+              "chevron.right",
+              () => run("go_forward"),
+              !!active && !busy,
+            ),
             {
-              id: "browser-heading",
-              kind: "VStack",
+              id: "browser-address-mobile",
+              kind: "TextInput",
+              label: t("browser.addressPlaceholder"),
+              value: address,
               fill: true,
-              children: [
-                { id: "browser-title", kind: "Heading", text: t("browser.title"), icon: "globe" },
-                {
-                  id: "browser-status",
-                  kind: "Text",
-                  text: busy ? t("browser.agentOperating") : t("browser.sharedSession"),
-                  secondary: true,
-                  maxLines: 2,
-                },
-              ],
+              disabled: !active,
+              action: bind(
+                "browser-address-mobile",
+                (value) => setAddress(value as string),
+                (value) => typeof value === "string",
+                !!active,
+              ),
             },
             {
-              ...button("browser-close", t("browser.close"), "xmark", () =>
-                browserSessionController.closePanel(),
+              ...button("browser-close-mobile", t("browser.close"), "xmark", () =>
+                window.setTimeout(() => browserSessionController.closePanel(), 0),
               ),
               variant: "secondary",
             },
           ],
         },
         {
-          id: "browser-tabs-row",
+          id: "browser-tabs-row-mobile",
           kind: "HStack",
-          padding: 8,
+          spacing: 4,
+          padding: 6,
           children: [
-            button(
-              "browser-new",
-              t("browser.newTab"),
-              "plus",
-              () => browserSessionController.newSession(),
-              sessions.length < MAX_BROWSER_SESSIONS,
-            ),
             {
-              id: "browser-tabs",
+              id: "browser-tabs-mobile",
               kind: "Selector",
               variant: "compact",
               fill: true,
@@ -172,7 +182,7 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
                 label: session.title?.trim() || session.url || t("browser.untitled"),
               })),
               action: bind(
-                "browser-tabs",
+                "browser-tabs-mobile",
                 (value) => browserSessionController.selectSession(value as string),
                 (value) =>
                   typeof value === "string" &&
@@ -181,49 +191,160 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
               ),
             },
             button(
-              "browser-close-tab",
-              t("browser.closeTab"),
-              "xmark",
-              () => active && browserSessionController.closeSession(active.sessionId),
-              !!active,
-            ),
-          ],
-        },
-        {
-          id: "browser-address-row",
-          kind: "HStack",
-          padding: 8,
-          children: [
-            {
-              id: "browser-address",
-              kind: "TextInput",
-              label: t("browser.addressPlaceholder"),
-              value: address,
-              fill: true,
-              disabled: !active,
-              action: bind(
-                "browser-address",
-                (value) => setAddress(value as string),
-                (value) => typeof value === "string",
-                !!active,
-              ),
-            },
-            button(
-              "browser-go",
+              "browser-go-mobile",
               t("browser.open"),
               "arrow.right",
               () => run("navigate"),
               !!active && !!address.trim() && !busy,
             ),
             button(
-              "browser-reload",
+              "browser-reload-mobile",
               t("browser.reload"),
               "arrow.clockwise",
               () => run("reload"),
               !!active && !busy,
             ),
+            button(
+              "browser-new-mobile",
+              t("browser.newTab"),
+              "plus",
+              () => browserSessionController.newSession("about:blank"),
+              sessions.length < MAX_BROWSER_SESSIONS,
+            ),
+            button(
+              "browser-close-tab-mobile",
+              t("browser.closeTab"),
+              "xmark.circle",
+              () => active && browserSessionController.closeSession(active.sessionId),
+              !!active,
+            ),
           ],
         },
+      ],
+    },
+  ];
+  const nodes: PresentationNode[] = [
+    {
+      id: "browser-layout",
+      kind: "BrowserLayout",
+      fill: true,
+      children: [
+        ...(compact ? mobileChrome : []),
+        ...(!compact
+          ? ([
+              {
+                id: "browser-header",
+                kind: "HStack",
+                minHeight: 68,
+                padding: 12,
+                children: [
+                  {
+                    id: "browser-heading",
+                    kind: "VStack",
+                    fill: true,
+                    children: [
+                      {
+                        id: "browser-title",
+                        kind: "Heading",
+                        text: t("browser.title"),
+                        icon: "globe",
+                      },
+                      {
+                        id: "browser-status",
+                        kind: "Text",
+                        text: busy ? t("browser.agentOperating") : t("browser.sharedSession"),
+                        secondary: true,
+                        maxLines: 2,
+                      },
+                    ],
+                  },
+                  {
+                    ...button("browser-close", t("browser.close"), "xmark", () =>
+                      browserSessionController.closePanel(),
+                    ),
+                    variant: "secondary",
+                  },
+                ],
+              },
+              {
+                id: "browser-tabs-row",
+                kind: "HStack",
+                padding: 8,
+                children: [
+                  button(
+                    "browser-new",
+                    t("browser.newTab"),
+                    "plus",
+                    () => browserSessionController.newSession(),
+                    sessions.length < MAX_BROWSER_SESSIONS,
+                  ),
+                  {
+                    id: "browser-tabs",
+                    kind: "Selector",
+                    variant: "compact",
+                    fill: true,
+                    label: t("browser.title"),
+                    value: active?.sessionId ?? "",
+                    disabled: sessions.length === 0,
+                    options: sessions.map((session) => ({
+                      value: session.sessionId,
+                      label: session.title?.trim() || session.url || t("browser.untitled"),
+                    })),
+                    action: bind(
+                      "browser-tabs",
+                      (value) => browserSessionController.selectSession(value as string),
+                      (value) =>
+                        typeof value === "string" &&
+                        sessions.some((session) => session.sessionId === value),
+                      sessions.length > 0,
+                    ),
+                  },
+                  button(
+                    "browser-close-tab",
+                    t("browser.closeTab"),
+                    "xmark",
+                    () => active && browserSessionController.closeSession(active.sessionId),
+                    !!active,
+                  ),
+                ],
+              },
+              {
+                id: "browser-address-row",
+                kind: "HStack",
+                padding: 8,
+                children: [
+                  {
+                    id: "browser-address",
+                    kind: "TextInput",
+                    label: t("browser.addressPlaceholder"),
+                    value: address,
+                    fill: true,
+                    disabled: !active,
+                    action: bind(
+                      "browser-address",
+                      (value) => setAddress(value as string),
+                      (value) => typeof value === "string",
+                      !!active,
+                    ),
+                  },
+                  button(
+                    "browser-go",
+                    t("browser.open"),
+                    "arrow.right",
+                    () => run("navigate"),
+                    !!active && !!address.trim() && !busy,
+                  ),
+                  button(
+                    "browser-reload",
+                    t("browser.reload"),
+                    "arrow.clockwise",
+                    () => run("reload"),
+                    !!active && !busy,
+                  ),
+                ],
+              },
+            ] as PresentationNode[])
+          : []),
         ...(state.error
           ? [
               {
@@ -255,15 +376,17 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
                 ),
               },
             ]
-          : [
-              {
-                id: "browser-preparing",
-                kind: "EmptyState" as const,
-                icon: "globe",
-                label: t("browser.preparing"),
-                text: t("browser.startBrowsingDescription"),
-              },
-            ]),
+          : compact
+            ? [{ id: "browser-preparing", kind: "Spacer" as const, fill: true }]
+            : [
+                {
+                  id: "browser-preparing",
+                  kind: "EmptyState" as const,
+                  icon: "globe",
+                  label: t("browser.preparing"),
+                  text: t("browser.startBrowsingDescription"),
+                },
+              ]),
       ],
     },
   ];

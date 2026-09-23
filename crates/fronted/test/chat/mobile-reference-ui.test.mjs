@@ -71,7 +71,9 @@ test("mobile navigation and settings retain Astryx drawer and bottom-sheet hiera
   assert.match(chatPageSource, /activeView === "mcp-hub"[\s\S]*?<MobileMcpPage/);
   assert.match(mobileSkillsSource, /skills-hub-layout[\s\S]*?mode: "root"/);
   assert.match(mobileMcpSource, /mcp-hub-layout[\s\S]*?mode: "root"/);
-  assert.match(nativeBrowserSource, /browser-header[\s\S]*?browser-tabs-row[\s\S]*?browser-address-row/);
+  assert.match(nativeBrowserSource, /browser-toolbar[\s\S]*?browser-address[\s\S]*?browser-close[\s\S]*?browser-viewport/);
+  assert.match(nativeBrowserSource, /\.\.\.\(compact \? mobileChrome : \[\]\)/);
+  assert.match(nativeBrowserSource, /\.\.\.\(!compact\s*\?\s*\(\[[\s\S]*?id: "browser-title"[\s\S]*?id: "browser-status"/);
   assert.match(nativeFilesSource, /files-header[\s\S]*?files-search-row[\s\S]*?files-actions/);
   assert.doesNotMatch(nativeFilesSource, /id: "files-hidden"/);
   assert.match(appSource, /<BottomSheet[\s\S]*?height="tall"[\s\S]*?<SettingsPage/);

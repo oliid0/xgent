@@ -399,7 +399,10 @@ export class BrowserSessionController {
       activeSessionId: nextSessionId,
       error: null,
     });
-    void this.ensureSession({ sessionId: nextSessionId ?? undefined }).catch((error) => {
+    void this.ensureSession({
+      sessionId: nextSessionId ?? undefined,
+      url: source === "user" && !nextSessionId ? "about:blank" : undefined,
+    }).catch((error) => {
       this.update({ error: errorMessage(error) });
     });
   }

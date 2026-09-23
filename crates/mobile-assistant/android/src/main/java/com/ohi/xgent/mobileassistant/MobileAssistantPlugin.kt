@@ -10,7 +10,11 @@ import android.content.Intent
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.net.Uri
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -215,6 +219,39 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
     @Command
     fun status(invoke: Invoke) {
         val photoAlias = if (Build.VERSION.SDK_INT >= 33) ALIAS_PHOTOS else ALIAS_PHOTOS_LEGACY
+        val connectivity = activity.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val capabilities = connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+        val transport = when {
+            capabilities == null -> "none"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+            else -> "other"
+        }
+        val audioOutputs = runCatching {
+            val audio = activity.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            JSONArray().apply {
+                audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS).forEach { device ->
+                    val outputTransport = when (device.type) {
+                        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "bluetooth"
+                        AudioDeviceInfo.TYPE_REMOTE_SUBMIX -> "remote"
+                        AudioDeviceInfo.TYPE_HDMI -> "hdmi"
+                        AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+                        AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                        AudioDeviceInfo.TYPE_USB_HEADSET -> "wired"
+                        else -> null
+                    }
+                    if (outputTransport != null) {
+                        put(JSObject().apply {
+                            put("id", device.id.toString())
+                            put("name", device.productName.toString())
+                            put("transport", outputTransport)
+                        })
+                    }
+                }
+            }
+        }.getOrDefault(JSONArray())
         invoke.resolve(
             JSObject().apply {
                 put("backend", "android-native")
@@ -227,6 +264,13 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
                 put("cloudSyncAvailable", false)
                 put("healthAvailable", healthSdkStatus() == HealthConnectClient.SDK_AVAILABLE)
                 put("homeAvailable", false)
+                put("network", JSObject().apply {
+                    put("transport", transport)
+                    put("connected", capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true)
+                    put("validated", capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true)
+                    put("metered", connectivity.isActiveNetworkMetered)
+                })
+                put("audioOutputs", audioOutputs)
                 put(
                     "permissionAliases",
                     JSObject().apply {

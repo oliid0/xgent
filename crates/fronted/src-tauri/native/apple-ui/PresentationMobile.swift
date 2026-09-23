@@ -30,12 +30,14 @@ struct XgentIOSRootPresentation: View {
                     .accessibilityIdentifier("xgent-native-root")
                     .accessibilityHidden(sidebar != nil)
                     .allowsHitTesting(sidebar == nil)
+                    .zIndex(0)
                 if let sidebar {
                     Button { model.dismiss(sidebar) } label: {
                         Color.black.opacity(0.32).contentShape(Rectangle()).ignoresSafeArea()
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text("Close sidebar"))
+                    .zIndex(100)
                     XgentIOSSidebarPresentation(document: sidebar, model: model)
                         .frame(width: drawerWidth, height: geometry.size.height)
                         .overlay(alignment: .trailing) {
@@ -44,7 +46,7 @@ struct XgentIOSRootPresentation: View {
                                 .frame(width: 1)
                         }
                         .clipped()
-                        .zIndex(1)
+                        .zIndex(101)
                         .transition(.move(edge: .leading))
                         .gesture(DragGesture().onEnded {
                             if $0.translation.width < -60 { model.dismiss(sidebar) }
@@ -67,7 +69,26 @@ struct XgentIOSWorkspacePresentation: View {
 
     var body: some View {
         Group {
-            if let layout {
+            if let layout, let toolbar = layout.child(id: "browser-toolbar") {
+                // Keep the browser chrome at its intrinsic height and give the
+                // live WebKit viewport the entire remaining iPhone surface.
+                VStack(spacing: 0) {
+                    XgentIOSNode(node: toolbar, document: document, model: model,
+                                 parentAxis: .vertical)
+                    if let error = layout.child(id: "browser-error") {
+                        XgentIOSNode(node: error, document: document, model: model,
+                                     parentAxis: .vertical)
+                    }
+                    if let viewport = layout.children?.first(where: {
+                        $0.kind == .browserViewport || $0.id == "browser-preparing"
+                    }) {
+                        XgentIOSNode(node: viewport, document: document, model: model,
+                                     parentAxis: .vertical)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let layout {
                 // BrowserPanel, MobileFilesPanel and the other compact tools
                 // already serialize the Astryx order. Do not lift their first
                 // HStack into a system navigation bar: that changes both the
@@ -130,19 +151,21 @@ struct XgentIOSPagePresentation: View {
                 page
                     .accessibilityHidden(sidebar != nil)
                     .allowsHitTesting(sidebar == nil)
+                    .zIndex(0)
                 if let sidebar {
                     Button { model.dismiss(sidebar) } label: {
                         Color.black.opacity(0.32).contentShape(Rectangle()).ignoresSafeArea()
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text("Close sidebar"))
+                    .zIndex(100)
                     XgentIOSSidebarPresentation(document: sidebar, model: model)
                         .frame(width: drawerWidth, height: geometry.size.height)
                         .overlay(alignment: .trailing) {
                             Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1)
                         }
                         .clipped()
-                        .zIndex(1)
+                        .zIndex(101)
                         .transition(.move(edge: .leading))
                         .gesture(DragGesture().onEnded {
                             if $0.translation.width < -60 { model.dismiss(sidebar) }
@@ -163,6 +186,7 @@ private struct XgentIOSChatPresentation: View {
     private var chat: XgentNode? { document.nodes.first { $0.kind == .chatLayout } }
     private var toolbar: XgentNode? { chat?.child(id: "toolbar") }
     private var sidebarControl: XgentNode? { toolbar?.child(id: "sidebar") }
+    private var executionMode: XgentNode? { toolbar?.child(id: "execution-mode") }
     private var toolsControl: XgentNode? { toolbar?.child(id: "tools") }
     private var transcript: XgentNode? { chat?.child(id: "transcript") }
     private var composer: XgentNode? { chat?.child(id: "composer") }
@@ -175,6 +199,10 @@ private struct XgentIOSChatPresentation: View {
             HStack(spacing: 4) {
                 if let sidebarControl {
                     XgentIOSNode(node: sidebarControl, document: document, model: model)
+                }
+                Spacer(minLength: 0)
+                if let executionMode {
+                    XgentIOSNode(node: executionMode, document: document, model: model)
                 }
                 Spacer(minLength: 0)
                 if let toolsControl {
@@ -280,7 +308,18 @@ private struct XgentIOSComposer: View {
             }
             if let actions {
                 HStack(spacing: 6) {
-                    XgentIOSNodes(nodes: actions.children ?? [], document: document, model: model)
+                    ForEach(actions.children ?? []) { child in
+                        if child.id == "context-usage" {
+                            XgentIOSContextUsage(node: child)
+                        } else if child.id == "model" {
+                            XgentIOSNode(node: child, document: document, model: model,
+                                         parentAxis: .horizontal)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            XgentIOSNode(node: child, document: document, model: model,
+                                         parentAxis: .horizontal)
+                        }
+                    }
                 }
             }
         }
@@ -397,6 +436,37 @@ private struct XgentIOSSidebarFooter: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
+    }
+}
+
+private struct XgentIOSContextUsage: View {
+    let node: XgentNode
+
+    private var ratio: Double {
+        min(1, max(0, (node.current ?? 0) / max(node.total ?? 1, 1)))
+    }
+
+    private var color: Color {
+        if ratio >= 0.8 { return .red }
+        if ratio >= 0.5 { return .orange }
+        return .green
+    }
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(Color.primary.opacity(0.16), lineWidth: 2.5)
+            Circle()
+                .trim(from: 0, to: ratio)
+                .stroke(color, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Text("\(Int(((node.current ?? 0) / max(node.total ?? 1, 1) * 100).rounded()))%")
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+        }
+        .frame(width: 34, height: 34)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "Context usage")
+        .accessibilityValue(node.accessibilityValue ?? "")
     }
 }
 

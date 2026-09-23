@@ -508,7 +508,8 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v4.0.1
+      # v4.0.1 still asks sdkmanager for Google's removed legacy "tools" package.
+      - uses: android-actions/setup-android@v4.0.4
 
       - name: Install Android SDK and native build tools
         run: |

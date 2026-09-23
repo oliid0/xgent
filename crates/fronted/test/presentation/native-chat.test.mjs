@@ -43,7 +43,10 @@ function harness(overrides = {}, options = {}) {
     sidebarStore: { subscribe: () => () => {}, getSnapshot: () => ({ conversations: [], hasMore: false }) },
     historyItems: [], liveTranscriptStore: createLiveTranscriptStore(),
     modelOptions: [{ value: "provider::model", providerName: "Provider", label: "Model" }],
-    selectedValue: "provider::model", inputDisabled: false, inputPlaceholder: "Message",
+    selectedValue: "provider::model",
+    contextUsageTokensSource: { subscribe: () => () => {}, getContextUsageTokens: () => 45_000 },
+    contextWindow: 100_000,
+    inputDisabled: false, inputPlaceholder: "Message",
     isSending: false, errorMessage: null, hasMoreHistory: false, pendingApprovals: [],
     projects: [], attachmentsEnabled: true, uploads: [], isUploading: false,
     onSend() {}, onStop() {}, onSelectModel() {}, onSelectConversation() {}, onSelectProject() {},
@@ -171,6 +174,25 @@ test("native iPhone uses the same anchored tools menu and compact drawer hierarc
     "new-chat",
     "settings",
   ]);
+  h.unmount();
+});
+
+test("native iPhone exposes execution mode and live context usage in the chat chrome", async () => {
+  const selectedModes = [];
+  const h = harness({ onChangeMode: (mode) => selectedModes.push(mode) }, { mobile: true });
+  const chat = h.render().nodes[0];
+  const toolbar = chat.children.find((node) => node.id === "toolbar");
+  const mode = toolbar.children.find((node) => node.id === "execution-mode");
+  assert.equal(mode.kind, "Selector");
+  assert.equal(mode.value, "text");
+  assert.equal((await h.dispatch("execution-mode", "tools")).ok, true);
+  assert.deepEqual(selectedModes, ["tools"]);
+  const composer = chat.children.find((node) => node.id === "composer");
+  const actions = composer.children.find((node) => node.id === "composer-actions");
+  const usage = actions.children.find((node) => node.id === "context-usage");
+  assert.equal(usage.kind, "ProgressBar");
+  assert.equal(usage.current, 45_000);
+  assert.equal(usage.total, 100_000);
   h.unmount();
 });
 

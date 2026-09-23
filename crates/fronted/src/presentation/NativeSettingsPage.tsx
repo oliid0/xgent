@@ -55,6 +55,7 @@ import { createUuid } from "../lib/shared/id";
 import { desktopSttSettingsService } from "../lib/stt/desktopSttSettingsService";
 import { BUILTIN_TOOL_CATALOG, BUILTIN_TOOL_CATEGORIES } from "../lib/tools/builtinToolCatalog";
 import { resolveRuntimeToolCapabilities } from "../lib/tools/runtimeToolCapabilities";
+import { MobileMcpPage } from "../pages/chat/mobile/MobileMcpPage";
 import { MobileSkillsPage } from "../pages/chat/mobile/MobileSkillsPage";
 import { canTestSyncConnection } from "../pages/settings/backupSyncForm";
 import { ComputerUseSection } from "../pages/settings/ComputerUseSection";
@@ -86,15 +87,29 @@ type CloudSecretVaultStatus = {
   githubUsername?: string | null;
 };
 
+function formatByteCount(value?: number | null) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return "—";
+  if (value < 1024) return `${value} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let amount = value / 1024;
+  let unit = units[0];
+  for (let index = 1; index < units.length && amount >= 1024; index += 1) {
+    amount /= 1024;
+    unit = units[index];
+  }
+  return `${amount >= 10 ? amount.toFixed(0) : amount.toFixed(1)} ${unit}`;
+}
+
 /** Native navigation uses the same reducers, discovery and persistence as desktop settings. */
 export function NativeSettingsPage(props: SettingsPageProps) {
   const { settings, setSettings, nativeMobile = false } = props;
-  const { t, locale } = useLocale();
+  const { t } = useLocale();
   const [page, setPage] = useState(
     nativeMobile && props.initialSection === "system"
       ? ""
       : (props.initialSection ?? (nativeMobile ? "" : "system")),
   );
+  const [returnPage, setReturnPage] = useState("");
   const [settingsQuery, setSettingsQuery] = useState("");
   const [failure, setFailure] = useState<unknown>(null);
   const [status, setStatus] = useState<MobileAssistantStatus>();
@@ -102,6 +117,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [shell, setShell] = useState<MobileExecutionStatus>();
   const [shellToolchains, setShellToolchains] = useState<string[]>([]);
   const [shellRunId, setShellRunId] = useState("");
+  const [shellInstallStage, setShellInstallStage] = useState<"rootfs" | "essentials" | "">("");
   const [shellWorkspaces, setShellWorkspaces] = useState<ExternalMobileWorkspace[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -134,9 +150,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [backupConfig, setBackupConfig] = useState<BackupSyncConfigView | null>(null);
   const [backupPassword, setBackupPassword] = useState("");
   const c = presentationControls();
-  const tr = (en: string, zh: string) => (locale === "zh-CN" ? zh : en);
   const provider = settings.customProviders.find((item) => item.id === providerId);
-  const returnToSettings = () => setPage(nativeMobile ? "" : "system");
+  const returnToSettings = () => {
+    setPage(nativeMobile ? returnPage : "system");
+    setReturnPage("");
+  };
 
   async function refreshShell() {
     const next = await mobileExecutionStatus();
@@ -154,11 +172,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     }
   }
 
-  async function installShellToolchains() {
+  async function installShellToolchains(toolchains = shellToolchains) {
     const runId = `mobile-install-${createUuid()}`;
     setShellRunId(runId);
     try {
-      const result = await installMobileToolchains(shellToolchains, runId);
+      const result = await installMobileToolchains(toolchains, runId);
       await refreshShell();
       if (!result.succeeded)
         throw new Error(
@@ -168,6 +186,27 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         );
     } finally {
       setShellRunId("");
+    }
+  }
+
+  async function installShellEnvironment() {
+    setShellInstallStage("rootfs");
+    try {
+      const installed = await installMobileEnvironment();
+      if (!installed.installed)
+        throw new Error(installed.detail || t("settings.mobileNotInstalled"));
+      await refreshShell();
+      if (installed.backend === "android-proot") {
+        setShellInstallStage("essentials");
+        try {
+          await installShellToolchains(["essentials"]);
+        } catch (cause) {
+          const detail = cause instanceof Error ? cause.message : String(cause);
+          throw new Error(t("settings.native.shellEssentialsError").replace("{detail}", detail));
+        }
+      }
+    } finally {
+      setShellInstallStage("");
     }
   }
 
@@ -191,7 +230,10 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     }
   }
   useEffect(() => {
-    if ((page === "mobileAssistant" || page === "voice") && nativeMobile)
+    if (
+      (page === "mobileAssistant" || page === "toolPermissions" || page === "voice") &&
+      nativeMobile
+    )
       void work(refreshPermissions);
     if (page === "mobileExecution" && nativeMobile) void work(refreshShell);
     if (page === "access") {
@@ -221,7 +263,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     }
   }, [page, nativeMobile]);
   useEffect(() => {
-    if (page !== "mobileAssistant" || !nativeMobile) return;
+    if ((page !== "mobileAssistant" && page !== "toolPermissions") || !nativeMobile) return;
     const refresh = () => {
       if (document.visibilityState === "visible") void work(refreshPermissions);
     };
@@ -299,7 +341,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     shortcuts: t("settings.navShortcuts"),
     computerUse: t("settings.cua.title"),
     mobileAssistant: t("settings.mobileAssistant.permissions"),
-    mobileExecution: t("settings.mobile.executionDescription"),
+    mobileExecution: t("settings.native.shellTitle"),
     cron: t("settings.navCron"),
     ssh: t("settings.navSsh"),
     about: t("settings.navAbout"),
@@ -310,17 +352,44 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         settings={settings}
         setSettings={setSettings}
         onOpenSidebar={returnToSettings}
+        presentationMode={nativeMobile ? "root" : "sheet"}
+      />
+    );
+  if (page === "mcp" && nativeMobile)
+    return (
+      <MobileMcpPage
+        settings={settings}
+        setSettings={setSettings}
+        onOpenSidebar={returnToSettings}
+        allowStdio={false}
       />
     );
   if (page === "ssh")
     return (
-      <SshSettingsSection settings={settings} setSettings={setSettings} onBack={returnToSettings} />
+      <SshSettingsSection
+        settings={settings}
+        setSettings={setSettings}
+        onBack={returnToSettings}
+        openCreateImmediately={nativeMobile}
+      />
     );
   if (page === "cron")
-    return <CronSection settings={settings} setSettings={setSettings} onBack={returnToSettings} />;
+    return (
+      <CronSection
+        settings={settings}
+        setSettings={setSettings}
+        onBack={returnToSettings}
+        openCreateImmediately={nativeMobile}
+      />
+    );
   if (page === "hooks")
     return (
-      <HooksSection settings={settings} setSettings={setSettings} onBack={() => setPage("other")} />
+      <HooksSection
+        settings={settings}
+        setSettings={setSettings}
+        onBack={returnToSettings}
+        openCreateImmediately={nativeMobile}
+      />
     );
   if (page === "soul")
     return (
@@ -337,13 +406,53 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       <ComputerUseSection settings={settings} setSettings={setSettings} onBack={returnToSettings} />
     );
   const nodes: PresentationNode[] = [];
+  function appendToolPolicyGroups() {
+    const capabilities = resolveRuntimeToolCapabilities(nativeMobile ? "native-mobile" : "desktop");
+    for (const category of BUILTIN_TOOL_CATEGORIES) {
+      const tools = BUILTIN_TOOL_CATALOG.filter(
+        (tool) =>
+          tool.categoryId === category.id &&
+          (tool.toolName !== "ManagedProcess" || capabilities.managedProcess) &&
+          (tool.toolName !== "ReadTerminal" || capabilities.terminal),
+      );
+      nodes.push(
+        c.group(
+          category.id,
+          t(category.labelKey),
+          tools.map((tool) =>
+            c.select(
+              `policy:${tool.toolName}`,
+              tool.toolName,
+              settings.system.toolPolicies?.[tool.toolName] ?? "allow",
+              ["allow", "ask", "deny"].map((value) => ({
+                value,
+                label: t(`settings.toolPolicy.${value}`),
+              })),
+              (value) =>
+                setSettings((previous) =>
+                  updateSystem(previous, {
+                    toolPolicies: {
+                      ...previous.system.toolPolicies,
+                      [tool.toolName]: value as "allow" | "ask" | "deny",
+                    },
+                  }),
+                ),
+            ),
+          ),
+        ),
+      );
+    }
+  }
   if (page && (nativeMobile || providerId))
     nodes.push({
-      ...c.action("back", tr("Back", "返回"), () => {
+      ...c.action("back", t("settings.native.back"), () => {
         if (providerId) {
           setProviderId("");
           setProviderDeletePending(false);
-        } else setPage("");
+        } else {
+          setPage(returnPage);
+          setReturnPage("");
+        }
         setError("");
       }),
       icon: "chevron.left",
@@ -359,9 +468,28 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           : t(props.saveState.status === "saving" ? "settings.saving" : "settings.saved"),
     });
   if (error) nodes.push({ id: "error", kind: "Text", text: error });
-  if (busy) nodes.push({ id: "busy", kind: "Progress", label: t("app.loading") });
+  if (busy)
+    nodes.push({
+      id: "busy",
+      kind: "Progress",
+      label:
+        shellInstallStage === "rootfs"
+          ? t("settings.native.shellInstalling")
+          : shellInstallStage === "essentials"
+            ? t("settings.native.shellInstallingEssentials")
+            : t("app.loading"),
+    });
   const navigate = (id: string, icon: string, description?: string) =>
-    row("nav:" + id, titles[id], icon, () => setPage(id), description);
+    row(
+      "nav:" + id,
+      titles[id],
+      icon,
+      () => {
+        setReturnPage(page);
+        setPage(id);
+      },
+      description,
+    );
   const visible = (id: SectionId) => !props.hiddenSections?.includes(id);
 
   if (!page && nativeMobile) {
@@ -381,16 +509,13 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         ...(visible("memory")
           ? [navigate("memory", "brain", t("settings.mobile.memoryDescription"))]
           : []),
-        ...(visible("mobileAssistant")
-          ? [navigate("mobileAssistant", "mic", t("settings.mobile.assistantDescription"))]
-          : []),
       ]),
       c.group("mobile-capabilities", t("settings.mobile.capabilitiesGroup"), [
-        ...(visible("mobileExecution")
-          ? [navigate("mobileExecution", "terminal", t("settings.mobile.executionDescription"))]
+        ...(visible("mobileAssistant")
+          ? [navigate("mobileAssistant", "hand.raised", t("settings.mobile.assistantDescription"))]
           : []),
-        ...(visible("toolPermissions")
-          ? [navigate("toolPermissions", "lock.shield", t("settings.toolPermissionsDesc"))]
+        ...(visible("mobileExecution")
+          ? [navigate("mobileExecution", "terminal", t("settings.native.shellEnvironment"))]
           : []),
         ...(visible("other")
           ? [navigate("other", "terminal", t("settings.mobile.otherDescription"))]
@@ -419,15 +544,15 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         }),
       );
     nodes.push(
-      c.group("appearance", tr("Theme", "主题"), [
+      c.group("appearance", t("settings.native.theme"), [
         c.select(
           "theme",
-          tr("Appearance", "外观"),
+          t("settings.native.appearance"),
           settings.theme,
           [
-            { value: "system", label: tr("System", "跟随系统") },
-            { value: "light", label: tr("Light", "浅色") },
-            { value: "dark", label: tr("Dark", "深色") },
+            { value: "system", label: t("settings.native.system") },
+            { value: "light", label: t("settings.native.light") },
+            { value: "dark", label: t("settings.native.dark") },
           ],
           (theme) =>
             setSettings((previous) => ({ ...previous, theme: theme as typeof previous.theme })),
@@ -519,7 +644,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         ),
         c.toggle(
           "thinking",
-          tr("Show reasoning", "显示思考过程"),
+          t("settings.native.showReasoning"),
           settings.customSettings.appearance.showThinking,
           (showThinking) =>
             setSettings((previous) =>
@@ -531,7 +656,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       ]),
     );
     nodes.push(
-      c.group("app-settings", tr("App settings", "应用设置"), [
+      c.group("app-settings", t("settings.native.appSettings"), [
         ...(visible("system") ? [navigate("system", "gearshape")] : []),
         ...(visible("providers") ? [navigate("providers", "cpu")] : []),
         ...(!nativeMobile && visible("shortcuts") ? [navigate("shortcuts", "keyboard")] : []),
@@ -542,7 +667,9 @@ export function NativeSettingsPage(props: SettingsPageProps) {
               ...(visible("mobileExecution") ? [navigate("mobileExecution", "terminal")] : []),
             ]
           : []),
-        ...(visible("toolPermissions") ? [navigate("toolPermissions", "lock.shield")] : []),
+        ...(!nativeMobile && visible("toolPermissions")
+          ? [navigate("toolPermissions", "lock.shield")]
+          : []),
         ...(visible("voice") ? [navigate("voice", "mic")] : []),
         ...(visible("mcp") ? [navigate("mcp", "puzzlepiece.extension")] : []),
         ...(visible("other") ? [navigate("other", "ellipsis.circle")] : []),
@@ -593,10 +720,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       id: "system-font",
       kind: "Text",
       secondary: true,
-      text: tr(
-        "Text size, contrast and reduced motion follow system accessibility settings.",
-        "字号、对比度和减弱动态效果跟随系统辅助功能设置。",
-      ),
+      text: t("settings.native.accessibilityNote"),
     });
   } else if (page === "providers") {
     if (!provider) {
@@ -616,11 +740,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         ),
       );
       nodes.push(
-        c.action("add-provider", tr("Add provider", "添加服务商"), () => {
+        c.action("add-provider", t("settings.native.addProvider"), () => {
           const id = createUuid();
           const next = normalizeCustomProvider({
             id,
-            name: tr("New provider", "新服务商"),
+            name: t("settings.native.newProvider"),
             type: "codex",
           });
           setSettings((previous) =>
@@ -632,12 +756,12 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     } else {
       nodes.push(
         c.group("provider-details", provider.name, [
-          c.input("provider-name", tr("Name", "名称"), provider.name, (name) =>
+          c.input("provider-name", t("settings.native.name"), provider.name, (name) =>
             patchProvider({ name }),
           ),
           c.select(
             "provider-type",
-            tr("API", "接口"),
+            t("settings.native.api"),
             provider.type,
             ["codex", "claude_code", "gemini", "xai", "deepseek"].map((value) => ({
               value,
@@ -650,7 +774,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           ),
           c.toggle(
             "full-url",
-            tr("Use exact endpoint", "使用完整接口地址"),
+            t("settings.native.exactEndpoint"),
             provider.isFullUrl,
             (isFullUrl) => patchProvider({ isFullUrl }),
           ),
@@ -665,7 +789,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             ? [
                 c.select(
                   "request-format",
-                  tr("Request format", "请求格式"),
+                  t("settings.native.requestFormat"),
                   provider.requestFormat ?? "openai-responses",
                   [
                     { value: "openai-responses", label: "Responses API" },
@@ -680,7 +804,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             : []),
           c.action(
             "fetch-models",
-            tr("Fetch models", "获取模型"),
+            t("settings.native.fetchModels"),
             () =>
               work(async () => {
                 const targetId = provider.id;
@@ -711,7 +835,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       nodes.push(
         c.group(
           "models",
-          tr("Enabled models", "启用的模型"),
+          t("settings.native.enabledModels"),
           provider.models.map((model) =>
             c.toggle(
               "model:" + model.id,
@@ -738,11 +862,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         ),
       );
       nodes.push(
-        c.group("manual-model", tr("Add model", "添加模型"), [
+        c.group("manual-model", t("settings.native.addModel"), [
           c.input("model-id", "Model ID", modelId, setModelId),
           c.action(
             "add-model",
-            tr("Add", "添加"),
+            t("settings.native.add"),
             () => {
               const id = modelId.trim();
               setSettings((previous) =>
@@ -772,11 +896,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           ? {
               id: "provider-delete-confirmation",
               kind: "Banner",
-              label: tr("Delete this provider?", "删除这个供应商？"),
-              text: tr(
-                "Its local credentials and model configuration will be removed.",
-                "将移除其本地凭据和模型配置。",
-              ),
+              label: t("settings.native.deleteProvider"),
+              text: t("settings.native.deleteProviderDetail"),
               status: "paused",
               children: [
                 {
@@ -806,7 +927,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             },
       );
     }
-  } else if (page === "mobileAssistant") {
+  } else if (page === "mobileAssistant" || (page === "toolPermissions" && nativeMobile)) {
     nodes.push(
       c.action(
         "refresh-permissions",
@@ -818,103 +939,149 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     const aliases = Object.keys(
       status?.permissionAliases ?? {},
     ) as (keyof MobilePermissionStates)[];
-    nodes.push(
-      c.group(
-        "permissions",
-        titles.mobileAssistant,
-        aliases.map((permission) => {
-          const state = permissions[permission] ?? "prompt";
-          return {
-            ...row(
-              "permission:" + permission,
-              t("settings.mobileAssistant." + permission),
-              "hand.raised",
-              () =>
-                work(async () => {
-                  if (!status) return;
-                  if (state === "denied" || state === "requested") {
-                    await openMobileSystemSettings();
-                    return;
-                  }
-                  const next = await requestMobileAssistantPermission(
-                    status.permissionAliases[permission] ?? permission,
-                  );
-                  setPermissions(normalizeMobileAssistantPermissions(status, next));
-                }),
-              t(
-                "settings.mobileAssistant." +
-                  (state === "granted"
-                    ? "granted"
-                    : state === "requested"
-                      ? "requested"
-                      : state === "denied"
-                        ? "denied"
-                        : "notRequested"),
-              ),
-            ),
-            disabled: busy || state === "granted",
-          };
-        }),
-      ),
-    );
-    if (status?.detail)
-      nodes.push({ id: "permissions-detail", kind: "Text", secondary: true, text: status.detail });
+    const permissionRows: PresentationNode[] = aliases.map((permission) => {
+      const state = permissions[permission] ?? "prompt";
+      return {
+        ...row(
+          `permission:${permission}`,
+          t(`settings.mobileAssistant.${permission}`),
+          "hand.raised",
+          () =>
+            work(async () => {
+              if (!status) return;
+              if (state === "denied" || state === "requested") {
+                await openMobileSystemSettings();
+                return;
+              }
+              const next = await requestMobileAssistantPermission(
+                status.permissionAliases[permission] ?? permission,
+              );
+              setPermissions(normalizeMobileAssistantPermissions(status, next));
+            }),
+          t(
+            `settings.mobileAssistant.${state === "granted" ? "granted" : state === "requested" ? "requested" : state === "denied" ? "denied" : "notRequested"}`,
+          ),
+        ),
+        disabled: busy || state === "granted",
+      };
+    });
+    if (status?.network) {
+      const transport = status.network.transport;
+      const networkLabel =
+        transport === "wifi"
+          ? "Wi-Fi"
+          : transport === "cellular"
+            ? t("settings.native.cellular")
+            : transport === "ethernet"
+              ? t("settings.native.ethernet")
+              : transport === "none"
+                ? t("settings.native.offline")
+                : t("settings.native.otherNetwork");
+      permissionRows.push({
+        id: "network-status",
+        kind: "NavigationRow",
+        icon: "wifi",
+        label: t("settings.native.network"),
+        text: networkLabel,
+        disabled: true,
+      });
+    }
+    nodes.push(c.group("permissions", titles.mobileAssistant, permissionRows));
+    appendToolPolicyGroups();
   } else if (page === "mobileExecution") {
+    const backendLabel =
+      shell?.backend === "android-proot"
+        ? "Android PRoot"
+        : shell?.backend === "ios-a-shell"
+          ? "iOS a-Shell"
+          : t("settings.native.unavailable");
+    const statusLabel = shell?.installed
+      ? t("settings.native.installed")
+      : shell?.available
+        ? t("settings.native.notInstalled")
+        : t("settings.native.unavailable");
     nodes.push(
-      c.group("shell", "Shell", [
+      c.group("shell-status", t("settings.native.status"), [
         {
-          id: "shell-independent",
-          kind: "Text",
-          text: t("settings.mobileWithoutShell"),
-          secondary: true,
+          id: "shell-installation-status",
+          kind: "StatusDot",
+          label: statusLabel,
+          status: shell?.installed ? "completed" : shell?.available ? "paused" : "error",
         },
-        { id: "shell-source", kind: "Text", text: t("settings.mobileIosSource"), secondary: true },
-        { id: "shell-status", kind: "Text", text: shell?.detail ?? t("app.loading") },
-        c.action("refresh-shell", t("settings.mobileRefresh"), () => work(refreshShell), !busy),
+        {
+          id: "shell-backend",
+          kind: "Text",
+          text: `${t("settings.native.backend")}  ·  ${backendLabel}`,
+        },
+        ...(shell?.environmentVersion
+          ? [
+              {
+                id: "shell-version",
+                kind: "Text" as const,
+                text: `${t("settings.native.version")}  ·  ${shell.environmentVersion}`,
+              },
+            ]
+          : []),
+        ...(shell?.installed
+          ? [
+              {
+                id: "shell-size",
+                kind: "Text" as const,
+                text: `${t("settings.native.size")}  ·  ${formatByteCount(shell.diskUsageBytes)}`,
+              },
+            ]
+          : []),
+        ...(!shell?.available && shell?.detail
+          ? [
+              {
+                id: "shell-detail",
+                kind: "Banner" as const,
+                label: shell.detail,
+                status: "error" as const,
+              },
+            ]
+          : []),
+      ]),
+      c.group("shell-actions", t("settings.native.actions"), [
         c.action(
           "install-shell",
           busy ? t("settings.mobileInstalling") : t("settings.mobileInstallEnvironment"),
-          () =>
-            work(async () => {
-              const installed = await installMobileEnvironment();
-              if (!installed.installed)
-                throw new Error(installed.detail || t("settings.mobileNotInstalled"));
-              await refreshShell();
-            }),
+          () => work(installShellEnvironment),
           !busy && shell?.available === true && !shell.installed,
         ),
-        ...(shell?.toolchains ?? []).map(
-          (tool): PresentationNode => ({
-            id: "toolchain:" + tool.id,
-            kind: "Text",
-            text:
-              tool.label +
-              " · " +
-              (tool.installed ? tr("Ready", "可用") : tr("Unavailable", "不可用")) +
-              "\n" +
-              (tool.detail ?? ""),
-          }),
-        ),
+        c.action("refresh-shell", t("settings.mobileRefresh"), () => work(refreshShell), !busy),
       ]),
-      c.group("shell-packs", t("settings.mobileCapabilityPacks"), [
-        ...(shell?.toolchains ?? [])
-          .filter((tool) => tool.installable && !tool.installed)
-          .map((tool) =>
-            c.toggle(
-              `shell-pack:${tool.id}`,
-              tool.label,
-              shellToolchains.includes(tool.id),
-              (selected) =>
-                setShellToolchains((current) =>
-                  selected ? [...current, tool.id] : current.filter((id) => id !== tool.id),
-                ),
-              !busy && shell?.installed === true,
-            ),
-          ),
+      c.group("shell-toolchains", t("settings.native.toolchains"), [
+        ...(shell?.toolchains ?? []).map(
+          (tool): PresentationNode =>
+            tool.installable && !tool.installed
+              ? c.toggle(
+                  `shell-pack:${tool.id}`,
+                  tool.label,
+                  shellToolchains.includes(tool.id),
+                  (selected) =>
+                    setShellToolchains((current) =>
+                      selected ? [...current, tool.id] : current.filter((id) => id !== tool.id),
+                    ),
+                  !busy && shell?.installed === true,
+                )
+              : {
+                  id: `toolchain:${tool.id}`,
+                  kind: "NavigationRow",
+                  label: tool.label,
+                  text:
+                    tool.version ||
+                    (tool.installed
+                      ? t("settings.native.ready")
+                      : t("settings.native.unavailable")),
+                  icon: tool.installed ? "checkmark.circle" : "xmark.circle",
+                  disabled: true,
+                },
+        ),
         c.action(
           "install-shell-packs",
           busy ? t("settings.mobileInstalling") : t("settings.mobileInstallSelected"),
-          () => work(installShellToolchains),
+          () => work(() => installShellToolchains()),
           !busy && shell?.installed === true && shellToolchains.length > 0,
         ),
         ...(shellRunId
@@ -929,13 +1096,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             ]
           : []),
       ]),
-      c.group("shell-workspaces", t("settings.mobileExternalWorkspaces"), [
-        {
-          id: "shell-workspaces-hint",
-          kind: "Text",
-          text: t("settings.mobileExternalWorkspacesHint"),
-          secondary: true,
-        },
+      c.group("shell-workspaces", t("settings.native.folders"), [
         c.action(
           "shell-pick-workspace",
           t("settings.mobileMountFolder"),
@@ -946,74 +1107,47 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             }),
           !busy,
         ),
-        ...shellWorkspaces.flatMap((workspace): PresentationNode[] => [
-          {
-            id: `workspace:${workspace.id}`,
-            kind: "Text",
-            text: `${workspace.name}\n${workspace.path}\n${workspace.detail ?? ""}`,
-          },
-          c.action(
-            `remove-workspace:${workspace.id}`,
-            t("settings.delete"),
-            () =>
-              work(async () => {
-                await removeExternalMobileWorkspace(workspace.id);
-                await refreshShell();
-              }),
-            !busy,
-          ),
-        ]),
+        ...shellWorkspaces.map(
+          (workspace): PresentationNode =>
+            c.group(`workspace:${workspace.id}`, workspace.name, [
+              {
+                id: `workspace:${workspace.id}:path`,
+                kind: "Text",
+                text: workspace.path,
+                maxLines: 2,
+              },
+              {
+                ...c.action(
+                  `remove-workspace:${workspace.id}`,
+                  t("settings.delete"),
+                  () =>
+                    work(async () => {
+                      await removeExternalMobileWorkspace(workspace.id);
+                      await refreshShell();
+                    }),
+                  !busy,
+                ),
+                destructive: true,
+              },
+            ]),
+        ),
       ]),
     );
   } else if (page === "toolPermissions") {
-    const capabilities = resolveRuntimeToolCapabilities(nativeMobile ? "native-mobile" : "desktop");
-    for (const category of BUILTIN_TOOL_CATEGORIES) {
-      const tools = BUILTIN_TOOL_CATALOG.filter(
-        (tool) =>
-          tool.categoryId === category.id &&
-          (tool.toolName !== "ManagedProcess" || capabilities.managedProcess) &&
-          (tool.toolName !== "ReadTerminal" || capabilities.terminal),
-      );
-      nodes.push(
-        c.group(
-          category.id,
-          t(category.labelKey),
-          tools.map((tool) =>
-            c.select(
-              "policy:" + tool.toolName,
-              tool.toolName,
-              settings.system.toolPolicies?.[tool.toolName] ?? "allow",
-              ["allow", "ask", "deny"].map((value) => ({
-                value,
-                label: t("settings.toolPolicy." + value),
-              })),
-              (value) =>
-                setSettings((previous) =>
-                  updateSystem(previous, {
-                    toolPolicies: {
-                      ...previous.system.toolPolicies,
-                      [tool.toolName]: value as "allow" | "ask" | "deny",
-                    },
-                  }),
-                ),
-            ),
-          ),
-        ),
-      );
-    }
+    appendToolPolicyGroups();
   } else if (page === "memory") {
     nodes.push(
       c.group("memory", titles.memory, [
         c.toggle(
           "organizer",
-          tr("Automatic memory organization", "自动整理记忆"),
+          t("settings.native.organizeMemory"),
           settings.memory.organizerEnabled,
           (organizerEnabled) =>
             setSettings((previous) => updateMemorySettings(previous, { organizerEnabled })),
         ),
         c.select(
           "scope",
-          tr("Scope", "范围"),
+          t("settings.native.scope"),
           settings.memory.organizerScope,
           ["all", "global", "projects", "current-project"].map((value) => ({
             value,
@@ -1066,7 +1200,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       nodes.push({
         id: "mcp-delete-confirmation",
         kind: "Banner",
-        label: tr(`Delete ${mcpDeleteId}?`, `删除 ${mcpDeleteId}？`),
+        label: t("settings.native.deleteMcp").replace("{name}", mcpDeleteId),
         status: "paused",
         children: [
           {
@@ -1084,13 +1218,13 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       });
     }
     nodes.push(
-      c.group("new-mcp", tr("Connect MCP server", "连接 MCP 服务"), [
-        c.input("mcp-id", tr("Name", "名称"), mcpId, setMcpId),
+      c.group("new-mcp", t("settings.native.connectMcp"), [
+        c.input("mcp-id", t("settings.native.name"), mcpId, setMcpId),
         ...(!nativeMobile
           ? [
               c.select(
                 "mcp-transport",
-                tr("Transport", "传输方式"),
+                t("settings.native.transport"),
                 mcpTransport,
                 [
                   { value: "http", label: "HTTP" },
@@ -1103,18 +1237,13 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           : []),
         ...(mcpTransport === "stdio" && !nativeMobile
           ? [
-              c.input("mcp-command", tr("Command", "命令"), mcpCommand, setMcpCommand),
-              c.input(
-                "mcp-args",
-                tr("Arguments (one per line)", "参数（每行一个）"),
-                mcpArgs,
-                setMcpArgs,
-              ),
+              c.input("mcp-command", t("settings.native.command"), mcpCommand, setMcpCommand),
+              c.input("mcp-args", t("settings.native.arguments"), mcpArgs, setMcpArgs),
             ]
           : [c.input("mcp-url", "URL", mcpUrl, setMcpUrl)]),
         c.action(
           "add-mcp",
-          tr("Connect", "连接"),
+          t("settings.native.connect"),
           () => {
             const transport = nativeMobile ? "http" : mcpTransport;
             const url = transport === "stdio" ? null : new URL(mcpUrl.trim());
@@ -1166,10 +1295,10 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             id: "voice-device-status",
             kind: "StatusDot",
             label: !status
-              ? tr("Checking system speech recognition", "正在检查系统语音识别")
+              ? t("settings.native.speechChecking")
               : status.voiceInputAvailable
-                ? tr("System speech recognition is available", "系统语音识别可用")
-                : tr("System speech recognition is unavailable", "系统语音识别不可用"),
+                ? t("settings.native.speechAvailable")
+                : t("settings.native.speechUnavailable"),
             status: status?.voiceInputAvailable ? "completed" : status ? "error" : "running",
           },
           {
@@ -1177,7 +1306,10 @@ export function NativeSettingsPage(props: SettingsPageProps) {
               "voice-permissions",
               t("settings.mobileAssistant.microphone"),
               "hand.raised",
-              () => setPage("mobileAssistant"),
+              () => {
+                setReturnPage("voice");
+                setPage("mobileAssistant");
+              },
               t(
                 `settings.mobileAssistant.${
                   permissions.microphone === "granted"
@@ -1205,11 +1337,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       const providerId = settings.stt.provider;
       const sttProvider = settings.stt.providers[providerId];
       const providerLabels: Record<SttProviderId, string> = {
-        aliyun_dashscope: "阿里云 DashScope",
-        tencent_cloud: "腾讯云 ASR",
-        volcengine_v2: "火山引擎 ASR v2",
-        volcengine_seed_v3: "火山引擎 Seed ASR v3",
-        baidu_cloud: "百度智能云 ASR",
+        aliyun_dashscope: t("settings.native.aliyun"),
+        tencent_cloud: t("settings.native.tencent"),
+        volcengine_v2: t("settings.native.volcengineV2"),
+        volcengine_seed_v3: t("settings.native.volcengineV3"),
+        baidu_cloud: t("settings.native.baidu"),
       };
       const providerFields: Record<
         SttProviderId,
@@ -1713,7 +1845,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     nodes.push(
       c.action(
         "check-updates",
-        tr("Check for updates", "检查更新"),
+        t("settings.native.checkUpdates"),
         () => props.appUpdate.runCheck(),
         !nativeMobile,
       ),

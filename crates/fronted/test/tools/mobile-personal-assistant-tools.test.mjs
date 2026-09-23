@@ -58,6 +58,43 @@ test("Bluetooth discovery never scans when authorization is denied", async () =>
   assert.ok(!calls.some(({ command }) => command.endsWith("|scan_bluetooth")));
 });
 
+test("network status works without Shell or permission prompts", async () => {
+  const network = { transport: "wifi", connected: true, validated: true, metered: false };
+  const { bundle, calls } = createHarness((command) => {
+    assert.equal(command, "plugin:mobile-assistant|status");
+    return { network };
+  });
+  const response = await bundle.executeToolCall(toolCall("MobilePersonalData", {
+    action: "network_status",
+  }));
+  assert.equal(response.isError, false);
+  assert.deepEqual(resultData(response), { network });
+  assert.deepEqual(calls.map(({ command }) => command), ["plugin:mobile-assistant|status"]);
+});
+
+test("device discovery combines OS-connected routes with authorized nearby BLE results", async () => {
+  const output = { id: "route-1", name: "Headphones", transport: "bluetooth", active: true };
+  const { bundle, calls } = createHarness((command) => {
+    if (command.endsWith("|status")) return { audioOutputs: [output], permissionAliases: { bluetooth: "bluetooth" } };
+    if (command.endsWith("|check_permissions")) return { bluetooth: "granted" };
+    if (command.endsWith("|scan_bluetooth")) return [{ id: "ble-1", name: "Sensor", rssi: -50, serviceUuids: [] }];
+    throw new Error(`Unexpected command ${command}`);
+  });
+  const response = await bundle.executeToolCall(toolCall("MobilePersonalData", {
+    action: "discover_devices",
+  }));
+  assert.equal(response.isError, false);
+  assert.deepEqual(resultData(response), {
+    network: null,
+    connected: [output],
+    nearbyBluetooth: [{ id: "ble-1", name: "Sensor", rssi: -50, serviceUuids: [] }],
+  });
+  assert.deepEqual(calls.map(({ command }) => command), [
+    "plugin:mobile-assistant|status", "plugin:mobile-assistant|status",
+    "plugin:mobile-assistant|check_permissions", "plugin:mobile-assistant|scan_bluetooth",
+  ]);
+});
+
 test("mobile personal assistant separates read-only data from state-changing actions", () => {
   const { bundle } = createHarness(() => null);
 

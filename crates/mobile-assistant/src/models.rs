@@ -20,6 +20,10 @@ pub struct MobileAssistantStatus {
     pub health_available: bool,
     pub home_available: bool,
     #[serde(default)]
+    pub network: Option<MobileNetworkStatus>,
+    #[serde(default)]
+    pub audio_outputs: Vec<MobileAudioOutput>,
+    #[serde(default)]
     pub permission_aliases: BTreeMap<String, String>,
     pub detail: Option<String>,
 }
@@ -45,6 +49,24 @@ pub type MobilePermissionStates = BTreeMap<String, String>;
 #[serde(rename_all = "camelCase")]
 pub struct BluetoothScanRequest {
     pub timeout_ms: u64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MobileNetworkStatus {
+    pub transport: String,
+    pub connected: bool,
+    pub metered: Option<bool>,
+    pub validated: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MobileAudioOutput {
+    pub id: String,
+    pub name: String,
+    pub transport: String,
+    pub active: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

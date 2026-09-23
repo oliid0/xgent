@@ -20,6 +20,18 @@ export type MobileAssistantStatus = {
   cloudSyncAvailable: boolean;
   healthAvailable: boolean;
   homeAvailable: boolean;
+  network?: {
+    transport: "wifi" | "cellular" | "ethernet" | "other" | "none";
+    connected: boolean;
+    metered?: boolean;
+    validated?: boolean;
+  } | null;
+  audioOutputs?: Array<{
+    id: string;
+    name: string;
+    transport: "bluetooth" | "airplay" | "remote" | "hdmi" | "wired" | "other";
+    active?: boolean;
+  }>;
   permissionAliases: Partial<Record<MobileAssistantPermission, string>>;
   detail?: string | null;
 };
