@@ -65,6 +65,9 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Applied Biome's one requested line wrap to the Skills back action after the final lint pass; TypeScript and native component mapping had passed, and the non-native suite is still running.
 - Updated the existing mobile navigation regression after the full non-native suite exposed its obsolete literal `mode: "root"` assertion; it now checks chat root, settings sheet, and a single MCP native surface.
 - Replaced the iOS Edit detail's whole-snippet remove/add display with the actual unified line diff produced by the same installed `@git-diff-view/file` engine used in the desktop transcript; the existing SwiftUI CodeBlock remains the renderer.
+- Fixed the desktop app-proxy settings deadlock: the initially invalid, disabled switch now opens the existing configuration fields; a later valid activation atomically saves current drafts, and port parsing rejects trailing garbage.
+- Applied Biome's requested proxy-port expression wrap; the TypeScript check passed after the proxy activation change.
+- Marked malformed proxy port input as invalid in the existing field feedback, matching the strict activation check.
 - Extended the native chat evidence test with unchanged context lines, so it rejects the previous false whole-snippet deletion/addition while checking that activity and transcript share the same diff.
 - Adjusted the diff assertion to the library's actual unified patch format (`-old`/`+new`) and applied Biome's compact call formatting after the focused check revealed only those mismatches.
 - Applied Biome's two import/format corrections after TypeScript and native presentation checks passed; remaining consolidated checks continue after this fix.

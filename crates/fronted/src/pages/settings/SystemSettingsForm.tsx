@@ -136,6 +136,7 @@ function DesktopSystemSettingsForm({ settings, setSettings }: SystemSettingsForm
   const [proxyPortDraft, setProxyPortDraft] = useState<string | null>(null);
   const [proxyUsernameDraft, setProxyUsernameDraft] = useState<string | null>(null);
   const [proxyPasswordDraft, setProxyPasswordDraft] = useState<string | null>(null);
+  const [proxyConfigOpen, setProxyConfigOpen] = useState(false);
 
   const terminalShellSelectValue =
     settings.system.terminalShell === "auto" ||
@@ -145,14 +146,13 @@ function DesktopSystemSettingsForm({ settings, setSettings }: SystemSettingsForm
   const systemProxy = settings.system.systemProxy;
   const effectiveProxyHost = (proxyHostDraft ?? systemProxy.host).trim();
   const effectiveProxyPort =
-    proxyPortDraft !== null ? Number.parseInt(proxyPortDraft, 10) : systemProxy.port;
+    proxyPortDraft !== null ? Number(proxyPortDraft.trim()) : systemProxy.port;
   const proxyConfigValid =
     isValidSystemProxyHost(effectiveProxyHost) &&
     Number.isInteger(effectiveProxyPort) &&
     effectiveProxyPort >= 1 &&
     effectiveProxyPort <= 65535;
   const systemProxyInvalid = systemProxy.enabled && !proxyConfigValid;
-  const proxyToggleDisabled = !systemProxy.enabled && !proxyConfigValid;
   const fontScale = settings.customSettings.fontScale;
   const fontFamilyOptions = useMemo(
     () => buildFontFamilySelectOptions(localFontFamilies),
@@ -254,9 +254,29 @@ function DesktopSystemSettingsForm({ settings, setSettings }: SystemSettingsForm
 
   function commitProxyPortDraft() {
     if (proxyPortDraft === null) return;
-    const parsed = Number.parseInt(proxyPortDraft, 10);
-    patchSystemProxy({ port: Number.isNaN(parsed) ? 0 : parsed });
+    const parsed = Number(proxyPortDraft.trim());
+    patchSystemProxy({ port: Number.isInteger(parsed) ? parsed : 0 });
     setProxyPortDraft(null);
+  }
+
+  function toggleSystemProxy() {
+    if (systemProxy.enabled) {
+      patchSystemProxy({ enabled: false });
+      setProxyConfigOpen(false);
+      return;
+    }
+    if (!proxyConfigValid) {
+      setProxyConfigOpen(true);
+      return;
+    }
+    patchSystemProxy({
+      enabled: true,
+      host: effectiveProxyHost,
+      port: effectiveProxyPort,
+      username: (proxyUsernameDraft ?? systemProxy.username).trim(),
+      password: proxyPasswordDraft ?? systemProxy.password,
+    });
+    setProxyConfigOpen(false);
   }
 
   function commitProxyUsernameDraft() {
@@ -438,17 +458,20 @@ function DesktopSystemSettingsForm({ settings, setSettings }: SystemSettingsForm
         <SettingsRow
           label={t("settings.systemProxy")}
           description={
-            systemProxyInvalid ? t("settings.systemProxyInvalid") : t("settings.systemProxyDesc")
+            systemProxyInvalid
+              ? t("settings.systemProxyInvalid")
+              : proxyConfigOpen && !proxyConfigValid
+                ? t("settings.systemProxyEnableHint")
+                : t("settings.systemProxyDesc")
           }
         >
           <AgentActivationSwitch
             checked={systemProxy.enabled}
             title={t("settings.systemProxyEnable")}
-            disabled={proxyToggleDisabled}
-            onToggle={() => patchSystemProxy({ enabled: !systemProxy.enabled })}
+            onToggle={toggleSystemProxy}
           />
         </SettingsRow>
-        {systemProxy.enabled ? (
+        {systemProxy.enabled || proxyConfigOpen ? (
           <Section variant="muted" padding={4} width="100%">
             <FormLayout direction="vertical">
               <Selector
@@ -479,7 +502,9 @@ function DesktopSystemSettingsForm({ settings, setSettings }: SystemSettingsForm
                 value={proxyPortDraft ?? (systemProxy.port > 0 ? String(systemProxy.port) : "")}
                 placeholder={systemProxy.type === "socks5" ? "1080" : "7890"}
                 status={
-                  effectiveProxyPort < 1 || effectiveProxyPort > 65535
+                  !Number.isInteger(effectiveProxyPort) ||
+                  effectiveProxyPort < 1 ||
+                  effectiveProxyPort > 65535
                     ? { type: "error", message: t("settings.systemProxyInvalid") }
                     : undefined
                 }
