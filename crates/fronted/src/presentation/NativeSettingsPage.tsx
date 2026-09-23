@@ -230,10 +230,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     }
   }
   useEffect(() => {
-    if (
-      (page === "mobileAssistant" || page === "toolPermissions" || page === "voice") &&
-      nativeMobile
-    )
+    if ((page === "mobileAssistant" || page === "voice") && nativeMobile)
       void work(refreshPermissions);
     if (page === "mobileExecution" && nativeMobile) void work(refreshShell);
     if (page === "access") {
@@ -263,7 +260,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     }
   }, [page, nativeMobile]);
   useEffect(() => {
-    if ((page !== "mobileAssistant" && page !== "toolPermissions") || !nativeMobile) return;
+    if (page !== "mobileAssistant" || !nativeMobile) return;
     const refresh = () => {
       if (document.visibilityState === "visible") void work(refreshPermissions);
     };
@@ -513,6 +510,9 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       c.group("mobile-capabilities", t("settings.mobile.capabilitiesGroup"), [
         ...(visible("mobileAssistant")
           ? [navigate("mobileAssistant", "hand.raised", t("settings.mobile.assistantDescription"))]
+          : []),
+        ...(visible("toolPermissions")
+          ? [navigate("toolPermissions", "lock.shield", t("settings.toolPermissionsTitle"))]
           : []),
         ...(visible("mobileExecution")
           ? [navigate("mobileExecution", "terminal", t("settings.native.shellEnvironment"))]
@@ -927,7 +927,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             },
       );
     }
-  } else if (page === "mobileAssistant" || (page === "toolPermissions" && nativeMobile)) {
+  } else if (page === "mobileAssistant") {
     nodes.push(
       c.action(
         "refresh-permissions",
@@ -987,7 +987,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       });
     }
     nodes.push(c.group("permissions", titles.mobileAssistant, permissionRows));
-    appendToolPolicyGroups();
   } else if (page === "mobileExecution") {
     const backendLabel =
       shell?.backend === "android-proot"

@@ -7,6 +7,18 @@ private extension XgentNode {
     func child(id: String) -> XgentNode? { children?.first { $0.id == id } }
 }
 
+private struct XgentIOSNavigationControl: ViewModifier {
+    @Environment(\.xgentPresentationTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        let palette = theme.palette(for: colorScheme)
+        content
+            .background(Color(xgentHex: palette.card), in: Circle())
+            .overlay(Circle().stroke(Color(xgentHex: palette.border), lineWidth: 1))
+    }
+}
+
 struct XgentIOSRootPresentation: View {
     let document: XgentDocument
     let sidebar: XgentDocument?
@@ -222,9 +234,9 @@ private struct XgentIOSChatPresentation: View {
             } else {
                 Spacer(minLength: 0)
             }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let composer { XgentIOSComposer(node: composer, document: document, model: model) }
+            if let composer {
+                XgentIOSComposer(node: composer, document: document, model: model)
+            }
         }
         .background { XgentThemeBackground().ignoresSafeArea() }
     }
@@ -363,6 +375,7 @@ private struct XgentIOSSidebarPresentation: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .modifier(XgentIOSNavigationControl())
                 .accessibilityLabel(Text("Close sidebar"))
             }
             .padding(.horizontal, 16)
@@ -488,6 +501,7 @@ private struct XgentIOSPageHeader: View {
                             .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
+                    .modifier(XgentIOSNavigationControl())
                     .accessibilityLabel(Text("Close"))
                 }
             }
@@ -501,13 +515,9 @@ struct XgentIOSSheetPresentation: View {
     let initialDocument: XgentDocument
     @ObservedObject var model: XgentPresentationModel
     private var document: XgentDocument {
-        model.documents.first { $0.id == initialDocument.id } ?? initialDocument
-    }
-    private var nextSheet: XgentDocument? {
-        let sheets = model.documents.filter { $0.mode == .sheet }
-        guard let index = sheets.firstIndex(where: { $0.id == document.id }),
-              index + 1 < sheets.count else { return nil }
-        return sheets[index + 1]
+        // Keep settings and every child route inside the original sheet.
+        // The shared presentation model owns the route stack and its Back action.
+        model.documents.last { $0.mode == .sheet } ?? initialDocument
     }
     private var back: XgentNode? { document.nodes.first { $0.id == "back" } }
     private var saveStatus: XgentNode? { document.nodes.first { $0.id == "save-status" } }
@@ -524,12 +534,6 @@ struct XgentIOSSheetPresentation: View {
         list == nil ? [.large] : [.fraction(0.62), .large]
     }
 
-    private var nestedSheet: Binding<XgentDocument?> {
-        Binding(get: { nextSheet }, set: {
-            if $0 == nil, let nextSheet { model.dismiss(nextSheet) }
-        })
-    }
-
     private var header: some View {
         ZStack {
             Text(document.title).font(.headline).lineLimit(1)
@@ -542,6 +546,7 @@ struct XgentIOSSheetPresentation: View {
                             .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
+                    .modifier(XgentIOSNavigationControl())
                     .accessibilityLabel(back.label ?? "Back")
                 }
                 Spacer()
@@ -557,6 +562,7 @@ struct XgentIOSSheetPresentation: View {
                             .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
+                    .modifier(XgentIOSNavigationControl())
                     .accessibilityLabel(Text("Close"))
                 }
             }
@@ -582,6 +588,7 @@ struct XgentIOSSheetPresentation: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
+            .id(document.id)
             .scrollDismissesKeyboard(.interactively)
         }
         .background { XgentThemeBackground().ignoresSafeArea() }
@@ -591,10 +598,7 @@ struct XgentIOSSheetPresentation: View {
         .presentationDragIndicator(.hidden)
         .preferredColorScheme(document.colorScheme)
         .interactiveDismissDisabled(document.dismissAction == nil)
-        .sheet(item: nestedSheet) { next in
-            XgentIOSSheetPresentation(initialDocument: next, model: model)
-        }
-        .modifier(XgentAlerts(model: model, enabled: nextSheet == nil))
+        .modifier(XgentAlerts(model: model, enabled: true))
         .modifier(XgentPresentationThemeModifier(theme: document.theme ?? .fallback,
                                                   appearance: document.appearance))
     }

@@ -349,7 +349,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
     return (
       <NativeSurface
         document={{
-          mode: "sheet",
+          mode: "root",
           title: selectedHost?.name || t("chat.mobileSsh.title"),
           appearance: "system",
           nodes,

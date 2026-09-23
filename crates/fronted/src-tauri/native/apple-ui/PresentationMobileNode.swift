@@ -433,6 +433,10 @@ struct XgentIOSNode: View {
                         .padding(.vertical, 6)
                 }
             }
+            .padding(.horizontal, 12)
+            .background(Color(xgentHex: palette.card), in: RoundedRectangle(
+                cornerRadius: CGFloat(theme.radius.container), style: .continuous
+            ))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

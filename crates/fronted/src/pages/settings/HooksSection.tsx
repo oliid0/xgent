@@ -70,7 +70,11 @@ function getHookTypeColor(type: HookType): TokenColor {
 }
 
 export function HooksSection(
-  _props: SettingsSectionProps & { onBack?: () => void; openCreateImmediately?: boolean },
+  _props: SettingsSectionProps & {
+    onBack?: () => void;
+    openCreateImmediately?: boolean;
+    nativePresentationMode?: "root" | "sheet";
+  },
 ) {
   const { t } = useLocale();
   const [modalOpen, setModalOpen] = useState(_props.openCreateImmediately === true);
@@ -313,7 +317,7 @@ export function HooksSection(
       return (
         <NativeSurface
           document={{
-            mode: "sheet",
+            mode: _props.nativePresentationMode ?? "sheet",
             title: t(editingHook ? "settings.hooksEdit" : "settings.hooksAdd"),
             appearance: _props.settings.theme,
             formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
@@ -392,7 +396,7 @@ export function HooksSection(
       <>
         <NativeSurface
           document={{
-            mode: "sheet",
+            mode: _props.nativePresentationMode ?? "sheet",
             title: t("settings.navHooks"),
             appearance: _props.settings.theme,
             formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",

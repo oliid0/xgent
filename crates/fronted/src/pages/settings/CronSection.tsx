@@ -66,7 +66,11 @@ function formatRemainingExecutionsLabel(t: (key: string) => string, task: CronTa
 }
 
 export function CronSection(
-  props: SettingsSectionProps & { onBack?: () => void; openCreateImmediately?: boolean },
+  props: SettingsSectionProps & {
+    onBack?: () => void;
+    openCreateImmediately?: boolean;
+    nativePresentationMode?: "root" | "sheet";
+  },
 ) {
   const { settings } = props;
   const { t } = useLocale();
@@ -130,13 +134,20 @@ export function CronSection(
   }
 
   if (detail.open && detail.mode === "view") {
-    return <CronTaskViewModal taskId={detail.taskId} onClose={() => setDetail({ open: false })} />;
+    return (
+      <CronTaskViewModal
+        taskId={detail.taskId}
+        nativePresentationMode={props.nativePresentationMode}
+        onClose={() => setDetail({ open: false })}
+      />
+    );
   }
 
   if (detail.open) {
     return (
       <CronTaskModal
         mode={detail.mode}
+        nativePresentationMode={props.nativePresentationMode}
         initialData={detail.task}
         modelOptions={modelOptions}
         workspaceOptions={workspaceOptions}
@@ -201,7 +212,7 @@ export function CronSection(
       <>
         <NativeSurface
           document={{
-            mode: "sheet",
+            mode: props.nativePresentationMode ?? "sheet",
             title: t("settings.navCron"),
             appearance: settings.theme,
             nodes,

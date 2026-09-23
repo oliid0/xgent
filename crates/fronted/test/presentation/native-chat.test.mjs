@@ -100,7 +100,7 @@ test("native edits reach the shared composer used by send and conversation draft
   assert.equal((await h.dispatch("send")).ok, false);
 });
 
-test("native iPhone uses the same anchored tools menu and compact drawer hierarchy as WebUI", async () => {
+test("native iPhone opens More as a full-page tool list and keeps compact sidebar routes", async () => {
   const opened = [];
   const h = harness(
     {
@@ -120,24 +120,26 @@ test("native iPhone uses the same anchored tools menu and compact drawer hierarc
   assert.equal(document.formFactor, "mobile");
   const toolbar = document.nodes[0].children.find((node) => node.id === "toolbar");
   const tools = toolbar.children.find((node) => node.id === "tools");
-  assert.equal(tools.kind, "Menu");
+  assert.equal(tools.kind, "IconButton");
   assert.equal(toolbar.children.find((node) => node.id === "sidebar").variant, "secondary");
   assert.equal(tools.variant, "secondary");
+  assert.equal((await h.dispatch("tools")).ok, true);
+  h.render();
+  const toolsPage = h.documents().find((item) => item.mode === "root" && item.title === "chat.mobileMenu.title");
+  assert.ok(toolsPage);
   assert.deepEqual(
-    tools.children.map((node) => node.id),
+    toolsPage.nodes[0].children.map((node) => node.id),
     [
       "tool:terminal",
       "tool:shell",
-      "tool-divider-1",
       "tool:browser",
       "tool:browser-settings",
-      "tool-divider-2",
       "tool:git",
       "tool:ssh",
       "tool:background",
     ],
   );
-  assert.equal((await h.dispatch("tool:terminal")).ok, true);
+  assert.equal((await h.dispatch("tool:terminal", null, "tools")).ok, true);
   assert.equal((await h.dispatch("sidebar")).ok, true);
   h.render();
   let sidebar = h.documents().find((item) => item.mode === "sidebar");
@@ -147,7 +149,7 @@ test("native iPhone uses the same anchored tools menu and compact drawer hierarc
     list.children.slice(0, 6).map((node) => node.id),
     ["files", "sidebar-projects-toggle", "skills", "scheduled", "remote", "mcp"],
   );
-  assert.equal(layout.children.some((node) => node.id === "sidebar-title"), false);
+  assert.equal(layout.children.some((node) => node.id === "sidebar-title"), true);
   assert.equal(layout.children.some((node) => node.id === "sidebar-search"), false);
   assert.equal((await h.dispatch("sidebar-search-toggle", null, "sidebar")).ok, true);
   h.render();

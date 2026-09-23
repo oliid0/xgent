@@ -61,7 +61,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
       ["mobile-appearance", "settings.mobile.appearanceGroup", ["nav:system", "nav:providers"]],
       ["mobile-personal", "settings.mobile.personalGroup", ["nav:soul", "nav:memory"]],
       ["mobile-capabilities", "settings.mobile.capabilitiesGroup", [
-        "nav:mobileAssistant", "nav:mobileExecution", "nav:other", "nav:access", "nav:backup", "nav:about",
+        "nav:mobileAssistant", "nav:toolPermissions", "nav:mobileExecution", "nav:other", "nav:access", "nav:backup", "nav:about",
       ]],
     ],
   );
@@ -94,6 +94,10 @@ test("native settings mirrors compact navigation and persists shared system, pro
   await dispatch("back");
   await dispatch("back");
   await dispatch("nav:mobileAssistant");
+  assert.ok(!document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === "policy:Bash"));
+  await dispatch("back");
+  await dispatch("nav:toolPermissions");
+  assert.ok(document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === "policy:Bash"));
   assert.equal((await dispatch("policy:Bash", "deny")).ok, true);
   assert.equal(settings.system.toolPolicies.Bash, "deny");
 });

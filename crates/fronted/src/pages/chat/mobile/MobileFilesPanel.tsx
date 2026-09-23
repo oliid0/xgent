@@ -183,7 +183,7 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
         <HubHeader
           icon={<FolderTree className="h-5 w-5" />}
           title={t("sidebar.myFiles")}
-          subtitle={cwd || undefined}
+          subtitle={basename(cwd) || undefined}
           sidebarOpen
           onOpenSidebar={() => undefined}
           onClose={onClose}
@@ -366,7 +366,7 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
     id: `file-row:${node.path || "root"}`,
     kind: "TreeRow",
     label: node.name,
-    text: node.path || props.cwd,
+    text: node.path || undefined,
     icon: node.kind === "file" ? "doc" : expandedSet.has(node.path) ? "folder.fill" : "folder",
     selected: node.path === selectedPath,
     secondary: node.hidden,
@@ -461,7 +461,7 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
                 {
                   id: "files-location",
                   kind: "Text",
-                  text: props.cwd || t("projectTools.fileTreeDescription"),
+                  text: basename(props.cwd) || t("projectTools.fileTreeDescription"),
                   secondary: true,
                   maxLines: 1,
                 },

@@ -272,6 +272,15 @@ pub(crate) fn prepare_github_source(
     should_cancel: &dyn Fn() -> bool,
 ) -> Result<PathBuf, String> {
     let source = parse_github_url(value, default_ref)?;
+    prepare_github_source_parts(source, method, tmp_root, should_cancel)
+}
+
+fn prepare_github_source_parts(
+    source: GithubSource,
+    method: &str,
+    tmp_root: &Path,
+    should_cancel: &dyn Fn() -> bool,
+) -> Result<PathBuf, String> {
     let mut repo_root = None;
     if method == "auto" || method == "download" {
         let archive = tmp_root.join("github-repo.zip");
@@ -345,6 +354,51 @@ pub(crate) fn prepare_github_source(
     Ok(repo_root)
 }
 
+pub(crate) fn parse_clawhub_github_handoff(bytes: &[u8]) -> Result<Option<GithubSource>, String> {
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) else {
+        return Ok(None);
+    };
+    if value.get("sourceRef").and_then(serde_json::Value::as_str) != Some("public-github") {
+        return Ok(None);
+    }
+    let field = |name: &str| {
+        value.get(name).and_then(serde_json::Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| format!("ClawHub GitHub handoff is missing {name}"))
+    };
+    let repo = field("repo")?;
+    let mut parts = repo.split('/');
+    let owner = parts.next().unwrap_or_default();
+    let name = parts.next().unwrap_or_default();
+    let valid_name = |part: &str| {
+        !part.is_empty() && part != "." && part != ".."
+            && part.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
+    };
+    if !valid_name(owner) || !valid_name(name) || parts.next().is_some() {
+        return Err("ClawHub GitHub handoff has an invalid repository".to_string());
+    }
+    let commit = field("commit")?;
+    if !matches!(commit.len(), 40 | 64) || !commit.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("ClawHub GitHub handoff has an invalid commit".to_string());
+    }
+    let path = field("path")?;
+    if path.split('/').any(|part| {
+        part.is_empty() || part == "." || part == ".." || part.contains('\\') || part.contains(':')
+    }) {
+        return Err("ClawHub GitHub handoff has an unsafe path".to_string());
+    }
+    let content_hash = field("contentHash")?;
+    if content_hash.len() != 64 || !content_hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("ClawHub GitHub handoff has an invalid content hash".to_string());
+    }
+    Ok(Some(GithubSource {
+        owner: owner.to_string(),
+        repo: name.to_string(),
+        git_ref: commit.to_string(),
+        subpath: Some(path.to_string()),
+    }))
+}
+
 pub(crate) fn prepare_http_source_with_progress<F>(
     value: &str,
     tmp_root: &Path,
@@ -390,6 +444,18 @@ where
         });
         safe_extract_zip(&download_path, &extract_dir)?;
         return Ok(extract_dir);
+    }
+
+    if url.host_str() == Some("clawhub.ai") && url.path() == "/api/v1/download" {
+        if let Some(source) = parse_clawhub_github_handoff(&bytes)? {
+            on_progress(SkillInstallProgressUpdate {
+                phase: "downloading",
+                downloaded_bytes: None,
+                total_bytes: None,
+                message: Some("Downloading pinned GitHub Skill source".to_string()),
+            });
+            return prepare_github_source_parts(source, "download", tmp_root, should_cancel);
+        }
     }
 
     if lower_path.ends_with("skill.json")

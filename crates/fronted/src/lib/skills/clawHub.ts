@@ -67,7 +67,7 @@ function asStringArray(value: unknown): string[] {
 
 function buildClawHubWebUrl(ownerHandle: string | null, slug: string) {
   if (!ownerHandle) return null;
-  return `${CLAWHUB_API_BASE}/${encodeURIComponent(ownerHandle)}/${encodeURIComponent(slug)}`;
+  return `${CLAWHUB_API_BASE}/${encodeURIComponent(ownerHandle)}/skills/${encodeURIComponent(slug)}`;
 }
 
 export function buildClawHubSkillKey(skill: Pick<ClawHubSkillCard, "slug" | "ownerHandle">) {

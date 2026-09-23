@@ -1,28 +1,47 @@
 ﻿# Current objective
-Make the iPhone SwiftUI application preserve the Astryx mobile hierarchy, sizing, entry routes, and functional states instead of substituting system navigation/form layouts.
+Repair desktop settings and composer, Android compilation, and iOS navigation while using `xx`/`yy` as function references without importing their UI or gateway code.
 
 ## Completed
-- Removed iOS `NavigationStack`, toolbar reparenting, `Form`, and `List` substitutions. Chat, browser, file tools, root hubs, and settings now retain serialized Astryx order with custom 68pt headers.
-- Corrected axis-aware `fill`: horizontal fields expand in width without claiming infinite height; flexible vertical browser/editor/transcript regions still consume remaining height.
-- Restored MobileNav behavior (320pt/85vw drawer, scrim, fixed header/footer), capped list sheets at 62%, and kept long settings/detail sheets tall.
-- Routed Plugins and More to functional root Skills/MCP pages, with the shared native drawer available from both. MCP add/edit/delete/toggle and Skills search/refresh/preview/toggle remain wired to shared settings/state.
-- Matched browser hierarchy (header, tabs, address controls, viewport) and file hierarchy (header/location, search/refresh, four touch actions, tree); moved hidden-file control out of the search row.
+- Registered existing desktop backup, STT, and model failover commands that had been defined but omitted from Tauri's desktop invoke handler.
+- Corrected the Android Bluetooth adapter nullability error reported by release CI at `BluetoothDiscovery.kt:41`.
+- Kept iOS settings child routes inside the original SwiftUI sheet; the current route now follows the presentation stack.
+- Moved the iOS chat composer into the chat page's main SwiftUI stack so the sidebar covers the entire chat surface, including its input area.
+- Split mobile personal-assistant device permissions from tool execution policies: each now has a distinct settings route, and the assistant page no longer renders tool policy controls.
+- Updated the existing native settings flow check to verify both distinct routes and tool policy editing from the tool-permissions page.
+- Tightened that check to inspect the policy controls inside settings groups, so it proves the assistant route excludes them and the tool-permissions route includes them.
+- Allowed the composer execution controls to wrap within their available width.
+- Routed the iOS chat header's More action to its existing tool list as a full-screen root page.
+- Removed the extra branded label from the iOS system launch storyboard; the system-required launch surface now yields directly to app content.
+- Routed mobile SSH and background tasks from chat to root pages; scheduled tasks and Hooks now close to chat instead of bouncing between each other.
+- Passed the root/sheet presentation mode through scheduled-task and Hook detail pages so chat tools do not open a new drawer.
+- Kept background process logs in the same root surface instead of presenting a second sheet.
+- Added ClawHub `public-github` download handoff support to the existing Skill installer, constrained to a pinned commit and validated relative path.
+- Added a focused Rust regression test for valid handoffs, path traversal, mutable refs, and ordinary Skill JSON.
+- Aligned Skill card links with ClawHub's documented canonical `/<owner>/skills/<slug>` route.
+- Removed transformed entry geometry from popovers inside native desktop dialogs after reproducing the wide settings menu's visible but unclickable options.
+- Gave existing iOS SwiftUI settings groups rounded card containers with inset rows, following the new visual references while preserving their actions.
+- Styled the existing iOS sheet/page navigation buttons as bordered circles to match the visual references without adding controls.
+- Restored the typed Xgent heading in the compact sidebar header so its navigation has the same clear hierarchy as the reference.
+- Replaced the mobile file header's sandbox absolute path with the workspace folder name and removed the root row's repeated absolute path; file operations still use the original cwd and relative paths.
+- Applied the four formatting changes requested by Biome in the scheduled-task, Hooks, and native-settings routes.
+- Updated two existing native presentation tests to assert the requested full-page iOS More route and in-stack composer layout instead of their obsolete menu/inset behavior.
 
 ## Evidence and decisions
-- Inspected the clean baseline, prior history, SwiftUI host/adapters/tests, Web mobile sources, Astryx 0.6 installed source, Astryx MCP results, and CLI `manifest`/intent discovery before implementation.
-- WebKit remains a noninteractive transport and browser-content viewport only; all application chrome uses SwiftUI.
-- No build/dev/Cargo command was run. Windows cannot render or compile the iOS target, so Apple SDK compilation and device rendering remain CI/device responsibilities.
+- Started from clean `main` at `3175331`; inspected prior history, screenshots, `xx`, `yy`, Astryx 0.6 source/MCP/CLI, Swift documentation, and release logs.
+- Latest CI passed, while release failed in Android Kotlin compilation and macOS Intel DMG packaging; iOS IPA and Windows packages succeeded.
+- Installed Windows client saved, read, and deleted a temporary global memory; the list returned to zero. Its window restored the persisted 561×1085 client size and position from `main-window-size.json`. No storage or geometry change is justified by this reproduction.
+- `xx` provider persistence differs from this repository only by an unconditional auto-sync call; the current desktop guard is required because that service is desktop-only.
+- Installed Windows client: compact language selection saved; in wide settings dialog, the visible option did not highlight on hover and clicking it only dismissed the menu. The dialog's popover animation applies a persistent transform, so modal menus now use their measured position without that transform.
+- iOS screenshots 1125/1128 show the chat composer painted over the open sidebar. The SwiftUI chat view had placed it in a `safeAreaInset` outside the chat stack; it is now a sibling of the transcript within that stack.
+- New visual references 0386–0406 show pale grouped settings cards, circular navigation buttons, and a simple sidebar. They guide styling of existing controls only.
 
 ## Remaining
-- Track the pushed GitHub workflows through completion; repair any Apple compile or workflow failure with concrete logs.
-- Validate final wide/narrow iPhone rendering and interactions on an Apple simulator/device when available.
-- Bluetooth connection/read/write, broader system capabilities, mailbox integration, and device shell installation verification remain outside this UI correction.
+- Verify the desktop selector fix in a new package; inspect other memory entry points and wipe behavior only when a safe reproduction is available.
+- Inspect and complete mobile SSH, Git review, resource library, files, MCP/Skills store, permissions, and routing against `yy`.
+- Run one consolidated non-build verification, inspect the final diff, push, and track CI/release workflows.
 
 ## Touched files
-- Apple SwiftUI compact root/workspace/page/sheet/node renderers and root selection.
-- Native chat/browser/files/Skills/MCP adapters, route wiring, presentation contract/docs, and regression tests.
+- `crates/fronted/src-tauri/src/{lib.rs,services/skills/{clawhub,sources,tests}.rs}`, `crates/mobile-assistant/android/src/main/java/com/ohi/xgent/mobileassistant/BluetoothDiscovery.kt`, `crates/fronted/src-tauri/native/apple-ui/{PresentationMobile,PresentationMobileNode}.swift`, `crates/fronted/src-tauri/LaunchScreen.storyboard`, `crates/fronted/src/presentation/{NativeChatPage,NativeSettingsPage}.tsx`, `crates/fronted/src/pages/chat/mobile/{MobileFilesPanel,MobileSshPanel,MobileBackgroundTasksPanel}.tsx`, `crates/fronted/src/pages/settings/{CronSection,CronTaskModal,CronTaskViewModal,HooksSection}.tsx`, `crates/fronted/src/lib/skills/clawHub.ts`, `crates/fronted/src/index.css`, `crates/fronted/test/presentation/native-settings-flow.test.mjs`, `history.md`.
 
 ## Verification/CI
-- `pnpm check`, `pnpm native:check`, and `pnpm lint` pass.
-- `pnpm test:non-native`: 1,208 passed, 0 failed, 0 skipped.
-- GitHub CI: pending push.
+- TypeScript and native mapping checks passed; lint passed after four formatting corrections. The non-Cargo suite found two obsolete presentation assertions, now updated; focused rerun and new GitHub workflows remain.

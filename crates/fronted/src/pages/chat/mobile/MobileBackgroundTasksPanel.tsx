@@ -55,7 +55,8 @@ export function MobileBackgroundTasksPanel(props: MobileBackgroundTasksPanelProp
         <HooksSection
           settings={props.settings}
           setSettings={props.setSettings}
-          onBack={() => setView(props.managedProcessesAvailable ? "processes" : "schedules")}
+          nativePresentationMode="root"
+          onBack={props.onClose}
         />
       );
     if (view === "schedules")
@@ -63,7 +64,8 @@ export function MobileBackgroundTasksPanel(props: MobileBackgroundTasksPanelProp
         <CronSection
           settings={props.settings}
           setSettings={props.setSettings}
-          onBack={() => setView(props.managedProcessesAvailable ? "processes" : "hooks")}
+          nativePresentationMode="root"
+          onBack={props.onClose}
         />
       );
 
@@ -229,29 +231,15 @@ export function MobileBackgroundTasksPanel(props: MobileBackgroundTasksPanelProp
       run: () => setLogProcess(null),
     });
     return (
-      <>
-        <NativeSurface
-          document={{
-            mode: "sheet",
-            title: t("sidebar.backgroundTasks"),
-            appearance: props.settings.theme,
-            formFactor: compact ? "mobile" : "desktop",
-            theme: createNativePresentationTheme(props.settings, compact, "workspaceTools"),
-            nodes,
-            dismissAction: busy ? undefined : "close",
-          }}
-          handlers={c.handlers}
-          onError={(cause) => setError(cause instanceof Error ? cause.message : String(cause))}
-        />
-        {logProcess ? (
-          <NativeSurface
-            document={{
-              mode: "sheet",
-              title: logProcess.label.trim() || logProcess.command,
-              appearance: props.settings.theme,
-              formFactor: compact ? "mobile" : "desktop",
-              theme: createNativePresentationTheme(props.settings, compact, "workspaceTools"),
-              nodes: [
+      <NativeSurface
+        document={{
+          mode: "root",
+          title: logProcess?.label.trim() || logProcess?.command || t("sidebar.backgroundTasks"),
+          appearance: props.settings.theme,
+          formFactor: compact ? "mobile" : "desktop",
+          theme: createNativePresentationTheme(props.settings, compact, "workspaceTools"),
+          nodes: logProcess
+            ? [
                 logControls.action(
                   "background-log-refresh",
                   t("projectTools.bgTaskRefreshLog"),
@@ -276,14 +264,13 @@ export function MobileBackgroundTasksPanel(props: MobileBackgroundTasksPanelProp
                   text: logText || t("projectTools.bgTaskLogEmpty"),
                   fill: true,
                 },
-              ],
-              dismissAction: "close-log",
-            }}
-            handlers={logControls.handlers}
-            onError={(cause) => setError(cause instanceof Error ? cause.message : String(cause))}
-          />
-        ) : null}
-      </>
+              ]
+            : nodes,
+          dismissAction: logProcess ? "close-log" : busy ? undefined : "close",
+        }}
+        handlers={logProcess ? logControls.handlers : c.handlers}
+        onError={(cause) => setError(cause instanceof Error ? cause.message : String(cause))}
+      />
     );
   }
 

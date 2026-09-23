@@ -446,44 +446,6 @@ export function NativeChatPage(props: NativeChatPageProps) {
     action: action(id, run, enabled),
     disabled: !enabled,
   });
-  const compactToolNodes: PresentationNode[] = [
-    {
-      ...button("tool:terminal", t("chat.mobileMenu.terminal"), props.onOpenTerminal),
-      icon: "terminal",
-    },
-    {
-      ...button("tool:shell", t("chat.mobileMenu.rootfs"), () =>
-        props.onOpenSettings("mobileExecution"),
-      ),
-      icon: "shippingbox",
-    },
-    { id: "tool-divider-1", kind: "Divider" },
-    {
-      ...button("tool:browser", t("chat.mobileMenu.browser"), props.onOpenBrowser),
-      icon: "globe",
-    },
-    {
-      ...button(
-        "tool:browser-settings",
-        t("chat.mobileMenu.browserSettings"),
-        props.onOpenBrowserSettings,
-      ),
-      icon: "gearshape",
-    },
-    { id: "tool-divider-2", kind: "Divider" },
-    {
-      ...button("tool:git", t("chat.mobileMenu.gitReview"), props.onOpenGitReview),
-      icon: "arrow.triangle.branch",
-    },
-    {
-      ...button("tool:ssh", t("chat.mobileMenu.ssh"), props.onOpenRemote),
-      icon: "server.rack",
-    },
-    {
-      ...button("tool:background", t("chat.mobileMenu.background"), props.onOpenBackgroundTasks),
-      icon: "clock.arrow.circlepath",
-    },
-  ];
   const showThinking = props.settings.customSettings.appearance.showThinking;
   const contentLabels = {
     thinking: t("chat.thinking"),
@@ -669,24 +631,12 @@ export function NativeChatPage(props: NativeChatPageProps) {
                   },
                 ]
               : []),
-            ...(compact
-              ? [
-                  {
-                    id: "tools",
-                    kind: "Menu" as const,
-                    label: t("chat.mobileMenu.title"),
-                    icon: "ellipsis",
-                    variant: "secondary",
-                    children: compactToolNodes,
-                  },
-                ]
-              : [
-                  {
-                    ...button("tools", t("chat.mobileMenu.title"), () => setToolsOpen(true)),
-                    kind: "IconButton" as const,
-                    icon: "ellipsis",
-                  },
-                ]),
+            {
+              ...button("tools", t("chat.mobileMenu.title"), () => setToolsOpen(true)),
+              kind: "IconButton",
+              icon: "ellipsis",
+              variant: compact ? "secondary" : undefined,
+            },
           ],
         },
         ...(props.errorMessage
@@ -1209,9 +1159,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                 fill: true,
                 padding: 16,
                 children: [
-                  ...(!compact
-                    ? [{ id: "sidebar-title", kind: "Heading" as const, text: "Xgent" }]
-                    : []),
+                  { id: "sidebar-title", kind: "Heading" as const, text: "Xgent" },
                   {
                     id: "sidebar-execution-mode",
                     kind: compact ? "Selector" : "SegmentedControl",
@@ -1428,7 +1376,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
       {toolsOpen ? (
         <NativeSurface
           document={{
-            mode: "sheet",
+            mode: compact ? "root" : "sheet",
             title: t("chat.mobileMenu.title"),
             appearance: props.settings.theme,
             formFactor: compact ? "mobile" : "desktop",

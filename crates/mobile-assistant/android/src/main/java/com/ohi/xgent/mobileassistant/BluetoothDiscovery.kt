@@ -37,7 +37,8 @@ internal class BluetoothDiscovery(private val activity: Activity) {
                 "Bluetooth/nearby device permission is required"
             }
             val adapter = (activity.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
-            check(adapter?.isEnabled == true) { "Bluetooth is unavailable or turned off" }
+                ?: error("Bluetooth is unavailable")
+            check(adapter.isEnabled) { "Bluetooth is unavailable or turned off" }
             val scanner = adapter.bluetoothLeScanner ?: error("Bluetooth LE scanning is unavailable")
             devices.clear()
             pending = invoke

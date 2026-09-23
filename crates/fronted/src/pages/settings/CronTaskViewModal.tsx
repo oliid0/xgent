@@ -45,6 +45,7 @@ import { ConfirmActionPopover } from "./shared";
 
 type CronTaskViewModalProps = {
   taskId: string;
+  nativePresentationMode?: "root" | "sheet";
   onClose: () => void;
 };
 
@@ -889,7 +890,11 @@ function RightPanel({
 
 /* ─────────────────────── Modal shell ─────────────────────── */
 
-export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
+export function CronTaskViewModal({
+  taskId,
+  nativePresentationMode,
+  onClose,
+}: CronTaskViewModalProps) {
   const { t } = useLocale();
   const compactViewport = useCompactViewport();
   // Live subscription: enable/disable toggles, executor decrements and
@@ -1027,7 +1032,7 @@ export function CronTaskViewModal({ taskId, onClose }: CronTaskViewModalProps) {
     return (
       <NativeSurface
         document={{
-          mode: "sheet",
+          mode: nativePresentationMode ?? "sheet",
           title: task.name,
           appearance: "system",
           nodes,

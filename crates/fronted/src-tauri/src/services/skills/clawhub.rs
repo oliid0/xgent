@@ -99,7 +99,7 @@ pub(crate) fn normalize_clawhub_skill_card(raw: &Value) -> Option<SystemClawHubS
     let download_url = clawhub_download_url_for_slug(&slug, owner_handle.as_deref(), None).ok()?;
     let web_url = owner_handle
         .as_ref()
-        .map(|owner| format!("{CLAWHUB_API_BASE}/{owner}/{slug}"));
+        .map(|owner| format!("{CLAWHUB_API_BASE}/{owner}/skills/{slug}"));
 
     Some(SystemClawHubSkillCard {
         slug: slug.clone(),

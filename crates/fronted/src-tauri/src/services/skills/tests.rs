@@ -927,6 +927,39 @@ fn safe_extract_zip_rejects_parent_traversal() {
 }
 
 #[test]
+fn clawhub_github_handoff_requires_a_pinned_safe_source() {
+    let commit = "a".repeat(40);
+    let hash = "b".repeat(64);
+    let handoff = json!({
+        "sourceRef": "public-github",
+        "repo": "publisher/skills",
+        "commit": commit,
+        "path": "skills/my-skill",
+        "contentHash": hash,
+        "archiveUrl": "https://untrusted.example/archive.zip"
+    });
+    let source = parse_clawhub_github_handoff(handoff.to_string().as_bytes())
+        .expect("valid handoff")
+        .expect("GitHub source");
+    assert_eq!(source.owner, "publisher");
+    assert_eq!(source.repo, "skills");
+    assert_eq!(source.git_ref, commit);
+    assert_eq!(source.subpath.as_deref(), Some("skills/my-skill"));
+
+    for unsafe_path in ["../secret", "/absolute", "skills\\secret", "skills//secret"] {
+        let mut bad = handoff.clone();
+        bad["path"] = json!(unsafe_path);
+        assert!(parse_clawhub_github_handoff(bad.to_string().as_bytes()).is_err());
+    }
+    let mut unpinned = handoff.clone();
+    unpinned["commit"] = json!("main");
+    assert!(parse_clawhub_github_handoff(unpinned.to_string().as_bytes()).is_err());
+    assert!(parse_clawhub_github_handoff(b"{\"name\":\"ordinary-skill\"}")
+        .expect("ordinary skill JSON")
+        .is_none());
+}
+
+#[test]
 fn install_skill_dir_stages_source_metadata_atomically_and_drains_staging() {
     let tmp = TempDir::new("xgent-skill-meta-atomic-test").expect("temp dir");
     let root = tmp.path().join("skills");

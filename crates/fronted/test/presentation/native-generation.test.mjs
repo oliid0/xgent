@@ -131,7 +131,8 @@ test("the complete iOS application surface is handwritten and bypasses generated
   assert.match(nativeMobileSource, /struct XgentIOSWorkspacePresentation: View/);
   assert.match(nativeMobileSource, /struct XgentIOSPagePresentation: View/);
   assert.match(nativeMobileSource, /struct XgentIOSSheetPresentation: View/);
-  assert.match(nativeMobileSource, /\.safeAreaInset\(edge: \.bottom/);
+  assert.doesNotMatch(nativeMobileSource, /\.safeAreaInset\(edge: \.bottom/);
+  assert.match(nativeMobileSource, /if let composer \{\s*XgentIOSComposer\(node: composer/);
   assert.doesNotMatch(nativeMobileSource, /NavigationStack \{/);
   assert.doesNotMatch(nativeMobileSource, /@ToolbarContentBuilder/);
   assert.doesNotMatch(nativeMobileSource, /ToolbarItem\(placement:/);
