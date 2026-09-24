@@ -208,8 +208,9 @@ function mapWorkdir(value: unknown) {
   const path = normalizePath(value);
   const { localWorkdir, remoteWorkdir } = commandHostConfig;
   if (!path || !remoteWorkdir) return value;
+  if (pathStartsWith(path, remoteWorkdir)) return path;
   if (!localWorkdir || !pathStartsWith(path, localWorkdir)) {
-    return path === remoteWorkdir ? path : remoteWorkdir;
+    return remoteWorkdir;
   }
   if (pathsEqual(path, localWorkdir)) return remoteWorkdir;
   return joinRemotePath(remoteWorkdir, path.slice(localWorkdir.length));

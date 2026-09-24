@@ -2,6 +2,25 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
+test("LAN delegation preserves an already remote working subdirectory", () => {
+  const loader = createTsModuleLoader();
+  const host = loader.loadModule("src/runtime/lanPcCommandHost.ts");
+  for (const remoteWorkdir of ["C:\\workspace", "/home/owner/workspace"]) {
+    host.configureLanPcCommandHost({
+      enabled: true, baseUrl: "http://desktop:28367",
+      localWorkdir: "/phone/workspace", remoteWorkdir,
+    });
+    const child = `${remoteWorkdir}${remoteWorkdir.includes("\\") ? "\\" : "/"}report`;
+    assert.deepEqual(host.prepareLanPcInvokeArgs({ workdir: child, cwd: child }), {
+      workdir: child, cwd: child,
+    });
+    const once = host.prepareLanPcInvokeArgs({ cwd: "/phone/workspace/report" });
+    assert.equal(once.cwd, child);
+    assert.deepEqual(host.prepareLanPcInvokeArgs(once), once);
+    assert.equal(host.prepareLanPcInvokeArgs({ cwd: `${remoteWorkdir}-other` }).cwd, remoteWorkdir);
+  }
+});
+
 test("paired mobile delegates shell commands to the desktop workspace but keeps phone tools local", async () => {
   const calls = [];
   const loader = createTsModuleLoader({
