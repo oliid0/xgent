@@ -4,6 +4,7 @@ import type {
   RenderUserMessage,
 } from "../../../lib/chat/conversation/conversationState";
 import type { LiveTranscriptState } from "../../../lib/chat/conversation/liveTranscriptStore";
+import { isChangedFileToolResult } from "../../../lib/chat/messages/changedFiles";
 import { getRoundText, type LiveRound, type UiRound } from "../../../lib/chat/messages/uiMessages";
 import { isTaskToolBlock } from "../../../lib/chat/taskProgress";
 import {
@@ -152,14 +153,7 @@ function hasRunningToolCall(blocks: GroupedRoundBlock[], runningToolCallIds: str
 
 function hasChangedFilesCandidate(rounds: (UiRound | LiveRound)[]) {
   return rounds.some((round) =>
-    round.blocks.some(
-      (block) =>
-        block.kind === "tool" &&
-        (block.item.toolCall.name === "Write" ||
-          block.item.toolCall.name === "Edit" ||
-          block.item.toolCall.name === "Delete") &&
-        Boolean(block.item.toolResult && !block.item.toolResult.isError),
-    ),
+    round.blocks.some((block) => block.kind === "tool" && isChangedFileToolResult(block.item)),
   );
 }
 

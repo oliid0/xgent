@@ -2,6 +2,7 @@
 Repair desktop and mobile function paths using `xx`/`yy` evidence without importing their UI or gateway code. Latest user correction: prioritize general complex-task execution and individual mobile capability authorization, not expansion driven by the health example. Keep changes local until the complete goal is verified.
 
 ## Completed
+- Connected successful mobile photo-preview imports to the existing shared changed-file footer and virtual transcript eligibility. Use only the backend-returned output path, with no invented text snapshots or line changes; errors and pending imports remain excluded. Existing Android/desktop cards and iOS file actions consume this shared evidence without layout changes.
 - Registered the upstream-header envelope in fallback CORS headers and updated the existing proxy transport expectation to include the encoded payload.
 - Ported xx's bounded encoded upstream-header transport to Xgent's existing local proxy, preserving legacy User-Agent/Content-Type handling and managed OAuth injection. This restores explicitly configured Cookie/Referer and other browser-restricted headers; auth, transport and internal proxy control headers cannot be overridden through the envelope. Invalid envelope data fails visibly before upstream traffic.
 - Reserved internal x-xgent header names in provider custom-header configuration and reject CR/LF/NUL values, following xx validation behavior without importing UI or gateway code.
@@ -170,6 +171,9 @@ Repair desktop and mobile function paths using `xx`/`yy` evidence without import
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
+- Shared imported-file evidence batch passed all 1,257 non-Cargo tests, `pnpm check`, `pnpm native:check`, `pnpm lint` and final diff review. No layout/native implementation changed in this batch. Reviewed yy Bluetooth subcommands against current scanning-only implementations; GATT connection/service/read/write/notification operations remain a functional gap. No push; full goal remains active.
+- Formatted the shared import-evidence collector and transcript predicate using installed Biome before consolidated verification.
+- Added imported-artifact regressions for collision-resolved paths, binary/no-diff evidence, later deletion, pending/error results and unrelated native operations.
 - PC provider-header batch passed 65 request/model-discovery tests, `pnpm check`, `pnpm lint` and final diff review. Backend decoder tests were added but not run because Cargo is prohibited locally; the native proxy end-to-end check remains for final CI/package acceptance. No UI/gateway import and no push.
 - Applied installed Biome formatting to provider header transport and validation before consolidated verification.
 - Added Rust decoder regressions for restoring explicit restricted headers, override precedence, retained configured authentication, internal/transport exclusion, malformed values and size limits. Cargo execution remains excluded by user instruction; these await final CI.

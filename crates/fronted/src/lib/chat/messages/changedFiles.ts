@@ -84,6 +84,32 @@ function resolveEntryPath(item: ToolBlockItem, details: Record<string, unknown>)
   );
 }
 
+function importedPhotoPath(item: ToolBlockItem): string {
+  if (
+    item.toolCall.name !== "MobilePersonalActions" ||
+    item.toolCall.arguments?.action !== "import_photo_preview"
+  )
+    return "";
+  const details = toolResultDetails(item);
+  const data = details.data;
+  if (
+    details.kind !== "mobile_personal_assistant" ||
+    !data ||
+    typeof data !== "object" ||
+    Array.isArray(data)
+  )
+    return "";
+  return readString((data as Record<string, unknown>).path);
+}
+
+export function isChangedFileToolResult(item: ToolBlockItem): boolean {
+  return Boolean(
+    item.toolResult &&
+      !item.toolResult.isError &&
+      (FILE_CHANGE_TOOL_NAMES.has(item.toolCall.name) || importedPhotoPath(item)),
+  );
+}
+
 // Dedup key: same file edited twice must merge even when one op reported a
 // backslash path and the other a forward-slash one.
 function normalizePathKey(path: string): string {
@@ -100,12 +126,12 @@ export function collectChangedFiles(
     for (const block of round.blocks) {
       if (block.kind !== "tool") continue;
       const item = block.item;
-      const { toolCall, toolResult } = item;
-      if (!FILE_CHANGE_TOOL_NAMES.has(toolCall.name)) continue;
-      if (!toolResult || toolResult.isError) continue;
+      const { toolCall } = item;
+      if (!isChangedFileToolResult(item)) continue;
 
       const details = toolResultDetails(item);
-      const path = resolveEntryPath(item, details);
+      const importedPath = importedPhotoPath(item);
+      const path = importedPath || resolveEntryPath(item, details);
       if (!path) continue;
 
       const key = normalizePathKey(path);
@@ -120,7 +146,15 @@ export function collectChangedFiles(
       };
       const firstMutation = !entry.lastToolCallId;
 
-      if (toolCall.name === "Delete") {
+      if (importedPath) {
+        // Binary imports have an actual output path, but no text snapshots.
+        fullSnapshotKeys.delete(key);
+        entry.deleted = false;
+        entry.beforeText = undefined;
+        entry.afterText = undefined;
+        entry.beforeTextAvailable = false;
+        entry.afterTextAvailable = false;
+      } else if (toolCall.name === "Delete") {
         fullSnapshotKeys.delete(key);
         entry.deleted = true;
         entry.beforeText = undefined;

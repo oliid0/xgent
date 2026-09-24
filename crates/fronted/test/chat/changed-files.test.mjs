@@ -32,6 +32,44 @@ function round(...blocks) {
   return { blocks };
 }
 
+test("mobile binary imports expose the actual saved file without inventing a text diff", () => {
+  const block = toolBlock({
+    name: "MobilePersonalActions",
+    args: { action: "import_photo_preview", file_name: "photo.jpg" },
+    details: { kind: "mobile_personal_assistant", data: { path: "photos/photo (1).jpg" } },
+  });
+  assert.equal(changedFiles.isChangedFileToolResult(block.item), true);
+  const summary = changedFiles.collectChangedFiles([round(block)]);
+  assert.equal(summary.files[0].path, "photos/photo (1).jpg");
+  assert.equal(summary.totalAdded, 0);
+  assert.equal(summary.totalRemoved, 0);
+  assert.equal(summary.files[0].beforeTextAvailable, false);
+  assert.equal(summary.files[0].afterTextAvailable, false);
+  const deleted = changedFiles.collectChangedFiles([round(block, toolBlock({
+    name: "Delete", args: { path: "photos/photo (1).jpg" },
+  }))]);
+  assert.equal(deleted.files.length, 1);
+  assert.equal(deleted.files[0].deleted, true);
+});
+
+test("mobile import artifacts require settled successful evidence and a saved path", () => {
+  const base = {
+    name: "MobilePersonalActions",
+    args: { action: "import_photo_preview", path: "untrusted.jpg" },
+    details: { kind: "mobile_personal_assistant", data: { path: "saved.jpg" } },
+  };
+  for (const override of [
+    { isError: true }, { settled: false }, { details: {} },
+    { details: { kind: "mobile_personal_assistant", data: { path: "" } } },
+    { args: { action: "create_calendar_event" } },
+    { name: "MobilePersonalData" },
+  ]) {
+    const block = toolBlock({ ...base, ...override });
+    assert.equal(changedFiles.isChangedFileToolResult(block.item), false);
+    assert.equal(changedFiles.collectChangedFiles([round(block)]), null);
+  }
+});
+
 test("collectChangedFiles aggregates Write/Edit stats per file across rounds", () => {
   const summary = changedFiles.collectChangedFiles([
     round(
