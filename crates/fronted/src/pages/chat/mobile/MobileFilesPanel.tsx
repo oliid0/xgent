@@ -310,6 +310,7 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
   const [query, setQuery] = useState(props.fileTreeState.query);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [pendingTargetPath, setPendingTargetPath] = useState<string | null>(null);
+  const [pendingDirectory, setPendingDirectory] = useState(ROOT_PATH);
   const [draftName, setDraftName] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState(false);
@@ -347,7 +348,10 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
     setActionError(null);
   }, [props.projectPathKey]);
 
-  const selectedNode = nodes[props.fileTreeState.selectedPath] ?? nodes[ROOT_PATH];
+  const selectedNode =
+    nodes[props.fileTreeState.selectedPath] ??
+    search.results.find((entry) => entry.path === props.fileTreeState.selectedPath) ??
+    nodes[ROOT_PATH];
   const selectedPath = selectedNode?.path ?? ROOT_PATH;
   const emitExpanded = (next: string[]) => props.onFileTreeStateChange({ expandedPaths: next });
   const selectPath = (path: string) => props.onFileTreeStateChange({ selectedPath: path });
@@ -373,6 +377,7 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
     if (action === "rename" && !selectedPath) return;
     setPendingAction(action);
     setPendingTargetPath(selectedPath);
+    setPendingDirectory(selectedNode?.kind === "dir" ? selectedPath : dirname(selectedPath));
     setDraftName(action === "rename" ? basename(selectedPath) : "");
     setDeleteTarget(null);
     setActionError(null);
@@ -388,8 +393,7 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
     setActionError(null);
     try {
       const targetPath = pendingTargetPath ?? selectedPath;
-      const targetNode = nodes[targetPath] ?? nodes[ROOT_PATH];
-      const targetDir = targetNode?.kind === "dir" ? targetNode.path : dirname(targetPath);
+      const targetDir = pendingDirectory;
       if (pendingAction === "file") {
         const next = await createEntry("file", targetDir, name);
         emitExpanded(addExpandedPaths(expandedPaths, [targetDir]));
