@@ -24,6 +24,7 @@ import {
 import { collectChangedFiles } from "../lib/chat/messages/changedFiles";
 import { collectCloudArtifacts } from "../lib/chat/messages/cloudArtifacts";
 import { collectPreviewedFiles } from "../lib/chat/messages/previewedFiles";
+import { readStreamPreviewMeta } from "../lib/chat/messages/toolPreview";
 import {
   safeStringify,
   summarizeToolCall,
@@ -111,6 +112,7 @@ function toolEvidenceNodes(
   result: ToolResultMessage | undefined,
   prefix: string,
   pendingText: string,
+  args?: Record<string, unknown>,
 ): PresentationNode[] {
   const text = result ? toolResultMessageToText(result) : pendingText;
   const nodes = toolResultPreviewNodes(result, prefix);
@@ -146,7 +148,27 @@ function toolEvidenceNodes(
     details.kind === "write"
   ) {
     const write = details as WriteResultDetails;
-    if (write.preview) {
+    const content =
+      typeof args?.content === "string" &&
+      readStreamPreviewMeta(args)?.fields.content?.truncated !== true
+        ? args.content
+        : undefined;
+    if (
+      typeof write.beforeContent === "string" &&
+      content !== undefined &&
+      write.beforeContent.length + content.length <= 200_000
+    ) {
+      const path = write.displayPath || write.path;
+      const diff = generateDiffFile(path, write.beforeContent, path, content, "txt", "txt");
+      diff.initRaw();
+      nodes.push({
+        id: `${prefix}:diff`,
+        kind: "CodeBlock",
+        label: path,
+        language: "diff",
+        text: diff._diffList.join("\n"),
+      });
+    } else if (write.preview) {
       nodes.push({
         id: `${prefix}:content`,
         kind: "CodeBlock",
@@ -288,6 +310,7 @@ function roundNodes(
               block.item.toolResult,
               `${id}:tool:${block.item.toolCall.id}`,
               safeStringify(block.item.toolCall.arguments),
+              block.item.toolCall.arguments,
             ),
           },
         ];
@@ -1201,6 +1224,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
           item.toolResult,
           `activity:${item.toolCall.id}`,
           safeStringify(item.toolCall.arguments),
+          item.toolCall.arguments,
         ),
       }))
     : [

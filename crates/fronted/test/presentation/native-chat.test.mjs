@@ -279,6 +279,39 @@ test("native chat and activity preserve file edit evidence from tool results", a
   h.unmount();
 });
 
+test("native chat and activity show a Write overwrite diff when its preimage is available", async () => {
+  const h = harness({}, { mobile: true });
+  h.props.historyItems = [{
+    kind: "assistant", key: "rewrite", segmentIndex: 0, timestamp: 1,
+    isFromCompactedSegment: false,
+    rounds: [{ round: 1, key: "r1", blocks: [{
+      kind: "tool", item: {
+        toolCall: { id: "write-1", name: "Write", arguments: { path: "notes.md", content: "same\nnew\n" } },
+        toolResult: {
+          role: "toolResult", toolCallId: "write-1", toolName: "Write",
+          content: [{ type: "text", text: "File updated successfully" }],
+          details: {
+            kind: "write", path: "notes.md", existedBefore: true,
+            beforeContent: "same\nold\n", preview: "same\nnew\n",
+          },
+          isError: false, timestamp: 1,
+        },
+      },
+    }] }],
+  }];
+  const transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
+  const tool = transcript.children.find((node) => node.id === "rewrite").children[0];
+  const diff = tool.children.find((node) => node.language === "diff");
+  assert.match(diff.text, /-old/);
+  assert.match(diff.text, /\+new/);
+  assert.doesNotMatch(diff.text, /[-+]same/);
+  assert.equal((await h.dispatch("activity-preview")).ok, true);
+  h.render();
+  const activity = h.documents().find((document) => document.title === "chat.activity.title");
+  assert.equal(activity.nodes[0].children.find((node) => node.language === "diff").text, diff.text);
+  h.unmount();
+});
+
 test("native chat keeps a shell-created PreviewFile output openable after the tool finishes", async () => {
   const opened = [];
   const h = harness({ onOpenWorkspaceFile: (path) => opened.push(path) }, { mobile: true });
