@@ -36,7 +36,7 @@ pub struct DriverProbe {
     pub error: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct InstallProgress {
     stream: &'static str,
     line: String,
