@@ -628,7 +628,7 @@ async function executeSSHManager(
     if (params.mobileCommandMode) {
       if (action !== "exec") {
         throw new Error(
-          "Native mobile SSH supports list_hosts and one-shot exec. Interactive sessions and SFTP require a paired desktop command host.",
+          "Native mobile SSH supports list_hosts and one-shot exec. Interactive sessions and SFTP require a separately configured desktop SSH connection.",
         );
       }
       const hostId = requireString(args, "host_id");
@@ -1145,7 +1145,7 @@ export function createSSHManagerTools(params: {
             ? {
                 ...SSH_MANAGER_TOOL,
                 description:
-                  "Run non-interactive commands on SSH hosts explicitly associated with the current project. Call list_hosts first when the host id is unknown, then exec with host_id and command. Credentials remain in Xgent secure storage. Native mobile mode does not expose persistent sessions or SFTP; use a paired desktop command host for those actions.",
+                  "Run non-interactive commands on SSH hosts explicitly associated with the current project. Call list_hosts first when the host id is unknown, then exec with host_id and command. Credentials remain in this device's Xgent secure storage. Native mobile mode does not expose persistent sessions or SFTP.",
               }
             : SSH_MANAGER_TOOL,
         ]

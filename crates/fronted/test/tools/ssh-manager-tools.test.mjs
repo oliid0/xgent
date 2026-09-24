@@ -83,6 +83,15 @@ test("SSHManager is auto-registered by project hosts, runtime, and remote switch
   assert.equal(registry.metadataByName.get("SSHManager").kind, "ssh_manager");
   assert.equal(registry.metadataByName.get("SSHManager").displayCategory, "terminal");
 
+  const pairedMobile = await buildRegistry({
+    nativeMobileRuntime: true,
+    lanPcCommandHostReady: true,
+  });
+  assert.match(
+    pairedMobile.tools.find((tool) => tool.name === "SSHManager").description,
+    /this device's Xgent secure storage/,
+  );
+
   assert.equal(
     (
       await buildRegistry({

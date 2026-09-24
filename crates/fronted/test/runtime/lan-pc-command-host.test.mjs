@@ -36,6 +36,8 @@ test("paired mobile delegates shell commands to the desktop workspace but keeps 
   });
   await tauriRuntime.invoke("shell_session_wait", { session_id: "bash-1", cursor: 0 });
   await tauriRuntime.invoke("shell_cancel", { run_id: "run-1" });
+  await tauriRuntime.invoke("shell_cancel", { run_id: "mobile-ssh-123" });
+  await tauriRuntime.invoke("shell_cancel", { run_id: "ssh-tool-123" });
   await tauriRuntime.invoke("plugin:mobile-assistant|status");
   assert.deepEqual(calls.slice(0, 3).map((call) => call.command), [
     "lan_pc_invoke",
@@ -47,7 +49,11 @@ test("paired mobile delegates shell commands to the desktop workspace but keeps 
   assert.equal(calls[0].args.args.cwd, "C:\\Users\\owner\\workspace\\report");
   assert.equal(calls[1].args.command, "shell_session_wait");
   assert.equal(calls[2].args.command, "shell_cancel");
-  assert.equal(calls[3].command, "plugin:mobile-assistant|status");
+  assert.deepEqual(calls.slice(3).map((call) => call.command), [
+    "shell_cancel",
+    "shell_cancel",
+    "plugin:mobile-assistant|status",
+  ]);
   assert.equal(host.getLanPcCommandHostConfig().remotePlatform, "windows");
 });
 

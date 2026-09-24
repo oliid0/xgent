@@ -133,6 +133,13 @@ export function shouldDelegateCommandToLanPc(command: string, args?: RuntimeInvo
   if (!normalized || normalized.startsWith("lan_pc_") || normalized.startsWith("local_access_")) {
     return false;
   }
+  if (
+    normalized === "shell_cancel" &&
+    typeof args?.run_id === "string" &&
+    (args.run_id.startsWith("mobile-ssh-") || args.run_id.startsWith("ssh-tool-"))
+  ) {
+    return false;
+  }
   if (normalized.startsWith("mcp_")) {
     if (normalized === "mcp_list_tools" && Array.isArray(args?.servers)) {
       return (
