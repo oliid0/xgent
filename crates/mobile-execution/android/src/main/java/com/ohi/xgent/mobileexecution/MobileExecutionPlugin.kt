@@ -461,18 +461,32 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                 "test -s /etc/ssl/certs/ca-certificates.crt && " +
                 "printf '$READINESS_TOKEN'",
         )
+        var noSeccomp = File(rootfsDir, ProotRunner.NO_SECCOMP_MARKER).isFile
         try {
             probes.forEachIndexed { index, (name, command) ->
-                val result = runner.execute(
-                    AndroidRunRequest(
-                        runId = "install-probe-$index-${System.currentTimeMillis()}",
-                        workdir = workspace.absolutePath,
-                        command = command,
-                        cwd = "",
-                        timeoutMs = INSTALL_PROBE_TIMEOUT_MS,
-                        stdin = null,
-                    ),
+                val request = AndroidRunRequest(
+                    runId = "install-probe-$index-${System.currentTimeMillis()}",
+                    workdir = workspace.absolutePath,
+                    command = command,
+                    cwd = "",
+                    timeoutMs = INSTALL_PROBE_TIMEOUT_MS,
+                    stdin = null,
                 )
+                fun probe(): AndroidRunResult = try {
+                    runner.execute(request, noSeccomp = noSeccomp)
+                } finally {
+                    activeProcesses.remove(request.runId)
+                }
+                var result = probe()
+                // yy's SeccompFallbackPolicy identifies fast, silent fatal signals.
+                // Retry only these known idempotent install probes, never user commands.
+                if (!noSeccomp && !result.cancelled && !result.timedOut &&
+                    result.exitCode in setOf(132, 135, 139, 159) && result.durationMs < 1_500 &&
+                    result.stdout.isEmpty() && result.stderr.isEmpty()) {
+                    noSeccomp = true
+                    Log.w(TAG, "PRoot $name probe exited ${result.exitCode}; testing without seccomp")
+                    result = probe()
+                }
                 val diagnostics = listOf(result.stdout, result.stderr)
                     .joinToString("\n")
                     .trim()
@@ -491,6 +505,8 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                     }
                 }
             }
+            // Keep the workaround with this rootfs only after every probe passes.
+            if (noSeccomp) File(rootfsDir, ProotRunner.NO_SECCOMP_MARKER).writeText("1\n")
         } finally {
             File(workspace, ".xgent-write-probe").delete()
         }

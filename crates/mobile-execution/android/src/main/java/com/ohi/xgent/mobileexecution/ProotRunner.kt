@@ -53,7 +53,11 @@ internal class ProotRunner(
 ) {
     private val binaries = ProotBinaries.resolve(nativeLibraryDir)
 
-    fun execute(request: AndroidRunRequest, onOutput: ((String, ByteArray) -> Unit)? = null): AndroidRunResult {
+    fun execute(
+        request: AndroidRunRequest,
+        noSeccomp: Boolean = File(rootfsDir, NO_SECCOMP_MARKER).isFile,
+        onOutput: ((String, ByteArray) -> Unit)? = null,
+    ): AndroidRunResult {
         require(binaries.available) { "PRoot binaries are unavailable for this Android ABI" }
         require(File(rootfsDir, "bin/sh").isFile) { "Alpine rootfs is not installed" }
 
@@ -79,6 +83,7 @@ internal class ProotRunner(
                 environment()["PROOT_LOADER"] = binaries.loader.absolutePath
                 environment()["LD_LIBRARY_PATH"] = nativeLibraryDir.absolutePath
                 environment()["TMPDIR"] = tempDir.absolutePath
+                if (noSeccomp) environment()["PROOT_NO_SECCOMP"] = "1"
             }
             .start()
 
@@ -245,6 +250,7 @@ internal class ProotRunner(
     }
 
     companion object {
+        const val NO_SECCOMP_MARKER = ".xgent-proot-no-seccomp"
         private const val WORKSPACE_PATH = "/workspace"
         private const val EXTERNAL_CWD_PATH = "/xgent-cwd"
         private const val TERMINATION_GRACE_MS = 300L

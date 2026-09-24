@@ -60,6 +60,13 @@ exercise variables, a loop, conditionals, file writes and interpreter commands
 before reporting success. Android uses Alpine `/bin/sh` until its essentials
 profile installs Bash.
 
+On Android, a fast silent SIGILL/SIGBUS/SIGSEGV/SIGSYS during a known install
+probe triggers one retry with `PROOT_NO_SECCOMP=1`. The selection is saved
+inside that rootfs only after all installation probes pass. This accommodates
+the device-specific ptrace/seccomp issue documented by the reference runtime;
+ordinary user commands are never automatically retried. Native installation
+logs identify the failing probe and the compatibility attempt.
+
 Chat/provider requests and native sandbox file operations do not require this
 plugin to be installed. The shared tool registry also supports Skills and
 network MCP independently of Shell. Local stdio MCP requires a persistent
