@@ -120,8 +120,19 @@ function normalizedRelativeCwd(
 }
 
 function simpleCdTarget(command: string) {
-  const match = /^cd(?:\s+(.*))?$/s.exec(command.trim());
-  return match ? (match[1] ?? "") : null;
+  const match = /^cd(?:[ \t]+(.*))?$/.exec(command.trim());
+  if (!match) return null;
+  const target = (match[1] ?? "").trim();
+  if (!target) return "";
+  // Persist only a literal single-directory change. Operators, expansions and
+  // escape sequences belong to the backend Shell, not the workspace path parser.
+  const plain = /^[\p{L}\p{N}_./:@+,=%-]+$/u.test(target) || target === "~";
+  const quoted = /^'[^'\\\r\n]*'$/.test(target) || /^"[^"\\$`\r\n]*"$/.test(target);
+  if (!plain && !quoted) return null;
+  const path = unwrapShellPath(target);
+  if (path.startsWith("-") && path !== "-") return null;
+  if (quoted && (path.trim() !== path || !path || path === "~" || path === "-")) return null;
+  return target;
 }
 
 function shellQuote(value: string) {
