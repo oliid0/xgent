@@ -51,6 +51,40 @@ function writeMessages(paths, startTs = 1) {
   );
 }
 
+test("compaction retains actual native and cloud output paths for subsequent file operations", () => {
+  const messages = [
+    assistantBlocks([
+      tcBlock("MobilePersonalActions", { action: "import_photo_preview", file_name: "photo.jpg" }, "photo"),
+      tcBlock("CloudTaskManager", { action: "download_artifact", task_id: "task" }, "cloud"),
+    ], 1),
+    { ...toolResult("photo", false, 2), toolName: "MobilePersonalActions",
+      details: { kind: "mobile_personal_assistant", data: { path: "photos/photo (1).jpg" } } },
+    { ...toolResult("cloud", false, 3), toolName: "CloudTaskManager",
+      details: { kind: "cloud_task_manager", action: "download_artifact", localPath: "output/slides.zip" } },
+    ...readMessages(["photos/photo (1).jpg"], 4),
+  ];
+  const ledger = fileLedger.mergeMessagesIntoLedger({ readFiles: ["notes.md"], modifiedFiles: [] }, messages);
+  assert.deepEqual(ledger.modifiedFiles, ["output/slides.zip", "photos/photo (1).jpg"]);
+  assert.deepEqual(ledger.readFiles, ["notes.md"]);
+  assert.match(fileLedger.formatFileLedgerBlock(ledger), /photos\/photo \(1\)\.jpg/);
+});
+
+test("artifact tracking rejects failed, unpaired and mismatched results instead of trusting requested paths", () => {
+  for (const name of ["MobilePersonalActions", "CloudTaskManager"]) {
+    const action = name === "MobilePersonalActions" ? "import_photo_preview" : "download_artifact";
+    const details = name === "MobilePersonalActions"
+      ? { kind: "mobile_personal_assistant", data: { path: "actual.jpg" } }
+      : { kind: "cloud_task_manager", action, localPath: "actual.zip" };
+    const call = assistantBlocks([tcBlock(name, { action, path: "requested.jpg" }, "call")], 1);
+    const result = { ...toolResult("call", false, 2), toolName: name, details };
+    for (const override of [null, { isError: true }, { toolCallId: "other" }, { toolName: "other" },
+      { details: {} }, { details: { ...details, kind: "other" } }]) {
+      const messages = override === null ? [call] : [call, { ...result, ...override }];
+      assert.deepEqual(fileLedger.extractFileOperationsFromMessages(messages).modifiedFiles, []);
+    }
+  }
+});
+
 function checkpoint(text, timestamp) {
   return {
     role: "assistant",

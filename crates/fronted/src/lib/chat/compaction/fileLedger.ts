@@ -107,7 +107,11 @@ function normalizeFileOps(ops: FileOp[]): FileLedger {
 
 function collectFileOpsFromMessages(messages: Message[]): FileOp[] {
   const failedCallIds = new Set<string>();
+  const results = new Map<string, Extract<Message, { role: "toolResult" }>>();
   for (const message of messages) {
+    if (message.role === "toolResult" && typeof message.toolCallId === "string") {
+      results.set(message.toolCallId, message);
+    }
     if (
       message.role === "toolResult" &&
       message.isError === true &&
@@ -125,11 +129,31 @@ function collectFileOpsFromMessages(messages: Message[]): FileOp[] {
       if (block.type !== "toolCall") continue;
       if (typeof block.id === "string" && failedCallIds.has(block.id)) continue;
       const name = typeof block.name === "string" ? block.name : "";
+      const args = toArgsObject(block.arguments);
+      if (!args) continue;
+      if (
+        (name === "MobilePersonalActions" && args.action === "import_photo_preview") ||
+        (name === "CloudTaskManager" && args.action === "download_artifact")
+      ) {
+        const result = results.get(block.id);
+        if (!result || result.isError || result.toolName !== name) continue;
+        const details = toArgsObject(result.details);
+        const data = toArgsObject(details?.data);
+        const outputPath =
+          name === "MobilePersonalActions" && details?.kind === "mobile_personal_assistant"
+            ? data?.path
+            : name === "CloudTaskManager" &&
+                details?.kind === "cloud_task_manager" &&
+                details.action === "download_artifact"
+              ? details.localPath
+              : undefined;
+        const path = readPathArgument({ path: outputPath });
+        if (path) ops.push({ path, modified: true });
+        continue;
+      }
       const isRead = READ_TOOL_NAMES.has(name);
       const isModify = MODIFY_TOOL_NAMES.has(name);
       if (!isRead && !isModify) continue;
-      const args = toArgsObject(block.arguments);
-      if (!args) continue;
       const path = readPathArgument(args);
       if (!path) continue;
       ops.push({ path, modified: isModify });
