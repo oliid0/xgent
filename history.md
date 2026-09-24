@@ -91,6 +91,8 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Extended the native chat evidence test with unchanged context lines, so it rejects the previous false whole-snippet deletion/addition while checking that activity and transcript share the same diff.
 - Adjusted the diff assertion to the library's actual unified patch format (`-old`/`+new`) and applied Biome's compact call formatting after the focused check revealed only those mismatches.
 - Applied Biome's two import/format corrections after TypeScript and native presentation checks passed; remaining consolidated checks continue after this fix.
+- Kept native Edit activity diffs limited to complete exact single-replacement snippets; truncated or fuzzy/multiple edits now retain a text preview instead of showing a misleading synthetic diff. Added a transcript/activity regression for truncated and fuzzy cases.
+- Applied Biome's two line wrapping changes to the native Edit evidence condition after focused checks passed 15/15 and TypeScript.
 
 ## Evidence and decisions
 - Started from clean `main` at `3175331`; inspected prior history, screenshots, `xx`, `yy`, Astryx 0.6 source/MCP/CLI, Swift documentation, and release logs.
@@ -124,4 +126,4 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
-- Latest full local batch passed `pnpm test:non-native` (1,222 tests; Cargo skipped), `pnpm check`, `pnpm native:check`, and `pnpm lint`. Subsequent MCP store change passed focused registry tests 10/10, `pnpm check`, and `pnpm lint`; device behavior remains unverified. Release `35910177777` passed all platforms at `4d01a27`. Remote `c0d34ca` CI `35918340388` and release `35918757930` failed on `InstallProgress: Clone` in desktop Rust; all four failed release jobs show that error, while iOS passed. Local fix is awaiting final push/CI. No local Cargo/build commands. Push only after the whole goal is complete.
+- Latest full local batch passed `pnpm test:non-native` (1,230 tests; Cargo skipped), `pnpm check`, `pnpm native:check`, and `pnpm lint`. Subsequent native Edit evidence change passed focused tests 15/15, `pnpm check`, and `pnpm lint`. Device behavior remains unverified. Release `35910177777` passed all platforms at `4d01a27`. Remote `c0d34ca` CI `35918340388` and release `35918757930` failed on `InstallProgress: Clone` in desktop Rust; all four failed release jobs show that error, while iOS passed. Local fix is awaiting final push/CI. No local Cargo/build commands. Push only after the whole goal is complete.

@@ -312,6 +312,54 @@ test("native chat and activity show a Write overwrite diff when its preimage is 
   h.unmount();
 });
 
+test("native chat does not turn truncated or fuzzy Edit previews into a file diff", async () => {
+  const h = harness({}, { mobile: true });
+  h.props.historyItems = [{
+    kind: "assistant", key: "edit-preview", segmentIndex: 0, timestamp: 1,
+    isFromCompactedSegment: false,
+    rounds: [{ round: 1, key: "r1", blocks: [
+      ...["truncated", "fuzzy"].map((variant) => ({
+        kind: "tool", item: {
+          toolCall: {
+            id: variant, name: "Edit",
+            arguments: variant === "truncated"
+              ? {
+                path: "notes.md", old_string: "old...", new_string: "new...",
+                __xgent_stream_preview: { fields: {
+                  old_string: { truncated: true }, new_string: { truncated: true },
+                } },
+              }
+              : { path: "notes.md", old_string: "old", new_string: "new" },
+          },
+          toolResult: {
+            role: "toolResult", toolCallId: variant, toolName: "Edit",
+            content: [{ type: "text", text: "File edited" }],
+            details: {
+              kind: "edit", path: "notes.md", oldPreview: "old", newPreview: "new",
+              matchStrategy: variant === "fuzzy" ? "indentation" : "exact", replacements: 1,
+            },
+            isError: false, timestamp: 1,
+          },
+        },
+      })),
+    ] }],
+  }];
+  const transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
+  const tools = transcript.children.find((node) => node.id === "edit-preview").children
+    .filter((node) => node.kind === "ToolCall");
+  for (const tool of tools) {
+    assert.equal(tool.children.some((node) => node.language === "diff"), false);
+    assert.equal(tool.children.find((node) => node.id.endsWith(":edit-preview")).text, "old\n→\nnew");
+  }
+  assert.equal((await h.dispatch("activity-preview")).ok, true);
+  h.render();
+  const activity = h.documents().find((document) => document.title === "chat.activity.title");
+  for (const item of activity.nodes) {
+    assert.equal(item.children.some((node) => node.language === "diff"), false);
+  }
+  h.unmount();
+});
+
 test("native chat keeps a shell-created PreviewFile output openable after the tool finishes", async () => {
   const opened = [];
   const h = harness({ onOpenWorkspaceFile: (path) => opened.push(path) }, { mobile: true });
