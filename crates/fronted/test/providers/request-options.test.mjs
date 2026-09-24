@@ -1385,6 +1385,22 @@ test("custom provider headers filter invalid HTTP token keys", () => {
   assert.equal(providers.isValidCustomHeaderKey("Bad Header"), false);
 });
 
+test("custom provider headers drop values the local proxy cannot forward", () => {
+  const headers = [
+    { key: "X-Valid", value: "ASCII\tvalue" },
+    { key: "X-Unicode", value: "值" },
+    { key: "X-Delete", value: "a\x7fb" },
+    { key: "X-Control", value: "a\x01b" },
+  ];
+  assert.deepEqual(customHeaderHelpers.mergeCustomHeaders({}, headers), {
+    "X-Valid": "ASCII\tvalue",
+  });
+  assert.equal(customHeaderHelpers.isValidCustomHeaderValue(""), true);
+  assert.equal(customHeaderHelpers.isValidCustomHeaderValue("a\rb"), false);
+  assert.equal(customHeaderHelpers.isValidCustomHeaderValue("a\nb"), false);
+  assert.equal(customHeaderHelpers.isValidCustomHeaderValue("值"), false);
+});
+
 test("custom provider headers accept undefined and empty arrays", () => {
   const base = { Accept: "application/json" };
   assert.deepEqual(providers.mergeCustomHeaders(base, undefined), base);

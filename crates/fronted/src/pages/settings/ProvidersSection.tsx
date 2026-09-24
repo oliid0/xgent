@@ -63,6 +63,7 @@ import {
   getCustomHeaderKeyPresets,
   isReservedCustomHeaderKey,
   isValidCustomHeaderKey,
+  isValidCustomHeaderValue,
 } from "../../lib/providers/customHeaders";
 import { parseModelValue, toModelValue } from "../../lib/providers/llm";
 import {
@@ -669,12 +670,17 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
       return;
     }
     const invalidHeaderIndex = customHeaders.findIndex(
-      (header) => getCustomHeaderKeyIssue(header.key, true) !== null,
+      (header) =>
+        getCustomHeaderKeyIssue(header.key, true) !== null ||
+        !isValidCustomHeaderValue(header.value),
     );
     if (invalidHeaderIndex >= 0) {
       setHeaderValidationSubmitted(true);
       setActivePanel("request");
-      focusCustomHeader(invalidHeaderIndex, "key");
+      focusCustomHeader(
+        invalidHeaderIndex,
+        getCustomHeaderKeyIssue(customHeaders[invalidHeaderIndex].key, true) ? "key" : "value",
+      );
       return;
     }
     const nextApiKey =
@@ -797,14 +803,20 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   );
   const firstHeaderIssue =
     customHeaders
-      .map((header) => getCustomHeaderKeyIssue(header.key, headerValidationSubmitted))
+      .map(
+        (header) =>
+          getCustomHeaderKeyIssue(header.key, headerValidationSubmitted) ??
+          (!isValidCustomHeaderValue(header.value) ? "invalid-value" : null),
+      )
       .find((issue) => issue !== null) ?? null;
   const headerIssueMessage =
     firstHeaderIssue === "reserved"
       ? t("settings.customHeaderReservedTitle")
       : firstHeaderIssue === "invalid"
         ? t("settings.invalidCustomHeaderKey")
-        : null;
+        : firstHeaderIssue === "invalid-value"
+          ? t("settings.invalidCustomHeaderValue")
+          : null;
   return (
     <VStack height="100%" minHeight={0} gap={0}>
       <Toolbar
@@ -1743,6 +1755,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                           header.key,
                           headerValidationSubmitted,
                         );
+                        const valueIssue = !isValidCustomHeaderValue(header.value);
                         const issueTitle =
                           issue === "reserved"
                             ? t("settings.customHeaderReservedTitle")
@@ -1759,7 +1772,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                             key={index}
                             className={cn(
                               "provider-panel-enter group relative flex items-stretch overflow-hidden rounded-lg border bg-card transition-all focus-within:border-primary/45 focus-within:ring-2 focus-within:ring-primary/10 hover:border-muted-foreground/30 max-[720px]:flex-wrap",
-                              issue &&
+                              (issue || valueIssue) &&
                                 "border-destructive/60 focus-within:border-destructive focus-within:ring-destructive/10",
                             )}
                           >
@@ -1840,6 +1853,10 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                                 }}
                                 type={valueVisible ? "text" : "password"}
                                 value={header.value}
+                                aria-invalid={valueIssue ? true : undefined}
+                                labelTooltip={
+                                  valueIssue ? t("settings.invalidCustomHeaderValue") : undefined
+                                }
                                 isDisabled={isBrowser}
                                 className="h-10 w-full rounded-none border-0 bg-transparent pl-3 pr-[4.5rem] font-mono text-xs shadow-none focus-visible:ring-0"
                                 placeholder={t("settings.customHeaderValue")}

@@ -9,6 +9,7 @@ const RESERVED_CUSTOM_HEADER_KEYS = new Set([
   "content-length",
 ]);
 const HTTP_HEADER_TOKEN_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+const HTTP_HEADER_VALUE_PATTERN = /^[\t\x20-\x7e]*$/;
 
 export const ANTHROPIC_DEFAULT_REQUEST_HEADERS = {
   "x-app": "cli",
@@ -88,6 +89,10 @@ export function isValidCustomHeaderKey(key: string): boolean {
   return HTTP_HEADER_TOKEN_PATTERN.test(key);
 }
 
+export function isValidCustomHeaderValue(value: string): boolean {
+  return HTTP_HEADER_VALUE_PATTERN.test(value);
+}
+
 export function isReservedCustomHeaderKey(key: string): boolean {
   return (
     RESERVED_CUSTOM_HEADER_KEYS.has(key.toLowerCase()) || key.toLowerCase().startsWith("x-xgent-")
@@ -103,7 +108,7 @@ export function mergeCustomHeaders(
     if (
       !isValidCustomHeaderKey(header.key) ||
       isReservedCustomHeaderKey(header.key) ||
-      /[\r\n\0]/.test(header.value)
+      !isValidCustomHeaderValue(header.value)
     ) {
       continue;
     }

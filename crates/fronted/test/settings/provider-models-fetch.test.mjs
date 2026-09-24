@@ -405,6 +405,28 @@ test("fetchModelsFromApi accepts nested model-list response envelopes", async ()
   );
 });
 
+test("model discovery forwards only valid configured custom headers", async () => {
+  await withFetchStub(
+    () => jsonResponse(200, { data: [{ id: "relay-model" }] }),
+    async (calls) => {
+      const models = await providerUtils.fetchModelsFromApi(
+        "codex",
+        "https://relay.example.com",
+        "test-key",
+        { customHeaders: [
+          { key: "X-Relay-Region", value: "us-west" },
+          { key: "X-Bad", value: "值" },
+        ] },
+      );
+      assert.equal(models[0].id, "relay-model");
+      const encoded = calls[0].options.headers["x-xgent-upstream-headers"];
+      const forwarded = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+      assert.equal(forwarded["X-Relay-Region"], "us-west");
+      assert.equal(forwarded["X-Bad"], undefined);
+    },
+  );
+});
+
 test("fetchModelsFromApi derives model discovery from a complete inference URL", async () => {
   await withFetchStub(
     () => jsonResponse(200, { data: [{ id: "gpt-5" }] }),

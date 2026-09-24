@@ -2131,6 +2131,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.removeCustomHeader": "删除请求头",
     "settings.invalidCustomHeaderKey":
       "请求头名称无效。仅支持合法 HTTP Header 名称，例如 X-Environment、X-Request-ID。",
+    "settings.invalidCustomHeaderValue": "请求头的值只能包含可见 ASCII 字符或制表符。",
     "settings.close": "关闭",
     "settings.hideApiKey": "隐藏 API Key",
     "settings.showApiKey": "显示 API Key",
@@ -5109,6 +5110,8 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.removeCustomHeader": "Remove header",
     "settings.invalidCustomHeaderKey":
       "Invalid HTTP header name. Examples: X-Environment, X-Request-ID.",
+    "settings.invalidCustomHeaderValue":
+      "Header values may contain only visible ASCII characters or tabs.",
     "settings.close": "Close",
     "settings.hideApiKey": "Hide API Key",
     "settings.showApiKey": "Show API Key",
