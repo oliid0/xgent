@@ -203,8 +203,12 @@ fn install(app: &AppHandle) -> Result<DriverProbe, String> {
         .try_lock()
         .map_err(|_| "cua-driver installation is already running".to_string())?;
     let preview = install_preview();
-    let mut child = hidden_command(&preview.program)
-        .args(&preview.args)
+    let mut command = hidden_command(&preview.program);
+    command.args(&preview.args);
+    for (key, value) in crate::services::system_proxy::shell_proxy_envs()? {
+        command.env(key, value);
+    }
+    let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

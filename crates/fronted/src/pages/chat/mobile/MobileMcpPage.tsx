@@ -58,7 +58,7 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
   const [registryLoading, setRegistryLoading] = useState(false);
   const [registryError, setRegistryError] = useState("");
   const [installingCardId, setInstallingCardId] = useState("");
-  const [addedCardIds, setAddedCardIds] = useState<string[]>([]);
+  const [installedServerIds, setInstalledServerIds] = useState<Record<string, string>>({});
   const [configuring, setConfiguring] = useState<{
     card: McpRegistryCard;
     draft: McpRegistryInstallDraft;
@@ -107,10 +107,12 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
   }, [query, registrySource, view]);
 
   const cardIsInstalled = (card: McpRegistryCard) =>
-    addedCardIds.includes(card.id) ||
     props.settings.mcp.servers.some(
       (server) =>
-        server.id === card.installDraft?.server.id || server.id === card.manualDraft?.server.id,
+        server.id === installedServerIds[card.id] ||
+        server.id === card.installDraft?.server.id ||
+        server.id === card.networkDraft?.server.id ||
+        server.id === card.manualDraft?.server.id,
     );
 
   async function installRegistryCard(card: McpRegistryCard) {
@@ -137,7 +139,7 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
         props.setSettings((previous) =>
           updateMcp(previous, { servers: [...previous.mcp.servers, ready.server] }),
         );
-        setAddedCardIds((ids) => [...ids, card.id]);
+        setInstalledServerIds((current) => ({ ...current, [card.id]: ready.server.id }));
       }
     } catch (cause) {
       setRegistryError(cause instanceof Error ? cause.message : String(cause));
@@ -178,7 +180,7 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
     props.setSettings((previous) =>
       updateMcp(previous, { servers: [...previous.mcp.servers, { ...configured.server, id }] }),
     );
-    setAddedCardIds((ids) => [...ids, configuring.card.id]);
+    setInstalledServerIds((current) => ({ ...current, [configuring.card.id]: id }));
     setConfiguring(null);
     setRegistryError("");
   }

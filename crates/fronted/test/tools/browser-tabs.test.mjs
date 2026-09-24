@@ -33,6 +33,17 @@ test("concurrent tab creation reserves distinct ids and deduplicates the same ag
   assert.equal(controller.getSnapshot().sessions.length, 3);
 });
 
+test("new conversation tab skips an occupied mapped tab id", async () => {
+  const { controller, opens } = setup();
+  controller.selectConversation("chat-a");
+  const occupiedId = controller.sessionIdForConversation("chat-a", "tab-1");
+  await controller.ensureSession({ sessionId: occupiedId });
+  const created = await controller.newSession();
+  assert.notEqual(created.sessionId, occupiedId);
+  assert.equal(opens(), 2);
+  assert.equal(controller.sessionsForConversation().length, 2);
+});
+
 test("viewport and monitor frames do not wait behind a navigation and drag updates coalesce", async () => {
   let finishNavigation;
   let navigationStarted;

@@ -366,12 +366,14 @@ export class BrowserSessionController {
       ...this.openingSessions.keys(),
     ]);
     let index = ++this.nextUserTabId;
-    while (used.has(`tab-${index}`)) index = ++this.nextUserTabId;
+    const conversationId = options.conversationId ?? this.conversationId;
+    let sessionId = this.sessionIdForConversation(conversationId, `tab-${index}`);
+    while (used.has(sessionId)) {
+      index = ++this.nextUserTabId;
+      sessionId = this.sessionIdForConversation(conversationId, `tab-${index}`);
+    }
     return this.ensureSession({
-      sessionId: this.sessionIdForConversation(
-        options.conversationId ?? this.conversationId,
-        `tab-${index}`,
-      ),
+      sessionId,
       url,
       preserveActive: options.preserveActive,
     });
