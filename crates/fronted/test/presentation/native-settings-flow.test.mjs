@@ -37,13 +37,15 @@ test("native settings mirrors compact navigation and persists shared system, pro
   const registry = createPresentationActionRegistry();
   let settings = getDefaultSettings();
   let document;
+  let rendered;
   let request = 0;
   const render = () => {
     cursor = 0;
     const result = NativeSettingsPage({ settings, setSettings: (update) => { settings = update(settings); },
       nativeMobile: true, initialSection: "system", saveState: { status: "saved" }, onBack() {}, appUpdate: {} });
     document = result.props.document;
-    registry.register("settings", result.props.handlers);
+    rendered = result;
+    if (result.props.handlers) registry.register("settings", result.props.handlers);
   };
   const dispatch = async (action, value = null) => {
     const result = await registry.dispatch({ surface: "settings", action, value, requestId: String(++request) });
@@ -104,6 +106,17 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal((await dispatch("policy:Bash", "deny")).ok, true);
   assert.equal(settings.system.toolPolicies.Bash, "deny");
   assert.equal(settings.system.toolPolicies["personal:clipboard"], "deny");
+  await dispatch("back");
+  await dispatch("nav:other");
+  for (const [section, component] of [["ssh", "SshSettingsSection"], ["cron", "CronSection"], ["hooks", "HooksSection"]]) {
+    assert.equal((await dispatch(`nav:${section}`)).ok, true);
+    assert.equal(rendered.type, component);
+    assert.notEqual(rendered.props.openCreateImmediately, true, "enter the management list, not an unsolicited creation form");
+    rendered.props.onBack();
+    render();
+    assert.equal(document.mode, "sheet");
+    assert.ok(document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === `nav:${section}`), "return to the invoking settings category");
+  }
 });
 
 test("system picker payload rejects malformed files and preserves bytes and MIME type", () => {

@@ -370,31 +370,12 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     );
   if (page === "ssh")
     return (
-      <SshSettingsSection
-        settings={settings}
-        setSettings={setSettings}
-        onBack={returnToSettings}
-        openCreateImmediately={nativeMobile}
-      />
+      <SshSettingsSection settings={settings} setSettings={setSettings} onBack={returnToSettings} />
     );
   if (page === "cron")
-    return (
-      <CronSection
-        settings={settings}
-        setSettings={setSettings}
-        onBack={returnToSettings}
-        openCreateImmediately={nativeMobile}
-      />
-    );
+    return <CronSection settings={settings} setSettings={setSettings} onBack={returnToSettings} />;
   if (page === "hooks")
-    return (
-      <HooksSection
-        settings={settings}
-        setSettings={setSettings}
-        onBack={returnToSettings}
-        openCreateImmediately={nativeMobile}
-      />
-    );
+    return <HooksSection settings={settings} setSettings={setSettings} onBack={returnToSettings} />;
   if (page === "soul")
     return (
       <SoulSection
