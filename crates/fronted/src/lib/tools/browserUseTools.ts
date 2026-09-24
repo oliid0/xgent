@@ -429,10 +429,21 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
   let resolvedController: Promise<BrowserSessionController> | null = null;
   const resolveController = () => {
     if (!remoteController) return Promise.resolve(browserSessionController);
-    resolvedController ??= remoteController.initialize().then((state) => {
-      if (state.status?.available && !state.error) return remoteController;
+    resolvedController ??= (async () => {
+      try {
+        const local = await browserSessionController.initialize();
+        if (local.status?.available && !local.error) return browserSessionController;
+      } catch {
+        // The paired browser can still serve this run when the phone browser fails to start.
+      }
+      try {
+        const remote = await remoteController.initialize();
+        if (remote.status?.available && !remote.error) return remoteController;
+      } catch {
+        // Keep the phone's normal error reporting when neither browser starts.
+      }
       return browserSessionController;
-    });
+    })();
     return resolvedController;
   };
   const tool: Tool = {
