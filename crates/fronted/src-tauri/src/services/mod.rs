@@ -17,6 +17,7 @@ pub mod provider_usage;
 pub mod proxy;
 pub mod skills;
 pub(crate) mod ssh_proxy;
+pub(crate) mod ssh_transport;
 pub mod system_proxy;
 #[cfg(desktop)]
 pub mod stt;

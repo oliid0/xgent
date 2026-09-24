@@ -16,6 +16,7 @@ use crate::commands::settings::{
 use crate::runtime::shell_types::{
     ShellRunResponse, DEFAULT_SHELL_TIMEOUT_MS, MAX_SHELL_TIMEOUT_MS, MIN_SHELL_TIMEOUT_MS,
 };
+use crate::services::ssh_transport::open_ssh_transport;
 
 const MAX_OUTPUT_BYTES: usize = 512 * 1024;
 const MAX_COMMAND_BYTES: usize = 128 * 1024;
@@ -207,14 +208,6 @@ async fn execute_command(
     if host.host.trim().is_empty() || host.port == 0 {
         return Err("SSH host and port are required".to_string());
     }
-    if host.proxy.use_system_proxy
-        || !host.proxy.url.trim().is_empty()
-        || host.proxy.port > 0
-        || !host.proxy.username.trim().is_empty()
-        || host.proxy.password_configured
-    {
-        return Err("This SSH host uses a proxy; direct mobile SSH requires a direct host".to_string());
-    }
     let host_key_error = Arc::new(tokio::sync::Mutex::new(None));
     let handler = MobileSshClient {
         host: host.host.clone(),
@@ -222,7 +215,8 @@ async fn execute_command(
         host_key_error: Arc::clone(&host_key_error),
     };
     let config = Arc::new(client::Config::default());
-    let mut handle = match client::connect(config, (host.host.as_str(), host.port), handler).await {
+    let stream = open_ssh_transport(&host).await?;
+    let mut handle = match client::connect_stream(config, stream, handler).await {
         Ok(handle) => handle,
         Err(error) => {
             return Err(host_key_error

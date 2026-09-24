@@ -448,6 +448,11 @@ pub fn settings_backup_mark_dirty(skills: Option<Value>) {
     crate::services::webdav_auto_sync::mark_dirty();
 }
 
+#[tauri::command]
+pub fn settings_backup_cache_skills(skills: Option<Value>) {
+    crate::services::webdav_auto_sync::cache_skills(skills);
+}
+
 
 pub(crate) async fn auto_upload_backup_snapshot(
     skills: Option<Value>,

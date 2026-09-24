@@ -100,8 +100,8 @@ export async function downloadBackup(): Promise<BackupApplyOutcome> {
   return await invoke<BackupApplyOutcome>("settings_backup_download");
 }
 
-export function markBackupDirty(skills: SkillsSettings): void {
-  void invoke("settings_backup_mark_dirty", { skills }).catch(() => {});
+export async function markBackupDirty(skills: SkillsSettings): Promise<void> {
+  await invoke("settings_backup_mark_dirty", { skills });
 }
 
 export type BackupSyncStatusEvent = {

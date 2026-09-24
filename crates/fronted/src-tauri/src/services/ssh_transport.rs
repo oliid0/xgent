@@ -1,0 +1,343 @@
+//! Shared direct and proxy transport for desktop and mobile SSH sessions.
+
+use base64::Engine;
+use std::net::{IpAddr, Ipv6Addr};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+
+use crate::commands::settings::RuntimeSshHostConfig;
+use crate::services::ssh_proxy::{resolve_ssh_proxy_endpoint, SshProxyKind};
+
+#[derive(Debug, Clone)]
+pub(crate) struct ResolvedSshProxy {
+    pub(crate) kind: SshProxyKind,
+    pub(crate) host: String,
+    pub(crate) port: u16,
+    pub(crate) username: String,
+    pub(crate) password: String,
+}
+
+pub(crate) fn ssh_proxy_configured(host: &RuntimeSshHostConfig) -> bool {
+    host.proxy.use_system_proxy
+        || !host.proxy.url.trim().is_empty()
+        || host.proxy.port > 0
+        || !host.proxy.username.trim().is_empty()
+        || host.proxy.password_configured
+}
+
+pub(crate) async fn open_ssh_transport(
+    host_config: &RuntimeSshHostConfig,
+) -> Result<TcpStream, String> {
+    let Some(proxy) = resolve_effective_ssh_proxy(host_config)? else {
+        let stream = TcpStream::connect((host_config.host.as_str(), host_config.port))
+            .await
+            .map_err(|error| {
+                format!(
+                    "SSH TCP connection to {}:{} failed: {error}",
+                    host_config.host, host_config.port
+                )
+            })?;
+        configure_ssh_transport_stream(&stream);
+        return Ok(stream);
+    };
+
+    let mut stream = TcpStream::connect((proxy.host.as_str(), proxy.port))
+        .await
+        .map_err(|error| {
+            format!(
+                "SSH proxy connection to {}:{} failed: {error}",
+                proxy.host, proxy.port
+            )
+        })?;
+    match proxy.kind {
+        SshProxyKind::Http => {
+            http_connect_proxy(
+                &mut stream,
+                host_config.host.as_str(),
+                host_config.port,
+                &proxy,
+            )
+            .await?;
+        }
+        SshProxyKind::Socks5 => {
+            socks5_connect_proxy(
+                &mut stream,
+                host_config.host.as_str(),
+                host_config.port,
+                &proxy,
+            )
+            .await?;
+        }
+    }
+    configure_ssh_transport_stream(&stream);
+    Ok(stream)
+}
+
+pub(crate) fn configure_ssh_transport_stream(stream: &TcpStream) {
+    let _ = stream.set_nodelay(true);
+}
+
+/// Resolves the proxy an SSH connection should tunnel through. `Ok(None)`
+/// means a direct connection — either no proxy is configured, or the host
+/// reuses the app proxy which is currently disabled. An enabled-but-invalid
+/// app proxy fails fast instead of silently connecting directly.
+pub(crate) fn resolve_effective_ssh_proxy(
+    host_config: &RuntimeSshHostConfig,
+) -> Result<Option<ResolvedSshProxy>, String> {
+    if host_config.proxy.use_system_proxy {
+        let config = crate::services::system_proxy::current_config()
+            .map_err(|error| format!("SSH cannot reuse the app proxy: {error}"))?;
+        return Ok(config.as_ref().map(system_proxy_to_ssh_proxy));
+    }
+    if !ssh_proxy_configured(host_config) {
+        return Ok(None);
+    }
+    resolve_ssh_proxy(host_config).map(Some)
+}
+
+pub(crate) fn system_proxy_to_ssh_proxy(
+    config: &crate::services::system_proxy::SystemProxyConfig,
+) -> ResolvedSshProxy {
+    let kind = if config.proxy_type == crate::services::system_proxy::SYSTEM_PROXY_TYPE_SOCKS5 {
+        SshProxyKind::Socks5
+    } else {
+        SshProxyKind::Http
+    };
+    ResolvedSshProxy {
+        kind,
+        // The app proxy accepts bracketed IPv6 hosts ("[::1]"); TcpStream
+        // resolution needs the bare address.
+        host: strip_ipv6_brackets(config.host.trim()).to_string(),
+        port: config.port,
+        username: config.username.trim().to_string(),
+        password: config.password.clone(),
+    }
+}
+
+pub(crate) fn resolve_ssh_proxy(
+    host_config: &RuntimeSshHostConfig,
+) -> Result<ResolvedSshProxy, String> {
+    let endpoint = resolve_ssh_proxy_endpoint(
+        &host_config.proxy.url,
+        &host_config.proxy.proxy_type,
+        host_config.proxy.port,
+    )?;
+    Ok(ResolvedSshProxy {
+        kind: endpoint.kind,
+        host: endpoint.host,
+        port: endpoint.port,
+        username: host_config.proxy.username.trim().to_string(),
+        password: host_config.proxy.password.trim().to_string(),
+    })
+}
+
+pub(crate) async fn http_connect_proxy(
+    stream: &mut TcpStream,
+    target_host: &str,
+    target_port: u16,
+    proxy: &ResolvedSshProxy,
+) -> Result<(), String> {
+    let target = host_port_authority(target_host, target_port);
+    let mut request =
+        format!("CONNECT {target} HTTP/1.1\r\nHost: {target}\r\nProxy-Connection: Keep-Alive\r\n");
+    if !proxy.username.is_empty() || !proxy.password.is_empty() {
+        let token = base64::engine::general_purpose::STANDARD
+            .encode(format!("{}:{}", proxy.username, proxy.password));
+        request.push_str(&format!("Proxy-Authorization: Basic {token}\r\n"));
+    }
+    request.push_str("\r\n");
+    stream
+        .write_all(request.as_bytes())
+        .await
+        .map_err(|error| format!("SSH HTTP proxy CONNECT request failed: {error}"))?;
+
+    let mut response = Vec::with_capacity(512);
+    let mut byte = [0u8; 1];
+    while !response.ends_with(b"\r\n\r\n") {
+        if response.len() >= 16 * 1024 {
+            return Err("SSH HTTP proxy CONNECT response is too large".to_string());
+        }
+        let n = stream
+            .read(&mut byte)
+            .await
+            .map_err(|error| format!("SSH HTTP proxy CONNECT response failed: {error}"))?;
+        if n == 0 {
+            return Err("SSH HTTP proxy closed before CONNECT completed".to_string());
+        }
+        response.push(byte[0]);
+    }
+    let text = String::from_utf8_lossy(&response);
+    let status_line = text.lines().next().unwrap_or_default();
+    let status_code = status_line
+        .split_whitespace()
+        .nth(1)
+        .and_then(|value| value.parse::<u16>().ok())
+        .unwrap_or(0);
+    if !(200..300).contains(&status_code) {
+        return Err(format!(
+            "SSH HTTP proxy CONNECT failed: {}",
+            status_line.trim()
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) async fn socks5_connect_proxy(
+    stream: &mut TcpStream,
+    target_host: &str,
+    target_port: u16,
+    proxy: &ResolvedSshProxy,
+) -> Result<(), String> {
+    let wants_auth = !proxy.username.is_empty() || !proxy.password.is_empty();
+    if wants_auth
+        && (proxy.username.len() > u8::MAX as usize || proxy.password.len() > u8::MAX as usize)
+    {
+        return Err("SSH SOCKS5 proxy username/password is too long".to_string());
+    }
+    let greeting: &[u8] = if wants_auth {
+        &[0x05, 0x02, 0x00, 0x02]
+    } else {
+        &[0x05, 0x01, 0x00]
+    };
+    stream
+        .write_all(greeting)
+        .await
+        .map_err(|error| format!("SSH SOCKS5 proxy greeting failed: {error}"))?;
+    let mut method = [0u8; 2];
+    stream
+        .read_exact(&mut method)
+        .await
+        .map_err(|error| format!("SSH SOCKS5 proxy method response failed: {error}"))?;
+    if method[0] != 0x05 {
+        return Err("SSH SOCKS5 proxy returned an invalid version".to_string());
+    }
+    match method[1] {
+        0x00 => {}
+        0x02 => {
+            let mut auth = Vec::with_capacity(3 + proxy.username.len() + proxy.password.len());
+            auth.push(0x01);
+            auth.push(proxy.username.len() as u8);
+            auth.extend_from_slice(proxy.username.as_bytes());
+            auth.push(proxy.password.len() as u8);
+            auth.extend_from_slice(proxy.password.as_bytes());
+            stream
+                .write_all(&auth)
+                .await
+                .map_err(|error| format!("SSH SOCKS5 proxy auth request failed: {error}"))?;
+            let mut auth_response = [0u8; 2];
+            stream
+                .read_exact(&mut auth_response)
+                .await
+                .map_err(|error| format!("SSH SOCKS5 proxy auth response failed: {error}"))?;
+            if auth_response != [0x01, 0x00] {
+                return Err("SSH SOCKS5 proxy authentication failed".to_string());
+            }
+        }
+        0xff => return Err("SSH SOCKS5 proxy has no acceptable auth method".to_string()),
+        other => {
+            return Err(format!(
+                "SSH SOCKS5 proxy selected unsupported auth method: {other}"
+            ))
+        }
+    }
+
+    let mut request = Vec::new();
+    request.extend_from_slice(&[0x05, 0x01, 0x00]);
+    write_socks5_address(&mut request, target_host)?;
+    request.extend_from_slice(&target_port.to_be_bytes());
+    stream
+        .write_all(&request)
+        .await
+        .map_err(|error| format!("SSH SOCKS5 proxy CONNECT request failed: {error}"))?;
+
+    let mut response = [0u8; 4];
+    stream
+        .read_exact(&mut response)
+        .await
+        .map_err(|error| format!("SSH SOCKS5 proxy CONNECT response failed: {error}"))?;
+    if response[0] != 0x05 {
+        return Err("SSH SOCKS5 proxy returned an invalid CONNECT version".to_string());
+    }
+    if response[1] != 0x00 {
+        return Err(format!(
+            "SSH SOCKS5 proxy CONNECT failed: {}",
+            socks5_reply_label(response[1])
+        ));
+    }
+    let address_len = match response[3] {
+        0x01 => 4,
+        0x03 => {
+            let mut len = [0u8; 1];
+            stream
+                .read_exact(&mut len)
+                .await
+                .map_err(|error| format!("SSH SOCKS5 proxy response failed: {error}"))?;
+            usize::from(len[0])
+        }
+        0x04 => 16,
+        other => {
+            return Err(format!(
+                "SSH SOCKS5 proxy returned unsupported address type: {other}"
+            ))
+        }
+    };
+    let mut discard = vec![0u8; address_len + 2];
+    stream
+        .read_exact(&mut discard)
+        .await
+        .map_err(|error| format!("SSH SOCKS5 proxy response failed: {error}"))?;
+    Ok(())
+}
+
+pub(crate) fn write_socks5_address(out: &mut Vec<u8>, host: &str) -> Result<(), String> {
+    let normalized_host = strip_ipv6_brackets(host.trim());
+    if let Ok(ip) = normalized_host.parse::<IpAddr>() {
+        match ip {
+            IpAddr::V4(ip) => {
+                out.push(0x01);
+                out.extend_from_slice(&ip.octets());
+            }
+            IpAddr::V6(ip) => {
+                out.push(0x04);
+                out.extend_from_slice(&ip.octets());
+            }
+        }
+        return Ok(());
+    }
+    if normalized_host.is_empty() || normalized_host.len() > u8::MAX as usize {
+        return Err("SSH SOCKS5 target host is empty or too long".to_string());
+    }
+    out.push(0x03);
+    out.push(normalized_host.len() as u8);
+    out.extend_from_slice(normalized_host.as_bytes());
+    Ok(())
+}
+
+pub(crate) fn strip_ipv6_brackets(host: &str) -> &str {
+    host.strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+        .unwrap_or(host)
+}
+
+pub(crate) fn host_port_authority(host: &str, port: u16) -> String {
+    let host = host.trim();
+    if strip_ipv6_brackets(host).parse::<Ipv6Addr>().is_ok() && !host.starts_with('[') {
+        format!("[{host}]:{port}")
+    } else {
+        format!("{host}:{port}")
+    }
+}
+
+pub(crate) fn socks5_reply_label(code: u8) -> &'static str {
+    match code {
+        0x01 => "general failure",
+        0x02 => "connection not allowed",
+        0x03 => "network unreachable",
+        0x04 => "host unreachable",
+        0x05 => "connection refused",
+        0x06 => "TTL expired",
+        0x07 => "command not supported",
+        0x08 => "address type not supported",
+        _ => "unknown error",
+    }
+}

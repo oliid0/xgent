@@ -1,5 +1,7 @@
-import { invoke } from "@xgent/runtime";
+import { invoke, isTauriRuntime } from "@xgent/runtime";
 import { type Locale, normalizeLocale } from "../../i18n/config";
+import { markBackupDirty } from "../backup";
+import { isNativeMobileRuntime } from "../runtimePlatform";
 import { normalizeAppearance } from "./appearance";
 
 import {
@@ -249,6 +251,10 @@ export async function loadPersistedSettingsWithDefaults(): Promise<PersistedSett
     retryErrorSettings: localUi.retryErrorSettings,
   });
 
+  if (isTauriRuntime() && !isNativeMobileRuntime()) {
+    await invoke("settings_backup_cache_skills", { skills: settings.skills });
+  }
+
   return {
     settings: {
       ...settings,
@@ -378,5 +384,8 @@ export async function persistSettings(
   }
 
   await Promise.all(tasks);
+  if (hasChanged(prev.skills, next.skills) && isTauriRuntime() && !isNativeMobileRuntime()) {
+    await markBackupDirty(next.skills);
+  }
   return result;
 }
