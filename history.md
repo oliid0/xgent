@@ -2,6 +2,7 @@
 Repair desktop and mobile function paths while using `xx`/`yy` as references without importing their UI or gateway code. Current focus: desktop proxy/providers/authorized external CUA driver setup and mobile native/optional-shell/LAN/cloud tool orchestration with complete activity and result evidence.
 
 ## Completed
+- Mobile Skill store now derives installed state from current discovery rather than retained completed jobs, allowing a removed Skill to be installed again; active jobs still block duplicate installs and each install rechecks discovery after owner resolution.
 - Preserved already-remote workspace subdirectories in LAN command argument mapping. A PC path returned by an earlier tool is no longer silently reset to the workspace root; added Windows/POSIX and repeated-mapping regressions.
 - Added cancellation regressions for calendar creation, reminder creation and device discovery while OS permission is pending; each must return cancellation without issuing a native action afterward.
 - Propagated task cancellation through mobile personal permission checks, preventing cancelled calendar/reminder actions from executing after a delayed OS authorization response and preventing device discovery from reporting cancellation as partial success.
@@ -131,6 +132,7 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - New visual references 0386–0406 show pale grouped settings cards, circular navigation buttons, and a simple sidebar. They guide styling of existing controls only.
 
 ## Remaining
+- Native capability audit: personal data currently exposes health steps and BLE scanning only; general health metrics, peripheral data exchange and photo-library tool access are not proven implemented. `yy` iOS HealthKit has broader real operations, while `yy` Android HealthManager explicitly contains stubs and cannot be used as completion evidence.
 - Verify the desktop selector fix in a new package; inspect other memory entry points and wipe behavior only when a safe reproduction is available.
 - Inspect and complete mobile SSH, Git review, resource library, files, MCP/Skills store, permissions, and routing against `yy`.
 - Verify resumed Skill install status and completion on a device, including leaving the store before the download finishes; the backend list contract is only locally checked without Cargo.
@@ -142,6 +144,7 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
+- Skill installed-state correction passed `pnpm check`, `pnpm lint`, and existing Skill contract/recovery tests 4/4. These tests do not cover delete/reinstall interaction on a device; that acceptance check remains outstanding.
 - LAN working-directory follow-up passed routing regressions 3/3, `pnpm check`, and `pnpm lint`; device pairing execution is still unverified. Local-only commit policy remains in effect until the full goal is ready.
 - Follow-up acceptance audit: mobile permission cancellation and changed-file tests passed 17/17; `pnpm check` and `pnpm lint` passed after shared Edit viewer snapshot routing. No layout or reference UI/gateway imports were introduced. Device acceptance and final CI remain outstanding.
 - Closing batch: `pnpm test:non-native` passed 1,234/1,234; `pnpm check`, `pnpm native:check`, and `pnpm lint` passed. The final snapshot-pair correction separately passed changed-file tests 7/7, TypeScript and lint. No local Cargo/build command was used. Goal remains active: device acceptance, the remaining functional audit, and new-revision CI are not yet complete; retain local commits until the whole goal is ready for the requested single push.

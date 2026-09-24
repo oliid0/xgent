@@ -235,7 +235,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
       jobsLoading ||
       pendingStoreKeys.includes(key) ||
       installedStoreKeys.has(key) ||
-      (storeJobs[key] && !["error", "cancelled"].includes(storeJobs[key].phase))
+      (storeJobs[key] && !["done", "error", "cancelled"].includes(storeJobs[key].phase))
     )
       return;
     setPendingStoreKeys((current) => [...current, key]);
@@ -257,7 +257,8 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
               ownerHandle: installed.source.ownerHandle ?? null,
             }) === resolvedKey,
         ) ||
-        (storeJobs[resolvedKey] && !["error", "cancelled"].includes(storeJobs[resolvedKey].phase))
+        (storeJobs[resolvedKey] &&
+          !["done", "error", "cancelled"].includes(storeJobs[resolvedKey].phase))
       )
         return;
       const job = await startSkillInstallJob({
@@ -286,7 +287,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
     const job = storeJobs[key];
     return {
       job,
-      installed: installedStoreKeys.has(key) || job?.phase === "done",
+      installed: installedStoreKeys.has(key),
       pending:
         jobsLoading ||
         pendingStoreKeys.includes(key) ||
