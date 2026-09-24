@@ -19,6 +19,7 @@ import {
   isAlwaysEnabledSkillName,
   isUserSelectableSkill,
   listSkillInstallJobs,
+  notifySkillsDiscoveryUpdated,
   readSkillText,
   type SkillInstallJobSnapshot,
   type SkillSummary,
@@ -224,6 +225,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
         }),
       );
     }
+    notifySkillsDiscoveryUpdated();
     void discoverSkills({ force: true })
       .then((result) => setSkills(result.skills))
       .catch((cause) => setRefreshError(cause instanceof Error ? cause.message : String(cause)));
