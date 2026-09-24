@@ -211,6 +211,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           throw new Error(t("settings.native.shellEssentialsError").replace("{detail}", detail));
         }
       }
+    } catch (cause) {
+      // The Android installer restores the previous rootfs after a failed probe.
+      // Recheck it so the next chat turn sees the recovered Shell capability.
+      await refreshShell().catch(() => undefined);
+      throw cause;
     } finally {
       setShellInstallStage("");
     }

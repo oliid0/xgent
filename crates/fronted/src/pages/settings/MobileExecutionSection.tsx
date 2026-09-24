@@ -119,6 +119,7 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
       await installMobileEnvironment();
       await refresh();
     } catch (cause) {
+      await refresh();
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy("");
