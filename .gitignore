@@ -1,6 +1,7 @@
 node_modules
 dist
 history.md
+*.md
 img*
 xx/
 xx/*
