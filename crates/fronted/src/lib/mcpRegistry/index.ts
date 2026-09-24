@@ -36,6 +36,7 @@ export type McpRegistryCard = {
   transportHints: Array<"stdio" | "http" | "sse">;
   versionLabel?: string;
   installDraft?: McpRegistryInstallDraft;
+  networkDraft?: McpRegistryInstallDraft;
   manualDraft?: McpRegistryInstallDraft;
   installUnavailableReason?: string;
   scoreLabel?: string;
@@ -386,21 +387,27 @@ function buildOfficialPackageDraft(
   );
 }
 
-function pickOfficialDraft(server: RawRecord): McpRegistryInstallDraft | undefined {
-  for (const remote of asArray(server.remotes)) {
-    const remoteRecord = asRecord(remote);
-    const draft = buildRemoteDraft(
-      asString(server.name) ?? "mcp-server",
-      remoteRecord,
-      asRecord(remoteRecord.variables),
-    );
-    if (draft?.status === "ready") return draft;
-  }
-
-  const drafts = asArray(server.packages)
+function pickOfficialDrafts(server: RawRecord) {
+  const remoteDrafts = asArray(server.remotes)
+    .map((remote) => {
+      const record = asRecord(remote);
+      return buildRemoteDraft(
+        asString(server.name) ?? "mcp-server",
+        record,
+        asRecord(record.variables),
+      );
+    })
+    .filter(Boolean) as McpRegistryInstallDraft[];
+  const networkDraft = remoteDrafts.find((draft) => draft.status === "ready") ?? remoteDrafts[0];
+  const packageDrafts = asArray(server.packages)
     .map((pkg) => buildOfficialPackageDraft(asString(server.name) ?? "mcp-server", asRecord(pkg)))
     .filter(Boolean) as McpRegistryInstallDraft[];
-  return drafts.find((draft) => draft.status === "ready") ?? drafts[0];
+  const installDraft =
+    (networkDraft?.status === "ready" ? networkDraft : undefined) ??
+    packageDrafts.find((draft) => draft.status === "ready") ??
+    packageDrafts[0] ??
+    networkDraft;
+  return { installDraft, networkDraft };
 }
 
 function normalizeOfficialCard(raw: unknown): McpRegistryCard | null {
@@ -412,7 +419,7 @@ function normalizeOfficialCard(raw: unknown): McpRegistryCard | null {
   const meta = asRecord(record._meta);
   const officialMeta = asRecord(meta["io.modelcontextprotocol.registry/official"]);
   const versionLabel = asString(server.version) ?? "latest";
-  const installDraft = pickOfficialDraft(server);
+  const { installDraft, networkDraft } = pickOfficialDrafts(server);
   const transportHints = uniqueStrings([
     ...asArray(server.packages).map((pkg) => transportType(asRecord(asRecord(pkg).transport))),
     ...asArray(server.remotes).map((remote) => transportType(asRecord(remote))),
@@ -433,6 +440,7 @@ function normalizeOfficialCard(raw: unknown): McpRegistryCard | null {
     transportHints,
     versionLabel,
     installDraft,
+    networkDraft,
     installUnavailableReason: installDraft ? undefined : "manual",
     scoreLabel: versionLabel,
     detailUrl: asString(repository.url),
@@ -747,6 +755,14 @@ export async function resolveMcpRegistryInstallDraft(
     { fetchImpl: params.fetchImpl },
   );
   return normalizeSmitheryDetail(card, detail);
+}
+
+/** A phone without a stdio host can still configure an advertised remote endpoint. */
+export function selectMcpRegistryCardForHost(card: McpRegistryCard, allowStdio: boolean) {
+  if (allowStdio || card.installDraft?.server.transport !== "stdio" || !card.networkDraft) {
+    return card;
+  }
+  return { ...card, installDraft: card.networkDraft, installUnavailableReason: undefined };
 }
 
 export function withUniqueMcpServerId(

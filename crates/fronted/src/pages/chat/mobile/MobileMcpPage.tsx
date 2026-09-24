@@ -19,6 +19,7 @@ import {
   mcpRegistryConfigInputKey,
   resolveMcpRegistryInstallDraft,
   searchMcpRegistry,
+  selectMcpRegistryCardForHost,
   withUniqueMcpServerId,
 } from "../../../lib/mcpRegistry";
 import { type AppSettings, type McpServerConfig, updateMcp } from "../../../lib/settings";
@@ -117,8 +118,9 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
     setInstallingCardId(card.id);
     setRegistryError("");
     try {
-      const resolved = await resolveMcpRegistryInstallDraft(card);
-      setRegistryItems((items) => items.map((item) => (item.id === card.id ? resolved : item)));
+      const loaded = await resolveMcpRegistryInstallDraft(card);
+      const resolved = selectMcpRegistryCardForHost(loaded, props.allowStdio);
+      setRegistryItems((items) => items.map((item) => (item.id === card.id ? loaded : item)));
       const draft = resolved.installDraft ?? resolved.manualDraft;
       if (!draft)
         throw new Error(resolved.installUnavailableReason || t("mcpHub.storeInstallUnavailable"));

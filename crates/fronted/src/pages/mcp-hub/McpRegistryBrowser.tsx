@@ -54,6 +54,7 @@ import {
   mcpRegistryConfigInputKey,
   resolveMcpRegistryInstallDraft,
   searchMcpRegistry,
+  selectMcpRegistryCardForHost,
   withUniqueMcpServerId,
 } from "../../lib/mcpRegistry";
 import { type AppSettings, type McpServerConfig, updateMcp } from "../../lib/settings";
@@ -1046,7 +1047,7 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
     void resolveMcpRegistryInstallDraft(previewCard)
       .then((resolved) => {
         if (cancelled) return;
-        setPreviewDetail(resolved);
+        setPreviewDetail(selectMcpRegistryCardForHost(resolved, allowStdio));
         setItems((prev) => prev.map((item) => (item.id === resolved.id ? resolved : item)));
       })
       .catch((err) => {
@@ -1063,7 +1064,7 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
     return () => {
       cancelled = true;
     };
-  }, [previewCard, t]);
+  }, [allowStdio, previewCard, t]);
 
   const runSearch = useCallback(
     async (mode: "replace" | "append" = "replace") => {
@@ -1187,8 +1188,9 @@ export function McpRegistryBrowser(props: McpRegistryBrowserProps) {
     setInstallingId(card.id);
     setError(null);
     try {
-      const resolved = await resolveMcpRegistryInstallDraft(card);
-      setItems((prev) => prev.map((item) => (item.id === card.id ? resolved : item)));
+      const loaded = await resolveMcpRegistryInstallDraft(card);
+      const resolved = selectMcpRegistryCardForHost(loaded, allowStdio);
+      setItems((prev) => prev.map((item) => (item.id === card.id ? loaded : item)));
       if (previewCard?.id === card.id) {
         setPreviewDetail(resolved);
       }

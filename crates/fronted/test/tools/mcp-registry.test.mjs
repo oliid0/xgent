@@ -75,6 +75,46 @@ test("official registry npm stdio packages become Xgent MCP drafts", async () =>
   assert.deepEqual(draft.requiredConfig.map((input) => input.name), ["GCS_BUCKET"]);
 });
 
+test("mobile registry selects configurable remote transport when a ready stdio package also exists", async () => {
+  const result = await registry.searchMcpRegistry({
+    source: "official",
+    fetchImpl: mockFetch(() => ({ body: { servers: [{ server: {
+      name: "com.example/analytics", version: "1.0.0",
+      remotes: [{
+        type: "streamable-http", url: "https://{tenant}.example.com/mcp",
+        variables: { tenant: { isRequired: true } },
+      }],
+      packages: [{
+        registryType: "npm", identifier: "analytics-mcp", runtimeHint: "npx",
+        transport: { type: "stdio" },
+      }],
+    } }] } })),
+  });
+  const card = result.items[0];
+  assert.equal(card.installDraft.server.transport, "stdio");
+  assert.equal(card.networkDraft.server.transport, "http");
+  assert.equal(card.networkDraft.status, "needs_config");
+  const mobile = registry.selectMcpRegistryCardForHost(card, false);
+  assert.equal(mobile.installDraft, card.networkDraft);
+  const key = registry.mcpRegistryConfigInputKey(mobile.installDraft.requiredConfig[0]);
+  const configured = registry.applyMcpRegistryInstallConfig(mobile.installDraft, { [key]: "acme" });
+  assert.equal(configured.server.url, "https://acme.example.com/mcp");
+  assert.equal(registry.selectMcpRegistryCardForHost(card, true), card);
+});
+
+test("official registry keeps a remote endpoint requiring configuration even without packages", async () => {
+  const result = await registry.searchMcpRegistry({
+    source: "official",
+    fetchImpl: mockFetch(() => ({ body: { servers: [{ server: {
+      name: "com.example/remote-only", version: "1.0.0",
+      remotes: [{ type: "streamable-http", url: "https://{tenant}.example.com/mcp" }],
+    } }] } })),
+  });
+  assert.equal(result.items[0].installDraft.server.transport, "http");
+  assert.equal(result.items[0].installDraft.status, "needs_config");
+  assert.equal(result.items[0].installUnavailableReason, undefined);
+});
+
 test("smithery search cards resolve detail endpoint before install", async () => {
   const fetchImpl = mockFetch((url) => {
     if (url === "https://api.smithery.ai/servers?q=drive&pageSize=18&page=1") {
