@@ -1772,7 +1772,7 @@ export function ChatPage(props: ChatPageProps) {
     if (!nativeMobile) return true;
     try {
       const status = await mobileExecutionStatus();
-      if (status.installed && status.capabilities.shell) return true;
+      if (status.available && status.installed && status.capabilities.shell) return true;
     } catch (cause) {
       setErrorMessage(asErrorMessage(cause, "Unable to inspect the mobile shell environment."));
     }
@@ -1806,8 +1806,8 @@ export function ChatPage(props: ChatPageProps) {
             });
           }
         };
-        const needsShell =
-          target === "terminal" || target === "gitReview" || target === "sshConnection";
+        // Native Git and SSH use their own backends and work without a local Shell.
+        const needsShell = target === "terminal";
         if (nativeMobile && needsShell) {
           void ensureNativeMobileShellReady().then((ready) => {
             if (ready) open();
