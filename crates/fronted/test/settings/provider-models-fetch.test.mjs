@@ -164,9 +164,24 @@ test("provider model fetch identity changes when system proxy routing changes", 
     true,
   );
 
-  assert.equal(direct, "https://relay.example.com/v1||test-key||direct||api-key||||base||||");
-  assert.equal(proxied, "https://relay.example.com/v1||test-key||proxy||api-key||||base||||");
+  assert.equal(direct, providerUtils.buildProviderModelsFetchKey("https://relay.example.com/v1", "test-key", false));
   assert.notEqual(direct, proxied);
+});
+
+test("model cache identity follows effective headers without delimiter collisions", () => {
+  const key = (headers) => providerUtils.buildProviderModelsFetchKey("https://relay.test/v1", "key", false, "api-key", headers);
+  const first = { key: "X-Tenant", value: "first" };
+  const last = { key: "x-tenant", value: "last" };
+  assert.notEqual(key([first, last]), key([last, first]));
+  assert.equal(key([first, last]), key([last]));
+  const other = { key: "X-Region", value: "west" };
+  assert.equal(key([first, other]), key([other, first]));
+  assert.notEqual(key([{ key: "X-A", value: "one|x-b:two" }]), key([{ key: "X-A", value: "one" }, { key: "X-B", value: "two" }]));
+  assert.equal(key([{ key: "Authorization", value: "ignored" }]), key([]));
+  assert.notEqual(
+    providerUtils.buildProviderModelsFetchKey("https://relay.test/a||b", "c", false),
+    providerUtils.buildProviderModelsFetchKey("https://relay.test/a", "b||c", false),
+  );
 });
 
 test("pickProviderModelsFailure prefers informative errors over missing-endpoint noise", () => {

@@ -423,11 +423,19 @@ export function buildProviderModelsFetchKey(
   isFullUrl = false,
   modelsUrl?: string,
 ): string {
-  const headerKey = (customHeaders ?? [])
-    .map((header) => `${header.key.trim().toLowerCase()}:${header.value}`)
-    .sort()
-    .join("|");
-  return `${baseUrl.trim()}||${apiKey.trim()}||${useSystemProxy ? "proxy" : "direct"}||${authMode}||${oauthAccountId?.trim() ?? ""}||${isFullUrl ? "full" : "base"}||${modelsUrl?.trim() ?? ""}||${headerKey}`;
+  const headers = Object.entries(mergeCustomHeaders({}, customHeaders))
+    .map(([key, value]) => [key.toLowerCase(), value])
+    .sort(([left], [right]) => left.localeCompare(right));
+  return JSON.stringify([
+    baseUrl.trim(),
+    apiKey.trim(),
+    useSystemProxy,
+    authMode,
+    oauthAccountId?.trim() ?? "",
+    isFullUrl,
+    modelsUrl?.trim() ?? "",
+    headers,
+  ]);
 }
 
 export async function fetchModelsFromApi(
