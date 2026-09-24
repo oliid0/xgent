@@ -208,6 +208,24 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
     setStoreError("");
     try {
       const resolved = await resolveClawHubSkillOwner(skill);
+      const resolvedKey = buildClawHubSkillKey(resolved);
+      setStoreItems((current) =>
+        current.map((item) => (buildClawHubSkillKey(item) === key ? resolved : item)),
+      );
+      const currentSkills = await discoverSkills({ force: true });
+      setSkills(currentSkills.skills);
+      if (
+        currentSkills.skills.some(
+          (installed) =>
+            installed.source?.registry === "clawhub" &&
+            buildClawHubSkillKey({
+              slug: installed.source.slug,
+              ownerHandle: installed.source.ownerHandle ?? null,
+            }) === resolvedKey,
+        ) ||
+        (storeJobs[resolvedKey] && !["error", "cancelled"].includes(storeJobs[resolvedKey].phase))
+      )
+        return;
       const job = await startSkillInstallJob({
         source: buildClawHubDownloadUrl(resolved.slug, resolved.ownerHandle),
         label: resolved.displayName,
@@ -219,7 +237,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
       setStoreJobs((current) => ({
         ...current,
         [key]: job,
-        [buildClawHubSkillKey(resolved)]: job,
+        [resolvedKey]: job,
       }));
       if (job.phase === "done") completeStoreJob(job);
     } catch (cause) {
