@@ -20,6 +20,7 @@ export function personalCapability(toolCall: Pick<ToolCall, "name" | "arguments"
     scan_bluetooth: "bluetooth",
     bluetooth_services: "bluetooth",
     read_bluetooth_characteristic: "bluetooth",
+    collect_bluetooth_notifications: "bluetooth",
     discover_devices: "bluetooth",
     get_current_location: "location",
     read_clipboard: "clipboard",

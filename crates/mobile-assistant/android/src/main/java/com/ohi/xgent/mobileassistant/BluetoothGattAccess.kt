@@ -21,6 +21,8 @@ class GattArgs {
     var serviceUuid: String? = null
     var characteristicUuid: String? = null
     var timeoutMs: Long = 10_000
+    var durationMs: Long = 5_000
+    var sampleLimit: Int = 100
 }
 
 // State and callbacks are serialized on the main thread; late callbacks cannot
@@ -44,16 +46,26 @@ internal class BluetoothGattAccess(private val activity: Activity) {
         try {
             check(pending == null) { "Another Bluetooth GATT operation is active" }
             val args = invoke.parseArgs(GattArgs::class.java)
-            require(args.operation in listOf("services", "read") && args.timeoutMs in 1_000..30_000) { "Invalid Bluetooth operation or timeout" }
+            require(args.operation in listOf("services", "read", "notify") && args.timeoutMs in 1_000..30_000) { "Invalid Bluetooth operation or timeout" }
+            if (args.operation == "notify") require(args.durationMs in 1_000..30_000 && args.sampleLimit in 1..100) { "Notification duration must be 1000-30000 ms and sample limit 1-100" }
             require(BluetoothAdapter.checkBluetoothAddress(args.deviceId)) { "Invalid Bluetooth device address" }
-            val serviceId = if (args.operation == "read") uuid(args.serviceUuid) else null
-            val characteristicId = if (args.operation == "read") uuid(args.characteristicUuid) else null
+            val serviceId = if (args.operation != "services") uuid(args.serviceUuid) else null
+            val characteristicId = if (args.operation != "services") uuid(args.characteristicUuid) else null
             val permission = if (Build.VERSION.SDK_INT >= 31) Manifest.permission.BLUETOOTH_CONNECT else Manifest.permission.BLUETOOTH
             check(activity.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) { "Bluetooth permission is required" }
             val adapter = (activity.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
                 ?: error("Bluetooth is unavailable")
             check(adapter.isEnabled) { "Bluetooth is turned off" }
             val callback = object : BluetoothGattCallback() {
+                val samples = JSONArray()
+                var subscribed = false
+                var subscribingDescriptor: BluetoothGattDescriptor? = null
+                fun completeNotifications(gatt: BluetoothGatt, reason: String) {
+                    finish(result = payload(gatt, args).apply {
+                        put("samples", samples)
+                        put("stopReason", reason)
+                    })
+                }
                 fun dispatch(gatt: BluetoothGatt, body: () -> Unit) {
                     handler.post {
                         if (pending !== invoke || connection !== gatt) return@post
@@ -75,11 +87,54 @@ internal class BluetoothGattAccess(private val activity: Activity) {
                             .flatMap { it.characteristics }.filter { it.uuid == characteristicId }
                         check(matches.size == 1) { "Bluetooth characteristic is missing or ambiguous" }
                         val characteristic = matches.single()
+                        if (args.operation == "notify") {
+                            val notify = characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0
+                            check(notify || characteristic.properties and BluetoothGattCharacteristic.PROPERTY_INDICATE != 0) { "Characteristic does not support notifications or indications" }
+                            val descriptor = characteristic.getDescriptor(uuid("2902")) ?: error("Client characteristic configuration descriptor is missing")
+                            check(gatt.setCharacteristicNotification(characteristic, true)) { "Bluetooth subscription could not start" }
+                            subscribingDescriptor = descriptor
+                            val value = if (notify) BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE else BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+                            val started = if (Build.VERSION.SDK_INT >= 33) {
+                                gatt.writeDescriptor(descriptor, value) == BluetoothStatusCodes.SUCCESS
+                            } else {
+                                descriptor.value = value
+                                gatt.writeDescriptor(descriptor)
+                            }
+                            check(started) { "Bluetooth subscription configuration could not start" }
+                            return@dispatch
+                        }
                         check(characteristic.properties and BluetoothGattCharacteristic.PROPERTY_READ != 0) { "Characteristic does not support reads; notification-only data requires a subscription" }
                         check(gatt.readCharacteristic(characteristic)) { "Bluetooth characteristic read could not start" }
                     }
                 }
+                override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) = dispatch(gatt) {
+                    if (descriptor !== subscribingDescriptor || subscribed) return@dispatch
+                    check(status == BluetoothGatt.GATT_SUCCESS) { "Bluetooth subscription failed ($status)" }
+                    subscribed = true
+                    deadline?.let(handler::removeCallbacks)
+                    val stop = Runnable { if (pending === invoke && connection === gatt) completeNotifications(gatt, "duration") }
+                    deadline = stop
+                    handler.postDelayed(stop, args.durationMs)
+                    if (samples.length() >= args.sampleLimit) completeNotifications(gatt, "sample_limit")
+                }
+                fun notification(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray?, receivedAt: Long) = dispatch(gatt) {
+                    if (args.operation != "notify" || characteristic.uuid != characteristicId || characteristic.service?.uuid != serviceId || subscribingDescriptor == null) return@dispatch
+                    check(value != null && value.size <= 512) { "Bluetooth notification returned missing or oversized data" }
+                    if (samples.length() < args.sampleLimit) samples.put(JSObject().apply {
+                        put("receivedAtMs", receivedAt)
+                        put("dataHex", value.joinToString("") { "%02x".format(it.toInt() and 255) })
+                    })
+                    if (subscribed && samples.length() >= args.sampleLimit) completeNotifications(gatt, "sample_limit")
+                }
+                @Deprecated("Used by Android before API 33")
+                override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
+                    if (Build.VERSION.SDK_INT < 33) notification(gatt, characteristic, characteristic.value?.clone(), System.currentTimeMillis())
+                }
+                override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
+                    notification(gatt, characteristic, value.clone(), System.currentTimeMillis())
+                }
                 fun readResult(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray?, status: Int) = dispatch(gatt) {
+                    if (args.operation != "read") return@dispatch
                     if (characteristic.uuid != characteristicId || characteristic.service?.uuid != serviceId) return@dispatch
                     check(status == BluetoothGatt.GATT_SUCCESS) { "Bluetooth characteristic read failed ($status)" }
                     check(value != null && value.size <= 512) { "Bluetooth characteristic returned missing or oversized data" }

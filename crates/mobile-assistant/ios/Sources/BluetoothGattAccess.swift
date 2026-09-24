@@ -8,6 +8,8 @@ private struct GattArgs: Decodable {
     let serviceUuid: String?
     let characteristicUuid: String?
     let timeoutMs: UInt64
+    let durationMs: UInt64?
+    let sampleLimit: Int?
 }
 private struct GattCharacteristic: Encodable {
     let uuid: String
@@ -25,6 +27,12 @@ private struct GattResult: Encodable {
     let serviceUuid: String?
     let characteristicUuid: String?
     let dataHex: String?
+    let samples: [GattSample]
+    let stopReason: String?
+}
+private struct GattSample: Encodable {
+    let receivedAtMs: Int64
+    let dataHex: String
 }
 
 // Each operation owns a bounded connection. All delegates run on the main queue.
@@ -36,19 +44,24 @@ final class BluetoothGattAccess: NSObject, CBCentralManagerDelegate, CBPeriphera
     private var deadline: DispatchWorkItem?
     private var remaining = Set<ObjectIdentifier>()
     private var reading: CBCharacteristic?
+    private var subscribed = false
+    private var samples: [GattSample] = []
 
     func run(_ invoke: Invoke) {
         do {
             let request = try invoke.parseArgs(GattArgs.self)
             guard pending == nil else { invoke.reject("Another Bluetooth GATT operation is active"); return }
             guard BluetoothDiscovery.permissionState == "granted" else { invoke.reject("Bluetooth permission is required"); return }
-            guard ["services", "read"].contains(request.operation),
+            guard ["services", "read", "notify"].contains(request.operation),
                   UUID(uuidString: request.deviceId) != nil,
                   (1_000...30_000).contains(request.timeoutMs) else {
                 invoke.reject("Invalid Bluetooth GATT operation, device ID or timeout"); return
             }
-            if request.operation == "read" && (!validUuid(request.serviceUuid) || !validUuid(request.characteristicUuid)) {
-                invoke.reject("Read requires valid service and characteristic UUIDs"); return
+            if request.operation != "services" && (!validUuid(request.serviceUuid) || !validUuid(request.characteristicUuid)) {
+                invoke.reject("Characteristic access requires valid service and characteristic UUIDs"); return
+            }
+            if request.operation == "notify" && (!(1_000...30_000).contains(request.durationMs ?? 5_000) || !(1...100).contains(request.sampleLimit ?? 100)) {
+                invoke.reject("Notification duration must be 1000-30000 ms and sample limit 1-100"); return
             }
             pending = invoke
             args = request
@@ -82,7 +95,7 @@ final class BluetoothGattAccess: NSObject, CBCentralManagerDelegate, CBPeriphera
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         guard central === self.central, peripheral === self.peripheral, let args else { return }
-        peripheral.discoverServices(args.operation == "read" ? [CBUUID(string: args.serviceUuid!)] : nil)
+        peripheral.discoverServices(args.operation != "services" ? [CBUUID(string: args.serviceUuid!)] : nil)
     }
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         guard central === self.central, peripheral === self.peripheral else { return }
@@ -98,13 +111,13 @@ final class BluetoothGattAccess: NSObject, CBCentralManagerDelegate, CBPeriphera
         let services = peripheral.services ?? []
         guard services.count <= 256 else { finish(error: "Too many Bluetooth services"); return }
         if services.isEmpty {
-            if args.operation == "read" { finish(error: "Bluetooth service was not found") }
+            if args.operation != "services" { finish(error: "Bluetooth service was not found") }
             else { finish() }
             return
         }
         remaining = Set(services.map { ObjectIdentifier($0) })
         for service in services {
-            peripheral.discoverCharacteristics(args.operation == "read" ? [CBUUID(string: args.characteristicUuid!)] : nil, for: service)
+            peripheral.discoverCharacteristics(args.operation != "services" ? [CBUUID(string: args.characteristicUuid!)] : nil, for: service)
         }
     }
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
@@ -120,11 +133,30 @@ final class BluetoothGattAccess: NSObject, CBCentralManagerDelegate, CBPeriphera
         guard matches.count == 1, let characteristic = matches.first else {
             finish(error: "Bluetooth characteristic is missing or ambiguous"); return
         }
+        if args.operation == "notify" {
+            guard characteristic.properties.contains(.notify) || characteristic.properties.contains(.indicate) else {
+                finish(error: "Characteristic does not support notifications or indications"); return
+            }
+            reading = characteristic
+            peripheral.setNotifyValue(true, for: characteristic)
+            return
+        }
         guard characteristic.properties.contains(.read) else {
             finish(error: "This characteristic does not support reads; notification-only data requires a subscription"); return
         }
         reading = characteristic
         peripheral.readValue(for: characteristic)
+    }
+    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        guard peripheral === self.peripheral, characteristic === reading, args?.operation == "notify", !subscribed else { return }
+        if let error { finish(error: error.localizedDescription); return }
+        guard characteristic.isNotifying else { finish(error: "Bluetooth subscription was not enabled"); return }
+        subscribed = true
+        deadline?.cancel()
+        let stop = DispatchWorkItem { [weak self] in self?.finish(stopReason: "duration") }
+        deadline = stop
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(Int(args?.durationMs ?? 5_000)), execute: stop)
+        if samples.count >= (args?.sampleLimit ?? 100) { finish(stopReason: "sample_limit") }
     }
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard peripheral === self.peripheral, characteristic === reading else { return }
@@ -132,10 +164,17 @@ final class BluetoothGattAccess: NSObject, CBCentralManagerDelegate, CBPeriphera
         guard let data = characteristic.value, data.count <= 512 else {
             finish(error: "Bluetooth characteristic returned missing or oversized data"); return
         }
-        finish(dataHex: data.map { String(format: "%02x", $0) }.joined())
+        let hex = data.map { String(format: "%02x", $0) }.joined()
+        if args?.operation == "notify" {
+            // A value may arrive before the subscription acknowledgement.
+            if samples.count < (args?.sampleLimit ?? 100) {
+                samples.append(GattSample(receivedAtMs: Int64(Date().timeIntervalSince1970 * 1000), dataHex: hex))
+            }
+            if subscribed && samples.count >= (args?.sampleLimit ?? 100) { finish(stopReason: "sample_limit") }
+        } else { finish(dataHex: hex) }
     }
 
-    private func finish(error: String? = nil, dataHex: String? = nil) {
+    private func finish(error: String? = nil, dataHex: String? = nil, stopReason: String? = nil) {
         guard let invoke = pending, let args else { return }
         let services = (peripheral?.services ?? []).map { service in
             GattService(uuid: service.uuid.uuidString, characteristics: (service.characteristics ?? []).map {
@@ -149,6 +188,10 @@ final class BluetoothGattAccess: NSObject, CBCentralManagerDelegate, CBPeriphera
         deadline?.cancel()
         deadline = nil
         remaining.removeAll()
+        let collected = samples
+        samples.removeAll()
+        if subscribed, let reading { peripheral?.setNotifyValue(false, for: reading) }
+        subscribed = false
         reading = nil
         peripheral?.delegate = nil
         if let peripheral { central?.cancelPeripheralConnection(peripheral) }
@@ -157,6 +200,7 @@ final class BluetoothGattAccess: NSObject, CBCentralManagerDelegate, CBPeriphera
         central = nil
         if let error { invoke.reject(error) }
         else { invoke.resolve(GattResult(deviceId: args.deviceId, services: services,
-            serviceUuid: args.serviceUuid, characteristicUuid: args.characteristicUuid, dataHex: dataHex)) }
+            serviceUuid: args.serviceUuid, characteristicUuid: args.characteristicUuid, dataHex: dataHex,
+            samples: collected, stopReason: stopReason)) }
     }
 }

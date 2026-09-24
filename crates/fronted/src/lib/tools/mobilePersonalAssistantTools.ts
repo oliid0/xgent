@@ -33,7 +33,7 @@ import { resolveToolPolicy } from "./toolPolicy";
 const listDataTool: Tool = {
   name: "MobilePersonalData",
   description:
-    "Access authorized phone-native data without Shell: connectivity, nearby BLE discovery, location, clipboard, calendar, reminders, photos and health. list_photos returns accessible image IDs with optional start/end bounds; read_photo returns a bounded JPEG preview for a photo_id, not the original image. Restricted libraries return only authorized photos. Health samples require metric, start and end and return units/source; empty data does not prove normal health or permission denial. After BLE scanning, bluetooth_services connects to device_id and lists GATT service/characteristic UUIDs and properties; read_bluetooth_characteristic requires device_id, service_uuid and characteristic_uuid and returns raw dataHex. Connections close after each operation. Interpret bytes only using the device's documented protocol; notification-only characteristics cannot be read this way. Request personal data only when needed for the user's task.",
+    "Access authorized phone-native data without Shell: connectivity, nearby BLE discovery, location, clipboard, calendar, reminders, photos and health. list_photos returns accessible image IDs with optional start/end bounds; read_photo returns a bounded JPEG preview for a photo_id, not the original image. Restricted libraries return only authorized photos. Health samples require metric, start and end and return units/source; empty data does not prove normal health or permission denial. After BLE scanning, bluetooth_services connects to device_id and lists GATT service/characteristic UUIDs and properties; read_bluetooth_characteristic requires device_id, service_uuid and characteristic_uuid and returns raw dataHex. Connections close after each operation. Interpret bytes only using the device's documented protocol; use collect_bluetooth_notifications with the same device/service/characteristic IDs for notification or indication data. It collects timestamped raw samples for duration_ms (default 5000, maximum 30000) or sample_limit (default/maximum 100), after subscription confirmation. timeout_ms bounds connection/setup. Empty samples mean no updates arrived during that window, not a zero measurement. Request personal data only when needed for the user's task.",
   parameters: Type.Object({
     action: Type.Union([
       Type.Literal("network_status"),
@@ -41,6 +41,7 @@ const listDataTool: Tool = {
       Type.Literal("scan_bluetooth"),
       Type.Literal("bluetooth_services"),
       Type.Literal("read_bluetooth_characteristic"),
+      Type.Literal("collect_bluetooth_notifications"),
       Type.Literal("get_current_location"),
       Type.Literal("read_clipboard"),
       Type.Literal("list_calendar_events"),
@@ -55,6 +56,15 @@ const listDataTool: Tool = {
     device_id: Type.Optional(Type.String({ minLength: 1 })),
     service_uuid: Type.Optional(Type.String({ minLength: 1 })),
     characteristic_uuid: Type.Optional(Type.String({ minLength: 1 })),
+    duration_ms: Type.Optional(
+      Type.Integer({
+        minimum: 1_000,
+        maximum: 30_000,
+        description:
+          "Bluetooth notification collection duration after subscription succeeds; default 5000 ms.",
+      }),
+    ),
+    sample_limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
     start: Type.Optional(
       Type.String({ description: "Calendar or health range start as an ISO 8601 date-time." }),
     ),
@@ -334,9 +344,14 @@ export function createMobilePersonalAssistantTools(
             ...(bluetoothError ? { bluetoothError } : {}),
           });
         }
-        if (action === "bluetooth_services" || action === "read_bluetooth_characteristic") {
+        if (
+          action === "bluetooth_services" ||
+          action === "read_bluetooth_characteristic" ||
+          action === "collect_bluetooth_notifications"
+        ) {
           const deviceId = requiredText(args, "device_id");
-          const reading = action === "read_bluetooth_characteristic";
+          const reading = action !== "bluetooth_services";
+          const notifying = action === "collect_bluetooth_notifications";
           const serviceUuid = reading ? requiredText(args, "service_uuid") : undefined;
           const characteristicUuid = reading
             ? requiredText(args, "characteristic_uuid")
@@ -344,11 +359,17 @@ export function createMobilePersonalAssistantTools(
           await ensurePermission("bluetooth", signal);
           if (signal?.aborted) return result(toolCall, "Cancelled", true);
           const data = await accessMobileBluetoothGatt({
-            operation: reading ? "read" : "services",
+            operation: notifying ? "notify" : reading ? "read" : "services",
             deviceId,
             serviceUuid,
             characteristicUuid,
             timeoutMs: typeof args.timeout_ms === "number" ? args.timeout_ms : 10_000,
+            ...(notifying
+              ? {
+                  durationMs: typeof args.duration_ms === "number" ? args.duration_ms : 5_000,
+                  sampleLimit: typeof args.sample_limit === "number" ? args.sample_limit : 100,
+                }
+              : {}),
           });
           if (signal?.aborted) return result(toolCall, "Cancelled", true);
           return result(toolCall, data);

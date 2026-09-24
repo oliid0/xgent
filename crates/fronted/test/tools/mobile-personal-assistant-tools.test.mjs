@@ -34,6 +34,51 @@ function resultData(result) {
   return JSON.parse(result.content[0].text);
 }
 
+test("notification collection retains timestamped samples, empty windows and stop reasons", async () => {
+  for (const samples of [[], [{ receivedAtMs: 1234, dataHex: "0100ff" }]]) {
+    const data = { deviceId: "AA:BB:CC:DD:EE:FF", services: [], samples, stopReason: samples.length ? "sample_limit" : "duration" };
+    const { bundle, calls } = createHarness((command) => {
+      if (command.endsWith("|status")) return { permissionAliases: { bluetooth: "bluetooth" } };
+      if (command.endsWith("|check_permissions")) return { bluetooth: "granted" };
+      if (command.endsWith("|bluetooth_gatt")) return data;
+      throw new Error(`Unexpected command ${command}`);
+    });
+    const response = await bundle.executeToolCall(toolCall("MobilePersonalData", {
+      action: "collect_bluetooth_notifications", device_id: data.deviceId,
+      service_uuid: "180d", characteristic_uuid: "2a37", duration_ms: 2000, sample_limit: 1,
+    }));
+    assert.equal(response.isError, false);
+    assert.deepEqual(resultData(response), data);
+    assert.deepEqual(calls.at(-1).args.request, {
+      operation: "notify", deviceId: data.deviceId, serviceUuid: "180d", characteristicUuid: "2a37",
+      timeoutMs: 10000, durationMs: 2000, sampleLimit: 1,
+    });
+  }
+});
+
+test("notification collection enforces authorization, bounds and cancellation", async () => {
+  for (const mode of ["policy", "os", "duration", "limit", "cancel", "native_error"]) {
+    const controller = new AbortController();
+    const { bundle, calls } = createHarness((command) => {
+      if (command.endsWith("|status")) return { permissionAliases: { bluetooth: "bluetooth" } };
+      if (command.endsWith("|check_permissions")) return { bluetooth: mode === "os" ? "denied" : "granted" };
+      if (command.endsWith("|bluetooth_gatt")) {
+        if (mode === "cancel") { controller.abort(); return { samples: [] }; }
+        throw new Error("Bluetooth subscription failed");
+      }
+      throw new Error(`Unexpected command ${command}`);
+    }, { getToolPolicies: () => ({ "personal:bluetooth": mode === "policy" ? "deny" : "allow" }) });
+    const response = await bundle.executeToolCall(toolCall("MobilePersonalData", {
+      action: "collect_bluetooth_notifications", device_id: "AA:BB:CC:DD:EE:FF",
+      service_uuid: "180d", characteristic_uuid: "2a37",
+      duration_ms: mode === "duration" ? 30001 : 1000, sample_limit: mode === "limit" ? 101 : 10,
+    }), controller.signal);
+    assert.equal(response.isError, true);
+    assert.equal(calls.some(({ command }) => command.endsWith("|bluetooth_gatt")), ["cancel", "native_error"].includes(mode));
+    if (mode === "policy") assert.equal(calls.length, 0);
+  }
+});
+
 test("authorized GATT operations preserve discovered properties and raw bytes", async () => {
   const data = { deviceId: "AA:BB:CC:DD:EE:FF", services: [{ uuid: "180f", characteristics: [{ uuid: "2a19", readable: true, writable: false, notifiable: true }] }], dataHex: "64" };
   const { bundle, calls } = createHarness((command) => {

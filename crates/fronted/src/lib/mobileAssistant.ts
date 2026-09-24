@@ -177,14 +177,18 @@ export type MobileBluetoothGattResult = {
   serviceUuid?: string | null;
   characteristicUuid?: string | null;
   dataHex?: string | null;
+  samples?: { receivedAtMs: number; dataHex: string }[];
+  stopReason?: "duration" | "sample_limit" | null;
 };
 
 export function accessMobileBluetoothGatt(request: {
-  operation: "services" | "read";
+  operation: "services" | "read" | "notify";
   deviceId: string;
   serviceUuid?: string;
   characteristicUuid?: string;
   timeoutMs: number;
+  durationMs?: number;
+  sampleLimit?: number;
 }) {
   if (!request.deviceId.trim()) throw new Error("Bluetooth device_id is required");
   if (
@@ -196,10 +200,23 @@ export function accessMobileBluetoothGatt(request: {
   const uuid =
     /^(?:[\da-f]{4}|[\da-f]{8}|[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12})$/i;
   if (
-    request.operation === "read" &&
+    request.operation !== "services" &&
     (!uuid.test(request.serviceUuid ?? "") || !uuid.test(request.characteristicUuid ?? ""))
   )
-    throw new Error("Read requires valid service_uuid and characteristic_uuid");
+    throw new Error("Characteristic access requires valid service_uuid and characteristic_uuid");
+  if (request.operation === "notify") {
+    const duration = request.durationMs ?? 5_000;
+    const limit = request.sampleLimit ?? 100;
+    if (
+      !Number.isInteger(duration) ||
+      duration < 1_000 ||
+      duration > 30_000 ||
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 100
+    )
+      throw new Error("Notification duration must be 1000-30000 ms and sample limit 1-100");
+  }
   return invoke<MobileBluetoothGattResult>(`${PLUGIN_COMMAND}bluetooth_gatt`, { request });
 }
 

@@ -311,6 +311,10 @@ pub struct BluetoothGattRequest {
     pub service_uuid: Option<String>,
     pub characteristic_uuid: Option<String>,
     pub timeout_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sample_limit: Option<u16>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -321,6 +325,16 @@ pub struct BluetoothGattResult {
     pub service_uuid: Option<String>,
     pub characteristic_uuid: Option<String>,
     pub data_hex: Option<String>,
+    #[serde(default)]
+    pub samples: Vec<BluetoothGattSample>,
+    pub stop_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BluetoothGattSample {
+    pub received_at_ms: i64,
+    pub data_hex: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
