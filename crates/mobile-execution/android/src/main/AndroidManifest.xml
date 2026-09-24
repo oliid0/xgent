@@ -3,6 +3,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- PRoot needs a real POSIX path for a user-selected SAF tree. Android
          cannot bind a content:// descriptor as /workspace, so raw storage
          access is requested only when the user explicitly mounts an external

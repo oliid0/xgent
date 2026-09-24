@@ -1,5 +1,6 @@
 package com.ohi.xgent.mobileexecution
 
+import android.content.Context
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
@@ -44,6 +45,7 @@ internal data class ProotBinaries(
 }
 
 internal class ProotRunner(
+    private val context: Context,
     private val nativeLibraryDir: File,
     private val rootfsDir: File,
     private val tempDir: File,
@@ -69,7 +71,7 @@ internal class ProotRunner(
         val resolvedCwd = resolveCwd(request.cwd, workdir)
 
         tempDir.mkdirs()
-        RootfsEnvironment.prepare(rootfsDir)
+        RootfsEnvironment.prepare(rootfsDir, context)
         File(rootfsDir, WORKSPACE_PATH.trimStart('/')).mkdirs()
         if (resolvedCwd.externalBind != null) {
             File(rootfsDir, EXTERNAL_CWD_PATH.trimStart('/')).mkdirs()
@@ -176,6 +178,9 @@ internal class ProotRunner(
             "TERM=xterm-256color",
             "LANG=C.UTF-8",
             "LC_ALL=C.UTF-8",
+        )
+        command += RootfsEnvironment.proxyEnvironment(context)
+        command += listOf(
             "/bin/sh",
             "-c",
             "cd -- \"\$1\" || exit; " +

@@ -68,11 +68,12 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
 
     private val backendDir = File(activity.filesDir, "mobile-execution")
     private val rootfsDir = File(backendDir, "rootfs")
-    private val installer = RootfsInstaller(activity.assets, backendDir, rootfsDir)
+    private val installer = RootfsInstaller(activity, activity.assets, backendDir, rootfsDir)
     private val inventory = MobileEnvironmentInventory(backendDir, rootfsDir)
     private val externalWorkspaces = ExternalWorkspaceStore(activity)
     private val runner by lazy {
         ProotRunner(
+            context = activity,
             nativeLibraryDir = File(activity.applicationInfo.nativeLibraryDir),
             rootfsDir = rootfsDir,
             tempDir = File(activity.cacheDir, "xgent-proot"),

@@ -1,6 +1,7 @@
 package com.ohi.xgent.mobileexecution
 
 import android.content.res.AssetManager
+import android.content.Context
 import android.system.Os
 import java.io.BufferedInputStream
 import java.io.File
@@ -15,6 +16,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.json.JSONObject
 
 internal class RootfsInstaller(
+    private val context: Context,
     private val assets: AssetManager,
     private val backendDir: File,
     private val rootfsDir: File,
@@ -36,7 +38,7 @@ internal class RootfsInstaller(
             require(File(staging, "bin/sh").isFile) {
                 "archive does not contain a usable rootfs (bin/sh is missing)"
             }
-            RootfsEnvironment.prepare(staging, bundled.repositoryBranch)
+            RootfsEnvironment.prepare(staging, context, bundled.repositoryBranch)
             File(staging, XGENT_VERSION_FILE).apply {
                 parentFile?.mkdirs()
                 writeText("${bundled.distribution} ${bundled.version}\n")
