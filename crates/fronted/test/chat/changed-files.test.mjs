@@ -124,6 +124,31 @@ test("overwriting a known file uses its saved preimage for line stats and diff",
   assert.equal(unavailable.files[0].beforeTextAvailable, false);
 });
 
+test("consecutive Edit calls retain the first full preimage and final file contents", () => {
+  const summary = changedFiles.collectChangedFiles([
+    round(toolBlock({
+      name: "Edit",
+      args: { path: "notes.md", old_string: "old", new_string: "middle" },
+      details: {
+        kind: "edit", path: "notes.md",
+        beforeContent: "same\nold\nend\n", afterContent: "same\nmiddle\nend\n",
+      },
+    })),
+    round(toolBlock({
+      name: "Edit",
+      args: { path: "notes.md", old_string: "middle", new_string: "new" },
+      details: {
+        kind: "edit", path: "notes.md",
+        beforeContent: "same\nmiddle\nend\n", afterContent: "same\nnew\nend\n",
+      },
+    })),
+  ]);
+  assert.equal(summary.files[0].beforeText, "same\nold\nend\n");
+  assert.equal(summary.files[0].afterText, "same\nnew\nend\n");
+  assert.equal(summary.files[0].added, 2);
+  assert.equal(summary.files[0].removed, 2);
+});
+
 test("Delete marks the file deleted and a later Write revives it", () => {
   const deletedOnly = changedFiles.collectChangedFiles([
     round(

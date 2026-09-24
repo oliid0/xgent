@@ -305,6 +305,8 @@ export type EditResultDetails = {
   totalLines: number;
   oldPreview: string;
   newPreview: string;
+  beforeContent?: string;
+  afterContent?: string;
 };
 
 export type DeleteResultDetails = {

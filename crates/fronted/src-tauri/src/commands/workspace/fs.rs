@@ -3595,6 +3595,8 @@ pub struct EditTextResponse {
     pub mtime_ms: u64,
     pub content_hash: String,
     pub total_lines: usize,
+    pub before_content: Option<String>,
+    pub after_content: Option<String>,
     pub file_id: Option<String>,
 }
 
@@ -3652,9 +3654,7 @@ fn fs_edit_text_impl(
         ));
     }
 
-    ensure_expected_version_matches(&target, &logical_path, &expected)?;
-
-    let bytes = fs::read(&target)?;
+    let bytes = ensure_expected_version_matches(&target, &logical_path, &expected)?;
     let text = String::from_utf8_lossy(&bytes);
 
     // Exact match first, then increasingly lenient fallbacks (line endings,
@@ -3690,6 +3690,16 @@ fn fs_edit_text_impl(
         &outcome.replacements[..1]
     };
     let next = apply_edit_replacements(&text, applied);
+    let before_content = if bytes.len() <= 100 * 1024 {
+        String::from_utf8(bytes.clone()).ok()
+    } else {
+        None
+    };
+    let after_content = if next.len() <= 100 * 1024 {
+        Some(next.clone())
+    } else {
+        None
+    };
 
 
     capture_pre_image(
@@ -3710,6 +3720,8 @@ fn fs_edit_text_impl(
         mtime_ms: metadata_mtime_ms(&md),
         content_hash: hash_bytes(next.as_bytes()),
         total_lines: count_text_lines(&next),
+        before_content,
+        after_content,
         file_id: Some(file_identity(&md, &target)),
     })
 }
@@ -6804,6 +6816,8 @@ mod tests {
         .expect("exact edit should succeed");
         assert_eq!(response.match_strategy, "exact");
         assert_eq!(response.replacements, 1);
+        assert_eq!(response.before_content.as_deref(), Some("const a = 1;\nconst b = 2;\n"));
+        assert_eq!(response.after_content.as_deref(), Some("const a = 1;\nconst b = 3;\n"));
         let next = fs::read_to_string(workdir.join("app.ts")).expect("read edited file");
         assert_eq!(next, "const a = 1;\nconst b = 3;\n");
 
@@ -6830,6 +6844,10 @@ mod tests {
         )
         .expect("line-ending tolerant edit should succeed");
         assert_eq!(response.match_strategy, "line-endings");
+        assert_eq!(
+            response.before_content.as_deref(),
+            Some("const a = 1;\r\nconst b = 2;\r\nconst c = 3;\r\n")
+        );
         let next = fs::read_to_string(workdir.join("app.ts")).expect("read edited file");
         assert_eq!(next, "const a = 1;\r\nconst b = 20;\r\nconst c = 30;\r\n");
 

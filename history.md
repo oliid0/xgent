@@ -98,6 +98,12 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Deduplicated completed Skill job handling across page mounts, so returning to the store after manually disabling a Skill does not re-enable it from a retained finished job.
 - Extended the existing Skill job backend regression to verify that a running job is discoverable through the new list API; Cargo tests remain excluded by the user's tool restriction.
 - Added a frontend contract check that the mobile recovery request invokes the existing SkillsManager command with `install_jobs` and returns its snapshots.
+- Captured bounded exact pre/post text from Edit's existing version-checked read and applied output, removed its redundant second read, and passed both through the Edit tool result for accurate diff evidence.
+- Changed the file summary to use exact Edit pre/post snapshots for line counts and retained the first available preimage through a reply's later edits; existing preview-only behavior remains a fallback for old or oversized results.
+- Native chat/activity now prefers the exact bounded Edit file snapshots even for fuzzy or multi-replacement edits, while retaining the snippet safeguard when snapshots are absent.
+- Extended existing Edit backend and tool-result regressions to check exact pre/post content, including CRLF preservation; backend tests await final CI under the no-Cargo rule.
+- Added a changed-file regression for two successive full Edit snapshots, proving the reply-level diff spans from the original file to the final contents while operation line counts remain truthful.
+- Added a native transcript/activity regression showing that a fuzzy multi-replacement Edit with exact file snapshots renders the real diff rather than the snippet fallback.
 
 ## Evidence and decisions
 - Started from clean `main` at `3175331`; inspected prior history, screenshots, `xx`, `yy`, Astryx 0.6 source/MCP/CLI, Swift documentation, and release logs.
@@ -132,4 +138,8 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
+- Closing batch: `pnpm test:non-native` passed 1,234/1,234; `pnpm check`, `pnpm native:check`, and `pnpm lint` passed. The final snapshot-pair correction separately passed changed-file tests 7/7, TypeScript and lint. No local Cargo/build command was used. Goal remains active: device acceptance, the remaining functional audit, and new-revision CI are not yet complete; retain local commits until the whole goal is ready for the requested single push.
+- Kept Edit diff pairs consistent when only one bounded full snapshot is available: use both full snapshots together or both legacy snippets, never mix file and fragment contents.
+- Applied the installed Biome formatter to the two final diff presentation modules before consolidated verification.
+- Final review tightened Edit snapshot aggregation: preserve the original preimage only across matching full-file snapshots; older snippet-only results or intervening external changes use the latest operation's matched pair.
 - Latest full local batch passed `pnpm test:non-native` (1,230 tests; Cargo skipped), `pnpm check`, `pnpm native:check`, and `pnpm lint`. Subsequent native Edit evidence passed focused tests 15/15; Skill job recovery passed focused tests 4/4, `pnpm check`, and `pnpm lint`. Device behavior remains unverified. Release `35910177777` passed all platforms at `4d01a27`. Remote `c0d34ca` CI `35918340388` and release `35918757930` failed on `InstallProgress: Clone` in desktop Rust; all four failed release jobs show that error, while iOS passed. Local fix is awaiting final push/CI. No local Cargo/build commands. Push only after the whole goal is complete.

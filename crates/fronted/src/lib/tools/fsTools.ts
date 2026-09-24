@@ -134,6 +134,8 @@ type EditCommandResponse = {
   mtimeMs: number;
   contentHash: string;
   totalLines: number;
+  beforeContent?: string | null;
+  afterContent?: string | null;
   fileId?: string | null;
 };
 
@@ -1566,6 +1568,8 @@ export function createFsTools(params: {
       totalLines: res.totalLines,
       oldPreview: previewSnippet(old_string),
       newPreview: previewSnippet(new_string),
+      beforeContent: typeof res.beforeContent === "string" ? res.beforeContent : undefined,
+      afterContent: typeof res.afterContent === "string" ? res.afterContent : undefined,
     };
     fileState.recordTextMutation({
       ...statePathKey(resolved, res.fileId),

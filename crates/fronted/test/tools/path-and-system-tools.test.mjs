@@ -1488,6 +1488,8 @@ test("Edit auto-primes a full text snapshot before replacement", async () => {
             mtimeMs: 45,
             contentHash: "after-hash",
             totalLines: 1,
+            beforeContent: "const value = 'old';\n",
+            afterContent: "const value = 'new';\n",
           };
         },
       },
@@ -1514,6 +1516,8 @@ test("Edit auto-primes a full text snapshot before replacement", async () => {
   assert.equal(result.isError, false);
   assert.match(result.content[0].text, /autoRead=full/);
   assert.equal(result.details.replacements, 1);
+  assert.equal(result.details.beforeContent, "const value = 'old';\n");
+  assert.equal(result.details.afterContent, "const value = 'new';\n");
   assert.deepEqual(
     invocations.map((call) => call.command),
     ["fs_path_status", "fs_read_text", "fs_edit_text"],

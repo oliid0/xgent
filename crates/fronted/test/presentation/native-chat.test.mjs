@@ -360,6 +360,42 @@ test("native chat does not turn truncated or fuzzy Edit previews into a file dif
   h.unmount();
 });
 
+test("native chat and activity show the exact full-file diff for a fuzzy multi Edit", async () => {
+  const h = harness({}, { mobile: true });
+  h.props.historyItems = [{
+    kind: "assistant", key: "exact-edit", segmentIndex: 0, timestamp: 1,
+    isFromCompactedSegment: false,
+    rounds: [{ round: 1, key: "r1", blocks: [{
+      kind: "tool", item: {
+        toolCall: { id: "edit-1", name: "Edit", arguments: {
+          path: "notes.md", old_string: "old", new_string: "new", replace_all: true,
+        } },
+        toolResult: {
+          role: "toolResult", toolCallId: "edit-1", toolName: "Edit",
+          content: [{ type: "text", text: "Edited twice" }],
+          details: {
+            kind: "edit", path: "notes.md", oldPreview: "old", newPreview: "new",
+            matchStrategy: "indentation", replaceAll: true, replacements: 2,
+            beforeContent: "same\nold\nold\n", afterContent: "same\nnew\nnew\n",
+          },
+          isError: false, timestamp: 1,
+        },
+      },
+    }] }],
+  }];
+  const transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
+  const tool = transcript.children.find((node) => node.id === "exact-edit").children[0];
+  const diff = tool.children.find((node) => node.language === "diff");
+  assert.match(diff.text, /-old/);
+  assert.match(diff.text, /\+new/);
+  assert.doesNotMatch(diff.text, /[-+]same/);
+  assert.equal((await h.dispatch("activity-preview")).ok, true);
+  h.render();
+  const activity = h.documents().find((document) => document.title === "chat.activity.title");
+  assert.equal(activity.nodes[0].children.find((node) => node.language === "diff").text, diff.text);
+  h.unmount();
+});
+
 test("native chat keeps a shell-created PreviewFile output openable after the tool finishes", async () => {
   const opened = [];
   const h = harness({ onOpenWorkspaceFile: (path) => opened.push(path) }, { mobile: true });

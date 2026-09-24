@@ -131,15 +131,21 @@ function toolEvidenceNodes(
     const edit = details as EditResultDetails;
     if (edit.oldPreview || edit.newPreview) {
       const path = edit.displayPath || edit.path;
+      const exactSnapshot =
+        typeof edit.beforeContent === "string" &&
+        typeof edit.afterContent === "string" &&
+        edit.beforeContent.length + edit.afterContent.length <= 200_000;
       const previewMeta = args ? readStreamPreviewMeta(args) : undefined;
-      const oldText =
-        typeof args?.old_string === "string" && previewMeta?.fields.old_string?.truncated !== true
+      const oldText = exactSnapshot
+        ? edit.beforeContent
+        : typeof args?.old_string === "string" && previewMeta?.fields.old_string?.truncated !== true
           ? args.old_string
           : args?.old_string === undefined && edit.oldPreview.length <= 500
             ? edit.oldPreview
             : undefined;
-      const newText =
-        typeof args?.new_string === "string" && previewMeta?.fields.new_string?.truncated !== true
+      const newText = exactSnapshot
+        ? edit.afterContent
+        : typeof args?.new_string === "string" && previewMeta?.fields.new_string?.truncated !== true
           ? args.new_string
           : args?.new_string === undefined && edit.newPreview.length <= 500
             ? edit.newPreview
@@ -148,9 +154,10 @@ function toolEvidenceNodes(
         oldText !== undefined &&
         newText !== undefined &&
         oldText.length + newText.length <= 200_000 &&
-        (edit.matchStrategy === undefined || edit.matchStrategy === "exact") &&
-        edit.replaceAll !== true &&
-        (edit.replacements ?? 1) === 1
+        (exactSnapshot ||
+          ((edit.matchStrategy === undefined || edit.matchStrategy === "exact") &&
+            edit.replaceAll !== true &&
+            (edit.replacements ?? 1) === 1))
       ) {
         const diff = generateDiffFile(path, oldText, path, newText, "txt", "txt");
         diff.initRaw();

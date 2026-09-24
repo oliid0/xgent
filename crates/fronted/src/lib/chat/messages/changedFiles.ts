@@ -41,18 +41,23 @@ const statsByToolCall = new WeakMap<object, FileChangeStats | null>();
 function statsForToolCall(
   toolCall: ToolBlockItem["toolCall"],
   beforeContent?: string,
+  afterContent?: string,
 ): FileChangeStats | undefined {
   const cached = statsByToolCall.get(toolCall);
   if (cached !== undefined) return cached ?? undefined;
   const content = toolCall.arguments?.content;
+  const completeAfter =
+    toolCall.name === "Edit"
+      ? afterContent
+      : typeof content === "string" &&
+          readStreamPreviewMeta(toolCall.arguments)?.fields.content?.truncated !== true
+        ? content
+        : undefined;
   const stats =
-    toolCall.name === "Write" &&
-    beforeContent !== undefined &&
-    typeof content === "string" &&
-    readStreamPreviewMeta(toolCall.arguments)?.fields.content?.truncated !== true
+    beforeContent !== undefined && completeAfter !== undefined
       ? (deriveFileChangeStats({
           name: "Edit",
-          arguments: { old_string: beforeContent, new_string: content },
+          arguments: { old_string: beforeContent, new_string: completeAfter },
         }) ?? null)
       : (deriveFileChangeStats(toolCall) ?? null);
   statsByToolCall.set(toolCall, stats);
@@ -89,6 +94,7 @@ export function collectChangedFiles(
   rounds: readonly Pick<UiRound, "blocks">[],
 ): ChangedFilesSummary | null {
   const byKey = new Map<string, ChangedFileEntry>();
+  const fullSnapshotKeys = new Set<string>();
 
   for (const round of rounds) {
     for (const block of round.blocks) {
@@ -112,8 +118,10 @@ export function collectChangedFiles(
         beforeTextAvailable: false,
         afterTextAvailable: false,
       };
+      const firstMutation = !entry.lastToolCallId;
 
       if (toolCall.name === "Delete") {
+        fullSnapshotKeys.delete(key);
         entry.deleted = true;
         entry.beforeText = undefined;
         entry.afterText = "";
@@ -122,9 +130,8 @@ export function collectChangedFiles(
       } else {
         const stats = statsForToolCall(
           toolCall,
-          toolCall.name === "Write" && typeof details.beforeContent === "string"
-            ? details.beforeContent
-            : undefined,
+          typeof details.beforeContent === "string" ? details.beforeContent : undefined,
+          typeof details.afterContent === "string" ? details.afterContent : undefined,
         );
         entry.added += stats?.added ?? 0;
         entry.removed += stats?.removed ?? 0;
@@ -139,21 +146,39 @@ export function collectChangedFiles(
             typeof content === "string" && previewMeta?.fields.content?.truncated !== true;
           const beforeContent =
             typeof details.beforeContent === "string" ? details.beforeContent : undefined;
-          entry.beforeText = details.existedBefore === true ? beforeContent : "";
+          if (firstMutation || !fullSnapshotKeys.has(key) || entry.afterText !== beforeContent) {
+            entry.beforeText = details.existedBefore === true ? beforeContent : "";
+            entry.beforeTextAvailable =
+              details.existedBefore !== true || beforeContent !== undefined;
+          }
           entry.afterText = complete && content.length <= 200_000 ? content : undefined;
-          entry.beforeTextAvailable = details.existedBefore !== true || beforeContent !== undefined;
           entry.afterTextAvailable = entry.afterText !== undefined;
+          fullSnapshotKeys.add(key);
         } else {
+          const beforeContent =
+            typeof details.beforeContent === "string" ? details.beforeContent : undefined;
+          const afterContent =
+            typeof details.afterContent === "string" ? details.afterContent : undefined;
           const oldText = args.old_string;
           const newText = args.new_string;
           const oldComplete =
             typeof oldText === "string" && previewMeta?.fields.old_string?.truncated !== true;
           const newComplete =
             typeof newText === "string" && previewMeta?.fields.new_string?.truncated !== true;
-          entry.beforeText = oldComplete ? oldText : undefined;
-          entry.afterText = newComplete ? newText : undefined;
-          entry.beforeTextAvailable = oldComplete;
-          entry.afterTextAvailable = newComplete;
+          const fullSnapshot = beforeContent !== undefined && afterContent !== undefined;
+          if (
+            firstMutation ||
+            !fullSnapshot ||
+            !fullSnapshotKeys.has(key) ||
+            entry.afterText !== beforeContent
+          ) {
+            entry.beforeText = fullSnapshot ? beforeContent : oldComplete ? oldText : undefined;
+            entry.beforeTextAvailable = entry.beforeText !== undefined;
+          }
+          entry.afterText = fullSnapshot ? afterContent : newComplete ? newText : undefined;
+          entry.afterTextAvailable = entry.afterText !== undefined;
+          if (fullSnapshot) fullSnapshotKeys.add(key);
+          else fullSnapshotKeys.delete(key);
         }
       }
 
