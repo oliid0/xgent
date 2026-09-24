@@ -127,15 +127,23 @@ async function ensurePermission(permission: MobileAssistantPermission, signal?: 
     throw new Error(status.detail || "Health data is unavailable on this device.");
   }
   const alias = status.permissionAliases[permission] ?? permission;
+  // HealthKit intentionally hides read grants. Only its completed request can
+  // use this state; other capabilities require a confirmed OS grant.
+  const authorized = (state: string | undefined) =>
+    state === "granted" ||
+    (permission === "health" && status.backend === "ios-native" && state === "requested");
   let states = normalizeMobileAssistantPermissions(status, await checkMobileAssistantPermissions());
   checkCancelled();
-  if (states[permission] === "granted" || states[permission] === "requested") return;
+  if (authorized(states[permission])) return;
+  if (states[permission] === "denied") {
+    throw new Error(`The user denied ${permission} permission. Enable it in system settings.`);
+  }
   states = normalizeMobileAssistantPermissions(
     status,
-    await requestMobileAssistantPermission(alias),
+    await requestMobileAssistantPermission(alias, signal),
   );
   checkCancelled();
-  if (states[permission] !== "granted" && states[permission] !== "requested") {
+  if (!authorized(states[permission])) {
     throw new Error(`The user did not grant ${permission} permission.`);
   }
 }
@@ -163,9 +171,12 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
           if (signal?.aborted) return result(toolCall, "Cancelled", true);
           if (!status.healthAvailable)
             throw new Error(status.detail || "Health data is unavailable.");
-          const permission = await requestMobileHealthMetricPermission(request.metric);
+          const permission = await requestMobileHealthMetricPermission(request.metric, signal);
           if (signal?.aborted) return result(toolCall, "Cancelled", true);
-          if (permission.health !== "granted" && permission.health !== "requested") {
+          if (
+            permission.health !== "granted" &&
+            !(status.backend === "ios-native" && permission.health === "requested")
+          ) {
             throw new Error(`The user did not grant ${metric} read permission.`);
           }
           const health = await readMobileHealthSamples(request);

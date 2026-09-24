@@ -29,6 +29,57 @@ function resultData(result) {
   return JSON.parse(result.content[0].text);
 }
 
+test("ordinary capabilities require granted authorization, never merely requested", async () => {
+  for (const [action, permission, args] of [
+    ["scan_bluetooth", "bluetooth", {}],
+    ["get_current_location", "location", {}],
+    ["list_reminders", "reminders", {}],
+    ["list_calendar_events", "calendar", { start: "2026-09-01", end: "2026-09-02" }],
+  ]) {
+    for (const state of ["requested", "denied"]) {
+      const { bundle, calls } = createHarness((command) => {
+        if (command.endsWith("|status")) return { backend: "ios-native", permissionAliases: {} };
+        if (command.endsWith("|check_permissions") || command.endsWith("|request_permissions")) {
+          return { [permission]: state };
+        }
+        throw new Error(`Unauthorized native operation: ${command}`);
+      });
+      const response = await bundle.executeToolCall(toolCall("MobilePersonalData", { action, ...args }));
+      assert.equal(response.isError, true);
+      assert.match(response.content[0].text, /permission/);
+      assert.ok(calls.every(({ command }) => /\|(status|check_permissions|request_permissions)$/.test(command)));
+      if (state === "denied") assert.ok(!calls.some(({ command }) => command.endsWith("|request_permissions")));
+    }
+  }
+});
+
+test("settings and tools serialize OS prompts, skip cancelled requests and recover after errors", async () => {
+  const calls = [];
+  let finishFirst;
+  const firstReply = new Promise((resolve) => { finishFirst = resolve; });
+  const loader = createTsModuleLoader({ mocks: {
+    "@tauri-apps/api/core": { async invoke(command, args) {
+      calls.push(args.request.permissions[0]);
+      if (calls.length === 1) return firstReply;
+      if (args.request.permissions[0] === "camera") throw new Error("OS request failed");
+      return { location: "granted" };
+    } },
+  } });
+  const { requestMobileAssistantPermission } = loader.loadModule("src/lib/mobileAssistant.ts");
+  const controller = new AbortController();
+  const first = requestMobileAssistantPermission("calendar");
+  const cancelled = assert.rejects(requestMobileAssistantPermission("photos", controller.signal), /Cancelled/);
+  const failure = assert.rejects(requestMobileAssistantPermission("camera"), /OS request failed/);
+  const last = requestMobileAssistantPermission("location");
+  await Promise.resolve();
+  assert.deepEqual(calls, ["calendar"]);
+  controller.abort();
+  finishFirst({ calendar: "granted" });
+  await Promise.all([first, cancelled, failure]);
+  assert.deepEqual(await last, { location: "granted" });
+  assert.deepEqual(calls, ["calendar", "camera", "location"]);
+});
+
 test("Bluetooth discovery requests native authorization without invoking Shell", async () => {
   const devices = [{ id: "device-1", name: "Sensor", rssi: -48, serviceUuids: ["1809"] }];
   const { bundle, calls } = createHarness((command) => {
@@ -232,7 +283,7 @@ test("health step reads request only the health capability and preserve limited-
   };
   const { bundle, calls } = createHarness((command) => {
     if (command.endsWith("|status")) {
-      return { healthAvailable: true, permissionAliases: { health: "health" } };
+      return { backend: "ios-native", healthAvailable: true, permissionAliases: { health: "health" } };
     }
     if (command.endsWith("|check_permissions")) return { health: "requested" };
     return summary;
@@ -288,7 +339,7 @@ test("health metrics request only the selected native type and preserve sample e
       source: "healthkit", truncated: true, accessLimited: true,
     };
     const { bundle, calls } = createHarness((command, args) => {
-      if (command.endsWith("|status")) return { healthAvailable: true };
+      if (command.endsWith("|status")) return { backend: "ios-native", healthAvailable: true };
       if (command.endsWith("|request_health_metric_permission")) {
         assert.deepEqual(args.request, { metric });
         return { health: "requested" };

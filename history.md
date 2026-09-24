@@ -1,7 +1,8 @@
 ﻿# Current objective
-Repair desktop and mobile function paths while using `xx`/`yy` as references without importing their UI or gateway code. Current focus: desktop proxy/providers/authorized external CUA driver setup and mobile native/optional-shell/LAN/cloud tool orchestration with complete activity and result evidence.
+Repair desktop and mobile function paths using `xx`/`yy` evidence without importing their UI or gateway code. Latest user correction: prioritize general complex-task execution and individual mobile capability authorization, not expansion driven by the health example. Keep changes local until the complete goal is verified.
 
 ## Completed
+- Corrected general personal-assistant permission checks: only confirmed grants allow ordinary capabilities; HealthKit's read-privacy exception is limited to iOS health. Denial does not automatically retry authorization. Settings and tools now share a serial native permission queue, and cancelled queued tasks cannot launch another prompt.
 - Updated native capability descriptions to match supported health metrics and added tool regressions for all five metrics, unit/source evidence, bounded limits, denied permission, cancellation and invalid requests before IPC.
 - Connected the existing MobilePersonalData tool to metric-specific permission and read commands, validates metric/time range before native calls and respects cancellation after permission; preserves sample units, source, truncation and privacy context in persisted tool results.
 - Implemented Android health metric authorization and real Health Connect record reads with bounded records/samples, explicit per-type permissions, units and source metadata; updated existing permission rationale text to match supported reads.
@@ -116,6 +117,7 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Added a native transcript/activity regression showing that a fuzzy multi-replacement Edit with exact file snapshots renders the real diff rather than the snippet fallback.
 
 ## Evidence and decisions
+- User correction: complex task execution is the objective; the health prompt is only an example. Stop metric-specific expansion. Compared `yy` OffloadPermissionManager and Photos/Calendar native authorization: assistant policy and OS authorization are separate checks, with native requests serialized. Current settings already expose individual OS permission actions, but the general tool gate incorrectly accepted `requested` for all capabilities and concurrent requests were uncoordinated. Broader capability and policy coverage remains open.
 - Downloaded and inspected the published Health Connect 1.1.0 sources (no build): confirmed record fields, `ReadRecordsRequest` parameters and Kotlin unit getters. Corrected glucose's Kotlin getter to `inMilligramsPerDeciliter`; its documented Java getter uses a different JVM name.
 - Started from clean `main` at `3175331`; inspected prior history, screenshots, `xx`, `yy`, Astryx 0.6 source/MCP/CLI, Swift documentation, and release logs.
 - CI at `83e621a` and `da80012` passed. Unsigned release `35888070327` at `83e621a` passed Android, iOS, Windows, Linux, and both macOS builds; the earlier Android Kotlin and macOS Intel packaging failures no longer reproduce.
@@ -138,6 +140,7 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - New visual references 0386–0406 show pale grouped settings cards, circular navigation buttons, and a simple sidebar. They guide styling of existing controls only.
 
 ## Remaining
+- Align per-capability assistant access policy with `yy`, separately from OS permissions: current `runAgentConversationTurn` approval/session grants still cover the entire MobilePersonalData or MobilePersonalActions tool. Settings currently expose individual OS permissions but not independent assistant capability policies. Photo access and other native operations must be audited behind their actual grants; do not substitute more health metrics for this work.
 - Native capability audit: health steps plus five quantity metrics now have tool/IPC/native implementations; Swift/Kotlin compilation, native permission denial and real samples still need verification. BLE peripheral data exchange and photo-library tool access remain incomplete. `yy` Android HealthManager contains stubs and cannot be used as completion evidence.
 - Verify the desktop selector fix in a new package; inspect other memory entry points and wipe behavior only when a safe reproduction is available.
 - Inspect and complete mobile SSH, Git review, resource library, files, MCP/Skills store, permissions, and routing against `yy`.
@@ -150,6 +153,9 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
+- General authorization correction: all 1,240 non-Cargo tests passed; `pnpm check`, `pnpm native:check`, `pnpm lint` and diff whitespace review passed. No native build/device acceptance was performed. No UI change or push; full goal remains open.
+- Added behavioral regressions for Bluetooth/location/calendar/reminder non-grants and denied-state no-retry, plus a shared permission queue test proving serialization, queued cancellation and recovery after native errors.
+- Adjusted health privacy-state regression fixtures to identify iOS explicitly; generic permission denial/concurrency checks are being added before consolidated verification.
 - Health metric tool and release-contract checks passed 23/23; TypeScript, native mapping and lint passed. Applied Biome's requested health import ordering. Native compilation/device reads remain unverified under the no-build instruction.
 - Formatted health tool bridge files with the installed Biome version before final non-build verification. Native health metric compilation and real permission/data behavior still require final CI/device testing.
 - Skill installed-state correction passed `pnpm check`, `pnpm lint`, and existing Skill contract/recovery tests 4/4. These tests do not cover delete/reinstall interaction on a device; that acceptance check remains outstanding.

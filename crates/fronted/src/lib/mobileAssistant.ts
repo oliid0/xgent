@@ -102,10 +102,17 @@ export type HealthSamplesResult = {
   accessLimited: boolean;
 };
 
-export function requestMobileHealthMetricPermission(metric: HealthSampleMetric) {
-  return invoke<MobilePermissionStates>(`${PLUGIN_COMMAND}request_health_metric_permission`, {
-    request: { metric },
-  });
+export function requestMobileHealthMetricPermission(
+  metric: HealthSampleMetric,
+  signal?: AbortSignal,
+) {
+  return queuePermissionRequest(
+    () =>
+      invoke<MobilePermissionStates>(`${PLUGIN_COMMAND}request_health_metric_permission`, {
+        request: { metric },
+      }),
+    signal,
+  );
 }
 
 export function readMobileHealthSamples(request: {
@@ -168,10 +175,29 @@ export function normalizeMobileAssistantPermissions(
   return normalized;
 }
 
-export function requestMobileAssistantPermission(permissionAlias: string) {
-  return invoke<MobilePermissionStates>(`${PLUGIN_COMMAND}request_permissions`, {
-    request: { permissions: [permissionAlias] },
+// Settings and concurrent tools share one queue: native authorization dialogs
+// must finish before another capability can request its own OS authorization.
+let permissionQueue: Promise<unknown> = Promise.resolve();
+
+function queuePermissionRequest<T>(request: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  const pending = permissionQueue.then(async () => {
+    if (signal?.aborted) throw new Error("Cancelled");
+    const response = await request();
+    if (signal?.aborted) throw new Error("Cancelled");
+    return response;
   });
+  permissionQueue = pending.catch(() => undefined);
+  return pending;
+}
+
+export function requestMobileAssistantPermission(permissionAlias: string, signal?: AbortSignal) {
+  return queuePermissionRequest(
+    () =>
+      invoke<MobilePermissionStates>(`${PLUGIN_COMMAND}request_permissions`, {
+        request: { permissions: [permissionAlias] },
+      }),
+    signal,
+  );
 }
 
 export function startMobileVoiceInput(locale?: string) {
