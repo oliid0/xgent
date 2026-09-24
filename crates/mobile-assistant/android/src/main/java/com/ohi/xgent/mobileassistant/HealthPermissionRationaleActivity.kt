@@ -29,7 +29,7 @@ class HealthPermissionRationaleActivity : Activity() {
             setPadding(0, 0, 0, dp(16))
         })
         content.addView(TextView(this).apply {
-            text = "Xgent requests read-only access to your step count only when you ask it to use health data. It does not write health records, read in the background, sell health data, or use it for advertising.\n\nThe selected time range is processed on this device. If you ask an AI model to analyze or summarize the result, that result can be sent to the model provider you configured for the conversation.\n\nYou can revoke access at any time in Health Connect settings."
+            text = "Xgent requests read-only access to the health metric you ask to use: steps, heart rate, blood glucose, oxygen saturation, weight or body temperature. It does not write health records, read in the background, sell health data, or use it for advertising.\n\nThe selected time range is processed on this device. If you ask an AI model to analyze or summarize the result, that result can be sent to the model provider you configured for the conversation.\n\nYou can revoke access at any time in Health Connect settings."
             textSize = 16f
             setLineSpacing(0f, 1.2f)
         })

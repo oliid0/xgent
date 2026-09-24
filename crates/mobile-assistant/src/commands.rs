@@ -72,6 +72,22 @@ pub(crate) async fn read_health_steps<R: Runtime>(
 }
 
 #[command]
+pub(crate) async fn request_health_metric_permission<R: Runtime>(
+    app: AppHandle<R>,
+    request: crate::HealthMetricRequest,
+) -> Result<MobilePermissionStates> {
+    on_worker(move || app.mobile_assistant().request_health_metric_permission(request)).await
+}
+
+#[command]
+pub(crate) async fn read_health_samples<R: Runtime>(
+    app: AppHandle<R>,
+    request: crate::HealthSamplesRequest,
+) -> Result<crate::HealthSamplesResult> {
+    on_worker(move || app.mobile_assistant().read_health_samples(request)).await
+}
+
+#[command]
 pub(crate) async fn list_calendar_events<R: Runtime>(
     app: AppHandle<R>,
     request: CalendarRangeRequest,

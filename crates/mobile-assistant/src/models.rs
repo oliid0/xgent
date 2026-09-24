@@ -121,6 +121,55 @@ pub struct HealthStepsSummary {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HealthMetric {
+    HeartRate,
+    BloodGlucose,
+    OxygenSaturation,
+    Weight,
+    BodyTemperature,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HealthMetricRequest {
+    pub metric: HealthMetric,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HealthSamplesRequest {
+    pub metric: HealthMetric,
+    pub start_ms: i64,
+    pub end_ms: i64,
+    #[serde(default = "default_result_limit")]
+    pub limit: u16,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HealthSample {
+    pub id: String,
+    pub start_ms: i64,
+    pub end_ms: i64,
+    pub value: f64,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HealthSamplesResult {
+    pub metric: HealthMetric,
+    pub unit: String,
+    pub start_ms: i64,
+    pub end_ms: i64,
+    pub samples: Vec<HealthSample>,
+    pub source: String,
+    pub truncated: bool,
+    pub access_limited: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CalendarRangeRequest {
     pub start_ms: i64,

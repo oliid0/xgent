@@ -2,6 +2,11 @@
 Repair desktop and mobile function paths while using `xx`/`yy` as references without importing their UI or gateway code. Current focus: desktop proxy/providers/authorized external CUA driver setup and mobile native/optional-shell/LAN/cloud tool orchestration with complete activity and result evidence.
 
 ## Completed
+- Updated native capability descriptions to match supported health metrics and added tool regressions for all five metrics, unit/source evidence, bounded limits, denied permission, cancellation and invalid requests before IPC.
+- Connected the existing MobilePersonalData tool to metric-specific permission and read commands, validates metric/time range before native calls and respects cancellation after permission; preserves sample units, source, truncation and privacy context in persisted tool results.
+- Implemented Android health metric authorization and real Health Connect record reads with bounded records/samples, explicit per-type permissions, units and source metadata; updated existing permission rationale text to match supported reads.
+- Implemented iOS per-metric HealthKit authorization and bounded newest-first quantity queries with canonical units, source identifiers, truncation and read-privacy limitations; no settings layout or reference UI was copied.
+- Added typed native health sample and per-metric authorization contracts for heart rate, glucose, oxygen saturation, weight and temperature, registered through the existing plugin IPC and permissions; native implementations are being connected using HealthKit documentation and Health Connect 1.1.0 APIs.
 - Mobile Skill store now derives installed state from current discovery rather than retained completed jobs, allowing a removed Skill to be installed again; active jobs still block duplicate installs and each install rechecks discovery after owner resolution.
 - Preserved already-remote workspace subdirectories in LAN command argument mapping. A PC path returned by an earlier tool is no longer silently reset to the workspace root; added Windows/POSIX and repeated-mapping regressions.
 - Added cancellation regressions for calendar creation, reminder creation and device discovery while OS permission is pending; each must return cancellation without issuing a native action afterward.
@@ -111,6 +116,7 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Added a native transcript/activity regression showing that a fuzzy multi-replacement Edit with exact file snapshots renders the real diff rather than the snippet fallback.
 
 ## Evidence and decisions
+- Downloaded and inspected the published Health Connect 1.1.0 sources (no build): confirmed record fields, `ReadRecordsRequest` parameters and Kotlin unit getters. Corrected glucose's Kotlin getter to `inMilligramsPerDeciliter`; its documented Java getter uses a different JVM name.
 - Started from clean `main` at `3175331`; inspected prior history, screenshots, `xx`, `yy`, Astryx 0.6 source/MCP/CLI, Swift documentation, and release logs.
 - CI at `83e621a` and `da80012` passed. Unsigned release `35888070327` at `83e621a` passed Android, iOS, Windows, Linux, and both macOS builds; the earlier Android Kotlin and macOS Intel packaging failures no longer reproduce.
 - Installed Windows client saved, read, and deleted a temporary global memory; the list returned to zero. Its window restored the persisted 561×1085 client size and position from `main-window-size.json`. No storage or geometry change is justified by this reproduction.
@@ -132,7 +138,7 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - New visual references 0386–0406 show pale grouped settings cards, circular navigation buttons, and a simple sidebar. They guide styling of existing controls only.
 
 ## Remaining
-- Native capability audit: personal data currently exposes health steps and BLE scanning only; general health metrics, peripheral data exchange and photo-library tool access are not proven implemented. `yy` iOS HealthKit has broader real operations, while `yy` Android HealthManager explicitly contains stubs and cannot be used as completion evidence.
+- Native capability audit: health steps plus five quantity metrics now have tool/IPC/native implementations; Swift/Kotlin compilation, native permission denial and real samples still need verification. BLE peripheral data exchange and photo-library tool access remain incomplete. `yy` Android HealthManager contains stubs and cannot be used as completion evidence.
 - Verify the desktop selector fix in a new package; inspect other memory entry points and wipe behavior only when a safe reproduction is available.
 - Inspect and complete mobile SSH, Git review, resource library, files, MCP/Skills store, permissions, and routing against `yy`.
 - Verify resumed Skill install status and completion on a device, including leaving the store before the download finishes; the backend list contract is only locally checked without Cargo.
@@ -144,6 +150,8 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
+- Health metric tool and release-contract checks passed 23/23; TypeScript, native mapping and lint passed. Applied Biome's requested health import ordering. Native compilation/device reads remain unverified under the no-build instruction.
+- Formatted health tool bridge files with the installed Biome version before final non-build verification. Native health metric compilation and real permission/data behavior still require final CI/device testing.
 - Skill installed-state correction passed `pnpm check`, `pnpm lint`, and existing Skill contract/recovery tests 4/4. These tests do not cover delete/reinstall interaction on a device; that acceptance check remains outstanding.
 - LAN working-directory follow-up passed routing regressions 3/3, `pnpm check`, and `pnpm lint`; device pairing execution is still unverified. Local-only commit policy remains in effect until the full goal is ready.
 - Follow-up acceptance audit: mobile permission cancellation and changed-file tests passed 17/17; `pnpm check` and `pnpm lint` passed after shared Edit viewer snapshot routing. No layout or reference UI/gateway imports were introduced. Device acceptance and final CI remain outstanding.

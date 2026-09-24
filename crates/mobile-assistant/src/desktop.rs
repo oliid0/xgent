@@ -24,6 +24,13 @@ pub fn init<R: Runtime, C: serde::de::DeserializeOwned>(
 pub struct MobileAssistant<R: Runtime>(PhantomData<fn() -> R>);
 
 impl<R: Runtime> MobileAssistant<R> {
+    pub fn request_health_metric_permission(&self, _request: crate::HealthMetricRequest) -> Result<MobilePermissionStates> {
+        Err(Error::Unavailable("health data access is only available on mobile".into()))
+    }
+
+    pub fn read_health_samples(&self, _request: crate::HealthSamplesRequest) -> Result<crate::HealthSamplesResult> {
+        Err(Error::Unavailable("health data access is only available on mobile".into()))
+    }
     pub fn scan_bluetooth(&self, _request: crate::BluetoothScanRequest) -> Result<Vec<crate::BluetoothDevice>> {
         Err(Error::Unavailable("native Bluetooth scanning requires Android or iOS".into()))
     }

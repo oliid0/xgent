@@ -6,13 +6,17 @@ import {
   createMobileCalendarEvent,
   createMobileReminder,
   getMobileCurrentLocation,
+  HEALTH_SAMPLE_METRICS,
+  type HealthSampleMetric,
   listMobileCalendarEvents,
   listMobileReminders,
   type MobileAssistantPermission,
   mobileAssistantStatus,
   normalizeMobileAssistantPermissions,
+  readMobileHealthSamples,
   readMobileHealthSteps,
   requestMobileAssistantPermission,
+  requestMobileHealthMetricPermission,
   scanMobileBluetooth,
 } from "../mobileAssistant";
 import { readClipboardText, writeClipboardText } from "../system/clipboardText";
@@ -21,7 +25,7 @@ import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes
 const listDataTool: Tool = {
   name: "MobilePersonalData",
   description:
-    "Read device connectivity, discover nearby BLE peripherals and currently routed devices, or access authorized location, clipboard, calendar, reminders, and health steps on this Android/iOS device without requiring Shell. Discovery reports only what the OS exposes; it does not imply arbitrary control of a device. Use privacy-sensitive reads only when the user's task requires them.",
+    "Read device connectivity, discover nearby BLE peripherals and currently routed devices, or access authorized location, clipboard, calendar, reminders, health steps and health metric samples on this Android/iOS device without requiring Shell. Health samples require metric, start and end, request only that metric's native read permission, and return units, source and truncation flags. Empty health results do not prove normal health or permission denial. Bluetooth discovery reports only what the OS exposes; it does not read arbitrary sensor data. Use privacy-sensitive reads only when the user's task requires them.",
   parameters: Type.Object({
     action: Type.Union([
       Type.Literal("network_status"),
@@ -32,12 +36,14 @@ const listDataTool: Tool = {
       Type.Literal("list_calendar_events"),
       Type.Literal("list_reminders"),
       Type.Literal("read_health_steps"),
+      Type.Literal("read_health_samples"),
     ]),
+    metric: Type.Optional(Type.Union(HEALTH_SAMPLE_METRICS.map((metric) => Type.Literal(metric)))),
     start: Type.Optional(
-      Type.String({ description: "Calendar range start as an ISO 8601 date-time." }),
+      Type.String({ description: "Calendar or health range start as an ISO 8601 date-time." }),
     ),
     end: Type.Optional(
-      Type.String({ description: "Calendar range end as an ISO 8601 date-time." }),
+      Type.String({ description: "Calendar or health range end as an ISO 8601 date-time." }),
     ),
     incomplete_only: Type.Optional(Type.Boolean()),
     limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })),
@@ -141,6 +147,35 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
       const args = (toolCall.arguments ?? {}) as Record<string, unknown>;
       const action = text(args.action);
       if (toolCall.name === "MobilePersonalData") {
+        if (action === "read_health_samples") {
+          const metric = text(args.metric);
+          if (!HEALTH_SAMPLE_METRICS.includes(metric as HealthSampleMetric)) {
+            throw new Error(`metric must be one of: ${HEALTH_SAMPLE_METRICS.join(", ")}`);
+          }
+          const request = {
+            metric: metric as HealthSampleMetric,
+            startMs: dateMs(args.start, "start"),
+            endMs: dateMs(args.end, "end"),
+            limit: limit(args.limit),
+          };
+          if (request.endMs <= request.startMs) throw new Error("end must be after start.");
+          const status = await mobileAssistantStatus();
+          if (signal?.aborted) return result(toolCall, "Cancelled", true);
+          if (!status.healthAvailable)
+            throw new Error(status.detail || "Health data is unavailable.");
+          const permission = await requestMobileHealthMetricPermission(request.metric);
+          if (signal?.aborted) return result(toolCall, "Cancelled", true);
+          if (permission.health !== "granted" && permission.health !== "requested") {
+            throw new Error(`The user did not grant ${metric} read permission.`);
+          }
+          const health = await readMobileHealthSamples(request);
+          if (signal?.aborted) return result(toolCall, "Cancelled", true);
+          return result(toolCall, {
+            health,
+            privacyNote:
+              "Results contain only records exposed by the platform. Empty data does not establish health status or read authorization. If truncated, query a narrower time range.",
+          });
+        }
         if (action === "network_status") {
           const status = await mobileAssistantStatus();
           if (!status.network)

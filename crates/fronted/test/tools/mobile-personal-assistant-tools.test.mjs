@@ -276,3 +276,62 @@ test("invalid personal-action dates fail before native IPC", async () => {
   assert.match(result.content[0].text, /start must be a valid ISO 8601 date-time/);
   assert.deepEqual(calls, []);
 });
+
+test("health metrics request only the selected native type and preserve sample evidence without Shell", async () => {
+  for (const [metric, unit] of [
+    ["heart_rate", "bpm"], ["blood_glucose", "mg/dL"], ["oxygen_saturation", "%"],
+    ["weight", "kg"], ["body_temperature", "degC"],
+  ]) {
+    const health = {
+      metric, unit, startMs: 1, endMs: 2,
+      samples: [{ id: "sample-1", startMs: 1, endMs: 1, value: 12, source: "device.app" }],
+      source: "healthkit", truncated: true, accessLimited: true,
+    };
+    const { bundle, calls } = createHarness((command, args) => {
+      if (command.endsWith("|status")) return { healthAvailable: true };
+      if (command.endsWith("|request_health_metric_permission")) {
+        assert.deepEqual(args.request, { metric });
+        return { health: "requested" };
+      }
+      assert.equal(command, "plugin:mobile-assistant|read_health_samples");
+      assert.deepEqual(args.request, {
+        metric, startMs: Date.parse("2026-09-01T00:00:00Z"),
+        endMs: Date.parse("2026-09-02T00:00:00Z"), limit: 200,
+      });
+      return health;
+    });
+    const response = await bundle.executeToolCall(toolCall("MobilePersonalData", {
+      action: "read_health_samples", metric, start: "2026-09-01T00:00:00Z",
+      end: "2026-09-02T00:00:00Z", limit: 999,
+    }));
+    assert.equal(response.isError, false);
+    assert.deepEqual(resultData(response).health, health);
+    assert.deepEqual(response.details.data.health, health);
+    assert.equal(calls.length, 3);
+  }
+});
+
+test("health sample reads stop on denial or cancellation and reject invalid requests before IPC", async () => {
+  const args = {
+    action: "read_health_samples", metric: "heart_rate",
+    start: "2026-09-01T00:00:00Z", end: "2026-09-02T00:00:00Z",
+  };
+  for (const denied of [true, false]) {
+    const controller = new AbortController();
+    const { bundle, calls } = createHarness((command) => {
+      if (command.endsWith("|status")) return { healthAvailable: true };
+      assert.equal(command, "plugin:mobile-assistant|request_health_metric_permission");
+      if (!denied) controller.abort();
+      return { health: denied ? "denied" : "granted" };
+    });
+    const response = await bundle.executeToolCall(toolCall("MobilePersonalData", args), controller.signal);
+    assert.equal(response.isError, true);
+    assert.equal(calls.length, 2);
+  }
+  for (const invalid of [{ metric: "unknown" }, { end: args.start }, { start: "invalid" }]) {
+    const { bundle, calls } = createHarness(() => { throw new Error("must not invoke"); });
+    const response = await bundle.executeToolCall(toolCall("MobilePersonalData", { ...args, ...invalid }));
+    assert.equal(response.isError, true);
+    assert.equal(calls.length, 0);
+  }
+});

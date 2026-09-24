@@ -43,6 +43,13 @@ struct NativePermissionRequest {
 }
 
 impl<R: Runtime> MobileAssistant<R> {
+    pub fn request_health_metric_permission(&self, request: crate::HealthMetricRequest) -> crate::Result<MobilePermissionStates> {
+        self.0.run_mobile_plugin("requestHealthMetricPermission", request).map_err(Into::into)
+    }
+
+    pub fn read_health_samples(&self, request: crate::HealthSamplesRequest) -> crate::Result<crate::HealthSamplesResult> {
+        self.0.run_mobile_plugin("readHealthSamples", request).map_err(Into::into)
+    }
     pub fn scan_bluetooth(&self, request: crate::BluetoothScanRequest) -> crate::Result<Vec<crate::BluetoothDevice>> {
         self.0.run_mobile_plugin("scanBluetooth", request).map_err(Into::into)
     }

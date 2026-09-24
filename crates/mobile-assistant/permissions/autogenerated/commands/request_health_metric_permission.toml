@@ -1,0 +1,11 @@
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-request-health-metric-permission"
+description = "Enables native read authorization for one health metric."
+commands.allow = ["request_health_metric_permission"]
+
+[[permission]]
+identifier = "deny-request-health-metric-permission"
+description = "Denies native health metric authorization requests."
+commands.deny = ["request_health_metric_permission"]

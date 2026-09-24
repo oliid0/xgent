@@ -34,6 +34,31 @@ private struct HealthStepsArgs: Decodable {
     let endMs: Int64
 }
 
+private struct HealthMetricArgs: Decodable { let metric: String }
+private struct HealthSamplesArgs: Decodable {
+    let metric: String
+    let startMs: Int64
+    let endMs: Int64
+    let limit: UInt16
+}
+private struct HealthSamplePayload: Encodable {
+    let id: String
+    let startMs: Int64
+    let endMs: Int64
+    let value: Double
+    let source: String
+}
+private struct HealthSamplesPayload: Encodable {
+    let metric: String
+    let unit: String
+    let startMs: Int64
+    let endMs: Int64
+    let samples: [HealthSamplePayload]
+    let source: String
+    let truncated: Bool
+    let accessLimited: Bool
+}
+
 private struct ReminderListArgs: Decodable {
     let incompleteOnly: Bool
     let limit: UInt16
@@ -224,7 +249,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
                 "network": self.networkStatus.map { $0 as Any } ?? NSNull(),
                 "audioOutputs": audioOutputs,
                 "permissionAliases": aliases,
-                "detail": "iOS permissions are requested individually. HealthKit reads only step totals for user-requested time ranges.",
+                "detail": "iOS permissions are requested individually. HealthKit supports step totals and selected health metrics for user-requested time ranges; each metric requires its own read authorization.",
             ])
         }
     }
@@ -391,6 +416,99 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
                     accessLimited: true
                 )
             )
+        }
+        healthStore.execute(query)
+    }
+
+    private func healthMetric(_ metric: String) -> (HKQuantityType, HKUnit, String, Double)? {
+        let identifier: HKQuantityTypeIdentifier
+        let unit: HKUnit
+        let label: String
+        var multiplier = 1.0
+        switch metric {
+        case "heart_rate":
+            identifier = .heartRate
+            unit = HKUnit.count().unitDivided(by: .minute())
+            label = "bpm"
+        case "blood_glucose":
+            identifier = .bloodGlucose
+            unit = HKUnit(from: "mg/dL")
+            label = "mg/dL"
+        case "oxygen_saturation":
+            identifier = .oxygenSaturation
+            unit = .percent()
+            label = "%"
+            multiplier = 100
+        case "weight":
+            identifier = .bodyMass
+            unit = .gramUnit(with: .kilo)
+            label = "kg"
+        case "body_temperature":
+            identifier = .bodyTemperature
+            unit = .degreeCelsius()
+            label = "degC"
+        default: return nil
+        }
+        guard let type = HKObjectType.quantityType(forIdentifier: identifier) else { return nil }
+        return (type, unit, label, multiplier)
+    }
+
+    @objc func requestHealthMetricPermission(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(HealthMetricArgs.self)
+        guard HKHealthStore.isHealthDataAvailable(), let metric = healthMetric(args.metric) else {
+            invoke.reject("Requested HealthKit metric is unavailable")
+            return
+        }
+        healthStore.requestAuthorization(toShare: [], read: [metric.0]) { success, error in
+            if let error {
+                invoke.reject(error.localizedDescription)
+            } else if !success {
+                invoke.reject("HealthKit did not complete authorization")
+            } else {
+                // HealthKit deliberately does not disclose read authorization status.
+                invoke.resolve(["health": "requested"])
+            }
+        }
+    }
+
+    @objc func readHealthSamples(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(HealthSamplesArgs.self)
+        guard args.endMs > args.startMs else {
+            invoke.reject("Health range end must be after start")
+            return
+        }
+        guard HKHealthStore.isHealthDataAvailable(), let metric = healthMetric(args.metric) else {
+            invoke.reject("Requested HealthKit metric is unavailable")
+            return
+        }
+        let limit = clampedLimit(args.limit)
+        let predicate = HKQuery.predicateForSamples(
+            withStart: date(milliseconds: args.startMs), end: date(milliseconds: args.endMs),
+            options: [.strictStartDate, .strictEndDate]
+        )
+        let query = HKSampleQuery(
+            sampleType: metric.0, predicate: predicate, limit: limit + 1,
+            sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)]
+        ) { _, samples, error in
+            if let error {
+                invoke.reject("Unable to read HealthKit samples: \(error.localizedDescription)")
+                return
+            }
+            let quantities = (samples ?? []).compactMap { $0 as? HKQuantitySample }
+            let payload = quantities.prefix(limit).map { sample in
+                HealthSamplePayload(
+                    id: sample.uuid.uuidString,
+                    startMs: Int64((sample.startDate.timeIntervalSince1970 * 1000).rounded()),
+                    endMs: Int64((sample.endDate.timeIntervalSince1970 * 1000).rounded()),
+                    value: sample.quantity.doubleValue(for: metric.1) * metric.3,
+                    source: sample.sourceRevision.source.bundleIdentifier
+                )
+            }
+            invoke.resolve(HealthSamplesPayload(
+                metric: args.metric, unit: metric.2, startMs: args.startMs, endMs: args.endMs,
+                samples: payload, source: "healthkit", truncated: quantities.count > limit,
+                accessLimited: true
+            ))
         }
         healthStore.execute(query)
     }

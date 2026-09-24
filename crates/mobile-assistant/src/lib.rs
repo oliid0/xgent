@@ -44,6 +44,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::request_permissions,
             commands::get_current_location,
             commands::read_health_steps,
+            commands::request_health_metric_permission,
+            commands::read_health_samples,
             commands::list_calendar_events,
             commands::list_reminders,
             commands::create_calendar_event,

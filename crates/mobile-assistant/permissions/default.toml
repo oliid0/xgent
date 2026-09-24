@@ -9,6 +9,8 @@ permissions = [
   "allow-open-settings",
   "allow-get-current-location",
   "allow-read-health-steps",
+  "allow-request-health-metric-permission",
+  "allow-read-health-samples",
   "allow-status",
   "allow-start-voice-input",
   "allow-check-permissions",

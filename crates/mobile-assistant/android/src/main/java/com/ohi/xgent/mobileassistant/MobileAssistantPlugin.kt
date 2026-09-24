@@ -491,6 +491,63 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @Command
+    fun requestHealthMetricPermission(invoke: Invoke) {
+        val args = parseArgs(invoke, HealthMetricArgs::class.java) ?: return
+        if (healthSdkStatus() != HealthConnectClient.SDK_AVAILABLE) {
+            invoke.reject(healthStatusDetail())
+            return
+        }
+        val permission = runCatching { healthMetricPermission(args.metric) }.getOrElse {
+            invoke.reject(it.message ?: "Unsupported health metric")
+            return
+        }
+        Thread {
+            runCatching {
+                runBlocking {
+                    HealthConnectClient.getOrCreate(activity).permissionController.getGrantedPermissions()
+                }
+            }.onSuccess { granted ->
+                if (granted.contains(permission)) {
+                    invoke.resolve(JSObject().apply { put("health", "granted") })
+                } else {
+                    mainHandler.post {
+                        runCatching {
+                            val contract = PermissionController.createRequestPermissionResultContract(HEALTH_PROVIDER_PACKAGE)
+                            startActivityForResult(invoke, contract.createIntent(activity, setOf(permission)), "onHealthMetricPermissionResult")
+                        }.onFailure { invoke.reject("Unable to request health permission: ${it.message}") }
+                    }
+                }
+            }.onFailure { invoke.reject("Unable to check health permission: ${it.message}") }
+        }.start()
+    }
+
+    @ActivityCallback
+    private fun onHealthMetricPermissionResult(invoke: Invoke, result: ActivityResult) {
+        val args = parseArgs(invoke, HealthMetricArgs::class.java) ?: return
+        val contract = PermissionController.createRequestPermissionResultContract(HEALTH_PROVIDER_PACKAGE)
+        val granted = contract.parseResult(result.resultCode, result.data)
+        invoke.resolve(JSObject().apply {
+            put("health", if (granted.contains(healthMetricPermission(args.metric))) "granted" else "denied")
+        })
+    }
+
+    @Command
+    fun readHealthSamples(invoke: Invoke) {
+        val args = parseArgs(invoke, HealthSamplesArgs::class.java) ?: return
+        if (healthSdkStatus() != HealthConnectClient.SDK_AVAILABLE) {
+            invoke.reject(healthStatusDetail())
+            return
+        }
+        Thread {
+            runCatching {
+                runBlocking { readHealthMetricSamples(HealthConnectClient.getOrCreate(activity), args) }
+            }.onSuccess(invoke::resolve).onFailure {
+                invoke.reject("Unable to read Health Connect samples: ${it.message}")
+            }
+        }.start()
+    }
+
+    @Command
     fun listCalendarEvents(invoke: Invoke) {
         val args = parseArgs(invoke, CalendarRangeArgs::class.java) ?: return
         if (!calendarPermissionGranted(invoke)) return
@@ -676,9 +733,9 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
 
     private fun healthStatusDetail(): String = when (healthSdkStatus()) {
         HealthConnectClient.SDK_AVAILABLE ->
-            "Health Connect step access is available and requested only when needed."
+            "Health Connect access is available; each requested health metric requires its own read permission."
         HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ->
-            "Install or update Health Connect before reading step data."
+            "Install or update Health Connect before reading health data."
         else -> "Health Connect is unavailable on this Android device."
     }
 

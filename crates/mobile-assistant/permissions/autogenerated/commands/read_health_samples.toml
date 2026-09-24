@@ -1,0 +1,11 @@
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-read-health-samples"
+description = "Enables bounded native health metric reads."
+commands.allow = ["read_health_samples"]
+
+[[permission]]
+identifier = "deny-read-health-samples"
+description = "Denies native health metric reads."
+commands.deny = ["read_health_samples"]

@@ -83,6 +83,40 @@ export type HealthStepsSummary = {
   accessLimited: boolean;
 };
 
+export const HEALTH_SAMPLE_METRICS = [
+  "heart_rate",
+  "blood_glucose",
+  "oxygen_saturation",
+  "weight",
+  "body_temperature",
+] as const;
+export type HealthSampleMetric = (typeof HEALTH_SAMPLE_METRICS)[number];
+export type HealthSamplesResult = {
+  metric: HealthSampleMetric;
+  unit: string;
+  startMs: number;
+  endMs: number;
+  samples: Array<{ id: string; startMs: number; endMs: number; value: number; source: string }>;
+  source: "health-connect" | "healthkit";
+  truncated: boolean;
+  accessLimited: boolean;
+};
+
+export function requestMobileHealthMetricPermission(metric: HealthSampleMetric) {
+  return invoke<MobilePermissionStates>(`${PLUGIN_COMMAND}request_health_metric_permission`, {
+    request: { metric },
+  });
+}
+
+export function readMobileHealthSamples(request: {
+  metric: HealthSampleMetric;
+  startMs: number;
+  endMs: number;
+  limit: number;
+}) {
+  return invoke<HealthSamplesResult>(`${PLUGIN_COMMAND}read_health_samples`, { request });
+}
+
 export type MobileActionResult = {
   id?: string | null;
   presented: boolean;
