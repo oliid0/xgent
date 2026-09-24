@@ -1,3 +1,4 @@
+import type { ToolCall } from "@earendil-works/pi-ai";
 import { ASK_USER_QUESTION_TIMEOUT_MS } from "../chat/askUserQuestion";
 
 export const TOOL_APPROVAL_TIMEOUT_MS = ASK_USER_QUESTION_TIMEOUT_MS;
@@ -31,6 +32,30 @@ const listenersByConversation = new Map<string, Set<() => void>>();
 const pendingSnapshotsByConversation = new Map<string, PendingToolApprovalSummary[]>();
 const EMPTY_PENDING_APPROVALS: PendingToolApprovalSummary[] = [];
 let version = 0;
+
+// Mobile tools multiplex separate personal capabilities. A calendar grant must
+// not also grant location/clipboard access just because the tool name matches.
+export function toolApprovalScope(toolCall: Pick<ToolCall, "name" | "arguments">): string {
+  if (toolCall.name !== "MobilePersonalData" && toolCall.name !== "MobilePersonalActions") {
+    return toolCall.name;
+  }
+  const args = toolCall.arguments as Record<string, unknown> | undefined;
+  const action = typeof args?.action === "string" ? args.action.trim() : "";
+  const capabilities: Record<string, string> = {
+    scan_bluetooth: "bluetooth",
+    discover_devices: "bluetooth",
+    get_current_location: "location",
+    read_clipboard: "clipboard",
+    write_clipboard: "clipboard",
+    list_calendar_events: "calendar",
+    create_calendar_event: "calendar",
+    list_reminders: "reminders",
+    create_reminder: "reminders",
+    read_health_steps: "health",
+    read_health_samples: "health",
+  };
+  return `${toolCall.name}:${capabilities[action] ?? action}`;
+}
 
 function emitChange(conversationId: string) {
   const key = conversationId.trim();
@@ -136,6 +161,7 @@ export function cancelPendingToolApprovalsForConversation(conversationId: string
 export function requestToolApproval(params: {
   toolCallId: string;
   toolName: string;
+  sessionScope?: string;
   summary?: string;
   conversationId: string;
   signal?: AbortSignal;
@@ -156,7 +182,7 @@ export function requestToolApproval(params: {
       params.signal?.removeEventListener("abort", onAbort);
       globalThis.clearTimeout(timeoutId);
       if (settlement.kind === "decided" && settlement.decision === "approve_session") {
-        rememberSessionApproval(params.conversationId, params.toolName);
+        rememberSessionApproval(params.conversationId, params.sessionScope ?? params.toolName);
       }
       emitChange(params.conversationId);
       resolve(settlement);

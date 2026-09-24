@@ -2,6 +2,8 @@
 Repair desktop and mobile function paths using `xx`/`yy` evidence without importing their UI or gateway code. Latest user correction: prioritize general complex-task execution and individual mobile capability authorization, not expansion driven by the health example. Keep changes local until the complete goal is verified.
 
 ## Completed
+- Typed the capability-to-scope lookup for dynamic action names; unknown actions retain an isolated action scope rather than inheriting the whole mobile tool grant.
+- Scoped mobile conversation approvals by personal capability and read/action tool: allowing calendar reads for a session no longer allows location, clipboard or calendar writes. The runner uses the same scope when checking and recording an approval; existing approval UI keeps the actual tool name and argument summary.
 - Corrected general personal-assistant permission checks: only confirmed grants allow ordinary capabilities; HealthKit's read-privacy exception is limited to iOS health. Denial does not automatically retry authorization. Settings and tools now share a serial native permission queue, and cancelled queued tasks cannot launch another prompt.
 - Updated native capability descriptions to match supported health metrics and added tool regressions for all five metrics, unit/source evidence, bounded limits, denied permission, cancellation and invalid requests before IPC.
 - Connected the existing MobilePersonalData tool to metric-specific permission and read commands, validates metric/time range before native calls and respects cancellation after permission; preserves sample units, source, truncation and privacy context in persisted tool results.
@@ -117,6 +119,7 @@ Repair desktop and mobile function paths using `xx`/`yy` evidence without import
 - Added a native transcript/activity regression showing that a fuzzy multi-replacement Edit with exact file snapshots renders the real diff rather than the snippet fallback.
 
 ## Evidence and decisions
+- `yy` OffloadPermissionManager stores session grants by the native command/capability. Xgent multiplexes these capabilities inside two tools, so its prior tool-name session key unintentionally widened a single capability grant. Reused the current approval lifecycle with an explicit session scope; no reference UI/gateway code imported.
 - User correction: complex task execution is the objective; the health prompt is only an example. Stop metric-specific expansion. Compared `yy` OffloadPermissionManager and Photos/Calendar native authorization: assistant policy and OS authorization are separate checks, with native requests serialized. Current settings already expose individual OS permission actions, but the general tool gate incorrectly accepted `requested` for all capabilities and concurrent requests were uncoordinated. Broader capability and policy coverage remains open.
 - Downloaded and inspected the published Health Connect 1.1.0 sources (no build): confirmed record fields, `ReadRecordsRequest` parameters and Kotlin unit getters. Corrected glucose's Kotlin getter to `inMilligramsPerDeciliter`; its documented Java getter uses a different JVM name.
 - Started from clean `main` at `3175331`; inspected prior history, screenshots, `xx`, `yy`, Astryx 0.6 source/MCP/CLI, Swift documentation, and release logs.
@@ -140,7 +143,7 @@ Repair desktop and mobile function paths using `xx`/`yy` evidence without import
 - New visual references 0386–0406 show pale grouped settings cards, circular navigation buttons, and a simple sidebar. They guide styling of existing controls only.
 
 ## Remaining
-- Align per-capability assistant access policy with `yy`, separately from OS permissions: current `runAgentConversationTurn` approval/session grants still cover the entire MobilePersonalData or MobilePersonalActions tool. Settings currently expose individual OS permissions but not independent assistant capability policies. Photo access and other native operations must be audited behind their actual grants; do not substitute more health metrics for this work.
+- Align per-capability assistant access policy with `yy`, separately from OS permissions: mobile session approvals now isolate capability/read-write scopes, but persistent settings still configure the whole MobilePersonalData/MobilePersonalActions tool. Settings expose individual OS permissions but not independent assistant capability policies. Photo access and other native operations must be audited behind their actual grants; do not substitute more health metrics for this work.
 - Native capability audit: health steps plus five quantity metrics now have tool/IPC/native implementations; Swift/Kotlin compilation, native permission denial and real samples still need verification. BLE peripheral data exchange and photo-library tool access remain incomplete. `yy` Android HealthManager contains stubs and cannot be used as completion evidence.
 - Verify the desktop selector fix in a new package; inspect other memory entry points and wipe behavior only when a safe reproduction is available.
 - Inspect and complete mobile SSH, Git review, resource library, files, MCP/Skills store, permissions, and routing against `yy`.
@@ -153,6 +156,7 @@ Repair desktop and mobile function paths using `xx`/`yy` evidence without import
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
+- Approval scope follow-up passed 18 relevant authorization tests, `pnpm check`, `pnpm lint`, and final diff review. Tests cover capability/read-write/conversation isolation, session reset, single-use/denied/timed-out/cancelled decisions and non-mobile compatibility. Prior full 1,240-test suite remains the broader baseline; no UI/native code changed in this follow-up. Changes remain local pending full-goal completion.
 - General authorization correction: all 1,240 non-Cargo tests passed; `pnpm check`, `pnpm native:check`, `pnpm lint` and diff whitespace review passed. No native build/device acceptance was performed. No UI change or push; full goal remains open.
 - Added behavioral regressions for Bluetooth/location/calendar/reminder non-grants and denied-state no-retry, plus a shared permission queue test proving serialization, queued cancellation and recovery after native errors.
 - Adjusted health privacy-state regression fixtures to identify iOS explicitly; generic permission denial/concurrency checks are being added before consolidated verification.

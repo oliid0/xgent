@@ -90,7 +90,11 @@ import { resolveShellSandboxSettings } from "../../../lib/tools/sandboxPolicy";
 import type { SkillAccessPolicy } from "../../../lib/tools/skillAccessPolicy";
 import type { SshManagerSessionChange } from "../../../lib/tools/sshManagerTools";
 import { formatTaskListRuntimeContext, type TaskStateStore } from "../../../lib/tools/taskTools";
-import { isSessionApproved, requestToolApproval } from "../../../lib/tools/toolApproval";
+import {
+  isSessionApproved,
+  requestToolApproval,
+  toolApprovalScope,
+} from "../../../lib/tools/toolApproval";
 import { resolveToolPolicy } from "../../../lib/tools/toolPolicy";
 import {
   buildMcpRequestToolFilter,
@@ -713,12 +717,14 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     }
     const effectivePolicy =
       commandSafetyMode === "ask" && metadata?.isReadOnly !== true ? "ask" : policy;
-    if (effectivePolicy !== "ask" || isSessionApproved(conversationId, toolCall.name)) {
+    const sessionScope = toolApprovalScope(toolCall);
+    if (effectivePolicy !== "ask" || isSessionApproved(conversationId, sessionScope)) {
       return { allow: true };
     }
     const settlement = await requestToolApproval({
       toolCallId: toolCall.id,
       toolName: toolCall.name,
+      sessionScope,
       summary: summarizeToolCall(toolCall, { includeName: false }),
       conversationId,
       signal,
