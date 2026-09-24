@@ -281,6 +281,7 @@ export type WriteResultDetails = {
   mtimeMs: number;
   contentHash: string;
   totalLines: number;
+  beforeContent?: string;
   preview: string;
 };
 

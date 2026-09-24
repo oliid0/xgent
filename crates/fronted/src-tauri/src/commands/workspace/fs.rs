@@ -2413,7 +2413,7 @@ fn ensure_expected_version_matches(
     target: &Path,
     logical_path: &str,
     expected: &ExpectedVersion,
-) -> Result<(), FsError> {
+) -> Result<Vec<u8>, FsError> {
     let md = fs::metadata(target)?;
     let bytes = fs::read(target)?;
     let actual_mtime_ms = metadata_mtime_ms(&md);
@@ -2426,7 +2426,7 @@ fn ensure_expected_version_matches(
                     .to_string(),
         });
     }
-    Ok(())
+    Ok(bytes)
 }
 
 #[derive(Debug, Serialize)]
@@ -3244,6 +3244,7 @@ pub struct WriteTextResponse {
     pub mtime_ms: u64,
     pub content_hash: String,
     pub total_lines: usize,
+    pub before_content: Option<String>,
     pub file_id: Option<String>,
 }
 
@@ -3313,12 +3314,19 @@ fn fs_write_text_impl(
         Err(err) => return Err(FsError::Io(err)),
     };
 
-    if existed_before {
+    let before_content = if existed_before {
         let expected = expected.ok_or_else(|| FsError::RequiresFullRead {
             path: logical_path.clone(),
         })?;
-        ensure_expected_version_matches(&target, &logical_path, &expected)?;
-    }
+        let bytes = ensure_expected_version_matches(&target, &logical_path, &expected)?;
+        if bytes.len() <= 100 * 1024 {
+            String::from_utf8(bytes).ok()
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
 
 
@@ -3345,6 +3353,7 @@ fn fs_write_text_impl(
         mtime_ms: metadata_mtime_ms(&md),
         content_hash: hash_bytes(content.as_bytes()),
         total_lines: count_text_lines(&content),
+        before_content,
         file_id: Some(file_identity(&md, &canon)),
     })
 }
@@ -6729,11 +6738,24 @@ mod tests {
         )
         .expect("write should succeed");
         assert!(write.file_id.is_some());
+        assert!(write.before_content.is_none());
+
+        let rewrite = fs_write_text_sync(
+            workdir.display().to_string(),
+            "notes.txt".to_string(),
+            "hello again\n".to_string(),
+            "rewrite".to_string(),
+            Some(write.mtime_ms),
+            Some(write.content_hash.clone()),
+            None,
+        )
+        .expect("rewrite should succeed");
+        assert_eq!(rewrite.before_content.as_deref(), Some("hello\n"));
 
         let status = fs_path_status_sync(workdir.display().to_string(), "notes.txt".to_string())
             .expect("status should succeed");
         assert!(status.exists);
-        assert_eq!(write.file_id, status.file_id);
+        assert_eq!(rewrite.file_id, status.file_id);
 
         let _ = fs::remove_dir_all(workdir);
     }

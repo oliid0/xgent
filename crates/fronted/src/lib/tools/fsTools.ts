@@ -113,6 +113,7 @@ type WriteCommandResponse = {
   mtimeMs: number;
   contentHash: string;
   totalLines: number;
+  beforeContent?: string | null;
   fileId?: string | null;
 };
 
@@ -1469,6 +1470,7 @@ export function createFsTools(params: {
       mtimeMs: res.mtimeMs,
       contentHash: res.contentHash,
       totalLines: res.totalLines,
+      beforeContent: typeof res.beforeContent === "string" ? res.beforeContent : undefined,
       preview: previewSnippet(content),
     };
     fileState.recordTextMutation({

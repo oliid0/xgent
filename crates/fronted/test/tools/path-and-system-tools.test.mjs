@@ -733,6 +733,7 @@ test("Write auto-primes a full text snapshot before overwriting an unread file",
             mtimeMs: 45,
             contentHash: "after-hash",
             totalLines: 1,
+            beforeContent: args.path === "existing.html" ? "<html>old</html>\n" : null,
           };
         },
       },
@@ -756,6 +757,7 @@ test("Write auto-primes a full text snapshot before overwriting an unread file",
   });
 
   assert.equal(overwritten.isError, false);
+  assert.equal(overwritten.details.beforeContent, "<html>old</html>\n");
   assert.match(overwritten.content[0].text, /File updated successfully at: existing\.html/);
   assert.match(overwritten.content[0].text, /autoRead=full/);
   assert.deepEqual(

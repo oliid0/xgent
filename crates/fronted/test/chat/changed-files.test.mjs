@@ -92,6 +92,38 @@ test("failed or unsettled operations never count", () => {
   );
 });
 
+test("overwriting a known file uses its saved preimage for line stats and diff", () => {
+  const summary = changedFiles.collectChangedFiles([
+    round(
+      toolBlock({
+        name: "Write",
+        args: { path: "notes.md", content: "same\nnew\n" },
+        details: {
+          kind: "write",
+          path: "notes.md",
+          existedBefore: true,
+          beforeContent: "same\nold\n",
+        },
+      }),
+    ),
+  ]);
+  assert.equal(summary.files[0].added, 1);
+  assert.equal(summary.files[0].removed, 1);
+  assert.equal(summary.files[0].beforeText, "same\nold\n");
+  assert.equal(summary.files[0].afterText, "same\nnew\n");
+
+  const unavailable = changedFiles.collectChangedFiles([
+    round(
+      toolBlock({
+        name: "Write",
+        args: { path: "large.md", content: "new" },
+        details: { kind: "write", path: "large.md", existedBefore: true },
+      }),
+    ),
+  ]);
+  assert.equal(unavailable.files[0].beforeTextAvailable, false);
+});
+
 test("Delete marks the file deleted and a later Write revives it", () => {
   const deletedOnly = changedFiles.collectChangedFiles([
     round(

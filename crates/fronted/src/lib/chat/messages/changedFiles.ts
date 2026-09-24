@@ -38,10 +38,23 @@ const FILE_CHANGE_TOOL_NAMES = new Set(["Write", "Edit", "Delete"]);
 // per-call diff so the 200k-char Edit diff never reruns per delta.
 const statsByToolCall = new WeakMap<object, FileChangeStats | null>();
 
-function statsForToolCall(toolCall: ToolBlockItem["toolCall"]): FileChangeStats | undefined {
+function statsForToolCall(
+  toolCall: ToolBlockItem["toolCall"],
+  beforeContent?: string,
+): FileChangeStats | undefined {
   const cached = statsByToolCall.get(toolCall);
   if (cached !== undefined) return cached ?? undefined;
-  const stats = deriveFileChangeStats(toolCall) ?? null;
+  const content = toolCall.arguments?.content;
+  const stats =
+    toolCall.name === "Write" &&
+    beforeContent !== undefined &&
+    typeof content === "string" &&
+    readStreamPreviewMeta(toolCall.arguments)?.fields.content?.truncated !== true
+      ? (deriveFileChangeStats({
+          name: "Edit",
+          arguments: { old_string: beforeContent, new_string: content },
+        }) ?? null)
+      : (deriveFileChangeStats(toolCall) ?? null);
   statsByToolCall.set(toolCall, stats);
   return stats ?? undefined;
 }
@@ -107,7 +120,12 @@ export function collectChangedFiles(
         entry.beforeTextAvailable = false;
         entry.afterTextAvailable = true;
       } else {
-        const stats = statsForToolCall(toolCall);
+        const stats = statsForToolCall(
+          toolCall,
+          toolCall.name === "Write" && typeof details.beforeContent === "string"
+            ? details.beforeContent
+            : undefined,
+        );
         entry.added += stats?.added ?? 0;
         entry.removed += stats?.removed ?? 0;
         // A Write after a Delete re-creates the file.
@@ -119,10 +137,12 @@ export function collectChangedFiles(
           const content = args.content;
           const complete =
             typeof content === "string" && previewMeta?.fields.content?.truncated !== true;
-          entry.beforeText = "";
-          entry.afterText = complete ? content : undefined;
-          entry.beforeTextAvailable = true;
-          entry.afterTextAvailable = complete;
+          const beforeContent =
+            typeof details.beforeContent === "string" ? details.beforeContent : undefined;
+          entry.beforeText = details.existedBefore === true ? beforeContent : "";
+          entry.afterText = complete && content.length <= 200_000 ? content : undefined;
+          entry.beforeTextAvailable = details.existedBefore !== true || beforeContent !== undefined;
+          entry.afterTextAvailable = entry.afterText !== undefined;
         } else {
           const oldText = args.old_string;
           const newText = args.new_string;
