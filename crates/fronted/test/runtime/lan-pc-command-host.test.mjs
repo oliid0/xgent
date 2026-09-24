@@ -106,17 +106,20 @@ test("paired mobile keeps network MCP local and sends stdio calls and cancellati
   host.configureLanPcCommandHost({
     enabled: true,
     baseUrl: "http://desktop:28367",
+    localWorkdir: "/phone/workspace",
     remoteWorkdir: "C:\\workspace",
   });
 
   const tools = await tauriRuntime.invoke("mcp_list_tools", { servers: [
-    { id: "web", transport: "http" },
-    { id: "local", transport: "stdio" },
+    { id: "web", transport: "http", cwd: "/phone/workspace/web" },
+    { id: "local", transport: "stdio", cwd: "/phone/workspace/tools" },
   ] });
   assert.deepEqual(tools.map((tool) => tool.serverId), ["web", "local"]);
   assert.deepEqual(calls.map((call) => call.command), ["mcp_list_tools", "lan_pc_invoke"]);
   assert.deepEqual(calls[0].args.servers.map((server) => server.id), ["web"]);
   assert.deepEqual(calls[1].args.args.servers.map((server) => server.id), ["local"]);
+  assert.equal(calls[0].args.servers[0].cwd, "/phone/workspace/web");
+  assert.equal(calls[1].args.args.servers[0].cwd, "C:\\workspace\\tools");
 
   calls.length = 0;
   await tauriRuntime.invoke("mcp_call_tool", { server_id: "web", run_id: "web-run" });
@@ -130,7 +133,10 @@ test("paired mobile keeps network MCP local and sends stdio calls and cancellati
   assert.equal(calls[2].args.command, "mcp_cancel_tool");
 
   calls.length = 0;
-  await tauriRuntime.invoke("mcp_test_server", { server: { id: "another", transport: "stdio" } });
+  await tauriRuntime.invoke("mcp_test_server", { server: {
+    id: "another", transport: "stdio", cwd: "/phone/workspace/checks",
+  } });
   await tauriRuntime.invoke("mcp_runtime_status", { server_id: "another" });
   assert.deepEqual(calls.map((call) => call.command), ["lan_pc_invoke", "lan_pc_invoke"]);
+  assert.equal(calls[0].args.args.server.cwd, "C:\\workspace\\checks");
 });

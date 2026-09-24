@@ -216,12 +216,24 @@ function mapWorkdir(value: unknown) {
   return joinRemotePath(remoteWorkdir, path.slice(localWorkdir.length));
 }
 
-export function prepareLanPcInvokeArgs(args?: RuntimeInvokeArgs): RuntimeInvokeArgs {
+export function prepareLanPcInvokeArgs(
+  args?: RuntimeInvokeArgs,
+  command?: string,
+): RuntimeInvokeArgs {
   const next: RuntimeInvokeArgs = { ...(args ?? {}) };
   for (const key of ["workdir", "cwd", "project_path_key"]) {
     if (Object.hasOwn(next, key)) {
       next[key] = mapWorkdir(next[key]);
     }
+  }
+  if (command?.startsWith("mcp_")) {
+    const mapServer = (value: unknown) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+      const server = value as Record<string, unknown>;
+      return typeof server.cwd === "string" ? { ...server, cwd: mapWorkdir(server.cwd) } : value;
+    };
+    if (Object.hasOwn(next, "server")) next.server = mapServer(next.server);
+    if (Array.isArray(next.servers)) next.servers = next.servers.map(mapServer);
   }
   return next;
 }

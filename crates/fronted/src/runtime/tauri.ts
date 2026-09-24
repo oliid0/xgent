@@ -52,7 +52,7 @@ export const tauriRuntime: XgentRuntime = {
           tauriInvoke<unknown[]>("lan_pc_invoke", {
             base_url: host.baseUrl,
             command,
-            args: { servers: remote },
+            args: prepareLanPcInvokeArgs({ servers: remote }, command),
           }),
         ]);
         const tools: unknown[] = [];
@@ -83,7 +83,7 @@ export const tauriRuntime: XgentRuntime = {
         return await tauriInvoke<T>("lan_pc_invoke", {
           base_url: host.baseUrl,
           command,
-          args: prepareLanPcInvokeArgs(args),
+          args: prepareLanPcInvokeArgs(args, command),
         });
       }
       return await tauriInvoke<T>(command, args);
