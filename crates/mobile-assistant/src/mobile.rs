@@ -43,6 +43,9 @@ struct NativePermissionRequest {
 }
 
 impl<R: Runtime> MobileAssistant<R> {
+    pub fn bluetooth_gatt(&self, request: crate::BluetoothGattRequest) -> crate::Result<crate::BluetoothGattResult> {
+        self.0.run_mobile_plugin("bluetoothGatt", request).map_err(Into::into)
+    }
     pub fn list_photos(&self, request: crate::PhotoListRequest) -> crate::Result<crate::PhotoListResult> {
         self.0.run_mobile_plugin("listPhotos", request).map_err(Into::into)
     }

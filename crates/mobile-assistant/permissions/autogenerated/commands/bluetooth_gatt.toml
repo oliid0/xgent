@@ -1,0 +1,11 @@
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-bluetooth-gatt"
+description = "Enables the bluetooth_gatt command."
+commands.allow = ["bluetooth_gatt"]
+
+[[permission]]
+identifier = "deny-bluetooth-gatt"
+description = "Denies the bluetooth_gatt command."
+commands.deny = ["bluetooth_gatt"]

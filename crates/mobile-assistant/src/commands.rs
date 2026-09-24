@@ -10,6 +10,11 @@ use crate::models::{
 use crate::{MobileAssistantExt, Result};
 
 #[command]
+pub(crate) async fn bluetooth_gatt<R: Runtime>(app: AppHandle<R>, request: crate::BluetoothGattRequest) -> Result<crate::BluetoothGattResult> {
+    on_worker(move || app.mobile_assistant().bluetooth_gatt(request)).await
+}
+
+#[command]
 pub(crate) async fn list_photos<R: Runtime>(app: AppHandle<R>, request: crate::PhotoListRequest) -> Result<crate::PhotoListResult> {
     on_worker(move || app.mobile_assistant().list_photos(request)).await
 }

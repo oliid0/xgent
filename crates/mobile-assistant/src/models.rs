@@ -305,6 +305,40 @@ pub struct PhotoReadRequest {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BluetoothGattRequest {
+    pub operation: String,
+    pub device_id: String,
+    pub service_uuid: Option<String>,
+    pub characteristic_uuid: Option<String>,
+    pub timeout_ms: u64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BluetoothGattResult {
+    pub device_id: String,
+    pub services: Vec<BluetoothGattService>,
+    pub service_uuid: Option<String>,
+    pub characteristic_uuid: Option<String>,
+    pub data_hex: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BluetoothGattService {
+    pub uuid: String,
+    pub characteristics: Vec<BluetoothGattCharacteristic>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BluetoothGattCharacteristic {
+    pub uuid: String,
+    pub readable: bool,
+    pub writable: bool,
+    pub notifiable: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PhotoReadResult {
     pub id: String,
     pub mime_type: String,

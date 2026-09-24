@@ -1,6 +1,7 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import {
+  accessMobileBluetoothGatt,
   checkMobileAssistantPermissions,
   composeMobileMessage,
   createMobileCalendarEvent,
@@ -32,12 +33,14 @@ import { resolveToolPolicy } from "./toolPolicy";
 const listDataTool: Tool = {
   name: "MobilePersonalData",
   description:
-    "Access authorized phone-native data without Shell: connectivity, nearby BLE discovery, location, clipboard, calendar, reminders, photos and health. list_photos returns accessible image IDs with optional start/end bounds; read_photo returns a bounded JPEG preview for a photo_id, not the original image. Restricted libraries return only authorized photos. Health samples require metric, start and end and return units/source; empty data does not prove normal health or permission denial. BLE discovery does not read arbitrary sensor data. Request personal data only when needed for the user's task.",
+    "Access authorized phone-native data without Shell: connectivity, nearby BLE discovery, location, clipboard, calendar, reminders, photos and health. list_photos returns accessible image IDs with optional start/end bounds; read_photo returns a bounded JPEG preview for a photo_id, not the original image. Restricted libraries return only authorized photos. Health samples require metric, start and end and return units/source; empty data does not prove normal health or permission denial. After BLE scanning, bluetooth_services connects to device_id and lists GATT service/characteristic UUIDs and properties; read_bluetooth_characteristic requires device_id, service_uuid and characteristic_uuid and returns raw dataHex. Connections close after each operation. Interpret bytes only using the device's documented protocol; notification-only characteristics cannot be read this way. Request personal data only when needed for the user's task.",
   parameters: Type.Object({
     action: Type.Union([
       Type.Literal("network_status"),
       Type.Literal("discover_devices"),
       Type.Literal("scan_bluetooth"),
+      Type.Literal("bluetooth_services"),
+      Type.Literal("read_bluetooth_characteristic"),
       Type.Literal("get_current_location"),
       Type.Literal("read_clipboard"),
       Type.Literal("list_calendar_events"),
@@ -49,6 +52,9 @@ const listDataTool: Tool = {
     ]),
     metric: Type.Optional(Type.Union(HEALTH_SAMPLE_METRICS.map((metric) => Type.Literal(metric)))),
     photo_id: Type.Optional(Type.String({ minLength: 1 })),
+    device_id: Type.Optional(Type.String({ minLength: 1 })),
+    service_uuid: Type.Optional(Type.String({ minLength: 1 })),
+    characteristic_uuid: Type.Optional(Type.String({ minLength: 1 })),
     start: Type.Optional(
       Type.String({ description: "Calendar or health range start as an ISO 8601 date-time." }),
     ),
@@ -327,6 +333,25 @@ export function createMobilePersonalAssistantTools(
             nearbyBluetooth,
             ...(bluetoothError ? { bluetoothError } : {}),
           });
+        }
+        if (action === "bluetooth_services" || action === "read_bluetooth_characteristic") {
+          const deviceId = requiredText(args, "device_id");
+          const reading = action === "read_bluetooth_characteristic";
+          const serviceUuid = reading ? requiredText(args, "service_uuid") : undefined;
+          const characteristicUuid = reading
+            ? requiredText(args, "characteristic_uuid")
+            : undefined;
+          await ensurePermission("bluetooth", signal);
+          if (signal?.aborted) return result(toolCall, "Cancelled", true);
+          const data = await accessMobileBluetoothGatt({
+            operation: reading ? "read" : "services",
+            deviceId,
+            serviceUuid,
+            characteristicUuid,
+            timeoutMs: typeof args.timeout_ms === "number" ? args.timeout_ms : 10_000,
+          });
+          if (signal?.aborted) return result(toolCall, "Cancelled", true);
+          return result(toolCall, data);
         }
         if (action === "scan_bluetooth") {
           await ensurePermission("bluetooth", signal);

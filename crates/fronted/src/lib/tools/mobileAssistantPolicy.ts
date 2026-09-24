@@ -18,6 +18,8 @@ export function personalCapability(toolCall: Pick<ToolCall, "name" | "arguments"
   const action = (toolCall.arguments as Record<string, unknown> | undefined)?.action;
   const capabilities: Record<string, PersonalCapability> = {
     scan_bluetooth: "bluetooth",
+    bluetooth_services: "bluetooth",
+    read_bluetooth_characteristic: "bluetooth",
     discover_devices: "bluetooth",
     get_current_location: "location",
     read_clipboard: "clipboard",

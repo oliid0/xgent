@@ -24,6 +24,9 @@ pub fn init<R: Runtime, C: serde::de::DeserializeOwned>(
 pub struct MobileAssistant<R: Runtime>(PhantomData<fn() -> R>);
 
 impl<R: Runtime> MobileAssistant<R> {
+    pub fn bluetooth_gatt(&self, _request: crate::BluetoothGattRequest) -> Result<crate::BluetoothGattResult> {
+        Err(Error::Unavailable("native Bluetooth GATT requires Android or iOS".into()))
+    }
     pub fn list_photos(&self, _request: crate::PhotoListRequest) -> Result<crate::PhotoListResult> {
         Err(Error::Unavailable("photo library access is only available on mobile".into()))
     }

@@ -168,6 +168,41 @@ export function scanMobileBluetooth(timeoutMs = 5_000) {
   });
 }
 
+export type MobileBluetoothGattResult = {
+  deviceId: string;
+  services: {
+    uuid: string;
+    characteristics: { uuid: string; readable: boolean; writable: boolean; notifiable: boolean }[];
+  }[];
+  serviceUuid?: string | null;
+  characteristicUuid?: string | null;
+  dataHex?: string | null;
+};
+
+export function accessMobileBluetoothGatt(request: {
+  operation: "services" | "read";
+  deviceId: string;
+  serviceUuid?: string;
+  characteristicUuid?: string;
+  timeoutMs: number;
+}) {
+  if (!request.deviceId.trim()) throw new Error("Bluetooth device_id is required");
+  if (
+    !Number.isInteger(request.timeoutMs) ||
+    request.timeoutMs < 1_000 ||
+    request.timeoutMs > 30_000
+  )
+    throw new Error("Bluetooth timeout must be between 1000 and 30000 ms");
+  const uuid =
+    /^(?:[\da-f]{4}|[\da-f]{8}|[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12})$/i;
+  if (
+    request.operation === "read" &&
+    (!uuid.test(request.serviceUuid ?? "") || !uuid.test(request.characteristicUuid ?? ""))
+  )
+    throw new Error("Read requires valid service_uuid and characteristic_uuid");
+  return invoke<MobileBluetoothGattResult>(`${PLUGIN_COMMAND}bluetooth_gatt`, { request });
+}
+
 export function mobileAssistantStatus() {
   return invoke<MobileAssistantStatus>(`${PLUGIN_COMMAND}status`);
 }

@@ -34,6 +34,59 @@ function resultData(result) {
   return JSON.parse(result.content[0].text);
 }
 
+test("authorized GATT operations preserve discovered properties and raw bytes", async () => {
+  const data = { deviceId: "AA:BB:CC:DD:EE:FF", services: [{ uuid: "180f", characteristics: [{ uuid: "2a19", readable: true, writable: false, notifiable: true }] }], dataHex: "64" };
+  const { bundle, calls } = createHarness((command) => {
+    if (command.endsWith("|status")) return { permissionAliases: { bluetooth: "bluetooth" } };
+    if (command.endsWith("|check_permissions")) return { bluetooth: "granted" };
+    if (command.endsWith("|bluetooth_gatt")) return data;
+    throw new Error(`Unexpected command ${command}`);
+  });
+  for (const action of ["bluetooth_services", "read_bluetooth_characteristic"]) {
+    const response = await bundle.executeToolCall(toolCall("MobilePersonalData", { action, device_id: data.deviceId, service_uuid: "180f", characteristic_uuid: "2a19" }));
+    assert.equal(response.isError, false);
+    assert.deepEqual(resultData(response), data);
+    assert.equal(calls.at(-1).args.request.operation, action === "bluetooth_services" ? "services" : "read");
+    assert.equal(calls.at(-1).args.request.timeoutMs, 10_000);
+  }
+});
+
+test("GATT policy denial, OS denial and malformed reads cannot invoke native GATT", async () => {
+  for (const mode of ["policy", "os", "uuid", "timeout"]) {
+    const { bundle, calls } = createHarness((command) => {
+      if (command.endsWith("|status")) return { permissionAliases: { bluetooth: "bluetooth" } };
+      if (command.endsWith("|check_permissions")) return { bluetooth: mode === "os" ? "denied" : "granted" };
+      throw new Error(`Unexpected command ${command}`);
+    }, { getToolPolicies: () => ({ "personal:bluetooth": mode === "policy" ? "deny" : "allow" }) });
+    const response = await bundle.executeToolCall(toolCall("MobilePersonalData", {
+      action: "read_bluetooth_characteristic", device_id: "AA:BB:CC:DD:EE:FF",
+      service_uuid: mode === "uuid" ? "invalid" : "180f", characteristic_uuid: "2a19",
+      timeout_ms: mode === "timeout" ? 0 : 10_000,
+    }));
+    assert.equal(response.isError, true);
+    assert.equal(calls.some(({ command }) => command.endsWith("|bluetooth_gatt")), false);
+    if (mode === "policy") assert.equal(calls.length, 0);
+  }
+});
+
+test("GATT native failures and in-flight cancellation never become successful readings", async () => {
+  for (const cancel of [true, false]) {
+    const controller = new AbortController();
+    const { bundle } = createHarness((command) => {
+      if (command.endsWith("|status")) return { permissionAliases: { bluetooth: "bluetooth" } };
+      if (command.endsWith("|check_permissions")) return { bluetooth: "granted" };
+      if (command.endsWith("|bluetooth_gatt")) {
+        if (cancel) { controller.abort(); return { dataHex: "64" }; }
+        throw new Error("Bluetooth GATT operation timed out");
+      }
+      throw new Error(`Unexpected command ${command}`);
+    });
+    const response = await bundle.executeToolCall(toolCall("MobilePersonalData", { action: "bluetooth_services", device_id: "AA:BB:CC:DD:EE:FF" }), controller.signal);
+    assert.equal(response.isError, true);
+    assert.match(response.content[0].text, cancel ? /Cancelled/ : /timed out/);
+  }
+});
+
 test("authorized photo queries preserve restricted-library and truncation evidence", async () => {
   const data = { photos: [{ id: "42", createdMs: 1, width: 300, height: 200 }], accessLimited: true, truncated: true };
   const { bundle, calls } = createHarness((command) => {

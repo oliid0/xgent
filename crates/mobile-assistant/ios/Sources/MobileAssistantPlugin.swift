@@ -138,6 +138,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
 {
     private let eventStore = EKEventStore()
     private let bluetooth = BluetoothDiscovery()
+    private let bluetoothGattAccess = BluetoothGattAccess()
     private let healthStore = HKHealthStore()
     private let locationManager = CLLocationManager()
     private let networkMonitor = NWPathMonitor()
@@ -181,6 +182,10 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
 
     @objc func scanBluetooth(_ invoke: Invoke) {
         DispatchQueue.main.async { self.bluetooth.scan(invoke) }
+    }
+
+    @objc func bluetoothGatt(_ invoke: Invoke) {
+        DispatchQueue.main.async { self.bluetoothGattAccess.run(invoke) }
     }
 
     @objc func writeClipboard(_ invoke: Invoke) {
