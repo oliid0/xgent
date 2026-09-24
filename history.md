@@ -93,6 +93,11 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Applied Biome's two import/format corrections after TypeScript and native presentation checks passed; remaining consolidated checks continue after this fix.
 - Kept native Edit activity diffs limited to complete exact single-replacement snippets; truncated or fuzzy/multiple edits now retain a text preview instead of showing a misleading synthetic diff. Added a transcript/activity regression for truncated and fuzzy cases.
 - Applied Biome's two line wrapping changes to the native Edit evidence condition after focused checks passed 15/15 and TypeScript.
+- Added a read-only SkillsManager install job listing over the existing in-memory job registry, with newest-first snapshots; frontend API exposes it so mobile Skill installs can resume after the page is reopened.
+- Mobile Skills now loads those jobs on entry, resumes polling and enables completed installs after navigation; install is temporarily disabled until recovery finishes to avoid starting a duplicate.
+- Deduplicated completed Skill job handling across page mounts, so returning to the store after manually disabling a Skill does not re-enable it from a retained finished job.
+- Extended the existing Skill job backend regression to verify that a running job is discoverable through the new list API; Cargo tests remain excluded by the user's tool restriction.
+- Added a frontend contract check that the mobile recovery request invokes the existing SkillsManager command with `install_jobs` and returns its snapshots.
 
 ## Evidence and decisions
 - Started from clean `main` at `3175331`; inspected prior history, screenshots, `xx`, `yy`, Astryx 0.6 source/MCP/CLI, Swift documentation, and release logs.
@@ -118,6 +123,7 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 ## Remaining
 - Verify the desktop selector fix in a new package; inspect other memory entry points and wipe behavior only when a safe reproduction is available.
 - Inspect and complete mobile SSH, Git review, resource library, files, MCP/Skills store, permissions, and routing against `yy`.
+- Verify resumed Skill install status and completion on a device, including leaving the store before the download finishes; the backend list contract is only locally checked without Cargo.
 - Verify native SSH, Git, SwiftUI Quick Look, and file import on devices; Android/iOS compilation now passes in release `35910177777`, but device behavior still needs runtime evidence.
 - Continue deeper `xx`/`yy` function review, MCP/Skills store validation, and rendered/mobile runtime checks. The desktop selector fix still needs a new client package after the existing running process can be safely closed. Push only once the entire goal is complete, per the user's latest instruction.
 - Audit the user's compound mobile workflow end to end: browser research, health/nearby-device permissions and data, MCP/Skill execution, workspace file writes/diffs, optional shell package installation, LAN PC/cloud delegation, and chat/activity traces. Repair concrete missing edges without importing reference UI/gateway code.
@@ -126,4 +132,4 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
-- Latest full local batch passed `pnpm test:non-native` (1,230 tests; Cargo skipped), `pnpm check`, `pnpm native:check`, and `pnpm lint`. Subsequent native Edit evidence change passed focused tests 15/15, `pnpm check`, and `pnpm lint`. Device behavior remains unverified. Release `35910177777` passed all platforms at `4d01a27`. Remote `c0d34ca` CI `35918340388` and release `35918757930` failed on `InstallProgress: Clone` in desktop Rust; all four failed release jobs show that error, while iOS passed. Local fix is awaiting final push/CI. No local Cargo/build commands. Push only after the whole goal is complete.
+- Latest full local batch passed `pnpm test:non-native` (1,230 tests; Cargo skipped), `pnpm check`, `pnpm native:check`, and `pnpm lint`. Subsequent native Edit evidence passed focused tests 15/15; Skill job recovery passed focused tests 4/4, `pnpm check`, and `pnpm lint`. Device behavior remains unverified. Release `35910177777` passed all platforms at `4d01a27`. Remote `c0d34ca` CI `35918340388` and release `35918757930` failed on `InstallProgress: Clone` in desktop Rust; all four failed release jobs show that error, while iOS passed. Local fix is awaiting final push/CI. No local Cargo/build commands. Push only after the whole goal is complete.

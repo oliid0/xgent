@@ -18,6 +18,7 @@ import {
   getSkillInstallJobStatus,
   isAlwaysEnabledSkillName,
   isUserSelectableSkill,
+  listSkillInstallJobs,
   readSkillText,
   type SkillInstallJobSnapshot,
   type SkillSummary,
@@ -52,6 +53,8 @@ type SkillPreview = {
   error: string;
 };
 
+const completedStoreJobIds = new Set<string>();
+
 export function MobileSkillsPage(props: MobileSkillsPageProps) {
   const { t } = useLocale();
   const [skills, setSkills] = useState<SkillSummary[]>(props.initialSkills ?? []);
@@ -61,6 +64,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
   const [storeLoading, setStoreLoading] = useState(false);
   const [storeError, setStoreError] = useState("");
   const [storeJobs, setStoreJobs] = useState<Record<string, SkillInstallJobSnapshot>>({});
+  const [jobsLoading, setJobsLoading] = useState(true);
   const [pendingStoreKeys, setPendingStoreKeys] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
@@ -74,6 +78,33 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
   useEffect(() => {
     setSkills(props.initialSkills ?? []);
   }, [props.initialSkills]);
+
+  useEffect(() => {
+    let active = true;
+    void listSkillInstallJobs()
+      .then((jobs) => {
+        if (!active) return;
+        const recovered: Record<string, SkillInstallJobSnapshot> = {};
+        for (const job of jobs) {
+          if (!job.slug || !job.ownerHandle) continue;
+          const key = buildClawHubSkillKey({ slug: job.slug, ownerHandle: job.ownerHandle });
+          if (!recovered[key]) recovered[key] = job;
+        }
+        setStoreJobs((current) => ({ ...recovered, ...current }));
+        for (const job of Object.values(recovered)) {
+          if (job.phase === "done") completeStoreJob(job);
+        }
+      })
+      .catch((cause) => {
+        if (active) setStoreError(cause instanceof Error ? cause.message : String(cause));
+      })
+      .finally(() => {
+        if (active) setJobsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [props.setSettings]);
 
   useEffect(() => {
     if (!isApplePresentationRuntime() || props.initialSkills) return;
@@ -180,6 +211,8 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
   );
 
   function completeStoreJob(job: SkillInstallJobSnapshot) {
+    if (completedStoreJobIds.has(job.jobId)) return;
+    completedStoreJobIds.add(job.jobId);
     const names = (job.installed ?? [])
       .map((item) => item.name.trim())
       .filter((name) => name && !isAlwaysEnabledSkillName(name));
@@ -199,6 +232,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
   async function installStoreSkill(skill: ClawHubSkillCard) {
     const key = buildClawHubSkillKey(skill);
     if (
+      jobsLoading ||
       pendingStoreKeys.includes(key) ||
       installedStoreKeys.has(key) ||
       (storeJobs[key] && !["error", "cancelled"].includes(storeJobs[key].phase))
@@ -254,6 +288,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
       job,
       installed: installedStoreKeys.has(key) || job?.phase === "done",
       pending:
+        jobsLoading ||
         pendingStoreKeys.includes(key) ||
         Boolean(job && !["done", "error", "cancelled"].includes(job.phase)),
     };

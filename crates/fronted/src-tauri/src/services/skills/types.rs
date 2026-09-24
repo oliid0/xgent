@@ -197,6 +197,7 @@ pub struct SystemManageSkillResponse {
     pub package: Option<SystemSkillPackageResponse>,
     pub deleted: Option<SystemSkillDeleteResponse>,
     pub install_job: Option<SystemSkillInstallJobSnapshot>,
+    pub install_jobs: Option<Vec<SystemSkillInstallJobSnapshot>>,
     pub clawhub_results: Option<Vec<SystemClawHubSkillCard>>,
     pub clawhub_next_cursor: Option<String>,
     pub clawhub_slug: Option<String>,

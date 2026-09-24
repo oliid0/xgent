@@ -15,7 +15,7 @@ pub(crate) fn action_from_payload(
         }
     });
     match action {
-        "read" | "list" | "install" | "import_bundle" | "install_start" | "install_status" | "install_cancel"
+        "read" | "list" | "install" | "import_bundle" | "install_start" | "install_status" | "install_cancel" | "install_jobs"
         | "create" | "validate" | "package" | "delete" | "clawhub_search" | "clawhub_install"
         | "scan_external" | "scan_external_mcp" | "scan_mcp_file" | "scan_mcp_content" => {
             Ok(action.to_string())
@@ -129,6 +129,10 @@ pub fn system_manage_skill_sync(payload: Value) -> Result<SystemManageSkillRespo
                 ..base
             })
         }
+        "install_jobs" => Ok(SystemManageSkillResponse {
+            install_jobs: Some(list_install_job_snapshots()?),
+            ..base
+        }),
         "install_cancel" => {
             let job_id = object_string(payload, "jobId")
                 .or_else(|| object_string(payload, "job_id"))

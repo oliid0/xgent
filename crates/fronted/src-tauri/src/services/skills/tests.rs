@@ -1153,6 +1153,8 @@ fn cancel_install_job_flags_running_jobs_and_rejects_finished_ones() {
     let snapshot = get_install_job_snapshot(&job_id).expect("read job snapshot");
     assert_eq!(snapshot.slug.as_deref(), Some("github"));
     assert_eq!(snapshot.owner_handle.as_deref(), Some("acme"));
+    let listed = list_install_job_snapshots().expect("list job snapshots");
+    assert!(listed.iter().any(|job| job.job_id == job_id));
 
     cancel_install_job(&job_id).expect("cancel running job");
     let flagged = skill_install_jobs()

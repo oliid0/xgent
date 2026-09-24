@@ -118,6 +118,16 @@ pub(crate) fn get_install_job_snapshot(
     Ok(install_job_snapshot(job))
 }
 
+pub(crate) fn list_install_job_snapshots() -> Result<Vec<SystemSkillInstallJobSnapshot>, String> {
+    let mut jobs = skill_install_jobs()
+        .lock()
+        .map_err(|_| "Failed to lock Skill install jobs".to_string())?;
+    prune_old_install_jobs(&mut jobs, now_millis());
+    let mut snapshots: Vec<_> = jobs.values().map(install_job_snapshot).collect();
+    snapshots.sort_by_key(|job| std::cmp::Reverse(job.started_at));
+    Ok(snapshots)
+}
+
 pub(crate) fn cancel_install_job(job_id: &str) -> Result<SystemSkillInstallJobSnapshot, String> {
     let mut jobs = skill_install_jobs()
         .lock()

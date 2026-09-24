@@ -147,6 +147,7 @@ type SystemManageSkillResponse = {
     target: string;
   } | null;
   installJob?: SkillInstallJobSnapshot | null;
+  installJobs?: SkillInstallJobSnapshot[] | null;
   clawhubResults?: ClawHubSkillCard[] | null;
   clawhubNextCursor?: string | null;
   clawhubSlug?: string | null;
@@ -585,6 +586,14 @@ export async function getSkillInstallJobStatus(jobId: string): Promise<SkillInst
     throw new Error("SkillsManager install_status did not return an install job");
   }
   return response.installJob;
+}
+
+export async function listSkillInstallJobs(): Promise<SkillInstallJobSnapshot[]> {
+  const response = await manageSkill({ action: "install_jobs" });
+  if (!response.installJobs) {
+    throw new Error("SkillsManager install_jobs did not return install jobs");
+  }
+  return response.installJobs;
 }
 
 export async function cancelSkillInstallJob(jobId: string): Promise<SkillInstallJobSnapshot> {
