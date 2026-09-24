@@ -61,6 +61,7 @@ function resolveManualContextUsage(
 
 /** Runs explicit context compaction through the same local runtime used by normal sends. */
 export function useManualCompaction(params: {
+  recordTrajectory: boolean;
   settings: AppSettings;
   t: (key: string) => string;
   currentConversationIdRef: MutableRefObject<string>;
@@ -89,6 +90,7 @@ export function useManualCompaction(params: {
   }) => Promise<{ skillsPrompt: string; memoryPrompt: string }>;
 }) {
   const {
+    recordTrajectory,
     settings,
     t,
     currentConversationIdRef,
@@ -245,29 +247,31 @@ export function useManualCompaction(params: {
         };
 
         const compactionController = getCompactionController(conversationId);
-        const trajectory = acquireTrajectoryRecorder(
-          conversationId,
-          getActiveSegment(runtimeEntry.state)?.segmentIndex ??
-            runtimeEntry.state.meta.activeSegmentIndex,
-        );
-        flushTrajectory = trajectory.recorder.flush;
-        compactionController.setObserver({
-          onStart: ({ trigger }) => {
-            trajectory.recorder.compactionStart({ standalone: trigger === "manual" });
-          },
-          onEnd: ({ trigger, status, tokensBefore, tokensAfter, newSegmentIndex, error }) => {
-            trajectory.recorder.compactionEnd({
-              status,
-              standalone: trigger === "manual",
-              ...(tokensBefore === undefined ? {} : { tokensBefore }),
-              ...(tokensAfter === undefined ? {} : { tokensAfter }),
-              ...(error === undefined ? {} : { error }),
-            });
-            if (status === "complete" && newSegmentIndex !== undefined) {
-              updateTrajectoryRecorderSegment(conversationId, newSegmentIndex);
-            }
-          },
-        });
+        if (recordTrajectory) {
+          const trajectory = acquireTrajectoryRecorder(
+            conversationId,
+            getActiveSegment(runtimeEntry.state)?.segmentIndex ??
+              runtimeEntry.state.meta.activeSegmentIndex,
+          );
+          flushTrajectory = trajectory.recorder.flush;
+          compactionController.setObserver({
+            onStart: ({ trigger }) => {
+              trajectory.recorder.compactionStart({ standalone: trigger === "manual" });
+            },
+            onEnd: ({ trigger, status, tokensBefore, tokensAfter, newSegmentIndex, error }) => {
+              trajectory.recorder.compactionEnd({
+                status,
+                standalone: trigger === "manual",
+                ...(tokensBefore === undefined ? {} : { tokensBefore }),
+                ...(tokensAfter === undefined ? {} : { tokensAfter }),
+                ...(error === undefined ? {} : { error }),
+              });
+              if (status === "complete" && newSegmentIndex !== undefined) {
+                updateTrajectoryRecorderSegment(conversationId, newSegmentIndex);
+              }
+            },
+          });
+        }
 
         const outcome = await compactionController.compactManually(
           {
@@ -334,6 +338,7 @@ export function useManualCompaction(params: {
       getConversationLiveTranscriptStore,
       isConversationRunning,
       persistConversation,
+      recordTrajectory,
       resetLiveTranscript,
       resolveManualCompactionPromptInputs,
       setConversationAbortController,

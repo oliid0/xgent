@@ -142,6 +142,7 @@ test("native iPhone opens More as a full-page tool list and keeps compact sideba
   const h = harness(
     {
       projects: [{ id: "project", name: "Workspace" }],
+      trajectoryAvailable: true,
       onOpenTerminal: () => opened.push("terminal"),
       onOpenFiles: () => opened.push("library"),
       onOpenSettings: (section) => opened.push(section ?? "settings"),
@@ -186,6 +187,7 @@ test("native iPhone opens More as a full-page tool list and keeps compact sideba
     list.children.slice(0, 6).map((node) => node.id),
     ["files", "sidebar-projects-toggle", "skills", "scheduled", "remote", "mcp"],
   );
+  assert.equal(list.children.some((node) => node.id === "trajectory"), false);
   assert.equal(layout.children.some((node) => node.id === "sidebar-title"), true);
   assert.equal(layout.children.some((node) => node.id === "sidebar-search"), false);
   assert.equal((await h.dispatch("sidebar-search-toggle", null, "sidebar")).ok, true);

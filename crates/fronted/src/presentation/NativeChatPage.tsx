@@ -937,7 +937,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                   kind: "Selector",
                   variant: "compact",
                   icon: "sparkles",
-                  label: t("chat.trajectory.lane.model"),
+                  label: t("chat.model"),
                   value: props.selectedValue ?? "",
                   disabled: props.modelOptions.length === 0,
                   options: props.modelOptions.map((option) => ({

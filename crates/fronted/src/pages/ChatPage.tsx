@@ -3449,6 +3449,7 @@ export function ChatPage(props: ChatPageProps) {
   );
 
   const runManualCompaction = useManualCompaction({
+    recordTrajectory: desktopBridgeEnabled,
     settings,
     t,
     currentConversationIdRef,
