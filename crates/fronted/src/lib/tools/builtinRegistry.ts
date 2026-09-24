@@ -158,6 +158,7 @@ type BuildBuiltinBaseToolRegistryParams = {
   providerId: ProviderId;
   runtimePlatform?: RuntimePlatform;
   nativeMobileRuntime?: boolean;
+  personalAssistantAccess?: Parameters<typeof createMobilePersonalAssistantTools>[0];
   lanPcCommandHostReady?: boolean;
   fileState: FileToolState;
   sandbox?: ShellSandboxSettings;
@@ -273,7 +274,9 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       mode: params.memoryToolMode ?? "rw",
     }),
     ...(params.nativeMobileRuntime === true ? [createMobileExecutionTools()] : []),
-    ...(params.nativeMobileRuntime === true ? [createMobilePersonalAssistantTools()] : []),
+    ...(params.nativeMobileRuntime === true
+      ? [createMobilePersonalAssistantTools(params.personalAssistantAccess)]
+      : []),
     ...(params.nativeMobileRuntime === true && params.runtimeScope === "chat"
       ? [
           createMobilePreviewTools({

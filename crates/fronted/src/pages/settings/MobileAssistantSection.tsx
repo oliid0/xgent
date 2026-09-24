@@ -3,6 +3,7 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Section } from "@astryxdesign/core/Section";
+import { Selector } from "@astryxdesign/core/Selector";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
@@ -30,6 +31,13 @@ import {
   openMobileSystemSettings,
   requestMobileAssistantPermission,
 } from "../../lib/mobileAssistant";
+import { type ToolPolicy, updateSystem } from "../../lib/settings";
+import {
+  PERSONAL_CAPABILITIES,
+  personalPolicy,
+  personalPolicyKey,
+} from "../../lib/tools/mobileAssistantPolicy";
+import type { SettingsSectionProps } from "./types";
 
 type PermissionDescriptor = {
   id: MobileAssistantPermission;
@@ -111,7 +119,7 @@ function PermissionStateBadge({
   );
 }
 
-export function MobileAssistantSection() {
+export function MobileAssistantSection({ settings, setSettings }: SettingsSectionProps) {
   const { t } = useLocale();
   const [status, setStatus] = useState<MobileAssistantStatus>();
   const [permissions, setPermissions] = useState<MobilePermissionStates>({});
@@ -175,6 +183,39 @@ export function MobileAssistantSection() {
 
   return (
     <VStack gap={5}>
+      <Section padding={4} width="100%">
+        <VStack gap={3}>
+          <Heading level={3}>{t("settings.mobileAssistant.agentAccess")}</Heading>
+          <Text type="supporting" color="secondary">
+            {t("settings.mobileAssistant.agentAccessDescription")}
+          </Text>
+          {PERSONAL_CAPABILITIES.filter(
+            (capability) =>
+              capability === "clipboard" || status?.permissionAliases[capability] !== undefined,
+          ).map((capability) => (
+            <Selector
+              key={capability}
+              label={t(`settings.mobileAssistant.${capability}`)}
+              value={personalPolicy(capability, settings.system.toolPolicies)}
+              options={["allow", "ask", "deny"].map((value) => ({
+                value,
+                label: t(`settings.toolPolicy.${value}`),
+              }))}
+              onChange={(value) =>
+                setSettings((previous) =>
+                  updateSystem(previous, {
+                    toolPolicies: {
+                      ...previous.system.toolPolicies,
+                      [personalPolicyKey(capability)]: value as ToolPolicy,
+                    },
+                  }),
+                )
+              }
+              width="100%"
+            />
+          ))}
+        </VStack>
+      </Section>
       <Section padding={0} width="100%">
         <HStack gap={3} vAlign="start" padding={4}>
           <Shield />

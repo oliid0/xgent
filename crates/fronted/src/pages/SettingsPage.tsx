@@ -378,7 +378,7 @@ export function SettingsPage(props: SettingsPageProps) {
       case "mobileExecution":
         return <MobileExecutionSection settings={settings} setSettings={setSettings} />;
       case "mobileAssistant":
-        return <MobileAssistantSection />;
+        return <MobileAssistantSection settings={settings} setSettings={setSettings} />;
       case "memory":
         return (
           <MemoryPanel

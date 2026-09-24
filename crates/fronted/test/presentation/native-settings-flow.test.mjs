@@ -95,11 +95,15 @@ test("native settings mirrors compact navigation and persists shared system, pro
   await dispatch("back");
   await dispatch("nav:mobileAssistant");
   assert.ok(!document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === "policy:Bash"));
+  assert.equal((await dispatch("personal-policy:clipboard", "deny")).ok, true);
+  assert.equal(settings.system.toolPolicies["personal:clipboard"], "deny");
+  assert.ok(document.nodes.some((node) => node.id === "personal-access"));
   await dispatch("back");
   await dispatch("nav:toolPermissions");
   assert.ok(document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === "policy:Bash"));
   assert.equal((await dispatch("policy:Bash", "deny")).ok, true);
   assert.equal(settings.system.toolPolicies.Bash, "deny");
+  assert.equal(settings.system.toolPolicies["personal:clipboard"], "deny");
 });
 
 test("system picker payload rejects malformed files and preserves bytes and MIME type", () => {

@@ -81,6 +81,7 @@ import type { AdditionalProjectRoot } from "../../../lib/tools/additionalProject
 import { buildBuiltinToolRegistry } from "../../../lib/tools/builtinRegistry";
 import type { BuiltinToolExecutionContext } from "../../../lib/tools/builtinTypes";
 import { createFileToolState } from "../../../lib/tools/fileToolState";
+import { personalCapability } from "../../../lib/tools/mobileAssistantPolicy";
 import {
   buildPlanModeSystemPromptSection,
   createPlanModeRunPolicy,
@@ -585,6 +586,11 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       : effectiveWorkdir;
   const buildRegistryStartedAt = perfNowMs();
   const builtinRegistry = await buildBuiltinToolRegistry({
+    personalAssistantAccess: {
+      getToolPolicies,
+      getCommandSafetyMode: () => commandSafetyMode ?? "auto",
+      conversationId,
+    },
     workdir: toolWorkdir,
     additionalRoots,
     providerId,
@@ -717,6 +723,9 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     }
     const effectivePolicy =
       commandSafetyMode === "ask" && metadata?.isReadOnly !== true ? "ask" : policy;
+    // Personal capability approval is enforced inside the native tool bundle,
+    // including subagent calls. Avoid prompting twice for the same operation.
+    if (personalCapability(toolCall)) return { allow: true };
     const sessionScope = toolApprovalScope(toolCall);
     if (effectivePolicy !== "ask" || isSessionApproved(conversationId, sessionScope)) {
       return { allow: true };

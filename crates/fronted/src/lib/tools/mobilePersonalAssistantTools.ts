@@ -19,8 +19,12 @@ import {
   requestMobileHealthMetricPermission,
   scanMobileBluetooth,
 } from "../mobileAssistant";
+import type { CommandSafetyMode, ToolPolicy } from "../settings";
 import { readClipboardText, writeClipboardText } from "../system/clipboardText";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
+import { personalCapability, personalPolicy } from "./mobileAssistantPolicy";
+import { isSessionApproved, requestToolApproval, toolApprovalScope } from "./toolApproval";
+import { resolveToolPolicy } from "./toolPolicy";
 
 const listDataTool: Tool = {
   name: "MobilePersonalData",
@@ -148,12 +152,76 @@ async function ensurePermission(permission: MobileAssistantPermission, signal?: 
   }
 }
 
-export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
+export function createMobilePersonalAssistantTools(
+  options: {
+    getToolPolicies?: () => Record<string, ToolPolicy> | undefined;
+    getCommandSafetyMode?: () => CommandSafetyMode;
+    conversationId?: string;
+  } = {},
+): BuiltinToolBundle {
   async function executeToolCall(toolCall: ToolCall, signal?: AbortSignal) {
     if (signal?.aborted) return result(toolCall, "Cancelled", true);
     try {
       const args = (toolCall.arguments ?? {}) as Record<string, unknown>;
       const action = text(args.action);
+      const capability = personalCapability(toolCall);
+      if (capability) {
+        const policies = options.getToolPolicies?.();
+        const broadPolicy = (current: Record<string, ToolPolicy> | undefined) =>
+          resolveToolPolicy(
+            toolCall.name,
+            {
+              groupId: "system",
+              kind: "mobile_personal_data",
+              displayCategory: "system",
+              isReadOnly: toolCall.name === "MobilePersonalData",
+            },
+            current,
+          );
+        const broad = broadPolicy(policies);
+        const personal = personalPolicy(capability, policies);
+        if (broad === "deny" || personal === "deny") {
+          throw new Error(
+            `The user disabled ${capability} access for the assistant. Do not retry.`,
+          );
+        }
+        const needsApproval =
+          broad === "ask" ||
+          personal === "ask" ||
+          (toolCall.name === "MobilePersonalActions" && options.getCommandSafetyMode?.() === "ask");
+        const scope = toolApprovalScope(toolCall);
+        if (
+          needsApproval &&
+          (!options.conversationId || !isSessionApproved(options.conversationId, scope))
+        ) {
+          if (!options.conversationId)
+            throw new Error(`${capability} requires interactive assistant authorization.`);
+          const approval = await requestToolApproval({
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            sessionScope: scope,
+            summary: JSON.stringify(args),
+            conversationId: options.conversationId,
+            signal,
+          });
+          if (approval.kind !== "decided" || approval.decision === "deny") {
+            throw new Error(
+              approval.kind === "cancelled"
+                ? "Cancelled"
+                : `Assistant access to ${capability} was not approved. Do not retry.`,
+            );
+          }
+          // A settings change while the prompt was open takes precedence.
+          const currentPolicies = options.getToolPolicies?.();
+          if (
+            personalPolicy(capability, currentPolicies) === "deny" ||
+            broadPolicy(currentPolicies) === "deny"
+          ) {
+            throw new Error(`The user disabled ${capability} access for the assistant.`);
+          }
+        }
+        if (signal?.aborted) throw new Error("Cancelled");
+      }
       if (toolCall.name === "MobilePersonalData") {
         if (action === "read_health_samples") {
           const metric = text(args.metric);

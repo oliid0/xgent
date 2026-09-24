@@ -3,7 +3,9 @@ import test from "node:test";
 
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
-function createHarness(resolveInvoke) {
+function createHarness(resolveInvoke, access = {
+  getToolPolicies: () => Object.fromEntries(["bluetooth", "location", "calendar", "reminders", "health", "clipboard"].map((key) => [`personal:${key}`, "allow"])),
+}) {
   const calls = [];
   const loader = createTsModuleLoader({
     mocks: {
@@ -18,7 +20,10 @@ function createHarness(resolveInvoke) {
   const { createMobilePersonalAssistantTools } = loader.loadModule(
     "src/lib/tools/mobilePersonalAssistantTools.ts",
   );
-  return { bundle: createMobilePersonalAssistantTools(), calls };
+  return {
+    bundle: createMobilePersonalAssistantTools(access), calls,
+    approval: loader.loadModule("src/lib/tools/toolApproval.ts"),
+  };
 }
 
 function toolCall(name, args, id = "mobile-call") {
@@ -28,6 +33,50 @@ function toolCall(name, args, id = "mobile-call") {
 function resultData(result) {
   return JSON.parse(result.content[0].text);
 }
+
+test("personal capability policy denies before any OS access, including noninteractive calls", async () => {
+  for (const access of [
+    { getToolPolicies: () => ({ "personal:location": "deny" }) },
+    {},
+    { getToolPolicies: () => ({ "personal:location": "allow", MobilePersonalData: "deny" }) },
+  ]) {
+    const { bundle, calls } = createHarness(() => { throw new Error("Unexpected native access"); }, access);
+    const response = await bundle.executeToolCall(toolCall("MobilePersonalData", { action: "get_current_location" }));
+    assert.equal(response.isError, true);
+    assert.equal(calls.length, 0);
+    assert.match(response.content[0].text, /disabled|interactive/);
+  }
+});
+
+test("assistant approval precedes OS authorization and rejected approval never requests OS access", async () => {
+  for (const decision of ["approve", "deny"]) {
+    const { bundle, calls, approval } = createHarness((command) => {
+      if (command.endsWith("|status")) return { permissionAliases: { location: "location" } };
+      if (command.endsWith("|check_permissions")) return { location: "prompt" };
+      if (command.endsWith("|request_permissions")) return { location: "denied" };
+      throw new Error(`Unauthorized native read ${command}`);
+    }, { conversationId: "chat" });
+    const pending = bundle.executeToolCall(toolCall("MobilePersonalData", { action: "get_current_location" }));
+    assert.equal(calls.length, 0);
+    assert.equal(approval.listPendingToolApprovalsForConversation("chat").length, 1);
+    approval.answerToolApproval("mobile-call", decision);
+    const response = await pending;
+    assert.equal(response.isError, true);
+    assert.equal(calls.length, decision === "approve" ? 3 : 0);
+  }
+});
+
+test("live personal policy revocation wins over a pending assistant approval", async () => {
+  let policy = "ask";
+  const { bundle, calls, approval } = createHarness(() => null, {
+    conversationId: "chat", getToolPolicies: () => ({ "personal:location": policy }),
+  });
+  const pending = bundle.executeToolCall(toolCall("MobilePersonalData", { action: "get_current_location" }));
+  policy = "deny";
+  approval.answerToolApproval("mobile-call", "approve_session");
+  assert.equal((await pending).isError, true);
+  assert.equal(calls.length, 0);
+});
 
 test("ordinary capabilities require granted authorization, never merely requested", async () => {
   for (const [action, permission, args] of [

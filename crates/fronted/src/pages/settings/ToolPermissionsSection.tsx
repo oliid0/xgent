@@ -13,6 +13,7 @@ import { useLocale } from "../../i18n";
 import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import { type CommandSafetyMode, type ToolPolicy, updateSystem } from "../../lib/settings";
 import { BUILTIN_TOOL_CATALOG, BUILTIN_TOOL_CATEGORIES } from "../../lib/tools/builtinToolCatalog";
+import { PERSONAL_POLICY_PREFIX } from "../../lib/tools/mobileAssistantPolicy";
 import { resolveRuntimeToolCapabilities } from "../../lib/tools/runtimeToolCapabilities";
 import { SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
@@ -29,12 +30,23 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
   const { t } = useLocale();
   const nativeMobile = isNativeMobileRuntime();
   const capabilities = resolveRuntimeToolCapabilities(nativeMobile ? "native-mobile" : "desktop");
-  const policies = settings.system.toolPolicies ?? {};
+  const policies = Object.fromEntries(
+    Object.entries(settings.system.toolPolicies ?? {}).filter(
+      ([key]) => !key.startsWith(PERSONAL_POLICY_PREFIX),
+    ),
+  );
 
   const setToolPolicies = (nextPolicies: Record<string, ToolPolicy>) => {
     setSettings((prev) =>
       updateSystem(prev, {
-        toolPolicies: Object.keys(nextPolicies).length > 0 ? nextPolicies : undefined,
+        toolPolicies: {
+          ...Object.fromEntries(
+            Object.entries(prev.system.toolPolicies ?? {}).filter(([key]) =>
+              key.startsWith(PERSONAL_POLICY_PREFIX),
+            ),
+          ),
+          ...nextPolicies,
+        },
       }),
     );
   };

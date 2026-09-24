@@ -1459,6 +1459,10 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.native.volcengineV3": "火山引擎 Seed ASR v3",
     "settings.native.baidu": "百度智能云 ASR",
     "settings.native.checkUpdates": "检查更新",
+    "settings.mobileAssistant.agentAccess": "助手访问权限",
+    "settings.mobileAssistant.agentAccessDescription":
+      "分别控制各项能力。选择询问后，助手必须先获得你的同意，同时仍需系统授权。会话授权仅适用于该能力及相应的读取或写入操作。",
+    "settings.mobileAssistant.clipboard": "剪贴板",
     "settings.mobileAssistant.permissionsDescription":
       "每项能力都由系统单独授权；XGent 只会在你主动使用相关功能时请求。",
     "settings.mobileAssistant.refresh": "刷新权限状态",
@@ -4387,6 +4391,10 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.native.baidu": "Baidu Cloud ASR",
     "settings.native.checkUpdates": "Check for updates",
     "settings.mobileAssistant.permissions": "Personal assistant permissions",
+    "settings.mobileAssistant.agentAccess": "Assistant access",
+    "settings.mobileAssistant.agentAccessDescription":
+      "Control each capability separately. Ask requires your approval before access; operating system authorization is also required. Session approval applies only to that capability and read or write operation.",
+    "settings.mobileAssistant.clipboard": "Clipboard",
     "settings.mobileAssistant.permissionsDescription":
       "Every capability is authorized separately by the system. XGent asks only when you use it.",
     "settings.mobileAssistant.refresh": "Refresh permission status",

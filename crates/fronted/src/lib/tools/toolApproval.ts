@@ -1,5 +1,6 @@
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { ASK_USER_QUESTION_TIMEOUT_MS } from "../chat/askUserQuestion";
+import { personalCapability } from "./mobileAssistantPolicy";
 
 export const TOOL_APPROVAL_TIMEOUT_MS = ASK_USER_QUESTION_TIMEOUT_MS;
 
@@ -41,20 +42,7 @@ export function toolApprovalScope(toolCall: Pick<ToolCall, "name" | "arguments">
   }
   const args = toolCall.arguments as Record<string, unknown> | undefined;
   const action = typeof args?.action === "string" ? args.action.trim() : "";
-  const capabilities: Record<string, string> = {
-    scan_bluetooth: "bluetooth",
-    discover_devices: "bluetooth",
-    get_current_location: "location",
-    read_clipboard: "clipboard",
-    write_clipboard: "clipboard",
-    list_calendar_events: "calendar",
-    create_calendar_event: "calendar",
-    list_reminders: "reminders",
-    create_reminder: "reminders",
-    read_health_steps: "health",
-    read_health_samples: "health",
-  };
-  return `${toolCall.name}:${capabilities[action] ?? action}`;
+  return `${toolCall.name}:${personalCapability(toolCall) ?? action}`;
 }
 
 function emitChange(conversationId: string) {

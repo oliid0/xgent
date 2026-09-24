@@ -54,6 +54,11 @@ import { UI_THEME_PRESETS } from "../lib/settings/appearance";
 import { createUuid } from "../lib/shared/id";
 import { desktopSttSettingsService } from "../lib/stt/desktopSttSettingsService";
 import { BUILTIN_TOOL_CATALOG, BUILTIN_TOOL_CATEGORIES } from "../lib/tools/builtinToolCatalog";
+import {
+  PERSONAL_CAPABILITIES,
+  personalPolicy,
+  personalPolicyKey,
+} from "../lib/tools/mobileAssistantPolicy";
 import { resolveRuntimeToolCapabilities } from "../lib/tools/runtimeToolCapabilities";
 import { MobileMcpPage } from "../pages/chat/mobile/MobileMcpPage";
 import { MobileSkillsPage } from "../pages/chat/mobile/MobileSkillsPage";
@@ -989,6 +994,35 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       });
     }
     nodes.push(c.group("permissions", titles.mobileAssistant, permissionRows));
+    nodes.push(
+      c.group(
+        "personal-access",
+        t("settings.mobileAssistant.agentAccess"),
+        PERSONAL_CAPABILITIES.filter(
+          (capability) =>
+            capability === "clipboard" || status?.permissionAliases[capability] !== undefined,
+        ).map((capability) =>
+          c.select(
+            `personal-policy:${capability}`,
+            t(`settings.mobileAssistant.${capability}`),
+            personalPolicy(capability, settings.system.toolPolicies),
+            ["allow", "ask", "deny"].map((value) => ({
+              value,
+              label: t(`settings.toolPolicy.${value}`),
+            })),
+            (value) =>
+              setSettings((previous) =>
+                updateSystem(previous, {
+                  toolPolicies: {
+                    ...previous.system.toolPolicies,
+                    [personalPolicyKey(capability)]: value as "allow" | "ask" | "deny",
+                  },
+                }),
+              ),
+          ),
+        ),
+      ),
+    );
   } else if (page === "mobileExecution") {
     const backendLabel =
       shell?.backend === "android-proot"

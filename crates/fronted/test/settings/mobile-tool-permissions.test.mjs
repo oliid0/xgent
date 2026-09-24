@@ -16,7 +16,7 @@ function harness(nativeMobile) {
   })) mocks[`@astryxdesign/core/${module}`] = Object.fromEntries(names.map((name) => [name, name]));
   const loader = createTsModuleLoader({ mocks });
   const { ToolPermissionsSection } = loader.loadModule("src/pages/settings/ToolPermissionsSection.tsx");
-  let settings = { system: { toolPolicies: { Write: "deny", ManagedProcess: "ask" }, commandSafetyMode: "sandbox" } };
+  let settings = { system: { toolPolicies: { Write: "deny", ManagedProcess: "ask", "personal:calendar": "deny" }, commandSafetyMode: "sandbox" } };
   const render = () => {
     const nodes = [];
     function visit(value) {
@@ -53,4 +53,19 @@ test("desktop permissions retain supported command safety and terminal policies"
   const safety = nodes.find((node) => node.type === "Selector" && node.props.label === "settings.commandSafety.title");
   assert.deepEqual(safety.props.options.map((option) => option.value), ["auto", "ask", "sandbox", "sandboxOffline"]);
   assert.ok(nodes.some((node) => node.props.label === "ReadTerminal"));
+});
+
+test("general tool policy reset preserves personal capability authorization preferences", () => {
+  const h = harness(true);
+  const reset = h.render().find((node) => node.props.label === "settings.toolPermissionsReset");
+  reset.props.onClick();
+  assert.deepEqual(h.settings().system.toolPolicies, { "personal:calendar": "deny" });
+  assert.ok(!h.render().some((node) => node.props.label === "settings.toolPermissionsReset"));
+});
+
+test("personal capability choices survive the existing settings normalization", () => {
+  const { normalizeToolPolicies } = createTsModuleLoader().loadModule("src/lib/settings/index.ts");
+  assert.deepEqual(normalizeToolPolicies(JSON.parse(JSON.stringify({
+    "personal:calendar": "deny", "personal:location": "ask", "personal:clipboard": "allow", Write: "ask",
+  }))), { "personal:calendar": "deny", "personal:location": "ask", "personal:clipboard": "allow", Write: "ask" });
 });
