@@ -24,6 +24,12 @@ pub fn init<R: Runtime, C: serde::de::DeserializeOwned>(
 pub struct MobileAssistant<R: Runtime>(PhantomData<fn() -> R>);
 
 impl<R: Runtime> MobileAssistant<R> {
+    pub fn list_photos(&self, _request: crate::PhotoListRequest) -> Result<crate::PhotoListResult> {
+        Err(Error::Unavailable("photo library access is only available on mobile".into()))
+    }
+    pub fn read_photo(&self, _request: crate::PhotoReadRequest) -> Result<crate::PhotoReadResult> {
+        Err(Error::Unavailable("photo library access is only available on mobile".into()))
+    }
     pub fn request_health_metric_permission(&self, _request: crate::HealthMetricRequest) -> Result<MobilePermissionStates> {
         Err(Error::Unavailable("health data access is only available on mobile".into()))
     }

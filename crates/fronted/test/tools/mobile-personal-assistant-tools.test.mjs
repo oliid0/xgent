@@ -4,7 +4,7 @@ import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 function createHarness(resolveInvoke, access = {
-  getToolPolicies: () => Object.fromEntries(["bluetooth", "location", "calendar", "reminders", "health", "clipboard"].map((key) => [`personal:${key}`, "allow"])),
+  getToolPolicies: () => Object.fromEntries(["bluetooth", "location", "calendar", "reminders", "health", "clipboard", "photos"].map((key) => [`personal:${key}`, "allow"])),
 }) {
   const calls = [];
   const loader = createTsModuleLoader({
@@ -33,6 +33,68 @@ function toolCall(name, args, id = "mobile-call") {
 function resultData(result) {
   return JSON.parse(result.content[0].text);
 }
+
+test("authorized photo queries preserve restricted-library and truncation evidence", async () => {
+  const data = { photos: [{ id: "42", createdMs: 1, width: 300, height: 200 }], accessLimited: true, truncated: true };
+  const { bundle, calls } = createHarness((command) => {
+    if (command.endsWith("|status")) return { permissionAliases: { photos: "photosSelected" } };
+    if (command.endsWith("|check_permissions")) return { photosSelected: "granted" };
+    if (command.endsWith("|list_photos")) return data;
+    throw new Error(`Unexpected command ${command}`);
+  });
+  const response = await bundle.executeToolCall(toolCall("MobilePersonalData", { action: "list_photos", limit: 999 }));
+  assert.deepEqual(resultData(response), data);
+  assert.deepEqual(calls.at(-1).args.request, { startMs: null, endMs: null, limit: 200 });
+});
+
+test("photo preview reads return actual image content without embedding base64 in text evidence", async () => {
+  const { bundle } = createHarness((command) => {
+    if (command.endsWith("|status")) return { permissionAliases: { photos: "photos" } };
+    if (command.endsWith("|check_permissions")) return { photos: "granted" };
+    if (command.endsWith("|read_photo")) return { id: "42", width: 20, height: 10, mimeType: "image/jpeg", dataBase64: "aW1hZ2U=" };
+    throw new Error(`Unexpected command ${command}`);
+  });
+  const response = await bundle.executeToolCall(toolCall("MobilePersonalData", { action: "read_photo", photo_id: "42" }));
+  assert.equal(response.isError, false);
+  assert.deepEqual(response.content[1], { type: "image", mimeType: "image/jpeg", data: "aW1hZ2U=" });
+  assert.match(response.content[0].text, /not original/);
+  assert.ok(!response.content[0].text.includes("aW1hZ2U="));
+});
+
+test("photo preview import requires authorization and never writes after cancellation", async () => {
+  for (const cancel of [false, true]) {
+    const controller = new AbortController();
+    const { bundle, calls } = createHarness((command) => {
+      if (command.endsWith("|status")) return { permissionAliases: { photos: "photos" } };
+      if (command.endsWith("|check_permissions")) return { photos: "granted" };
+      if (command.endsWith("|read_photo")) {
+        if (cancel) controller.abort();
+        return { id: "42", mimeType: "image/jpeg", dataBase64: "aW1hZ2U=", width: 20, height: 10 };
+      }
+      if (command === "fs_import_file") return { path: "images/photo (1).jpg" };
+      throw new Error(`Unexpected command ${command}`);
+    }, { workdir: "/workspace", getToolPolicies: () => ({ "personal:photos": "allow" }) });
+    const response = await bundle.executeToolCall(toolCall("MobilePersonalActions", {
+      action: "import_photo_preview", photo_id: "42", file_name: "photo.jpg", directory: "images",
+    }), controller.signal);
+    assert.equal(response.isError, cancel);
+    assert.equal(calls.some(({ command }) => command === "fs_import_file"), !cancel);
+    if (!cancel) {
+      assert.equal(resultData(response).path, "images/photo (1).jpg");
+      assert.deepEqual(calls.at(-1).args, { workdir: "/workspace", directory: "images", file_name: "photo.jpg", content_base64: "aW1hZ2U=" });
+    }
+  }
+});
+
+test("denied photo permission prevents native list and read operations", async () => {
+  const { bundle, calls } = createHarness((command) => command.endsWith("|status")
+    ? { permissionAliases: { photos: "photos" } } : { photos: "denied" });
+  for (const action of ["list_photos", "read_photo"]) {
+    const response = await bundle.executeToolCall(toolCall("MobilePersonalData", { action, photo_id: "42" }));
+    assert.equal(response.isError, true);
+  }
+  assert.ok(calls.every(({ command }) => /\|(status|check_permissions)$/.test(command)));
+});
 
 test("personal capability policy denies before any OS access, including noninteractive calls", async () => {
   for (const access of [

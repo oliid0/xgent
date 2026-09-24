@@ -1,0 +1,11 @@
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-list-photos"
+description = "Allows querying authorized photo library metadata."
+commands.allow = ["list_photos"]
+
+[[permission]]
+identifier = "deny-list-photos"
+description = "Denies photo library queries."
+commands.deny = ["list_photos"]

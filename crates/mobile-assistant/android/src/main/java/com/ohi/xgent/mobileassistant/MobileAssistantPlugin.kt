@@ -50,6 +50,7 @@ private const val ALIAS_CALENDAR = "calendar"
 private const val ALIAS_LOCATION = "location"
 private const val ALIAS_PHOTOS = "photos"
 private const val ALIAS_PHOTOS_LEGACY = "photosLegacy"
+private const val ALIAS_PHOTOS_SELECTED = "photosSelected"
 private const val ALIAS_HEALTH = "health"
 private const val ALIAS_BLUETOOTH = "bluetooth"
 private const val HEALTH_PROVIDER_PACKAGE = "com.google.android.apps.healthdata"
@@ -140,10 +141,16 @@ class ComposeMessageArgs {
             alias = ALIAS_LOCATION,
         ),
         Permission(strings = [Manifest.permission.READ_MEDIA_IMAGES], alias = ALIAS_PHOTOS),
+        Permission(strings = [Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED], alias = ALIAS_PHOTOS_SELECTED),
         Permission(strings = [Manifest.permission.READ_EXTERNAL_STORAGE], alias = ALIAS_PHOTOS_LEGACY),
     ],
 )
 class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
+    private val photos = PhotoLibrary(activity)
+    @Command
+    fun listPhotos(invoke: Invoke) { photos.list(invoke) }
+    @Command
+    fun readPhoto(invoke: Invoke) { photos.read(invoke) }
     private val bluetooth = BluetoothDiscovery(activity)
 
     @Command
@@ -218,7 +225,7 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun status(invoke: Invoke) {
-        val photoAlias = if (Build.VERSION.SDK_INT >= 33) ALIAS_PHOTOS else ALIAS_PHOTOS_LEGACY
+        val photoAlias = if (Build.VERSION.SDK_INT >= 34) ALIAS_PHOTOS_SELECTED else if (Build.VERSION.SDK_INT >= 33) ALIAS_PHOTOS else ALIAS_PHOTOS_LEGACY
         val connectivity = activity.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val capabilities = connectivity.getNetworkCapabilities(connectivity.activeNetwork)
         val transport = when {
@@ -711,6 +718,11 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
     private fun permissionPayload(healthGranted: Boolean? = null): JSObject {
         val payload = JSObject()
         getPermissionStates().forEach { (alias, state) -> payload.put(alias, state.toString()) }
+        if (photos.hasAccess()) {
+            payload.put(ALIAS_PHOTOS, PermissionState.GRANTED.toString())
+            payload.put(ALIAS_PHOTOS_SELECTED, PermissionState.GRANTED.toString())
+            payload.put(ALIAS_PHOTOS_LEGACY, PermissionState.GRANTED.toString())
+        }
         if (healthSdkStatus() == HealthConnectClient.SDK_AVAILABLE) {
             val granted = healthGranted ?: runBlocking {
                 HealthConnectClient.getOrCreate(activity)

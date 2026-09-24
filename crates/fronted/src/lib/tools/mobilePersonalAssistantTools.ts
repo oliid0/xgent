@@ -9,12 +9,14 @@ import {
   HEALTH_SAMPLE_METRICS,
   type HealthSampleMetric,
   listMobileCalendarEvents,
+  listMobilePhotos,
   listMobileReminders,
   type MobileAssistantPermission,
   mobileAssistantStatus,
   normalizeMobileAssistantPermissions,
   readMobileHealthSamples,
   readMobileHealthSteps,
+  readMobilePhoto,
   requestMobileAssistantPermission,
   requestMobileHealthMetricPermission,
   scanMobileBluetooth,
@@ -22,6 +24,7 @@ import {
 import type { CommandSafetyMode, ToolPolicy } from "../settings";
 import { readClipboardText, writeClipboardText } from "../system/clipboardText";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
+import { invokeFs } from "./fsBackend";
 import { personalCapability, personalPolicy } from "./mobileAssistantPolicy";
 import { isSessionApproved, requestToolApproval, toolApprovalScope } from "./toolApproval";
 import { resolveToolPolicy } from "./toolPolicy";
@@ -29,7 +32,7 @@ import { resolveToolPolicy } from "./toolPolicy";
 const listDataTool: Tool = {
   name: "MobilePersonalData",
   description:
-    "Read device connectivity, discover nearby BLE peripherals and currently routed devices, or access authorized location, clipboard, calendar, reminders, health steps and health metric samples on this Android/iOS device without requiring Shell. Health samples require metric, start and end, request only that metric's native read permission, and return units, source and truncation flags. Empty health results do not prove normal health or permission denial. Bluetooth discovery reports only what the OS exposes; it does not read arbitrary sensor data. Use privacy-sensitive reads only when the user's task requires them.",
+    "Access authorized phone-native data without Shell: connectivity, nearby BLE discovery, location, clipboard, calendar, reminders, photos and health. list_photos returns accessible image IDs with optional start/end bounds; read_photo returns a bounded JPEG preview for a photo_id, not the original image. Restricted libraries return only authorized photos. Health samples require metric, start and end and return units/source; empty data does not prove normal health or permission denial. BLE discovery does not read arbitrary sensor data. Request personal data only when needed for the user's task.",
   parameters: Type.Object({
     action: Type.Union([
       Type.Literal("network_status"),
@@ -41,8 +44,11 @@ const listDataTool: Tool = {
       Type.Literal("list_reminders"),
       Type.Literal("read_health_steps"),
       Type.Literal("read_health_samples"),
+      Type.Literal("list_photos"),
+      Type.Literal("read_photo"),
     ]),
     metric: Type.Optional(Type.Union(HEALTH_SAMPLE_METRICS.map((metric) => Type.Literal(metric)))),
+    photo_id: Type.Optional(Type.String({ minLength: 1 })),
     start: Type.Optional(
       Type.String({ description: "Calendar or health range start as an ISO 8601 date-time." }),
     ),
@@ -58,7 +64,7 @@ const listDataTool: Tool = {
 const actionTool: Tool = {
   name: "MobilePersonalActions",
   description:
-    "Create an authorized calendar event or reminder, write clipboard text, or open the device's email/SMS composer. Email and SMS are drafts that the user must review and send; never report them as sent.",
+    "Create an authorized calendar event or reminder, write clipboard text, import an authorized photo's JPEG preview into the workspace, or open the device's email/SMS composer. import_photo_preview requires photo_id and a .jpg file_name; directory is relative to the workspace and existing files are preserved. Email and SMS are drafts that the user must review and send; never report them as sent.",
   parameters: Type.Object({
     action: Type.Union([
       Type.Literal("create_calendar_event"),
@@ -66,8 +72,12 @@ const actionTool: Tool = {
       Type.Literal("write_clipboard"),
       Type.Literal("compose_email"),
       Type.Literal("compose_sms"),
+      Type.Literal("import_photo_preview"),
     ]),
     title: Type.Optional(Type.String({ minLength: 1 })),
+    photo_id: Type.Optional(Type.String({ minLength: 1 })),
+    file_name: Type.Optional(Type.String({ minLength: 1 })),
+    directory: Type.Optional(Type.String()),
     start: Type.Optional(Type.String({ description: "Event start as an ISO 8601 date-time." })),
     end: Type.Optional(Type.String({ description: "Event end as an ISO 8601 date-time." })),
     due: Type.Optional(Type.String({ description: "Reminder due date as an ISO 8601 date-time." })),
@@ -147,6 +157,13 @@ async function ensurePermission(permission: MobileAssistantPermission, signal?: 
     await requestMobileAssistantPermission(alias, signal),
   );
   checkCancelled();
+  // Android's permission callback reports each requested permission; selected
+  // photos can be granted even when full-library access was denied. Native
+  // checkPermissions reconciles these into the effective photo capability.
+  if (permission === "photos") {
+    states = normalizeMobileAssistantPermissions(status, await checkMobileAssistantPermissions());
+    checkCancelled();
+  }
   if (!authorized(states[permission])) {
     throw new Error(`The user did not grant ${permission} permission.`);
   }
@@ -157,6 +174,7 @@ export function createMobilePersonalAssistantTools(
     getToolPolicies?: () => Record<string, ToolPolicy> | undefined;
     getCommandSafetyMode?: () => CommandSafetyMode;
     conversationId?: string;
+    workdir?: string;
   } = {},
 ): BuiltinToolBundle {
   async function executeToolCall(toolCall: ToolCall, signal?: AbortSignal) {
@@ -223,6 +241,34 @@ export function createMobilePersonalAssistantTools(
         if (signal?.aborted) throw new Error("Cancelled");
       }
       if (toolCall.name === "MobilePersonalData") {
+        if (action === "list_photos") {
+          const startMs = args.start === undefined ? null : dateMs(args.start, "start");
+          const endMs = args.end === undefined ? null : dateMs(args.end, "end");
+          if (startMs !== null && endMs !== null && endMs <= startMs)
+            throw new Error("end must be after start.");
+          await ensurePermission("photos", signal);
+          const photos = await listMobilePhotos({ startMs, endMs, limit: limit(args.limit) });
+          if (signal?.aborted) throw new Error("Cancelled");
+          return result(toolCall, photos);
+        }
+        if (action === "read_photo") {
+          const id = requiredText(args, "photo_id");
+          await ensurePermission("photos", signal);
+          const photo = await readMobilePhoto(id);
+          if (signal?.aborted) throw new Error("Cancelled");
+          const response = result(toolCall, {
+            id: photo.id,
+            width: photo.width,
+            height: photo.height,
+            representation: "JPEG preview, not original",
+          });
+          response.content.push({
+            type: "image",
+            data: photo.dataBase64,
+            mimeType: photo.mimeType,
+          });
+          return response;
+        }
         if (action === "read_health_samples") {
           const metric = text(args.metric);
           if (!HEALTH_SAMPLE_METRICS.includes(metric as HealthSampleMetric)) {
@@ -342,6 +388,28 @@ export function createMobilePersonalAssistantTools(
       }
       if (toolCall.name !== "MobilePersonalActions") {
         throw new Error(`Unknown tool: ${toolCall.name}`);
+      }
+      if (action === "import_photo_preview") {
+        const id = requiredText(args, "photo_id");
+        const fileName = requiredText(args, "file_name");
+        if (!/^[^/\\]+\.jpe?g$/i.test(fileName))
+          throw new Error("file_name must be a JPEG filename without directories.");
+        if (!options.workdir) throw new Error("A workspace is required to import a photo preview.");
+        await ensurePermission("photos", signal);
+        const photo = await readMobilePhoto(id);
+        if (signal?.aborted) throw new Error("Cancelled");
+        const imported = await invokeFs<{ path: string }>("fs_import_file", {
+          workdir: options.workdir,
+          directory: text(args.directory),
+          file_name: fileName,
+          content_base64: photo.dataBase64,
+        });
+        return result(toolCall, {
+          ...imported,
+          photoId: id,
+          mimeType: photo.mimeType,
+          representation: "JPEG preview, not original",
+        });
       }
       if (action === "create_calendar_event") {
         const request = {

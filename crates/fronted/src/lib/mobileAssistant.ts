@@ -132,6 +132,28 @@ export type MobileActionResult = {
 
 const PLUGIN_COMMAND = "plugin:mobile-assistant|";
 
+export type MobilePhotoList = {
+  photos: Array<{ id: string; createdMs: number | null; width: number; height: number }>;
+  truncated: boolean;
+  accessLimited: boolean;
+};
+export function listMobilePhotos(request: {
+  startMs: number | null;
+  endMs: number | null;
+  limit: number;
+}) {
+  return invoke<MobilePhotoList>(`${PLUGIN_COMMAND}list_photos`, { request });
+}
+export function readMobilePhoto(id: string) {
+  return invoke<{
+    id: string;
+    mimeType: string;
+    dataBase64: string;
+    width: number;
+    height: number;
+  }>(`${PLUGIN_COMMAND}read_photo`, { request: { id } });
+}
+
 export type MobileBluetoothDevice = {
   id: string;
   name?: string | null;

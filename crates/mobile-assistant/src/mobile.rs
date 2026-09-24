@@ -43,6 +43,12 @@ struct NativePermissionRequest {
 }
 
 impl<R: Runtime> MobileAssistant<R> {
+    pub fn list_photos(&self, request: crate::PhotoListRequest) -> crate::Result<crate::PhotoListResult> {
+        self.0.run_mobile_plugin("listPhotos", request).map_err(Into::into)
+    }
+    pub fn read_photo(&self, request: crate::PhotoReadRequest) -> crate::Result<crate::PhotoReadResult> {
+        self.0.run_mobile_plugin("readPhoto", request).map_err(Into::into)
+    }
     pub fn request_health_metric_permission(&self, request: crate::HealthMetricRequest) -> crate::Result<MobilePermissionStates> {
         self.0.run_mobile_plugin("requestHealthMetricPermission", request).map_err(Into::into)
     }

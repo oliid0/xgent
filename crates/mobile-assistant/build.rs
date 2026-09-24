@@ -1,4 +1,6 @@
 const COMMANDS: &[&str] = &[
+    "list_photos",
+    "read_photo",
     "scan_bluetooth",
     "read_clipboard",
     "write_clipboard",

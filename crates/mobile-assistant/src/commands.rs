@@ -9,6 +9,16 @@ use crate::models::{
 };
 use crate::{MobileAssistantExt, Result};
 
+#[command]
+pub(crate) async fn list_photos<R: Runtime>(app: AppHandle<R>, request: crate::PhotoListRequest) -> Result<crate::PhotoListResult> {
+    on_worker(move || app.mobile_assistant().list_photos(request)).await
+}
+
+#[command]
+pub(crate) async fn read_photo<R: Runtime>(app: AppHandle<R>, request: crate::PhotoReadRequest) -> Result<crate::PhotoReadResult> {
+    on_worker(move || app.mobile_assistant().read_photo(request)).await
+}
+
 // Native permission, speech and location callbacks can wait for user input.
 // Keep their synchronous mobile IPC off the executor that serves model traffic.
 async fn on_worker<T: Send + 'static>(

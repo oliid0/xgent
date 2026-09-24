@@ -275,7 +275,12 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
     }),
     ...(params.nativeMobileRuntime === true ? [createMobileExecutionTools()] : []),
     ...(params.nativeMobileRuntime === true
-      ? [createMobilePersonalAssistantTools(params.personalAssistantAccess)]
+      ? [
+          createMobilePersonalAssistantTools({
+            ...params.personalAssistantAccess,
+            workdir: params.workdir,
+          }),
+        ]
       : []),
     ...(params.nativeMobileRuntime === true && params.runtimeScope === "chat"
       ? [

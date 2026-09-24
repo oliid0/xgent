@@ -9,6 +9,7 @@ export const PERSONAL_CAPABILITIES = [
   "reminders",
   "health",
   "clipboard",
+  "photos",
 ] as const;
 export type PersonalCapability = (typeof PERSONAL_CAPABILITIES)[number];
 
@@ -27,6 +28,9 @@ export function personalCapability(toolCall: Pick<ToolCall, "name" | "arguments"
     create_reminder: "reminders",
     read_health_steps: "health",
     read_health_samples: "health",
+    list_photos: "photos",
+    read_photo: "photos",
+    import_photo_preview: "photos",
   };
   return typeof action === "string" && Object.hasOwn(capabilities, action.trim())
     ? capabilities[action.trim()]

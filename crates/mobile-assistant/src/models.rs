@@ -271,3 +271,44 @@ fn default_true() -> bool {
 pub struct ClipboardText {
     pub text: String,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoListRequest {
+    pub start_ms: Option<i64>,
+    pub end_ms: Option<i64>,
+    #[serde(default = "default_result_limit")]
+    pub limit: u16,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MobilePhoto {
+    pub id: String,
+    pub created_ms: Option<i64>,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoListResult {
+    pub photos: Vec<MobilePhoto>,
+    pub truncated: bool,
+    pub access_limited: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PhotoReadRequest {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoReadResult {
+    pub id: String,
+    pub mime_type: String,
+    pub data_base64: String,
+    pub width: u32,
+    pub height: u32,
+}

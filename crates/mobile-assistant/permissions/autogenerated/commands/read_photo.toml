@@ -1,0 +1,11 @@
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-read-photo"
+description = "Allows reading bounded previews from authorized photos."
+commands.allow = ["read_photo"]
+
+[[permission]]
+identifier = "deny-read-photo"
+description = "Denies photo library previews."
+commands.deny = ["read_photo"]
