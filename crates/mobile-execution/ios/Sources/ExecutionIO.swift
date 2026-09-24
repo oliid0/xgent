@@ -4,6 +4,7 @@ import Foundation
 struct BoundedOutput {
     let text: String
     let truncated: Bool
+    let openAfterExit: Bool
 }
 
 final class BoundedPOSIXPipe {
@@ -14,6 +15,7 @@ final class BoundedPOSIXPipe {
     private var data = Data()
     private var didTruncate = false
     private var writerClosed = false
+    private var stopRequested = false
     private let onOutput: ((Data) -> Void)?
 
     let writeDescriptor: Int32
@@ -24,6 +26,11 @@ final class BoundedPOSIXPipe {
         var descriptors: [Int32] = [0, 0]
         guard Darwin.pipe(&descriptors) == 0 else {
             throw MobileExecutionError.io("Could not create output pipe: \(String(cString: strerror(errno)))")
+        }
+        guard fcntl(descriptors[0], F_SETFL, O_NONBLOCK) == 0 else {
+            Darwin.close(descriptors[0])
+            Darwin.close(descriptors[1])
+            throw MobileExecutionError.io("Could not configure command output polling")
         }
         readHandle = FileHandle(fileDescriptor: descriptors[0], closeOnDealloc: true)
         writeDescriptor = descriptors[1]
@@ -52,31 +59,53 @@ final class BoundedPOSIXPipe {
 
     func finish(timeout: DispatchTime = .now() + .seconds(2)) -> BoundedOutput {
         closeWriter()
-        _ = readerDone.wait(timeout: timeout)
+        let openAfterExit = readerDone.wait(timeout: timeout) == .timedOut
         lock.lock()
+        stopRequested = true
         let output = data
         let truncated = didTruncate
         lock.unlock()
         return BoundedOutput(
             text: String(decoding: output, as: UTF8.self),
-            truncated: truncated
+            truncated: truncated || openAfterExit,
+            openAfterExit: openAfterExit
         )
     }
 
     private func drain() {
-        defer { readerDone.signal() }
+        // The reader owns descriptor closure; never close a descriptor while
+        // another thread is blocked on it. See yy ISHShellExecutor teardown.
+        defer {
+            try? readHandle.close()
+            readerDone.signal()
+        }
+        var descriptor = pollfd(fd: readHandle.fileDescriptor, events: Int16(POLLIN), revents: 0)
+        var buffer = [UInt8](repeating: 0, count: 8 * 1024)
         while true {
-            do {
-                guard let chunk = try readHandle.read(upToCount: 8 * 1024), !chunk.isEmpty else { break }
-                lock.lock()
-                let remaining = max(0, limit - data.count)
-                if remaining > 0 { data.append(chunk.prefix(remaining)) }
-                if chunk.count > remaining { didTruncate = true }
-                lock.unlock()
-                if remaining > 0 { onOutput?(Data(chunk.prefix(remaining))) }
-            } catch {
+            lock.lock()
+            let stopped = stopRequested
+            lock.unlock()
+            if stopped { break }
+            let ready = Darwin.poll(&descriptor, 1, 100)
+            if ready < 0 {
+                if errno == EINTR { continue }
                 break
             }
+            if ready == 0 { continue }
+            if descriptor.revents & Int16(POLLNVAL) != 0 { break }
+            let count = Darwin.read(descriptor.fd, &buffer, buffer.count)
+            if count < 0 {
+                if errno == EINTR || errno == EAGAIN { continue }
+                break
+            }
+            if count == 0 { break }
+            lock.lock()
+            if stopRequested { lock.unlock(); break }
+            let remaining = max(0, limit - data.count)
+            if remaining > 0 { data.append(contentsOf: buffer.prefix(min(remaining, count))) }
+            if count > remaining { didTruncate = true }
+            lock.unlock()
+            if remaining > 0 { onOutput?(Data(buffer.prefix(min(remaining, count)))) }
         }
     }
 

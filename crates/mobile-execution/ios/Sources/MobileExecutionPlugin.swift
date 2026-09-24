@@ -497,7 +497,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             "stderrTruncated": result.stderrTruncated,
             "timedOut": result.timedOut,
             "cancelled": result.cancelled,
-            "stdioOpenAfterExit": false,
+            "stdioOpenAfterExit": result.stdioOpenAfterExit,
             "effectiveTimeoutMs": request.timeoutMs,
             "durationMs": durationMs,
         ]
@@ -609,7 +609,8 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             timedOut: finalState?.timedOut ?? false,
             cancelled: finalState?.cancelled ?? false,
             profile: "ios-a-shell-bsd",
-            shell: "sh"
+            shell: "sh",
+            stdioOpenAfterExit: stdoutResult.openAfterExit || stderrResult.openAfterExit
         )
     }
 
@@ -893,6 +894,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             guard result.exitCode == 0,
                   !result.timedOut,
                   !result.cancelled,
+                  !result.stdioOpenAfterExit,
                   result.stdout.contains(probe.expected) else {
                 let diagnostics = [result.stdout, result.stderr]
                     .joined(separator: "\n")
@@ -1201,6 +1203,7 @@ private struct AShellCommandResult {
     let cancelled: Bool
     let profile: String
     let shell: String
+    var stdioOpenAfterExit: Bool = false
 }
 
 @_cdecl("init_plugin_mobile_execution")
