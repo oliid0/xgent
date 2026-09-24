@@ -8,6 +8,7 @@ export const XGENT_UPSTREAM_ORIGIN_HEADER = "x-xgent-upstream-origin";
 export const XGENT_UPSTREAM_URL_HEADER = "x-xgent-upstream-url";
 export const XGENT_UPSTREAM_USER_AGENT_HEADER = "x-xgent-upstream-user-agent";
 export const XGENT_UPSTREAM_CONTENT_TYPE_HEADER = "x-xgent-upstream-content-type";
+export const XGENT_UPSTREAM_HEADERS_HEADER = "x-xgent-upstream-headers";
 export const XGENT_OAUTH_ACCOUNT_ID_HEADER = "x-xgent-oauth-account-id";
 export const XGENT_PROVIDER_CONFIG_ID_HEADER = "x-xgent-provider-config-id";
 
@@ -28,9 +29,39 @@ export function buildUpstreamHeaderOverrideHeaders(
 ): Record<string, string> {
   const userAgent = readHeaderValue(headers, "user-agent");
   const contentType = readHeaderValue(headers, "content-type");
+  const overrides = Object.fromEntries(
+    Object.entries(headers).filter(
+      ([name]) =>
+        ![
+          "authorization",
+          "x-api-key",
+          "x-goog-api-key",
+          "host",
+          "content-length",
+          "connection",
+          "keep-alive",
+          "proxy-connection",
+          "proxy-authenticate",
+          "proxy-authorization",
+          "te",
+          "trailer",
+          "transfer-encoding",
+          "upgrade",
+        ].includes(name.toLowerCase()) && !name.toLowerCase().startsWith("x-xgent-"),
+    ),
+  );
+  let encoded: string | undefined;
+  if (Object.keys(overrides).length > 0) {
+    const bytes = new TextEncoder().encode(JSON.stringify(overrides));
+    // Base64 expands the payload by 4/3; enforce the transmitted header limit.
+    if (Math.ceil(bytes.length / 3) * 4 > 8192)
+      throw new Error("Custom request headers exceed the 8 KB transport limit.");
+    encoded = btoa(String.fromCharCode(...bytes));
+  }
   return {
     ...(userAgent !== undefined ? { [XGENT_UPSTREAM_USER_AGENT_HEADER]: userAgent } : {}),
     ...(contentType !== undefined ? { [XGENT_UPSTREAM_CONTENT_TYPE_HEADER]: contentType } : {}),
+    ...(encoded ? { [XGENT_UPSTREAM_HEADERS_HEADER]: encoded } : {}),
   };
 }
 

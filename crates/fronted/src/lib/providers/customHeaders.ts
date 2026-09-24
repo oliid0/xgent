@@ -89,7 +89,9 @@ export function isValidCustomHeaderKey(key: string): boolean {
 }
 
 export function isReservedCustomHeaderKey(key: string): boolean {
-  return RESERVED_CUSTOM_HEADER_KEYS.has(key.toLowerCase());
+  return (
+    RESERVED_CUSTOM_HEADER_KEYS.has(key.toLowerCase()) || key.toLowerCase().startsWith("x-xgent-")
+  );
 }
 export function mergeCustomHeaders(
   base: Record<string, string>,
@@ -98,7 +100,11 @@ export function mergeCustomHeaders(
   const merged = { ...base };
 
   for (const header of customHeaders ?? []) {
-    if (!isValidCustomHeaderKey(header.key) || isReservedCustomHeaderKey(header.key)) {
+    if (
+      !isValidCustomHeaderKey(header.key) ||
+      isReservedCustomHeaderKey(header.key) ||
+      /[\r\n\0]/.test(header.value)
+    ) {
       continue;
     }
 

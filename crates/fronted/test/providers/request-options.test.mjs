@@ -275,8 +275,34 @@ test("local proxy preserves explicit user-agent and content-type values for the 
     {
       "x-xgent-upstream-user-agent": "custom-agent/1.0",
       "x-xgent-upstream-content-type": "application/custom+json",
+      "x-xgent-upstream-headers": Buffer.from(JSON.stringify({
+        "user-agent": "custom-agent/1.0", "CONTENT-TYPE": "application/custom+json",
+      })).toString("base64"),
     },
   );
+});
+
+test("upstream override transport preserves restricted headers and excludes credentials and proxy controls", () => {
+  const headers = proxy.buildUpstreamHeaderOverrideHeaders({
+    Cookie: "session=example", Referer: "https://relay.example/app", "X-Title": "项目",
+    Authorization: "Bearer secret", "x-api-key": "secret", "x-goog-api-key": "secret",
+    "X-Xgent-OAuth-Account-Id": "other-account", Host: "other.example", Connection: "close",
+  });
+  assert.deepEqual(JSON.parse(Buffer.from(headers[proxy.XGENT_UPSTREAM_HEADERS_HEADER], "base64").toString("utf8")), {
+    Cookie: "session=example", Referer: "https://relay.example/app", "X-Title": "项目",
+  });
+  assert.throws(() => proxy.buildUpstreamHeaderOverrideHeaders({ "X-Large": "x".repeat(8192) }), /8 KB/);
+  assert.equal(proxy.buildUpstreamHeaderOverrideHeaders({ Authorization: "Bearer secret" })[proxy.XGENT_UPSTREAM_HEADERS_HEADER], undefined);
+});
+
+test("provider custom headers cannot set proxy controls or inject new header lines", () => {
+  assert.deepEqual(customHeaderHelpers.mergeCustomHeaders({ Authorization: "Bearer configured" }, [
+    { key: "X-Xgent-Upstream-Origin", value: "https://other.example" },
+    { key: "x-xgent-oauth-account-id", value: "other-account" },
+    { key: "X-Injected", value: "a\r\nAuthorization: other" },
+    { key: "X-Null", value: "a\0b" },
+    { key: "Referer", value: "https://relay.example/app" },
+  ]), { Authorization: "Bearer configured", Referer: "https://relay.example/app" });
 });
 
 test("gemini models use native google api metadata", () => {

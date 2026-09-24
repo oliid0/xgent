@@ -2,6 +2,9 @@
 Repair desktop and mobile function paths using `xx`/`yy` evidence without importing their UI or gateway code. Latest user correction: prioritize general complex-task execution and individual mobile capability authorization, not expansion driven by the health example. Keep changes local until the complete goal is verified.
 
 ## Completed
+- Registered the upstream-header envelope in fallback CORS headers and updated the existing proxy transport expectation to include the encoded payload.
+- Ported xx's bounded encoded upstream-header transport to Xgent's existing local proxy, preserving legacy User-Agent/Content-Type handling and managed OAuth injection. This restores explicitly configured Cookie/Referer and other browser-restricted headers; auth, transport and internal proxy control headers cannot be overridden through the envelope. Invalid envelope data fails visibly before upstream traffic.
+- Reserved internal x-xgent header names in provider custom-header configuration and reject CR/LF/NUL values, following xx validation behavior without importing UI or gateway code.
 - Recheck effective photo access after an OS request so Android selected-photo grants are recognized even when the runtime callback denies full-library access; the native permission check reconciles partial grants before reads.
 - Connected authorized photo queries and image reads to the existing personal-data tool and image-result renderer. Added an explicit JPEG-preview import action through the existing atomic workspace import command; it preserves existing files and requires separate action authorization. Photos now participates in the existing per-capability policy controls only because its query/read actions are implemented.
 - Implemented Android MediaStore photo queries and JPEG preview reads, including Android 14 selected-photo authorization. Native permission checks precede queries/reads; identifiers are restricted to the image collection, legacy decoding is size-bounded with orientation handling, and partial-library/truncation evidence is returned.
@@ -167,6 +170,10 @@ Repair desktop and mobile function paths using `xx`/`yy` evidence without import
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
+- PC provider-header batch passed 65 request/model-discovery tests, `pnpm check`, `pnpm lint` and final diff review. Backend decoder tests were added but not run because Cargo is prohibited locally; the native proxy end-to-end check remains for final CI/package acceptance. No UI/gateway import and no push.
+- Applied installed Biome formatting to provider header transport and validation before consolidated verification.
+- Added Rust decoder regressions for restoring explicit restricted headers, override precedence, retained configured authentication, internal/transport exclusion, malformed values and size limits. Cargo execution remains excluded by user instruction; these await final CI.
+- Added frontend transport regressions for Cookie/Referer and UTF-8 values, encoded-size limits, excluded authentication/internal/transport fields and custom-header injection rejection.
 - Photo batch passed 36 relevant tool/approval/release-contract tests, `pnpm check`, `pnpm native:check`, `pnpm lint` and diff review. Native Swift/Kotlin/Rust compilation is unverified under the local build ban. Evidence: yy PhotosOffload.m and Android PhotosOffloadHandler.kt, Swift MCP PhotoKit requestImage documentation, Android official partial-photo-access and ContentResolver documentation. No push.
 - Formatted the photo tool, bridge and registry with the installed Biome version before non-build checks.
 - Added photo execution regressions for selected-library metadata, bounded query limits, actual image result content, authorized collision-safe import routing, cancellation before file mutation, and OS denial before native data access. Native compile/device verification is still outstanding.

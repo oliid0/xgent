@@ -13,6 +13,7 @@ use axum::{
     Router,
 };
 use reqwest::Url;
+use base64::Engine as _;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener as TokioTcpListener;
 use uuid::Uuid;
@@ -43,8 +44,10 @@ const UPSTREAM_ORIGIN_HEADER: &str = "x-xgent-upstream-origin";
 const UPSTREAM_URL_HEADER: &str = "x-xgent-upstream-url";
 const UPSTREAM_USER_AGENT_HEADER: &str = "x-xgent-upstream-user-agent";
 const UPSTREAM_CONTENT_TYPE_HEADER: &str = "x-xgent-upstream-content-type";
+const UPSTREAM_HEADERS_HEADER: &str = "x-xgent-upstream-headers";
+const UPSTREAM_HEADERS_MAX_BYTES: usize = 8 * 1024;
 const USE_SYSTEM_PROXY_HEADER: &str = "x-xgent-use-system-proxy";
-const DEFAULT_ALLOW_HEADERS: &str = "authorization,content-type,x-api-key,x-goog-api-key,anthropic-version,x-xgent-upstream-origin,x-xgent-upstream-url,x-xgent-upstream-user-agent,x-xgent-upstream-content-type,x-xgent-proxy-token,x-xgent-use-system-proxy,x-xgent-oauth-account-id";
+const DEFAULT_ALLOW_HEADERS: &str = "authorization,content-type,x-api-key,x-goog-api-key,anthropic-version,x-xgent-upstream-origin,x-xgent-upstream-url,x-xgent-upstream-user-agent,x-xgent-upstream-content-type,x-xgent-upstream-headers,x-xgent-proxy-token,x-xgent-use-system-proxy,x-xgent-oauth-account-id";
 const ALLOW_METHODS_VALUE: &str = "GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD";
 const VARY_VALUE: &str = "Origin, Access-Control-Request-Method, Access-Control-Request-Headers";
 const IMAGE_PROXY_MAX_BYTES: usize = 25 * 1024 * 1024;
@@ -432,7 +435,10 @@ async fn handle_proxy(
     } else {
         state.client.clone()
     };
-    let mut upstream_headers = build_upstream_request_headers(&headers);
+    let mut upstream_headers = match build_upstream_request_headers(&headers) {
+        Ok(headers) => headers,
+        Err(error) => return error_response(StatusCode::BAD_REQUEST, &error, &headers),
+    };
     if provider == "codex" {
         if let Some(account_id) = headers
             .get(OAUTH_ACCOUNT_ID_HEADER)
@@ -724,7 +730,30 @@ fn should_forward_request_header(name: &HeaderName) -> bool {
         && !lowered.starts_with(PROXY_PREFIX)
 }
 
-fn build_upstream_request_headers(headers: &HeaderMap) -> HeaderMap {
+fn decode_upstream_header_overrides(encoded: &str) -> Result<Vec<(HeaderName, HeaderValue)>, String> {
+    if encoded.len() > UPSTREAM_HEADERS_MAX_BYTES {
+        return Err("Upstream header overrides exceed the 8 KB limit".into());
+    }
+    let decoded = base64::engine::general_purpose::STANDARD.decode(encoded)
+        .map_err(|_| "Upstream header overrides are not valid base64".to_string())?;
+    let parsed: serde_json::Map<String, serde_json::Value> = serde_json::from_slice(&decoded)
+        .map_err(|_| "Upstream header overrides must be a JSON object".to_string())?;
+    let mut overrides = Vec::with_capacity(parsed.len());
+    for (name, value) in parsed {
+        let value = value.as_str().ok_or_else(|| "Upstream header override values must be strings".to_string())?;
+        let name = HeaderName::from_bytes(name.as_bytes())
+            .map_err(|_| "Invalid upstream header override name".to_string())?;
+        if matches!(name.as_str(), HOST | CONTENT_LENGTH | CONNECTION | KEEP_ALIVE | PROXY_CONNECTION | PROXY_AUTHENTICATE | PROXY_AUTHORIZATION | TE | TRAILER | TRANSFER_ENCODING | UPGRADE | "authorization" | "x-api-key" | "x-goog-api-key") || name.as_str().starts_with(PROXY_PREFIX) {
+            continue;
+        }
+        let value = HeaderValue::from_str(value)
+            .map_err(|_| "Invalid upstream header override value".to_string())?;
+        overrides.push((name, value));
+    }
+    Ok(overrides)
+}
+
+fn build_upstream_request_headers(headers: &HeaderMap) -> Result<HeaderMap, String> {
     let mut upstream_headers = HeaderMap::new();
     for (name, value) in headers {
         if should_forward_request_header(name) {
@@ -737,7 +766,13 @@ fn build_upstream_request_headers(headers: &HeaderMap) -> HeaderMap {
     if let Some(value) = headers.get(UPSTREAM_CONTENT_TYPE_HEADER) {
         upstream_headers.insert(HeaderName::from_static(CONTENT_TYPE), value.clone());
     }
-    upstream_headers
+    if let Some(encoded) = headers.get(UPSTREAM_HEADERS_HEADER) {
+        let encoded = encoded.to_str().map_err(|_| "Upstream header overrides must be ASCII".to_string())?;
+        for (name, value) in decode_upstream_header_overrides(encoded)? {
+            upstream_headers.insert(name, value);
+        }
+    }
+    Ok(upstream_headers)
 }
 
 fn should_forward_response_header(name: &HeaderName) -> bool {
@@ -961,7 +996,7 @@ mod tests {
             HeaderValue::from_static("application/custom+json"),
         );
 
-        let upstream_headers = build_upstream_request_headers(&headers);
+        let upstream_headers = build_upstream_request_headers(&headers).expect("valid headers");
 
         assert_eq!(
             upstream_headers
@@ -977,5 +1012,38 @@ mod tests {
         );
         assert!(!upstream_headers.contains_key(UPSTREAM_USER_AGENT_HEADER));
         assert!(!upstream_headers.contains_key(UPSTREAM_CONTENT_TYPE_HEADER));
+    }
+
+    #[test]
+    fn encoded_headers_restore_explicit_values_without_overriding_auth_or_transport() {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(serde_json::to_vec(&serde_json::json!({
+            "Cookie": "session=example", "Referer": "https://relay.example/app",
+            "Authorization": "Bearer other", "Host": "other.example",
+            "Connection": "close", "x-xgent-proxy-token": "other",
+            "User-Agent": "configured-client"
+        })).unwrap());
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", HeaderValue::from_static("Bearer configured"));
+        headers.insert(REFERER, HeaderValue::from_static("http://tauri.localhost"));
+        headers.insert(UPSTREAM_USER_AGENT_HEADER, HeaderValue::from_static("legacy-client"));
+        headers.insert(UPSTREAM_HEADERS_HEADER, HeaderValue::from_str(&encoded).unwrap());
+        let upstream = build_upstream_request_headers(&headers).unwrap();
+        assert_eq!(upstream.get("authorization").unwrap(), "Bearer configured");
+        assert_eq!(upstream.get("cookie").unwrap(), "session=example");
+        assert_eq!(upstream.get(REFERER).unwrap(), "https://relay.example/app");
+        assert_eq!(upstream.get("user-agent").unwrap(), "configured-client");
+        for name in [HOST, CONNECTION, PROXY_TOKEN_HEADER, UPSTREAM_HEADERS_HEADER] {
+            assert!(!upstream.contains_key(name));
+        }
+    }
+
+    #[test]
+    fn encoded_headers_reject_malformed_or_oversized_values() {
+        assert!(decode_upstream_header_overrides("!base64!").is_err());
+        assert!(decode_upstream_header_overrides(&"a".repeat(8193)).is_err());
+        for json in [r#"[]"#, r#"{"X-Test":2}"#, r#"{"Bad Name":"value"}"#, r#"{"X-Test":"value\r\ninjected"}"#] {
+            let encoded = base64::engine::general_purpose::STANDARD.encode(json.as_bytes());
+            assert!(decode_upstream_header_overrides(&encoded).is_err());
+        }
     }
 }
