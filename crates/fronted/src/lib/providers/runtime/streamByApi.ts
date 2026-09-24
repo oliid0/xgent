@@ -30,6 +30,7 @@ import {
   resolveAnthropicThinkingRuntime,
   resolveGeminiThinkingRuntime,
 } from "./thinkingLevels";
+import { omitToolResultImagesForTextOnlyModel } from "./toolResultImageFallback";
 import type { StreamOptionsEx, ToolChoice } from "./types";
 
 function mapToolChoiceToOpenAI(
@@ -127,6 +128,7 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
       );
     }
     case "openai-completions": {
+      const requestContext = omitToolResultImagesForTextOnlyModel(context, model);
       const effectiveOptions = attachDeepSeekProviderPayloadAdapter(options, {
         providerId: "codex",
         baseUrl: model.baseUrl,
@@ -144,7 +146,7 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
         () => {
           const source = streamOpenAICompletions(
             model as Model<"openai-completions">,
-            context,
+            requestContext,
             openAIOptions,
           );
           const compatible = effectiveOptions.recoverMissingFinishReason
@@ -156,17 +158,24 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
       );
     }
     case DEEPSEEK_RESPONSES_API:
-      return withStreamRetry(() => streamDeepSeekResponses(model, context, options), {
-        signal: options.signal,
-        ...options.streamRetry,
-      });
+      return withStreamRetry(
+        () =>
+          streamDeepSeekResponses(
+            model,
+            omitToolResultImagesForTextOnlyModel(context, model),
+            options,
+          ),
+        { signal: options.signal, ...options.streamRetry },
+      );
     case "openai-responses": {
+      const requestContext = omitToolResultImagesForTextOnlyModel(context, model);
       const openAIOptions: OpenAIResponsesOptions = {
         ...buildOpenAIBaseOptions(model, options),
         reasoningEffort: clampOpenAIReasoningEffort(model, options.reasoning),
       };
       return withStreamRetry(
-        () => streamOpenAIResponses(model as Model<"openai-responses">, context, openAIOptions),
+        () =>
+          streamOpenAIResponses(model as Model<"openai-responses">, requestContext, openAIOptions),
         {
           signal: options.signal,
           ...options.streamRetry,
@@ -174,6 +183,7 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
       );
     }
     case "google-generative-ai": {
+      const requestContext = omitToolResultImagesForTextOnlyModel(context, model);
       const googleOptions: GoogleOptions = {
         temperature: options.temperature,
         maxTokens: resolveMaxTokens(options.maxTokens, model.maxTokens),
@@ -188,7 +198,7 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
         toolChoice: mapToolChoiceToGoogle(options.toolChoice) ?? "none",
       };
       return withStreamRetry(
-        () => streamGoogle(model as Model<"google-generative-ai">, context, googleOptions),
+        () => streamGoogle(model as Model<"google-generative-ai">, requestContext, googleOptions),
         {
           signal: options.signal,
           ...options.streamRetry,
