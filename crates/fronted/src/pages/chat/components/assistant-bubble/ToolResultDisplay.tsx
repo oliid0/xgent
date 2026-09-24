@@ -604,10 +604,14 @@ export function ToolResultDisplay({
 
   if (kind === "edit") {
     const details = result.details as EditResultDetails;
+    const hasFullSnapshots =
+      typeof details.beforeContent === "string" &&
+      typeof details.afterContent === "string" &&
+      details.beforeContent.length + details.afterContent.length <= 200_000;
     return (
       <EditDiffView
-        beforeText={details.oldPreview}
-        afterText={details.newPreview}
+        beforeText={hasFullSnapshots ? details.beforeContent! : details.oldPreview}
+        afterText={hasFullSnapshots ? details.afterContent! : details.newPreview}
         filePath={details.displayPath || details.path}
       />
     );

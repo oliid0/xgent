@@ -110,18 +110,25 @@ function result(toolCall: ToolCall, data: unknown, isError = false): ToolResultM
   };
 }
 
-async function ensurePermission(permission: MobileAssistantPermission) {
+async function ensurePermission(permission: MobileAssistantPermission, signal?: AbortSignal) {
+  const checkCancelled = () => {
+    if (signal?.aborted) throw new Error("Cancelled");
+  };
+  checkCancelled();
   const status = await mobileAssistantStatus();
+  checkCancelled();
   if (permission === "health" && !status.healthAvailable) {
     throw new Error(status.detail || "Health data is unavailable on this device.");
   }
   const alias = status.permissionAliases[permission] ?? permission;
   let states = normalizeMobileAssistantPermissions(status, await checkMobileAssistantPermissions());
+  checkCancelled();
   if (states[permission] === "granted" || states[permission] === "requested") return;
   states = normalizeMobileAssistantPermissions(
     status,
     await requestMobileAssistantPermission(alias),
   );
+  checkCancelled();
   if (states[permission] !== "granted" && states[permission] !== "requested") {
     throw new Error(`The user did not grant ${permission} permission.`);
   }
@@ -145,12 +152,13 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
           let nearbyBluetooth: Awaited<ReturnType<typeof scanMobileBluetooth>> = [];
           let bluetoothError: string | undefined;
           try {
-            await ensurePermission("bluetooth");
+            await ensurePermission("bluetooth", signal);
             if (signal?.aborted) return result(toolCall, "Cancelled", true);
             nearbyBluetooth = await scanMobileBluetooth(
               typeof args.timeout_ms === "number" ? args.timeout_ms : 5_000,
             );
           } catch (cause) {
+            if (signal?.aborted) return result(toolCall, "Cancelled", true);
             bluetoothError = cause instanceof Error ? cause.message : String(cause);
           }
           return result(toolCall, {
@@ -161,7 +169,7 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
           });
         }
         if (action === "scan_bluetooth") {
-          await ensurePermission("bluetooth");
+          await ensurePermission("bluetooth", signal);
           if (signal?.aborted) return result(toolCall, "Cancelled", true);
           const devices = await scanMobileBluetooth(
             typeof args.timeout_ms === "number" ? args.timeout_ms : 5_000,
@@ -170,7 +178,7 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
           return result(toolCall, { devices });
         }
         if (action === "get_current_location") {
-          await ensurePermission("location");
+          await ensurePermission("location", signal);
           const timeoutMs =
             typeof args.timeout_ms === "number" && Number.isInteger(args.timeout_ms)
               ? args.timeout_ms
@@ -188,12 +196,12 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
             endMs: dateMs(args.end, "end"),
             limit: limit(args.limit),
           };
-          await ensurePermission("calendar");
+          await ensurePermission("calendar", signal);
           const events = await listMobileCalendarEvents(request);
           return result(toolCall, { events });
         }
         if (action === "list_reminders") {
-          await ensurePermission("reminders");
+          await ensurePermission("reminders", signal);
           const reminders = await listMobileReminders({
             incompleteOnly: args.incomplete_only !== false,
             limit: limit(args.limit),
@@ -208,7 +216,7 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
           if (request.endMs <= request.startMs) {
             throw new Error("end must be after start.");
           }
-          await ensurePermission("health");
+          await ensurePermission("health", signal);
           const summary = await readMobileHealthSteps(request);
           return result(toolCall, {
             summary,
@@ -230,7 +238,7 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
           location: text(args.location) || null,
           notes: text(args.notes) || null,
         };
-        await ensurePermission("calendar");
+        await ensurePermission("calendar", signal);
         const created = await createMobileCalendarEvent(request);
         return result(toolCall, created);
       }
@@ -241,7 +249,7 @@ export function createMobilePersonalAssistantTools(): BuiltinToolBundle {
           dueMs: due ? dateMs(due, "due") : null,
           notes: text(args.notes) || null,
         };
-        await ensurePermission("reminders");
+        await ensurePermission("reminders", signal);
         const created = await createMobileReminder(request);
         return result(toolCall, created);
       }

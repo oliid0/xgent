@@ -58,6 +58,31 @@ test("Bluetooth discovery never scans when authorization is denied", async () =>
   assert.ok(!calls.some(({ command }) => command.endsWith("|scan_bluetooth")));
 });
 
+test("cancelling while OS authorization is pending prevents personal actions and reads", async () => {
+  for (const [name, action, permission, args] of [
+    ["MobilePersonalActions", "create_calendar_event", "calendar", {
+      title: "Meeting", start: "2026-09-01T14:00:00Z", end: "2026-09-01T15:00:00Z",
+    }],
+    ["MobilePersonalActions", "create_reminder", "reminders", { title: "Reminder" }],
+    ["MobilePersonalData", "discover_devices", "bluetooth", {}],
+  ]) {
+    const controller = new AbortController();
+    const { bundle, calls } = createHarness(async (command) => {
+      if (command.endsWith("|status")) return { permissionAliases: {} };
+      if (command.endsWith("|check_permissions")) return { [permission]: "prompt" };
+      if (command.endsWith("|request_permissions")) {
+        controller.abort();
+        return { [permission]: "granted" };
+      }
+      throw new Error(`Unexpected post-cancellation operation: ${command}`);
+    });
+    const response = await bundle.executeToolCall(toolCall(name, { action, ...args }), controller.signal);
+    assert.equal(response.isError, true, action);
+    assert.equal(response.content[0].text, "Cancelled");
+    assert.equal(calls.at(-1).command, "plugin:mobile-assistant|request_permissions");
+  }
+});
+
 test("network status works without Shell or permission prompts", async () => {
   const network = { transport: "wifi", connected: true, validated: true, metered: false };
   const { bundle, calls } = createHarness((command) => {

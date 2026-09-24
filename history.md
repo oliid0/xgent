@@ -2,6 +2,9 @@
 Repair desktop and mobile function paths while using `xx`/`yy` as references without importing their UI or gateway code. Current focus: desktop proxy/providers/authorized external CUA driver setup and mobile native/optional-shell/LAN/cloud tool orchestration with complete activity and result evidence.
 
 ## Completed
+- Added cancellation regressions for calendar creation, reminder creation and device discovery while OS permission is pending; each must return cancellation without issuing a native action afterward.
+- Propagated task cancellation through mobile personal permission checks, preventing cancelled calendar/reminder actions from executing after a delayed OS authorization response and preventing device discovery from reporting cancellation as partial success.
+- Routed the shared desktop/Android Edit result viewer to the same bounded exact pre/post snapshots as native chat; partial snapshot pairs still fall back together, preserving the existing component and layout.
 - Registered existing desktop backup, STT, and model failover commands that had been defined but omitted from Tauri's desktop invoke handler.
 - Corrected the Android Bluetooth adapter nullability error reported by release CI at `BluetoothDiscovery.kt:41`.
 - Kept iOS settings child routes inside the original SwiftUI sheet; the current route now follows the presentation stack.
@@ -138,6 +141,7 @@ Repair desktop and mobile function paths while using `xx`/`yy` as references wit
 - Prior files above, plus `.github/workflows/desktop-release.yml`, mobile Git/SSH sources, workspace FS, SwiftUI attachment picker, mobile Files/Git panels, shared file tree, i18n, and `history.md`.
 
 ## Verification/CI
+- Follow-up acceptance audit: mobile permission cancellation and changed-file tests passed 17/17; `pnpm check` and `pnpm lint` passed after shared Edit viewer snapshot routing. No layout or reference UI/gateway imports were introduced. Device acceptance and final CI remain outstanding.
 - Closing batch: `pnpm test:non-native` passed 1,234/1,234; `pnpm check`, `pnpm native:check`, and `pnpm lint` passed. The final snapshot-pair correction separately passed changed-file tests 7/7, TypeScript and lint. No local Cargo/build command was used. Goal remains active: device acceptance, the remaining functional audit, and new-revision CI are not yet complete; retain local commits until the whole goal is ready for the requested single push.
 - Kept Edit diff pairs consistent when only one bounded full snapshot is available: use both full snapshots together or both legacy snippets, never mix file and fragment contents.
 - Applied the installed Biome formatter to the two final diff presentation modules before consolidated verification.
