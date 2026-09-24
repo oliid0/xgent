@@ -279,6 +279,33 @@ test("native chat and activity preserve file edit evidence from tool results", a
   h.unmount();
 });
 
+test("native chat keeps a shell-created PreviewFile output openable after the tool finishes", async () => {
+  const opened = [];
+  const h = harness({ onOpenWorkspaceFile: (path) => opened.push(path) }, { mobile: true });
+  h.props.historyItems = [{
+    kind: "assistant", key: "shell-output", segmentIndex: 0, timestamp: 1,
+    isFromCompactedSegment: false,
+    rounds: [{ round: 1, key: "r1", blocks: [{
+      kind: "tool", item: {
+        toolCall: { id: "preview-1", name: "PreviewFile", arguments: { path: "slides.pptx" } },
+        toolResult: {
+          role: "toolResult", toolCallId: "preview-1", toolName: "PreviewFile",
+          content: [{ type: "text", text: "Opened slides.pptx" }],
+          details: { kind: "mobile_file_preview", path: "slides.pptx" },
+          isError: false, timestamp: 1,
+        },
+      },
+    }] }],
+  }];
+  const transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
+  const result = transcript.children.find((node) => node.id === "shell-output");
+  const fileAction = result.children.find((node) => node.id === "shell-output:previewed-file:preview-1");
+  assert.equal(fileAction.label, "slides.pptx");
+  assert.equal((await h.dispatch(fileAction.action)).ok, true);
+  assert.deepEqual(opened, ["slides.pptx"]);
+  h.unmount();
+});
+
 test("native Apple documents declare desktop shape and shared visual tokens", () => {
   const h = harness();
   const document = h.render();

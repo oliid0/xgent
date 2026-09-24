@@ -4,11 +4,13 @@ import { memo, useMemo } from "react";
 import { ChangedFilesCard } from "../../../components/chat/ChangedFilesCard";
 import { CloudArtifactsCard } from "../../../components/chat/CloudArtifactsCard";
 import { GeneratedFilePreviewCard } from "../../../components/chat/GeneratedFilePreviewCard";
+import { isWorkspacePreviewPath } from "../../../components/workspace-editor/workspaceImagePreview";
 import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { HistoryMessageRef } from "../../../lib/chat/conversation/conversationState";
 import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
 import { collectChangedFiles } from "../../../lib/chat/messages/changedFiles";
 import { collectCloudArtifacts } from "../../../lib/chat/messages/cloudArtifacts";
+import { collectPreviewedFiles } from "../../../lib/chat/messages/previewedFiles";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
 import { AssistantBubbleUnit } from "../components/AssistantBubble";
 import { AssistantRowFooter } from "./RowActions";
@@ -46,7 +48,18 @@ const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
     [unit.hasChangedFilesCandidate, unit.rounds],
   );
   const cloudArtifacts = useMemo(() => collectCloudArtifacts(unit.rounds), [unit.rounds]);
-  const hasCards = Boolean(changedFiles) || cloudArtifacts.length > 0;
+  const previewedFiles = useMemo(
+    () => collectPreviewedFiles(unit.rounds, changedFiles),
+    [changedFiles, unit.rounds],
+  );
+  const resultPaths = [
+    ...(changedFiles?.files.filter((file) => !file.deleted).map((file) => file.path) ?? []),
+    ...previewedFiles.map((file) => file.path),
+  ];
+  const hasCards =
+    Boolean(changedFiles) ||
+    cloudArtifacts.length > 0 ||
+    (Boolean(props.workdir) && resultPaths.some(isWorkspacePreviewPath));
 
   return (
     <ChatMessage
@@ -57,9 +70,9 @@ const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
     >
       {hasCards ? (
         <VStack gap={2} width="100%">
-          {changedFiles && props.workdir ? (
+          {resultPaths.length > 0 && props.workdir ? (
             <GeneratedFilePreviewCard
-              summary={changedFiles}
+              paths={resultPaths}
               workdir={props.workdir}
               onOpenFileLink={onOpenFileLink}
             />

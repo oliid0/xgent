@@ -23,6 +23,7 @@ import {
 } from "../lib/chat/layoutPreferences";
 import { collectChangedFiles } from "../lib/chat/messages/changedFiles";
 import { collectCloudArtifacts } from "../lib/chat/messages/cloudArtifacts";
+import { collectPreviewedFiles } from "../lib/chat/messages/previewedFiles";
 import {
   safeStringify,
   summarizeToolCall,
@@ -500,8 +501,9 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const messages: PresentationNode[] = props.historyItems.flatMap((item): PresentationNode[] => {
     if (item.kind === "assistant") {
       const artifacts = collectCloudArtifacts(item.rounds);
-      const changedFiles =
-        collectChangedFiles(item.rounds)?.files.filter((file) => !file.deleted) ?? [];
+      const changedSummary = collectChangedFiles(item.rounds);
+      const changedFiles = changedSummary?.files.filter((file) => !file.deleted) ?? [];
+      const previewedFiles = collectPreviewedFiles(item.rounds, changedSummary);
       return [
         {
           id: item.key,
@@ -511,6 +513,19 @@ export function NativeChatPage(props: NativeChatPageProps) {
             ...roundNodes(item.rounds, item.key, showThinking, contentLabels),
             ...changedFiles.map((file): PresentationNode => {
               const id = `${item.key}:changed-file:${file.lastToolCallId}`;
+              return {
+                id,
+                kind: "Button",
+                label: file.path,
+                icon: "doc",
+                variant: "secondary",
+                size: "small",
+                accessibilityHint: t("projectTools.fileTree.openFile"),
+                action: action(id, () => props.onOpenWorkspaceFile(file.path)),
+              };
+            }),
+            ...previewedFiles.map((file): PresentationNode => {
+              const id = `${item.key}:previewed-file:${file.toolCallId}`;
               return {
                 id,
                 kind: "Button",

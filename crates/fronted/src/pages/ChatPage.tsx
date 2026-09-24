@@ -74,6 +74,7 @@ import type { AppUpdateController } from "../lib/appUpdates";
 import { getAutomationState, useAutomation } from "../lib/automation";
 import { createHookRunScope } from "../lib/automation/hookRunner";
 import { browserSessionController } from "../lib/browser/browserSessionController";
+import type { ChatFileLink } from "../lib/chat/chatFileLinks";
 import type { CompactionStatus } from "../lib/chat/compaction/types";
 import {
   buildPersistableMessagesFromSnapshot,
@@ -2044,6 +2045,10 @@ export function ChatPage(props: ChatPageProps) {
       openWorkspaceEditorFile,
       openWorkspaceFilePreview,
     ],
+  );
+  const handleOpenMobileChatFileLink = useCallback(
+    (link: ChatFileLink) => handleOpenMobileWorkspaceFile(link.path),
+    [handleOpenMobileWorkspaceFile],
   );
 
   const latestChangedFiles = useMemo(() => {
@@ -6813,7 +6818,13 @@ export function ChatPage(props: ChatPageProps) {
                         isCompactionRunning={isCompactionRunning}
                         bottomReservePx={0}
                         onOpenFileLink={
-                          desktopCommandHostAvailable ? handleOpenChatFileLink : undefined
+                          nativeMobile
+                            ? mobileWorkspacePath
+                              ? handleOpenMobileChatFileLink
+                              : undefined
+                            : desktopCommandHostAvailable
+                              ? handleOpenChatFileLink
+                              : undefined
                         }
                         onResendFromEdit={handleResendFromEdit}
                         onBranchConversation={
