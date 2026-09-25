@@ -136,6 +136,7 @@ export function CronSection(
   if (detail.open && detail.mode === "view") {
     return (
       <CronTaskViewModal
+        nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
         taskId={detail.taskId}
         nativePresentationMode={props.nativePresentationMode}
         onClose={() => setDetail({ open: false })}
@@ -146,6 +147,7 @@ export function CronSection(
   if (detail.open) {
     return (
       <CronTaskModal
+        nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
         mode={detail.mode}
         nativePresentationMode={props.nativePresentationMode}
         initialData={detail.task}
@@ -211,6 +213,7 @@ export function CronSection(
     return (
       <>
         <NativeSurface
+          sessionSurface={props.nativeSettingsSurfaceId}
           document={{
             mode: props.nativePresentationMode ?? "sheet",
             title: t("settings.navCron"),

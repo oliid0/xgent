@@ -316,6 +316,7 @@ export function HooksSection(
       ];
       return (
         <NativeSurface
+          sessionSurface={_props.nativeSettingsSurfaceId}
           document={{
             mode: _props.nativePresentationMode ?? "sheet",
             title: t(editingHook ? "settings.hooksEdit" : "settings.hooksAdd"),
@@ -395,6 +396,7 @@ export function HooksSection(
     return (
       <>
         <NativeSurface
+          sessionSurface={_props.nativeSettingsSurfaceId}
           document={{
             mode: _props.nativePresentationMode ?? "sheet",
             title: t("settings.navHooks"),

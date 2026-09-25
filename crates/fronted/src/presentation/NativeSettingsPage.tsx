@@ -77,7 +77,11 @@ import { SshSettingsSection } from "../pages/settings/SshSettingsSection";
 import type { SectionId, SettingsPageProps } from "../pages/settings/types";
 import { isLanPcCommandHostReady } from "../runtime/lanPcCommandHost";
 import { presentationControls } from "./controls";
-import { NativeSurface } from "./NativeSurface";
+import {
+  NativeSurface,
+  removeNativeSurfaceSession,
+  retainNativeSurfaceSession,
+} from "./NativeSurface";
 import { createNativePresentationTheme } from "./nativeTheme";
 import type { PresentationNode } from "./types";
 
@@ -108,6 +112,11 @@ function formatByteCount(value?: number | null) {
 
 /** Native navigation uses the same reducers, discovery and persistence as desktop settings. */
 export function NativeSettingsPage(props: SettingsPageProps) {
+  const [sessionSurface] = useState(() => `settings:${crypto.randomUUID()}`);
+  useEffect(() => {
+    retainNativeSurfaceSession(sessionSurface);
+    return () => removeNativeSurfaceSession(sessionSurface, console.error);
+  }, [sessionSurface]);
   const { settings, setSettings, nativeMobile = false } = props;
   const { t } = useLocale();
   const [page, setPage] = useState(
@@ -361,6 +370,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         setSettings={setSettings}
         onOpenSidebar={returnToSettings}
         presentationMode="sheet"
+        nativeSettingsSurfaceId={sessionSurface}
       />
     );
   if (page === "mcp" && nativeMobile)
@@ -371,22 +381,43 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         onOpenSidebar={returnToSettings}
         allowStdio={isLanPcCommandHostReady()}
         presentationMode="sheet"
+        nativeSettingsSurfaceId={sessionSurface}
       />
     );
   if (page === "ssh")
     return (
-      <SshSettingsSection settings={settings} setSettings={setSettings} onBack={returnToSettings} />
+      <SshSettingsSection
+        settings={settings}
+        setSettings={setSettings}
+        onBack={returnToSettings}
+        nativeSettingsSurfaceId={sessionSurface}
+      />
     );
   if (page === "cron")
-    return <CronSection settings={settings} setSettings={setSettings} onBack={returnToSettings} />;
+    return (
+      <CronSection
+        settings={settings}
+        setSettings={setSettings}
+        onBack={returnToSettings}
+        nativeSettingsSurfaceId={sessionSurface}
+      />
+    );
   if (page === "hooks")
-    return <HooksSection settings={settings} setSettings={setSettings} onBack={returnToSettings} />;
+    return (
+      <HooksSection
+        settings={settings}
+        setSettings={setSettings}
+        onBack={returnToSettings}
+        nativeSettingsSurfaceId={sessionSurface}
+      />
+    );
   if (page === "soul")
     return (
       <SoulSection
         settings={settings}
         createRequestId={props.soulCreateRequestId}
         onBack={returnToSettings}
+        nativeSettingsSurfaceId={sessionSurface}
       />
     );
   if (page === "shortcuts" && !nativeMobile)
@@ -1691,19 +1722,23 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             backupConfig.profile,
             (profile) => patchBackupConfig({ profile }),
           ),
-          c.toggle(
-            "backup-auto",
-            t("settings.backupSyncAuto"),
-            backupConfig.autoSync,
-            (autoSync) => {
-              if (!autoSync) {
-                patchBackupConfig({ autoSync: false });
-                return;
-              }
-              patchBackupConfig({ autoSync: true });
-              setBackupConfirmation({ kind: "auto-sync" });
-            },
-          ),
+          ...(!nativeMobile
+            ? [
+                c.toggle(
+                  "backup-auto",
+                  t("settings.backupSyncAuto"),
+                  backupConfig.autoSync,
+                  (autoSync) => {
+                    if (!autoSync) {
+                      patchBackupConfig({ autoSync: false });
+                      return;
+                    }
+                    patchBackupConfig({ autoSync: true });
+                    setBackupConfirmation({ kind: "auto-sync" });
+                  },
+                ),
+              ]
+            : []),
           c.action(
             "backup-save-connection",
             t("settings.save"),
@@ -1753,22 +1788,25 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         ]),
       );
     }
+    if (!nativeMobile)
+      nodes.push(
+        c.group("backup-local", t("settings.backupLocalTitle"), [
+          c.action("backup-export", t("settings.backupExport"), () =>
+            work(async () => {
+              const path = await exportBackup(settings.skills);
+              if (path)
+                setBackupStatus({ ok: true, message: `${t("settings.backupExportDone")}${path}` });
+            }),
+          ),
+          c.action("backup-import", t("settings.backupImport"), () =>
+            work(async () => {
+              const preview = await peekBackupImport();
+              if (preview) setBackupConfirmation({ kind: "import", path: preview.path });
+            }),
+          ),
+        ]),
+      );
     nodes.push(
-      c.group("backup-local", t("settings.backupLocalTitle"), [
-        c.action("backup-export", t("settings.backupExport"), () =>
-          work(async () => {
-            const path = await exportBackup(settings.skills);
-            if (path)
-              setBackupStatus({ ok: true, message: `${t("settings.backupExportDone")}${path}` });
-          }),
-        ),
-        c.action("backup-import", t("settings.backupImport"), () =>
-          work(async () => {
-            const preview = await peekBackupImport();
-            if (preview) setBackupConfirmation({ kind: "import", path: preview.path });
-          }),
-        ),
-      ]),
       c.group("backup-cloud", t("settings.backupSyncTitle"), [
         c.action("backup-upload", t("settings.backupSyncUpload"), async () => {
           const remote = await fetchRemoteInfo();
@@ -1959,6 +1997,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       ];
   return (
     <NativeSurface
+      sessionSurface={sessionSurface}
       document={{
         mode: "sheet",
         title: provider?.name || titles[page] || t("settings.title"),

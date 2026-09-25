@@ -122,6 +122,7 @@ export type CronTaskFormData = Omit<CronTask, "id" | "enabled" | "lastError">;
 
 type CronTaskModalProps = {
   mode: "add" | "edit";
+  nativeSettingsSurfaceId?: string;
   nativePresentationMode?: "root" | "sheet";
   initialData?: CronTask;
   modelOptions: CronPromptModelOption[];
@@ -139,6 +140,7 @@ type CronTaskModalProps = {
 
 export function CronTaskModal({
   mode,
+  nativeSettingsSurfaceId,
   nativePresentationMode,
   initialData,
   modelOptions,
@@ -442,6 +444,7 @@ export function CronTaskModal({
     });
     return (
       <NativeSurface
+        sessionSurface={nativeSettingsSurfaceId}
         document={{
           mode: nativePresentationMode ?? "sheet",
           title: modalTitle,

@@ -46,6 +46,7 @@ type MobileSkillsPageProps = {
   initialSkills?: SkillSummary[];
   onOpenSidebar: () => void;
   presentationMode?: "root" | "sheet";
+  nativeSettingsSurfaceId?: string;
 };
 
 type SkillPreview = {
@@ -612,6 +613,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
     }
     return (
       <NativeSurface
+        sessionSurface={props.nativeSettingsSurfaceId}
         document={{
           mode: "sheet",
           title: selected?.name || t("sidebar.mobile.plugins"),

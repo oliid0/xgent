@@ -50,4 +50,5 @@ export type SettingsSectionProps = {
   settings: AppSettings;
   setSettings: SetSettingsFn;
   reloadSettings?: () => Promise<void>;
+  nativeSettingsSurfaceId?: string;
 };

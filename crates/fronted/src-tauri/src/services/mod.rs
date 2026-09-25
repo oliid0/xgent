@@ -23,7 +23,6 @@ pub mod system_proxy;
 pub mod stt;
 #[cfg(desktop)]
 pub mod tray;
-#[cfg(desktop)]
 pub mod webdav;
 #[cfg(desktop)]
 pub mod webdav_auto_sync;

@@ -38,6 +38,7 @@ type MobileMcpPageProps = {
   onOpenSidebar: () => void;
   allowStdio: boolean;
   presentationMode?: "root" | "sheet";
+  nativeSettingsSurfaceId?: string;
 };
 
 type EditingState = { mode: "add" } | { mode: "edit"; index: number; server: McpServerConfig };
@@ -686,6 +687,7 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
 
     return (
       <NativeSurface
+        sessionSurface={props.nativeSettingsSurfaceId}
         document={{
           mode: props.presentationMode ?? "root",
           title: activeTitle,

@@ -271,7 +271,10 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
         healthStore.getRequestStatusForAuthorization(toShare: [], read: [stepType]) {
             status, error in
             if let error {
-                invoke.reject("Unable to check HealthKit authorization: \(error.localizedDescription)")
+                // A sideloaded build may lack the HealthKit entitlement even when
+                // the device supports HealthKit. Keep unrelated permissions usable.
+                NSLog("Unable to check HealthKit authorization: %@", error.localizedDescription)
+                invoke.resolve(payload)
                 return
             }
             var resolvedPayload = payload

@@ -308,6 +308,7 @@ fn touch_backup_last_sync_at() -> Result<i64, String> {
 }
 
 
+#[cfg(desktop)]
 fn record_backup_auto_sync_error(message: &str) {
     let Ok(conn) = open_db() else { return };
     let Ok(mut config) = load_backup_sync_config(&conn) else {
@@ -443,17 +444,20 @@ pub async fn settings_backup_upload(skills: Option<Value>) -> Result<i64, String
 
 
 #[tauri::command]
+#[cfg(desktop)]
 pub fn settings_backup_mark_dirty(skills: Option<Value>) {
     crate::services::webdav_auto_sync::cache_skills(skills);
     crate::services::webdav_auto_sync::mark_dirty();
 }
 
 #[tauri::command]
+#[cfg(desktop)]
 pub fn settings_backup_cache_skills(skills: Option<Value>) {
     crate::services::webdav_auto_sync::cache_skills(skills);
 }
 
 
+#[cfg(desktop)]
 pub(crate) async fn auto_upload_backup_snapshot(
     skills: Option<Value>,
 ) -> Result<Option<i64>, String> {
@@ -517,6 +521,7 @@ pub async fn settings_backup_download() -> Result<BackupApplyOutcome, String> {
     tauri::async_runtime::spawn_blocking(move || {
 
 
+        #[cfg(desktop)]
         let _suppression = crate::services::webdav_auto_sync::suppress();
         let (snapshot, _) = parse_backup_document(&document)?;
         let mut conn = open_db()?;

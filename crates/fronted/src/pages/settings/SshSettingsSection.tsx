@@ -105,6 +105,7 @@ function SshHostModal(props: {
   onImport?: (hosts: SshImportCandidate[]) => void;
   onSave: (data: SshHostDraft) => void;
   onClose: () => void;
+  nativeSettingsSurfaceId?: string;
 }) {
   const browser = isBrowserRuntime();
   const { initialData, existingHosts, onImport, onSave, onClose } = props;
@@ -325,6 +326,7 @@ function SshHostModal(props: {
     if (importError) nodes.push({ id: "error", kind: "Text", text: importError });
     return (
       <NativeSurface
+        sessionSurface={props.nativeSettingsSurfaceId}
         document={{
           mode: "sheet",
           title: t(isEditing ? "settings.sshEdit" : "settings.sshAdd"),
@@ -908,6 +910,7 @@ export function SshSettingsSection(
   if (modalOpen) {
     return (
       <SshHostModal
+        nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
         initialData={editingHost ?? undefined}
         existingHosts={hosts}
         onImport={editingHost ? undefined : handleImport}
@@ -957,6 +960,7 @@ export function SshSettingsSection(
     return (
       <>
         <NativeSurface
+          sessionSurface={props.nativeSettingsSurfaceId}
           document={{
             mode: "sheet",
             title: t("settings.sshTitle"),

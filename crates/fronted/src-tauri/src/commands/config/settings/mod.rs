@@ -9,9 +9,9 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use std::path::Path;
 #[cfg(desktop)]
-use std::{path::Path, sync::Arc};
-#[cfg(desktop)]
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::runtime::project_path::project_path_key as normalize_project_path_key;
@@ -32,7 +32,6 @@ const MEMORY_SETTINGS_TABLE: &str = "memory_settings";
 const MODEL_FAILOVER_SETTINGS_TABLE: &str = "model_failover_settings";
 #[cfg(desktop)]
 const STT_SETTINGS_TABLE: &str = "stt_settings";
-#[cfg(desktop)]
 const BACKUP_SYNC_SETTINGS_TABLE: &str = "backup_sync_settings";
 
 const SYSTEM_EXECUTION_MODE_KEY: &str = "executionMode";
@@ -181,11 +180,9 @@ include!("model_failover.rs");
 include!("secret_redaction.rs");
 #[cfg(desktop)]
 include!("stt.rs");
-#[cfg(desktop)]
 include!("backup_snapshot.rs");
 #[cfg(desktop)]
 include!("backup_io.rs");
-#[cfg(desktop)]
 include!("webdav_sync.rs");
 #[cfg(desktop)]
 include!("local_access_snapshot.rs");

@@ -13,6 +13,8 @@ function harness(overrides = {}, options = {}) {
   const loader = createTsModuleLoader({ mocks: {
     ...(options.invoke ? { "@tauri-apps/api/core": { invoke: options.invoke } } : {}),
     react: {
+      lazy: () => "NativeDesktopTrajectory",
+      Suspense: "Suspense",
       useState(initial) {
         const index = cursor++;
         if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
@@ -137,7 +139,7 @@ test("native chat exposes downloaded cloud artifacts as working file actions", a
   h.unmount();
 });
 
-test("native iPhone opens More as a full-page tool list and keeps compact sidebar routes", async () => {
+test("native iPhone opens More as a sheet menu and keeps compact sidebar routes", async () => {
   const opened = [];
   const h = harness(
     {
@@ -163,7 +165,7 @@ test("native iPhone opens More as a full-page tool list and keeps compact sideba
   assert.equal(tools.variant, "secondary");
   assert.equal((await h.dispatch("tools")).ok, true);
   h.render();
-  const toolsPage = h.documents().find((item) => item.mode === "root" && item.title === "chat.mobileMenu.title");
+  const toolsPage = h.documents().find((item) => item.mode === "sheet" && item.title === "chat.mobileMenu.title");
   assert.ok(toolsPage);
   assert.deepEqual(
     toolsPage.nodes[0].children.map((node) => node.id),

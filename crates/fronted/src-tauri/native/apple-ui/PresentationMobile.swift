@@ -39,6 +39,9 @@ struct XgentIOSRootPresentation: View {
             let drawerWidth = min(320, geometry.size.width * 0.85)
             ZStack(alignment: .leading) {
                 XgentIOSChatPresentation(document: document, model: model)
+                    // Liquid Glass floats above sibling layers on recent iOS.
+                    // Hide the underlying page while its navigation drawer is open.
+                    .opacity(sidebar == nil ? 1 : 0)
                     .accessibilityIdentifier("xgent-native-root")
                     .accessibilityHidden(sidebar != nil)
                     .allowsHitTesting(sidebar == nil)
@@ -161,6 +164,7 @@ struct XgentIOSPagePresentation: View {
             let drawerWidth = min(320, geometry.size.width * 0.85)
             ZStack(alignment: .leading) {
                 page
+                    .opacity(sidebar == nil ? 1 : 0)
                     .accessibilityHidden(sidebar != nil)
                     .allowsHitTesting(sidebar == nil)
                     .zIndex(0)

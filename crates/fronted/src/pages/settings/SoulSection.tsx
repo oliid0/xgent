@@ -24,6 +24,7 @@ type SoulSectionProps = {
   createRequestId?: number;
   settings?: AppSettings;
   onBack?: () => void;
+  nativeSettingsSurfaceId?: string;
 };
 
 function createEmptySoulDraft(): SoulDraft {
@@ -33,7 +34,12 @@ function createEmptySoulDraft(): SoulDraft {
   };
 }
 
-export function SoulSection({ createRequestId = 0, settings, onBack }: SoulSectionProps) {
+export function SoulSection({
+  createRequestId = 0,
+  settings,
+  onBack,
+  nativeSettingsSurfaceId,
+}: SoulSectionProps) {
   const { t } = useLocale();
   const soul = useSoul();
   const [draft, setDraft] = useState<SoulDraft>({
@@ -271,6 +277,7 @@ export function SoulSection({ createRequestId = 0, settings, onBack }: SoulSecti
     return (
       <>
         <NativeSurface
+          sessionSurface={nativeSettingsSurfaceId}
           document={{
             mode: "sheet",
             title: t("settings.soulTitle"),

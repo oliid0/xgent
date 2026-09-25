@@ -45,6 +45,7 @@ import { ConfirmActionPopover } from "./shared";
 
 type CronTaskViewModalProps = {
   taskId: string;
+  nativeSettingsSurfaceId?: string;
   nativePresentationMode?: "root" | "sheet";
   onClose: () => void;
 };
@@ -892,6 +893,7 @@ function RightPanel({
 
 export function CronTaskViewModal({
   taskId,
+  nativeSettingsSurfaceId,
   nativePresentationMode,
   onClose,
 }: CronTaskViewModalProps) {
@@ -1031,6 +1033,7 @@ export function CronTaskViewModal({
     ];
     return (
       <NativeSurface
+        sessionSurface={nativeSettingsSurfaceId}
         document={{
           mode: nativePresentationMode ?? "sheet",
           title: task.name,
