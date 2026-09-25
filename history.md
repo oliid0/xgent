@@ -22,5 +22,5 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Backup WebDAV functions existed only behind desktop cfg; rfd 0.17.2 officially supports desktop platforms, so mobile local file actions were omitted instead of left dead.
 
 ## Verification and CI
-- 1,275 non-Cargo tests, pnpm check, pnpm lint and pnpm native:check passed for the sheet/backup change. Later provider/model selection and mobile voice edits passed focused settings tests; mobile voice also passed pnpm check/lint. No Cargo/build tools per instructions. git diff --check passed during review.
+- Current local revision: 1,276 non-Cargo tests passed; pnpm check/lint and native:check passed. Full diff against origin/main passed git diff --check. No Cargo/build tools per instructions.
 - Prior revision: 1,274 non-Cargo tests and check/lint/native:check passed. Remote release run 36030128646 succeeded on ea5f4e0, before current local changes. No push until full goal complete.
