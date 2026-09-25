@@ -54,3 +54,23 @@ test("unmounted settings consumers ignore late success and late failure", async 
     assert.deepEqual(events, []);
   }
 });
+
+test("mobile settings retry a transient native read before exposing the application", async () => {
+  const settings = { customProviders: [{ id: "configured-provider" }] };
+  const events = [];
+  let reads = 0;
+  startSettingsHydration({
+    load: async () => {
+      if (++reads === 1) throw new Error("native database is opening");
+      return settings;
+    },
+    retryCount: 1,
+    retryDelayMs: 0,
+    onLoaded: (value) => events.push(["loaded", value]),
+    onError: (error) => events.push(["error", error]),
+    onSettled: () => events.push(["settled"]),
+  });
+  await sleep(20);
+  assert.equal(reads, 2);
+  assert.deepEqual(events, [["loaded", settings], ["settled"]]);
+});

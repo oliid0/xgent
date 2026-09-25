@@ -4,6 +4,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { ContextMenu } from "@astryxdesign/core/ContextMenu";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
+import { Spinner } from "@astryxdesign/core/Spinner";
 import { StackItem, VStack } from "@astryxdesign/core/Stack";
 import { ToastViewport } from "@astryxdesign/core/Toast";
 import { Theme } from "@astryxdesign/core/theme";
@@ -121,8 +122,34 @@ function applyRuntimeSystemDefaults(settings: AppSettings, defaultWorkdir: strin
   });
 }
 
-function AppStartupSurface(props: { locale: AppSettings["locale"]; failures: string[] }) {
-  if (props.failures.length === 0) return null;
+function AppStartupSurface(props: {
+  locale: AppSettings["locale"];
+  failures: string[];
+  settingsFailure?: string;
+}) {
+  if (props.settingsFailure)
+    return (
+      <Banner
+        status="error"
+        container="section"
+        title={props.settingsFailure}
+        collapsible={false}
+        endContent={
+          <Button
+            size="sm"
+            variant="secondary"
+            label={translate("app.errorBoundaryReload", props.locale)}
+            onClick={() => window.location.reload()}
+          />
+        }
+      />
+    );
+  if (props.failures.length === 0)
+    return (
+      <VStack width="100%" height="100%" hAlign="center" vAlign="center">
+        <Spinner size="lg" label={translate("app.loading", props.locale)} />
+      </VStack>
+    );
   return <MobileStartupWarning failures={props.failures} locale={props.locale} />;
 }
 
@@ -452,6 +479,7 @@ export default function App() {
     if (settingsHydratedRef.current) return;
     return startSettingsHydration({
       load: loadPersistedSettingsWithDefaults,
+      retryCount: nativeMobile ? 1 : 0,
       onLoaded: ({ settings: loaded, defaultWorkdir }) => {
         defaultWorkdirRef.current = defaultWorkdir;
         const loadedWithDefaults = applyRuntimeSystemDefaults(loaded, defaultWorkdir);
@@ -645,10 +673,11 @@ export default function App() {
   // history/settings commands and can replace the entire mobile UI with an
   // error boundary. Keep the native component tree inert until both the
   // platform and persisted settings are ready.
-  const appContentReady = platformResolved && settingsReady;
+  const appContentReady =
+    platformResolved && settingsReady && (!nativeMobile || settingsHydratedRef.current);
   useEffect(() => {
-    if (appContentReady) finishLaunch(settingsHydratedRef.current);
-  }, [appContentReady]);
+    if (platformResolved && settingsReady) finishLaunch(settingsHydratedRef.current);
+  }, [platformResolved, settingsReady]);
   useEffect(() => {
     if (!desktopBridgeEnabled || nativeMobile || browserRuntime) return;
     let disposed = false;
@@ -815,7 +844,15 @@ export default function App() {
                     {restartConfirmDialog}
                   </>
                 ) : (
-                  <AppStartupSurface locale={settings.locale} failures={mobileStartup.failures} />
+                  <AppStartupSurface
+                    locale={settings.locale}
+                    failures={mobileStartup.failures}
+                    settingsFailure={
+                      nativeMobile && settingsReady && settingsSaveState.status === "error"
+                        ? settingsSaveState.message
+                        : undefined
+                    }
+                  />
                 )}
               </SoulProvider>
             </AppChrome>

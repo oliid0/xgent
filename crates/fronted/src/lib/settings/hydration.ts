@@ -6,6 +6,8 @@ export function startSettingsHydration<T>(options: {
   onSettled: () => void;
   onSlow?: () => void;
   slowAfterMs?: number;
+  retryCount?: number;
+  retryDelayMs?: number;
 }) {
   let cancelled = false;
   const timer = options.onSlow
@@ -14,8 +16,20 @@ export function startSettingsHydration<T>(options: {
       }, options.slowAfterMs ?? 2_500)
     : undefined;
 
+  const load = async () => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await options.load();
+      } catch (error) {
+        if (cancelled || attempt >= (options.retryCount ?? 0)) throw error;
+        await new Promise((resolve) => setTimeout(resolve, options.retryDelayMs ?? 250));
+        if (cancelled) throw error;
+      }
+    }
+  };
+
   void Promise.resolve()
-    .then(options.load)
+    .then(load)
     .then((value) => {
       if (!cancelled) options.onLoaded(value);
     })
