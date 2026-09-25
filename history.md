@@ -11,6 +11,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - First discovered or manually added iOS model now becomes the chat selection when none was selected; an empty discovery result reports the existing no-model message. Existing selections remain intact.
 - Mobile native voice enablement now persists in the existing local UI settings instead of invoking desktop-only STT commands; a regression test covers the default-disabled state, enable/reload and desktop STT storage.
 - Mobile assistant capability rows now render as soon as native status resolves in both settings views, even when the independent OS permission-state query fails; its error remains visible.
+- SwiftUI action delivery now requires a synchronous receipt from the live React subscriber. Missing/invalid delivery clears the pending native control with an error instead of leaving it busy indefinitely; a transport regression test covers the receipt lifecycle.
 
 ## Remaining
 - Provider/model/chat failure and roughly three-second blank startup need device error/timing evidence; no speculative network/startup edit. A question about the exact model-fetch error and blank API key is pending.
@@ -23,6 +24,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - NativeSettingsPage swapped NativeSurface owners on section changes; SwiftUI sheet identity followed surface ID. Session sharing keeps it stable. Astryx MCP/CLI and Apple Swift docs informed drawer/sheet behavior.
 - Backup WebDAV functions existed only behind desktop cfg; rfd 0.17.2 officially supports desktop platforms, so mobile local file actions were omitted instead of left dead.
 - Apple HealthKit authorization status is an independent asynchronous callback. The previous Promise.all withheld all permission rows until it resolved; the native iOS plugin always supplies capability aliases from status.
+- Apple WebKit callAsyncJavaScript returns explicit JS values. The native event is cancelable; React cancels it only after validating the action payload, so Swift can distinguish a live receiver from a lost event without adding another bridge API.
 
 ## Verification and CI
 - Current local revision: 1,276 non-Cargo tests passed; pnpm check/lint and native:check passed. Full diff against origin/main passed git diff --check. No Cargo/build tools per instructions.

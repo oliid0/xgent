@@ -369,10 +369,17 @@ final class XgentPresentationModel: ObservableObject {
             let json = try JSONEncoder().encode(action)
             let value = try JSONSerialization.jsonObject(with: json)
             webview.callAsyncJavaScript(
-                "window.dispatchEvent(new CustomEvent('xgent:native-action', {detail: action}));",
+                "return !window.dispatchEvent(new CustomEvent('xgent:native-action', {detail: action, cancelable: true}));",
                 arguments: ["action": value], in: nil, in: .page
             ) { [weak self] result in
-                if case .failure = result {
+                let received: Bool
+                switch result {
+                case .success(let value):
+                    received = (value as? NSNumber)?.boolValue == true
+                case .failure:
+                    received = false
+                }
+                if !received {
                     self?.complete(XgentActionResult(surface: action.surface, requestId: action.requestId,
                                                     ok: false, error: "The application could not receive this action."))
                 }

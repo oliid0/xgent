@@ -31,6 +31,43 @@ test("native actions cannot execute disabled, removed, foreign or malformed hand
   assert.equal(executions, 0);
 });
 
+test("native action event receipt requires a live subscriber and a valid payload", () => {
+  const originalWindow = globalThis.window;
+  const originalCustomEvent = globalThis.CustomEvent;
+  class NativeActionEvent extends Event {
+    constructor(type, options) {
+      super(type, options);
+      this.detail = options.detail;
+    }
+  }
+  const target = new EventTarget();
+  globalThis.window = target;
+  globalThis.CustomEvent = NativeActionEvent;
+  try {
+    const { subscribeApplePresentation } = createTsModuleLoader({ mocks: {
+      "../lib/runtimePlatform": { inferRuntimePlatform: () => "ios" },
+      "./index": { invoke: async () => {}, isTauriRuntime: () => true },
+    } }).loadModule("src/runtime/applePresentation.ts");
+    const action = event("receipt");
+    const publish = (detail) => target.dispatchEvent(new NativeActionEvent("xgent:native-action", {
+      cancelable: true, detail,
+    }));
+    assert.equal(publish(action), true, "no subscriber must not claim delivery");
+    const received = [];
+    const unsubscribe = subscribeApplePresentation((value) => received.push(value));
+    assert.equal(publish(action), false, "a valid subscribed action claims delivery");
+    assert.deepEqual(received, [action]);
+    assert.equal(publish({ ...action, value: {} }), true, "invalid payload cannot claim delivery");
+    unsubscribe();
+    assert.equal(publish(action), true, "unmounted subscriber cannot claim delivery");
+  } finally {
+    if (originalWindow === undefined) delete globalThis.window;
+    else globalThis.window = originalWindow;
+    if (originalCustomEvent === undefined) delete globalThis.CustomEvent;
+    else globalThis.CustomEvent = originalCustomEvent;
+  }
+});
+
 test("pending native actions stay deduplicated while more than 256 other requests settle", async () => {
   const registry = createPresentationActionRegistry();
   const work = deferred();

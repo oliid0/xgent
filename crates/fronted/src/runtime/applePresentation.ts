@@ -42,6 +42,10 @@ export function subscribeApplePresentation(handler: (action: PresentationAction)
       )
     )
       return;
+    // The Swift host uses cancellation as a synchronous delivery receipt.
+    // This only confirms that a live JS subscriber received the action;
+    // the result still arrives through apple_ui_action_result.
+    event.preventDefault();
     handler(action as PresentationAction);
   };
   window.addEventListener("xgent:native-action", receive);
