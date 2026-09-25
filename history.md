@@ -21,6 +21,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - The iOS settings sheet now resolves document updates by its own stable surface ID; unrelated sheet documents can no longer replace the content of an already open settings sheet.
 - Native settings actions now reject on failure after recording the inline error, so the existing SwiftUI action alert reports failed provider discovery, permission, backup and shell operations instead of acknowledging success. Background status refreshes consume their own rejection; formatting follows the repository lint rule.
 - Provider model discovery now uses xx's 10-second total request deadline through the existing browser proxy flow; unresponsive endpoints return a specific timeout instead of leaving the native action busy indefinitely.
+- iOS settings root now renders its existing save/load failure node; the SwiftUI sheet only moves that node into the header on child pages that have a Back control.
 
 ## Remaining
 - Confirm provider/model/chat, action delivery, permission discovery and roughly three-second blank startup on a new iOS build with device timing/errors. The latest successful remote IPA predates all local fixes.

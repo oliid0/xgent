@@ -527,7 +527,7 @@ struct XgentIOSSheetPresentation: View {
     private var back: XgentNode? { document.nodes.first { $0.id == "back" } }
     private var saveStatus: XgentNode? { document.nodes.first { $0.id == "save-status" } }
     private var visibleNodes: [XgentNode] {
-        document.nodes.filter { !["back", "save-status"].contains($0.id) }
+        document.nodes.filter { $0.id != "back" && ($0.id != "save-status" || back == nil) }
     }
     private var grouped: Bool { visibleNodes.contains { $0.kind == .settingsGroup } }
     private var list: XgentNode? {
