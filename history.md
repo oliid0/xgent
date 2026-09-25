@@ -17,6 +17,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Memory success feedback is withheld if the required follow-up reload fails; the reload error remains visible instead of reporting a false success.
 - Reading the selected entry is part of reload success; a failed read now suppresses success feedback. Manual refresh/navigation also clears stale notices.
 - The desktop composer execution selector now uses up to 448px for its option descriptions instead of the shared 320px selector cap, while staying inside the viewport; Astryx Selector/Popover source and MCP/CLI confirmed the positioning path.
+- The native mobile System settings page now exposes the existing persisted theme selector. A settings load/save error is visible even on the mobile settings root, so a failed initialization no longer leaves the first settings page falsely quiet.
 
 ## Remaining
 - Confirm provider/model/chat, action delivery, permission discovery and roughly three-second blank startup on a new iOS build with device timing/errors. The latest successful remote IPA predates all local fixes.

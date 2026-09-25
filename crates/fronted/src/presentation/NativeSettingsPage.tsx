@@ -477,7 +477,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       }),
       icon: "chevron.left",
     });
-  if (!nativeMobile || page)
+  if (!nativeMobile || page || props.saveState.status === "error")
     nodes.push({
       id: "save-status",
       kind: "Text",
@@ -707,6 +707,18 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   } else if (page === "system") {
     nodes.push(
       c.group("general", titles.system, [
+        c.select(
+          "theme",
+          t("settings.native.appearance"),
+          settings.theme,
+          [
+            { value: "system", label: t("settings.native.system") },
+            { value: "light", label: t("settings.native.light") },
+            { value: "dark", label: t("settings.native.dark") },
+          ],
+          (theme) =>
+            setSettings((previous) => ({ ...previous, theme: theme as typeof previous.theme })),
+        ),
         c.select(
           "language",
           t("settings.language"),
