@@ -28,6 +28,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Confirm provider/model/chat, action delivery, permission discovery and roughly three-second blank startup on a new iOS build with device timing/errors. The latest successful remote IPA predates all local fixes.
 - Native memory management, settings coverage and local backup file operations still lag narrow desktop/yy. HealthKit signing, SwiftUI layer behavior, WebDAV backup, shell and Android/iOS builds need device/CI verification.
 - Continue xx PC functional review and yy mobile functional review. After function paths work, fix desktop execution-mode picker clipping, angular containers, and mobile/narrow visual parity. Do not push until full acceptance.
+- Native More still uses a sheet, and provider settings still expose fewer transport options than desktop. Keep visual changes deferred while provider/chat and command paths remain unverified; these are not accepted fixes.
 
 ## Evidence and decisions
 - Screenshots 1133–1141 show blank startup, full-page More, floating composer/store cards over sidebar, HealthKit entitlement error, backup command missing and empty provider model list.
@@ -36,7 +37,9 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Apple HealthKit authorization status is an independent asynchronous callback. The previous Promise.all withheld all permission rows until it resolved; the native iOS plugin always supplies capability aliases from status.
 - Apple WebKit callAsyncJavaScript returns explicit JS values. The native event is cancelable; React cancels it only after validating the action payload, so Swift can distinguish a live receiver from a lost event without adding another bridge API.
 - The previous mobile background worker registered ProxyServerState after setup returned, while both provider model discovery and chat call proxy_get_server_info immediately. Desktop setup already registers the same proxy synchronously; yy defers optional network work during cold launch.
+- Cross-area audit: the current PC proxy already routes provider requests through its per-provider app-proxy flag, window geometry has native save/restore hooks, and CUA has an authorized external installer. Mobile SSH, Git, backup and Skill installation commands are registered; Git review uses git2 without Shell. xx-only gateway modules remain excluded. git2 0.21 documentation confirms show_untracked_content includes untracked files, so no speculative Git diff change was made.
 
 ## Verification and CI
 - Full non-Cargo suite: 1,277 passed with the provider timeout and native action error path. pnpm check, lint, native:check and diff whitespace check passed; the iOS save-status visibility change is source-reviewed but cannot be compiled or device-tested on this Windows host under the no-build instruction. Native setup timing and menu hit testing still require device/runtime verification.
+- Full non-Cargo suite: 1,277 passed before the later Skill completion guard. pnpm check and lint passed again after that guard; prior native:check and current diff whitespace check passed. The iOS save-status visibility change is source-reviewed but cannot be compiled or device-tested on this Windows host under the no-build instruction. Native setup timing and menu hit testing still require device/runtime verification.
 - Remote release run 36030128646 succeeded on ea5f4e0, before current local changes. No push until full goal complete.
