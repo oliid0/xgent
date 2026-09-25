@@ -32,5 +32,5 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - The previous mobile background worker registered ProxyServerState after setup returned, while both provider model discovery and chat call proxy_get_server_info immediately. Desktop setup already registers the same proxy synchronously; yy defers optional network work during cold launch.
 
 ## Verification and CI
-- Current local revision: 1,277 non-Cargo tests passed; pnpm check/lint and native:check passed. Full diff against origin/main passed git diff --check. No Cargo/build tools per instructions. Native setup timing and menu hit testing still require device/runtime verification.
+- Full non-Cargo suite: 1,277 passed before the final memory read guard. The current revision passed pnpm check/lint and targeted memory tests; native:check and full diff whitespace check passed. No Cargo/build tools per instructions. Native setup timing and menu hit testing still require device/runtime verification.
 - Remote release run 36030128646 succeeded on ea5f4e0, before current local changes. No push until full goal complete.
