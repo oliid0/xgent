@@ -841,16 +841,23 @@ export function NativeSettingsPage(props: SettingsPageProps) {
                     providerConfigId: targetId,
                   },
                 );
-                setSettings((previous) =>
-                  updateCustomProviders(
+                if (fetched.length === 0) throw new Error(t("settings.noMatchingModels"));
+                setSettings((previous) => {
+                  const updated = updateCustomProviders(
                     previous,
                     previous.customProviders.map((item) => {
                       if (item.id !== targetId) return item;
                       const models = mergeFetchedModels(fetched, item.models);
                       return { ...item, models, activeModels: models.map((model) => model.id) };
                     }),
-                  ),
-                );
+                  );
+                  return updated.selectedModel
+                    ? updated
+                    : {
+                        ...updated,
+                        selectedModel: { customProviderId: targetId, model: fetched[0].id },
+                      };
+                });
               }),
             !busy && !!provider.baseUrl.trim(),
           ),
@@ -893,8 +900,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             t("settings.native.add"),
             () => {
               const id = modelId.trim();
-              setSettings((previous) =>
-                updateCustomProviders(
+              setSettings((previous) => {
+                const updated = updateCustomProviders(
                   previous,
                   previous.customProviders.map((item) =>
                     item.id === provider.id
@@ -907,8 +914,14 @@ export function NativeSettingsPage(props: SettingsPageProps) {
                         }
                       : item,
                   ),
-                ),
-              );
+                );
+                return updated.selectedModel
+                  ? updated
+                  : {
+                      ...updated,
+                      selectedModel: { customProviderId: provider.id, model: id },
+                    };
+              });
               setModelId("");
             },
             !!modelId.trim(),

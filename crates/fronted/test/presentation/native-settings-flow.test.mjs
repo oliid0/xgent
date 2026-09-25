@@ -93,6 +93,10 @@ test("native settings mirrors compact navigation and persists shared system, pro
   await dispatch("provider-url", "https://example.test/v1");
   assert.equal((await dispatch("fetch-models")).ok, true);
   assert.ok(settings.customProviders.at(-1).activeModels.includes("fetched-model"));
+  assert.deepEqual(settings.selectedModel, {
+    customProviderId: settings.customProviders.at(-1).id,
+    model: "fetched-model",
+  });
   await dispatch("model-id", "example-model");
   assert.equal((await dispatch("add-model")).ok, true);
   const provider = settings.customProviders.at(-1);
@@ -100,6 +104,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(provider.baseUrl, "https://example.test/v1");
   assert.ok(provider.activeModels.includes("example-model"));
   assert.ok(provider.models.some((model) => model.id === "example-model"));
+  assert.equal(settings.selectedModel.model, "fetched-model", "manual additions preserve the chosen model");
   await dispatch("back");
   await dispatch("back");
   await dispatch("nav:mobileAssistant");

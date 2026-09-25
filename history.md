@@ -8,6 +8,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Settings, Skills, MCP, SSH, Cron, Hooks and Soul routes and their detail forms reuse one native sheet session with ordered revisions. Added a lifecycle regression test.
 - Ported existing WebDAV backup snapshot/config/test/upload/download core to mobile and registered six commands. Mobile shows WebDAV actions; desktop rfd file dialogs and background auto-sync are excluded.
 - Native provider model discovery now activates fetched models, matching desktop behavior and preserving other providers. The settings flow test covers this path.
+- First discovered or manually added iOS model now becomes the chat selection when none was selected; an empty discovery result reports the existing no-model message. Existing selections remain intact.
 
 ## Remaining
 - Provider/model/chat failure and roughly three-second blank startup need device error/timing evidence; no speculative network/startup edit. A question about the exact model-fetch error and blank API key is pending.
