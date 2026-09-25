@@ -214,18 +214,23 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
 
   function completeStoreJob(job: SkillInstallJobSnapshot) {
     if (completedStoreJobIds.has(job.jobId)) return;
-    completedStoreJobIds.add(job.jobId);
     const names = (job.installed ?? [])
       .map((item) => item.name.trim())
       .filter((name) => name && !isAlwaysEnabledSkillName(name));
     if (names.length > 0) {
-      props.setSettings((previous) =>
-        updateSkills(previous, {
-          enabled: true,
-          selected: Array.from(new Set([...previous.skills.selected, ...names])),
-        }),
-      );
+      try {
+        props.setSettings((previous) =>
+          updateSkills(previous, {
+            enabled: true,
+            selected: Array.from(new Set([...previous.skills.selected, ...names])),
+          }),
+        );
+      } catch (cause) {
+        setStoreError(cause instanceof Error ? cause.message : String(cause));
+        return;
+      }
     }
+    completedStoreJobIds.add(job.jobId);
     notifySkillsDiscoveryUpdated();
     void discoverSkills({ force: true })
       .then((result) => setSkills(result.skills))
