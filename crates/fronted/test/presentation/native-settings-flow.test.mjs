@@ -3,6 +3,7 @@ import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 test("native settings mirrors compact navigation and persists shared system, provider, model and policy edits", async () => {
+  const providerUtils = createTsModuleLoader().loadModule("src/pages/settings/providerUtils.ts");
   const states = [];
   let cursor = 0;
   const locale = {
@@ -22,6 +23,10 @@ test("native settings mirrors compact navigation and persists shared system, pro
     "../../i18n": locale,
     "./NativeSurface": { NativeSurface: "NativeSurface" },
     "./nativeTheme": { createNativePresentationTheme: () => ({ marker: "theme" }) },
+    "../pages/settings/providerUtils": {
+      ...providerUtils,
+      fetchModelsFromApi: async () => [providerUtils.createDraftModelConfig("codex", "fetched-model")],
+    },
     "../pages/settings/CronSection": { CronSection: "CronSection" },
     "../pages/settings/SshSettingsSection": { SshSettingsSection: "SshSettingsSection" },
     "../pages/settings/ComputerUseSection": { ComputerUseSection: "ComputerUseSection" },
@@ -86,6 +91,8 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(settings.customProviders.length, count + 1);
   await dispatch("provider-name", "Local relay");
   await dispatch("provider-url", "https://example.test/v1");
+  assert.equal((await dispatch("fetch-models")).ok, true);
+  assert.ok(settings.customProviders.at(-1).activeModels.includes("fetched-model"));
   await dispatch("model-id", "example-model");
   assert.equal((await dispatch("add-model")).ok, true);
   const provider = settings.customProviders.at(-1);

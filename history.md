@@ -7,6 +7,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - iOS More uses a sheet menu. Opening the sidebar hides the covered chat/store root to prevent floating Liquid Glass controls from painting over the drawer.
 - Settings, Skills, MCP, SSH, Cron, Hooks and Soul routes and their detail forms reuse one native sheet session with ordered revisions. Added a lifecycle regression test.
 - Ported existing WebDAV backup snapshot/config/test/upload/download core to mobile and registered six commands. Mobile shows WebDAV actions; desktop rfd file dialogs and background auto-sync are excluded.
+- Native provider model discovery now activates fetched models, matching desktop behavior and preserving other providers. The settings flow test covers this path.
 
 ## Remaining
 - Provider/model/chat failure and roughly three-second blank startup need device error/timing evidence; no speculative network/startup edit. A question about the exact model-fetch error and blank API key is pending.
@@ -19,5 +20,5 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Backup WebDAV functions existed only behind desktop cfg; rfd 0.17.2 officially supports desktop platforms, so mobile local file actions were omitted instead of left dead.
 
 ## Verification and CI
-- 1,275 non-Cargo tests, pnpm check, pnpm lint and pnpm native:check passed. No Cargo/build tools per instructions. git diff --check passed during final review.
+- 1,275 non-Cargo tests, pnpm check, pnpm lint and pnpm native:check passed for the sheet/backup change. The later provider activation edit passed its focused settings test, pnpm check and pnpm lint. No Cargo/build tools per instructions. git diff --check passed during review.
 - Prior revision: 1,274 non-Cargo tests and check/lint/native:check passed. Remote release run 36030128646 succeeded on ea5f4e0, before current local changes. No push until full goal complete.

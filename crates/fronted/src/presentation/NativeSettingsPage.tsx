@@ -844,11 +844,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
                 setSettings((previous) =>
                   updateCustomProviders(
                     previous,
-                    previous.customProviders.map((item) =>
-                      item.id === targetId
-                        ? { ...item, models: mergeFetchedModels(fetched, item.models) }
-                        : item,
-                    ),
+                    previous.customProviders.map((item) => {
+                      if (item.id !== targetId) return item;
+                      const models = mergeFetchedModels(fetched, item.models);
+                      return { ...item, models, activeModels: models.map((model) => model.id) };
+                    }),
                   ),
                 );
               }),
