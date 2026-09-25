@@ -46,6 +46,7 @@ type PersistedSettingsResponse = {
 };
 
 type LocalUiSettings = {
+  mobileVoiceEnabled?: unknown;
   skills?: unknown;
   chatRuntimeControls?: unknown;
   customSettings?: unknown;
@@ -74,6 +75,7 @@ export type PersistSettingsResult = {
 };
 
 function readLocalUiSettings(): {
+  mobileVoiceEnabled: boolean;
   skills: SkillsSettings;
   chatRuntimeControls: ChatRuntimeControls;
   customSettings: AppSettings["customSettings"];
@@ -112,6 +114,7 @@ function readLocalUiSettings(): {
     const raw = localStorage.getItem(LOCAL_UI_SETTINGS_STORAGE_KEY);
     if (!raw) {
       return {
+        mobileVoiceEnabled: defaults.stt.enabled,
         skills: defaults.skills,
         chatRuntimeControls: defaults.chatRuntimeControls,
         customSettings: defaults.customSettings,
@@ -126,6 +129,10 @@ function readLocalUiSettings(): {
 
     const parsed = JSON.parse(raw) as LocalUiSettings | null;
     return {
+      mobileVoiceEnabled:
+        typeof parsed?.mobileVoiceEnabled === "boolean"
+          ? parsed.mobileVoiceEnabled
+          : defaults.stt.enabled,
       skills: normalizeSkillsSettings(parsed?.skills ?? defaults.skills),
       chatRuntimeControls: normalizeChatRuntimeControls(
         parsed?.chatRuntimeControls ?? defaults.chatRuntimeControls,
@@ -146,6 +153,7 @@ function readLocalUiSettings(): {
     };
   } catch {
     return {
+      mobileVoiceEnabled: defaults.stt.enabled,
       skills: defaults.skills,
       chatRuntimeControls: defaults.chatRuntimeControls,
       customSettings: defaults.customSettings,
@@ -162,6 +170,7 @@ function readLocalUiSettings(): {
 function writeLocalUiSettings(
   settings: Pick<
     AppSettings,
+    | "stt"
     | "skills"
     | "chatRuntimeControls"
     | "customSettings"
@@ -174,6 +183,7 @@ function writeLocalUiSettings(
   >,
 ) {
   const payload = {
+    ...(isNativeMobileRuntime() ? { mobileVoiceEnabled: settings.stt.enabled } : {}),
     skills: settings.skills,
     chatRuntimeControls: settings.chatRuntimeControls,
     customSettings: settings.customSettings,
@@ -234,7 +244,9 @@ export async function loadPersistedSettingsWithDefaults(): Promise<PersistedSett
     agents: (persisted?.agents ?? defaults.agents) as AppSettings["agents"],
     ssh: (persisted?.ssh ?? defaults.ssh) as AppSettings["ssh"],
     access: (persisted?.access ?? defaults.access) as AppSettings["access"],
-    stt: normalizeSttSettings(persisted?.stt ?? defaults.stt),
+    stt: isNativeMobileRuntime()
+      ? normalizeSttSettings({ ...defaults.stt, enabled: localUi.mobileVoiceEnabled })
+      : normalizeSttSettings(persisted?.stt ?? defaults.stt),
     modelFailover: normalizeModelFailoverSettings(
       persisted?.modelFailover ?? defaults.modelFailover,
       (persisted?.providers ?? defaults.customProviders) as AppSettings["customProviders"],
@@ -335,7 +347,7 @@ export async function persistSettings(
     );
   }
 
-  if (hasChanged(prev.stt, next.stt)) {
+  if (hasChanged(prev.stt, next.stt) && !isNativeMobileRuntime()) {
     tasks.push(
       invoke("settings_save_stt", {
         payload: { ...next.stt, allowIncomplete: true },
@@ -360,6 +372,7 @@ export async function persistSettings(
   }
 
   if (
+    (isNativeMobileRuntime() && prev.stt.enabled !== next.stt.enabled) ||
     hasChanged(prev.skills, next.skills) ||
     hasChanged(prev.chatRuntimeControls, next.chatRuntimeControls) ||
     hasChanged(prev.customSettings, next.customSettings) ||
@@ -371,6 +384,7 @@ export async function persistSettings(
     hasChanged(prev.retryErrorSettings, next.retryErrorSettings)
   ) {
     writeLocalUiSettings({
+      stt: next.stt,
       skills: next.skills,
       chatRuntimeControls: next.chatRuntimeControls,
       customSettings: next.customSettings,

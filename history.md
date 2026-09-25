@@ -9,6 +9,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Ported existing WebDAV backup snapshot/config/test/upload/download core to mobile and registered six commands. Mobile shows WebDAV actions; desktop rfd file dialogs and background auto-sync are excluded.
 - Native provider model discovery now activates fetched models, matching desktop behavior and preserving other providers. The settings flow test covers this path.
 - First discovered or manually added iOS model now becomes the chat selection when none was selected; an empty discovery result reports the existing no-model message. Existing selections remain intact.
+- Mobile native voice enablement now persists in the existing local UI settings instead of invoking desktop-only STT commands; a regression test covers the default-disabled state, enable/reload and desktop STT storage.
 
 ## Remaining
 - Provider/model/chat failure and roughly three-second blank startup need device error/timing evidence; no speculative network/startup edit. A question about the exact model-fetch error and blank API key is pending.
@@ -21,5 +22,5 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Backup WebDAV functions existed only behind desktop cfg; rfd 0.17.2 officially supports desktop platforms, so mobile local file actions were omitted instead of left dead.
 
 ## Verification and CI
-- 1,275 non-Cargo tests, pnpm check, pnpm lint and pnpm native:check passed for the sheet/backup change. The later provider activation edit passed its focused settings test, pnpm check and pnpm lint. No Cargo/build tools per instructions. git diff --check passed during review.
+- 1,275 non-Cargo tests, pnpm check, pnpm lint and pnpm native:check passed for the sheet/backup change. Later provider/model selection and mobile voice edits passed focused settings tests; mobile voice also passed pnpm check/lint. No Cargo/build tools per instructions. git diff --check passed during review.
 - Prior revision: 1,274 non-Cargo tests and check/lint/native:check passed. Remote release run 36030128646 succeeded on ea5f4e0, before current local changes. No push until full goal complete.
