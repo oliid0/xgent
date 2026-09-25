@@ -12,6 +12,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Mobile native voice enablement now persists in the existing local UI settings instead of invoking desktop-only STT commands; a regression test covers the default-disabled state, enable/reload and desktop STT storage.
 - Mobile assistant capability rows now render as soon as native status resolves in both settings views, even when the independent OS permission-state query fails; its error remains visible.
 - SwiftUI action delivery now requires a synchronous receipt from the live React subscriber. Missing/invalid delivery clears the pending native control with an error instead of leaving it busy indefinitely; a transport regression test covers the receipt lifecycle.
+- Mobile registers the local model proxy in Tauri setup before frontend IPC can request its state. Optional memory, vault, scheduler and Skill initialization remains on the background worker; proxy startup failures still reach mobile startup status.
 
 ## Remaining
 - Confirm provider/model/chat, action delivery, permission discovery and roughly three-second blank startup on a new iOS build with device timing/errors. The latest successful remote IPA predates all local fixes.
@@ -24,6 +25,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Backup WebDAV functions existed only behind desktop cfg; rfd 0.17.2 officially supports desktop platforms, so mobile local file actions were omitted instead of left dead.
 - Apple HealthKit authorization status is an independent asynchronous callback. The previous Promise.all withheld all permission rows until it resolved; the native iOS plugin always supplies capability aliases from status.
 - Apple WebKit callAsyncJavaScript returns explicit JS values. The native event is cancelable; React cancels it only after validating the action payload, so Swift can distinguish a live receiver from a lost event without adding another bridge API.
+- The previous mobile background worker registered ProxyServerState after setup returned, while both provider model discovery and chat call proxy_get_server_info immediately. Desktop setup already registers the same proxy synchronously; yy defers optional network work during cold launch.
 
 ## Verification and CI
 - Current local revision: 1,277 non-Cargo tests passed; pnpm check/lint and native:check passed. Full diff against origin/main passed git diff --check. No Cargo/build tools per instructions.

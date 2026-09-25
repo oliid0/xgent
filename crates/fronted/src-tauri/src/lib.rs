@@ -1083,27 +1083,9 @@ fn initialize_mobile_storage(app: &tauri::AppHandle) -> Result<std::path::PathBu
 fn initialize_mobile_services(
     app: tauri::AppHandle,
     app_data_dir: std::path::PathBuf,
+    proxy_server: Option<Arc<services::proxy::ProxyServerState>>,
+    mut failures: Vec<String>,
 ) -> Vec<String> {
-    let mut failures = Vec::new();
-
-    // API-key provider traffic only needs the loopback proxy. Start it before
-    // optional stores/services so a degraded vault, memory, or scheduler cannot
-    // leave an otherwise rendered mobile chat unable to reach its model.
-    let proxy_server = match services::proxy::start_proxy_server(None) {
-        Ok(proxy_server) => {
-            app.manage(Arc::clone(&proxy_server));
-            Some(proxy_server)
-        }
-        Err(error) => {
-            record_mobile_startup_failure(
-                &mut failures,
-                "start local proxy server failed",
-                error,
-            );
-            None
-        }
-    };
-
     if let Err(error) = commands::history_db::initialize_history_db() {
         record_mobile_startup_failure(
             &mut failures,
@@ -1279,8 +1261,31 @@ pub fn run() {
                     return Ok(());
                 }
             };
+            // Provider discovery and chat may invoke proxy_get_server_info as
+            // soon as the webview loads. Register its state before IPC starts;
+            // optional stores still initialize on the background worker.
+            let mut failures = Vec::new();
+            let proxy_server = match services::proxy::start_proxy_server(None) {
+                Ok(proxy_server) => {
+                    app.manage(Arc::clone(&proxy_server));
+                    Some(proxy_server)
+                }
+                Err(error) => {
+                    record_mobile_startup_failure(
+                        &mut failures,
+                        "start local proxy server failed",
+                        error,
+                    );
+                    None
+                }
+            };
             tauri::async_runtime::spawn_blocking(move || {
-                startup_state.finish(initialize_mobile_services(app_handle, storage));
+                startup_state.finish(initialize_mobile_services(
+                    app_handle,
+                    storage,
+                    proxy_server,
+                    failures,
+                ));
             });
             Ok(())
         })
