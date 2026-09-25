@@ -88,7 +88,10 @@ export function positionCompatibleLayer(layer: HTMLElement, anchor: HTMLElement 
   // transparent wrapper around a compact selector's content.
   const selector = layer.querySelector(".astryx-selector-popup");
   const surface = layer.querySelector(".astryx-popover-surface");
-  const compactWidth = Math.min(320, Math.max(200, anchor.getBoundingClientRect().width));
+  const composerExecutionMenu = Boolean(anchor.closest(".xgent-composer-execution-controls"));
+  const compactWidth = composerExecutionMenu
+    ? Math.min(448, Math.max(200, document.documentElement.clientWidth - 24))
+    : Math.min(320, Math.max(200, anchor.getBoundingClientRect().width));
   if (selector) {
     layer.style.width = `${compactWidth}px`;
     layer.style.minWidth = "0";
