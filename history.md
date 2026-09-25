@@ -13,6 +13,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Mobile assistant capability rows now render as soon as native status resolves in both settings views, even when the independent OS permission-state query fails; its error remains visible.
 - SwiftUI action delivery now requires a synchronous receipt from the live React subscriber. Missing/invalid delivery clears the pending native control with an error instead of leaving it busy indefinitely; a transport regression test covers the receipt lifecycle.
 - Mobile registers the local model proxy in Tauri setup before frontend IPC can request its state. Optional memory, vault, scheduler and Skill initialization remains on the background worker; proxy startup failures still reach mobile startup status.
+- Memory create/edit errors now appear in the active form, list errors stay with the list, and the settings drawer shows wipe errors. Successful create/save/accept/delete/wipe actions give visible feedback; yy iOS memory save also shows success feedback.
 
 ## Remaining
 - Confirm provider/model/chat, action delivery, permission discovery and roughly three-second blank startup on a new iOS build with device timing/errors. The latest successful remote IPA predates all local fixes.

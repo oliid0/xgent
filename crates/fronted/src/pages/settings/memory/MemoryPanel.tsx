@@ -79,6 +79,7 @@ export function MemoryPanel(props: {
     pathsInfo,
     loading,
     error,
+    notice,
     saving,
     editDraft,
     setEditDraft,
@@ -235,6 +236,8 @@ export function MemoryPanel(props: {
           setSettings={props.setSettings}
           workdir={workdir}
           saving={saving}
+          error={error}
+          notice={notice}
           t={t}
           onClose={() => setSettingsDrawerOpen(false)}
           onRequestWipe={wipeAll}
@@ -255,6 +258,10 @@ export function MemoryPanel(props: {
         paddingBlockEnd={4}
         className="settings-memory-panel flex min-h-0 flex-1 flex-col gap-5"
       >
+        {!showCreate && !selected && error ? (
+          <Banner status="error" title={error} collapsible={false} />
+        ) : null}
+        {notice ? <Banner status="success" title={notice} collapsible={false} /> : null}
         <AstryxStack
           direction="vertical"
           className={`settings-memory-overview shrink-0 space-y-4 ${
@@ -355,7 +362,6 @@ export function MemoryPanel(props: {
               collapsible={false}
             />
           ) : null}
-          {error ? <Banner status="error" title={error} collapsible={false} /> : null}
         </AstryxStack>
 
         <AstryxGrid className="settings-memory-layout flex min-h-0 flex-1 overflow-hidden">
@@ -486,6 +492,7 @@ export function MemoryPanel(props: {
             </HStack>
             {showCreate ? (
               <AstryxStack direction="vertical" className="shrink-0 border-b border-border/40 p-4">
+                {error ? <Banner status="error" title={error} collapsible={false} /> : null}
                 <AstryxStack direction="vertical" className="mb-3 text-sm font-semibold">
                   {t("settings.memoryNew")}
                 </AstryxStack>
@@ -653,6 +660,7 @@ export function MemoryPanel(props: {
                   direction="vertical"
                   className="settings-memory-detail-body min-h-0 flex-1 overflow-auto p-4"
                 >
+                  {error ? <Banner status="error" title={error} collapsible={false} /> : null}
                   {selected.memoryType === "daily" ? (
                     <AstryxStack direction="vertical" className="space-y-3">
                       <TextArea

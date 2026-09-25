@@ -57,6 +57,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
   const [pathsInfo, setPathsInfo] = useState<MemoryPathsInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [organizerWatchRunId, setOrganizerWatchRunId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<MemoryEditDraft>({
@@ -121,6 +122,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
   async function createEntry(draft: MemoryCreateDraft) {
     setSaving(true);
     setError(null);
+    setNotice(null);
     try {
       if (draft.scope === "project" && !workdir) {
         throw new Error(t("settings.memoryProjectRequiresWorkdir"));
@@ -135,6 +137,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         actor: "user",
       });
       await reload(result.slug);
+      setNotice(t("settings.memoryCreated"));
       return true;
     } catch (err) {
       setError(formatMemoryError(err));
@@ -148,6 +151,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
     if (!selected) return;
     setSaving(true);
     setError(null);
+    setNotice(null);
     try {
       const isDaily = selected.memoryType === "daily";
       const result = await memoryUpdate({
@@ -162,6 +166,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
       });
       setEditDraft((prev) => ({ ...prev, appendBody: "" }));
       await reload(selectedEntry ? entryKey(selectedEntry) : result.slug);
+      setNotice(t("settings.saved"));
     } catch (err) {
       setError(formatMemoryError(err));
     } finally {
@@ -173,6 +178,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
     if (!selected) return;
     setSaving(true);
     setError(null);
+    setNotice(null);
     try {
       await memoryAccept({
         slug: selected.slug,
@@ -181,6 +187,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         workdirHash: selectedEntry?.scope === "project" ? selectedEntry.workdirHash : undefined,
       });
       await reload(selectedEntry ? entryKey(selectedEntry) : selected.slug);
+      setNotice(t("settings.memoryAccepted"));
     } catch (err) {
       setError(formatMemoryError(err));
     } finally {
@@ -192,6 +199,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
     if (!selected) return;
     setSaving(true);
     setError(null);
+    setNotice(null);
     try {
       await memoryDelete({
         slug: selected.slug,
@@ -203,6 +211,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
       setSelected(null);
       setSelectedEntry(null);
       await reload();
+      setNotice(t("settings.memoryDeleted"));
     } catch (err) {
       setError(formatMemoryError(err));
     } finally {
@@ -214,6 +223,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
     if (saving) return;
     setSaving(true);
     setError(null);
+    setNotice(null);
     try {
       const info = await memoryWipeAll();
       setPathsInfo(info);
@@ -229,6 +239,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
       );
       setSelected(null);
       setSelectedEntry(null);
+      setNotice(t("settings.memoryCleared"));
     } catch (err) {
       setError(formatMemoryError(err));
     } finally {
@@ -280,6 +291,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
     pathsInfo,
     loading,
     error,
+    notice,
     saving,
     editDraft,
     setEditDraft,

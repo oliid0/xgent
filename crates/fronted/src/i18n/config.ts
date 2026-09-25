@@ -1820,6 +1820,10 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.memoryWipeConfirmTitle": "清空全部记忆？",
     "settings.memoryWipeConfirmDescription": "现有记忆会移动到隔离目录，并重建为空记忆库。",
     "settings.memoryWipeAll": "清空全部",
+    "settings.memoryCreated": "记忆已创建。",
+    "settings.memoryAccepted": "记忆已通过。",
+    "settings.memoryDeleted": "记忆已删除。",
+    "settings.memoryCleared": "全部记忆已清空。",
     "settings.memorySelectEntry": "选择一条记忆。",
 
     /* ── Settings Save State ── */
@@ -4776,6 +4780,10 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.memoryWipeConfirmDescription":
       "Existing memories will be moved to quarantine and the memory store will be rebuilt empty.",
     "settings.memoryWipeAll": "Wipe all",
+    "settings.memoryCreated": "Memory created.",
+    "settings.memoryAccepted": "Memory accepted.",
+    "settings.memoryDeleted": "Memory deleted.",
+    "settings.memoryCleared": "All memories cleared.",
     "settings.memorySelectEntry": "Select a memory entry.",
 
     /* ── Settings Save State ── */

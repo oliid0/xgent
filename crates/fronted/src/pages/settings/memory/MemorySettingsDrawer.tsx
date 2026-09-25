@@ -65,6 +65,8 @@ export function MemorySettingsDrawer(props: {
   setSettings: (updater: (prev: AppSettings) => AppSettings) => void;
   workdir?: string;
   saving: boolean;
+  error: string | null;
+  notice: string | null;
   t: (key: string) => string;
   onClose: () => void;
   onRequestWipe: () => void | Promise<void>;
@@ -77,6 +79,8 @@ export function MemorySettingsDrawer(props: {
     setSettings,
     workdir,
     saving,
+    error,
+    notice,
     t,
     onClose,
     onRequestWipe,
@@ -496,6 +500,8 @@ export function MemorySettingsDrawer(props: {
 
             <AstryxStack direction="vertical" as="section" className="space-y-2">
               <Heading level={4}>{t("settings.memorySettingsDangerZone")}</Heading>
+              {error ? <Banner status="error" title={error} collapsible={false} /> : null}
+              {notice ? <Banner status="success" title={notice} collapsible={false} /> : null}
               <AstryxStack direction="vertical" className="space-y-3">
                 <Text type="supporting" color="secondary">
                   {t("settings.memorySettingsWipeDescription")}
