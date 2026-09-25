@@ -14,10 +14,9 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - SwiftUI action delivery now requires a synchronous receipt from the live React subscriber. Missing/invalid delivery clears the pending native control with an error instead of leaving it busy indefinitely; a transport regression test covers the receipt lifecycle.
 
 ## Remaining
-- Provider/model/chat failure and roughly three-second blank startup need device error/timing evidence; no speculative network/startup edit. A question about the exact model-fetch error and blank API key is pending.
-- Confirm native permission discovery, provider input and model fetch on the user's installed iOS build. The installed build may predate local unpushed fixes.
-- HealthKit signing, SwiftUI layer behavior, settings navigation, WebDAV backup and Android/iOS builds require device/CI verification. Mobile local backup file picker/export and background sync remain unimplemented.
-- Continue broader yy mobile and xx PC functional review, Android shell and visual parity with narrow PC. Do not push until full acceptance.
+- Confirm provider/model/chat, action delivery, permission discovery and roughly three-second blank startup on a new iOS build with device timing/errors. The latest successful remote IPA predates all local fixes.
+- Native memory management, settings coverage and local backup file operations still lag narrow desktop/yy. HealthKit signing, SwiftUI layer behavior, WebDAV backup, shell and Android/iOS builds need device/CI verification.
+- Continue xx PC functional review and yy mobile functional review. After function paths work, fix desktop execution-mode picker clipping, angular containers, and mobile/narrow visual parity. Do not push until full acceptance.
 
 ## Evidence and decisions
 - Screenshots 1133–1141 show blank startup, full-page More, floating composer/store cards over sidebar, HealthKit entitlement error, backup command missing and empty provider model list.
@@ -27,5 +26,5 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Apple WebKit callAsyncJavaScript returns explicit JS values. The native event is cancelable; React cancels it only after validating the action payload, so Swift can distinguish a live receiver from a lost event without adding another bridge API.
 
 ## Verification and CI
-- Current local revision: 1,276 non-Cargo tests passed; pnpm check/lint and native:check passed. Full diff against origin/main passed git diff --check. No Cargo/build tools per instructions.
-- Prior revision: 1,274 non-Cargo tests and check/lint/native:check passed. Remote release run 36030128646 succeeded on ea5f4e0, before current local changes. No push until full goal complete.
+- Current local revision: 1,277 non-Cargo tests passed; pnpm check/lint and native:check passed. Full diff against origin/main passed git diff --check. No Cargo/build tools per instructions.
+- Remote release run 36030128646 succeeded on ea5f4e0, before current local changes. No push until full goal complete.
