@@ -519,9 +519,10 @@ struct XgentIOSSheetPresentation: View {
     let initialDocument: XgentDocument
     @ObservedObject var model: XgentPresentationModel
     private var document: XgentDocument {
-        // Keep settings and every child route inside the original sheet.
-        // The shared presentation model owns the route stack and its Back action.
-        model.documents.last { $0.mode == .sheet } ?? initialDocument
+        // A sheet's route updates retain its surface ID. Resolve only that
+        // surface so an unrelated sheet cannot replace this sheet's content.
+        model.documents.first { $0.mode == .sheet && $0.id == initialDocument.id }
+            ?? initialDocument
     }
     private var back: XgentNode? { document.nodes.first { $0.id == "back" } }
     private var saveStatus: XgentNode? { document.nodes.first { $0.id == "save-status" } }
