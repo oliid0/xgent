@@ -81,6 +81,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
   const [view, setView] = useState<"changes" | "history">("changes");
   const [snapshot, setSnapshot] = useState<GitSnapshot | null>(null);
   const [history, setHistory] = useState<GitHistoryEntry[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [selectedPath, setSelectedPath] = useState("");
   const [selectedCommit, setSelectedCommit] = useState<GitHistoryEntry | null>(null);
   const [detail, setDetail] = useState("");
@@ -146,6 +147,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
   useEffect(() => {
     if (!open) return;
     setView("changes");
+    setHistoryLoaded(false);
     setDetail("");
     setSelectedPath("");
     setSelectedCommit(null);
@@ -157,9 +159,10 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
   }, [open, refreshStatus]);
 
   useEffect(() => {
-    if (!open || view !== "history" || history.length > 0) return;
+    if (!open || view !== "history" || historyLoaded) return;
+    setHistoryLoaded(true);
     void refreshHistory();
-  }, [history.length, open, refreshHistory, view]);
+  }, [historyLoaded, open, refreshHistory, view]);
 
   const selectedChange = useMemo(
     () => snapshot?.changes.find((change) => change.path === selectedPath) ?? null,
