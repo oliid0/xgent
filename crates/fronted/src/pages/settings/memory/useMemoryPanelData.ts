@@ -69,6 +69,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
   async function reload(keepEntry?: string | null) {
     setLoading(true);
     setError(null);
+    setNotice(null);
     try {
       const [list, info] = await Promise.all([
         memoryList({ workdir, includeAllProjects: true, includeDaily: true, limit: 1000 }),
@@ -84,7 +85,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
           list.entries.find((entry) => entryKey(entry) === keepKey) ??
           list.entries.find((entry) => entry.slug === keepKey);
         if (found) {
-          await openEntry(found);
+          if (!(await openEntry(found))) return false;
         } else {
           setSelected(null);
           setSelectedEntry(null);
@@ -101,6 +102,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
 
   async function openEntry(entry: MemoryMeta) {
     setError(null);
+    setNotice(null);
     try {
       const read = await memoryRead({
         slug: entry.slug,
@@ -115,8 +117,10 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         body: read.body,
         appendBody: "",
       });
+      return true;
     } catch (err) {
       setError(formatMemoryError(err));
+      return false;
     }
   }
 
