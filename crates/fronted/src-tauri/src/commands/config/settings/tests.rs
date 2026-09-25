@@ -912,12 +912,13 @@ mod tests {
         };
         let loaded = load_system(&conn).expect("load system");
 
-        assert_eq!(row_count, 11);
+        assert_eq!(row_count, 14);
         assert_eq!(
             keys,
             vec![
                 SYSTEM_ACTIVE_WORKSPACE_PROJECT_ID_KEY.to_string(),
                 SYSTEM_ARCHIVED_WORKSPACE_PROJECT_PATHS_KEY.to_string(),
+                SYSTEM_COMMAND_SAFETY_MODE_KEY.to_string(),
                 SYSTEM_EXECUTION_MODE_KEY.to_string(),
                 SYSTEM_HIDDEN_WORKSPACE_PROJECT_PATHS_KEY.to_string(),
                 SYSTEM_MISSING_WORKSPACE_PROJECT_PATHS_KEY.to_string(),
@@ -926,13 +927,16 @@ mod tests {
                 SYSTEM_TERMINAL_SHELL_KEY.to_string(),
                 SYSTEM_TOOL_POLICIES_KEY.to_string(),
                 SYSTEM_WORKDIR_KEY.to_string(),
+                SYSTEM_WORKSPACE_PROJECT_GROUPS_KEY.to_string(),
                 SYSTEM_WORKSPACE_PROJECTS_KEY.to_string(),
+                SYSTEM_WORKSPACE_RESOURCE_SETTINGS_KEY.to_string(),
             ]
         );
         assert_eq!(
             loaded,
             Some(json!({
                 "activeWorkspaceProjectId": DEFAULT_WORKSPACE_PROJECT_ID,
+                "commandSafetyMode": "auto",
                 "executionMode": "tools",
                 "hiddenWorkspaceProjectPaths": [],
                 "missingWorkspaceProjectPaths": [],
@@ -942,6 +946,8 @@ mod tests {
                 "systemProxy": default_system_proxy_json(),
                 "workdir": default_workdir.clone(),
                 "selectedSystemTools": ["http_get_test"],
+                "workspaceProjectGroups": null,
+                "workspaceResourceSettings": {},
                 "workspaceProjects": [
                     {
                         "id": DEFAULT_WORKSPACE_PROJECT_ID,
@@ -953,6 +959,40 @@ mod tests {
                     }
                 ]
             }))
+        );
+    }
+
+    #[test]
+    fn save_system_round_trips_command_safety_and_workspace_resources() {
+        let mut conn = open_memory_db();
+        save_system_with_default_workdir(
+            &mut conn,
+            json!({
+                "commandSafetyMode": "ask",
+                "workspaceResourceSettings": {
+                    "/tmp/project-a": {
+                        "mode": "custom",
+                        "skillNames": ["review"],
+                        "mcpServerIds": ["filesystem"],
+                        "updatedAt": 1
+                    }
+                }
+            }),
+            "/tmp/xgent-default-project",
+        )
+        .expect("save system");
+
+        let loaded = load_system_with_defaults(&conn, "/tmp/xgent-default-project")
+            .expect("load system");
+        assert_eq!(loaded["commandSafetyMode"], "ask");
+        assert_eq!(loaded["workspaceResourceSettings"]["/tmp/project-a"]["mode"], "custom");
+        assert_eq!(
+            loaded["workspaceResourceSettings"]["/tmp/project-a"]["skillNames"],
+            json!(["review"])
+        );
+        assert_eq!(
+            loaded["workspaceResourceSettings"]["/tmp/project-a"]["mcpServerIds"],
+            json!(["filesystem"])
         );
     }
 
@@ -1004,6 +1044,7 @@ mod tests {
             loaded,
             Some(json!({
                 "activeWorkspaceProjectId": DEFAULT_WORKSPACE_PROJECT_ID,
+                "commandSafetyMode": "auto",
                 "executionMode": "tools",
                 "hiddenWorkspaceProjectPaths": [],
                 "missingWorkspaceProjectPaths": [],
@@ -1013,6 +1054,8 @@ mod tests {
                 "systemProxy": default_system_proxy_json(),
                 "workdir": "/tmp/xgent-default-project",
                 "selectedSystemTools": [],
+                "workspaceProjectGroups": null,
+                "workspaceResourceSettings": {},
                 "workspaceProjects": [
                     {
                         "id": DEFAULT_WORKSPACE_PROJECT_ID,
@@ -1058,6 +1101,7 @@ mod tests {
             loaded,
             Some(json!({
                 "activeWorkspaceProjectId": DEFAULT_WORKSPACE_PROJECT_ID,
+                "commandSafetyMode": "auto",
                 "executionMode": "tools",
                 "hiddenWorkspaceProjectPaths": [],
                 "missingWorkspaceProjectPaths": [],
@@ -1067,6 +1111,8 @@ mod tests {
                 "systemProxy": default_system_proxy_json(),
                 "workdir": "/tmp/xgent-default-project",
                 "selectedSystemTools": [],
+                "workspaceProjectGroups": null,
+                "workspaceResourceSettings": {},
                 "workspaceProjects": [
                     {
                         "id": DEFAULT_WORKSPACE_PROJECT_ID,
@@ -1093,6 +1139,7 @@ mod tests {
             loaded,
             json!({
                 "activeWorkspaceProjectId": DEFAULT_WORKSPACE_PROJECT_ID,
+                "commandSafetyMode": "auto",
                 "executionMode": "tools",
                 "hiddenWorkspaceProjectPaths": [],
                 "missingWorkspaceProjectPaths": [],
@@ -1102,6 +1149,7 @@ mod tests {
                 "systemProxy": default_system_proxy_json(),
                 "workdir": "/tmp/xgent-default-project",
                 "selectedSystemTools": [],
+                "workspaceResourceSettings": {},
                 "workspaceProjects": [
                     {
                         "id": DEFAULT_WORKSPACE_PROJECT_ID,
