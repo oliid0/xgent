@@ -115,7 +115,7 @@
     --xgent-context-progress-width: 6rem;
     --xgent-chat-queue-width: 62rem;
     --xgent-chat-queue-height: min(14rem, 30dvh);
-    --xgent-model-selector-width: min(20rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xgent-model-selector-width: min(28rem, calc(100dvw - (var(--spacing-4) * 2)));
     --xgent-model-selector-trigger-width: min(20rem, calc(100dvw - 8.5rem));
     --xgent-model-selector-list-height: min(20rem, 50dvh);
     --xgent-mobile-panel-hidden-offset: 8%;
@@ -2530,7 +2530,7 @@
     min-height: 0;
     flex: 1;
     border-width: 0;
-    border-radius: 0;
+    border-radius: var(--radius-container);
     background: transparent;
     box-shadow: none;
   }
@@ -2540,7 +2540,7 @@
     width: 100%;
     min-height: 0;
     border-width: 0;
-    border-radius: 0;
+    border-radius: var(--radius-container);
     background: transparent;
     box-shadow: none;
   }
@@ -3393,7 +3393,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 
 .xgent-chat-composer[data-expanded="true"] {
   height: 100%;
-  border-radius: 0;
+  border-radius: var(--radius-chat);
 }
 
 .xgent-chat-composer[data-expanded="true"] > div:last-child,
@@ -3662,7 +3662,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 /* Mobile settings use one continuous page. Groups are separated by row
    dividers rather than nested cards; controls retain their native semantics. */
 .settings-page-compact :is(.astryx-section, .astryx-card, .astryx-list) {
-  border-radius: 0;
+  border-radius: var(--radius-container);
   border: 0;
   box-shadow: none;
   background: transparent;
@@ -3673,7 +3673,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 .settings-page-compact .astryx-list-item {
-  border-radius: 0;
+  border-radius: var(--radius-element);
 }
 
 .settings-page-compact .astryx-dialog-header {
@@ -3745,7 +3745,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     .settings-about-release-notes
   ) {
   background: transparent;
-  border-radius: 0;
+  border-radius: var(--radius-container);
   border-inline: 0;
   box-shadow: none;
   -webkit-backdrop-filter: none;
@@ -4273,6 +4273,22 @@ dialog[open] > [popover][data-layer-ready="true"][data-layer-positioning="anchor
   max-width: min(32rem, calc(100dvw - 24px));
   box-sizing: border-box;
   transition-property: none;
+}
+
+/* Size the padded surface, not its child: a viewport-sized child plus the
+   selector's own padding otherwise creates horizontal scrolling on phones. */
+.astryx-popover-surface:has(.xgent-model-selector-content) {
+  width: var(--xgent-model-selector-width);
+}
+
+.xgent-model-selector-content {
+  min-width: 0;
+}
+
+.xgent-model-option-label {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .astryx-selector-popup {

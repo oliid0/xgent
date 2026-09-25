@@ -309,9 +309,11 @@ final class XgentPresentationModel: ObservableObject {
     }
 
     private func reconcileEdits(_ document: XgentDocument) {
+        var visibleNodes = Set<String>()
         func visit(_ nodes: [XgentNode]) {
             for node in nodes {
                 let nodeKey = key(document.surface, node.id)
+                visibleNodes.insert(nodeKey)
                 if acknowledgedEdits.contains(nodeKey), edits[nodeKey] == node.value {
                     edits.removeValue(forKey: nodeKey)
                     editRequests.removeValue(forKey: nodeKey)
@@ -321,6 +323,15 @@ final class XgentPresentationModel: ObservableObject {
             }
         }
         visit(document.nodes)
+        // Settings pages share a surface. A normalized edit (URL suffix, trimmed
+        // name) may never equal its persisted value; do not carry that draft into
+        // another page that reuses the same field ID.
+        let prefix = key(document.surface, "")
+        for nodeKey in Array(edits.keys) where nodeKey.hasPrefix(prefix) && !visibleNodes.contains(nodeKey) {
+            edits.removeValue(forKey: nodeKey)
+            editRequests.removeValue(forKey: nodeKey)
+            acknowledgedEdits.remove(nodeKey)
+        }
     }
 
     private func key(_ surface: String, _ node: String) -> String { "\(surface.count):\(surface)\(node)" }

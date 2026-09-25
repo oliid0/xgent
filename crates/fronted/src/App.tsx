@@ -126,13 +126,15 @@ function AppStartupSurface(props: {
   locale: AppSettings["locale"];
   failures: string[];
   settingsFailure?: string;
+  startupFailure?: string;
 }) {
-  if (props.settingsFailure)
+  if (props.settingsFailure || props.startupFailure)
     return (
       <Banner
         status="error"
         container="section"
-        title={props.settingsFailure}
+        title={props.settingsFailure ?? translate("app.mobileStartupDegraded", props.locale)}
+        description={props.startupFailure}
         collapsible={false}
         endContent={
           <Button
@@ -198,6 +200,7 @@ export default function App() {
   const [mobileStartup, setMobileStartup] = useState<MobileStartupStatus>({
     phase: "starting",
     failures: [],
+    coreReady: false,
   });
 
   useEffect(() => {
@@ -223,7 +226,7 @@ export default function App() {
           if (!startupDelayReported) {
             startupDelayReported = true;
             console.warn("Mobile service initialization is taking longer than expected", failures);
-            setMobileStartup({ phase: "starting", failures });
+            setMobileStartup({ phase: "starting", failures, coreReady: false });
           }
           retryTimer = window.setTimeout(() => void poll(), 1_000);
           return;
@@ -231,10 +234,17 @@ export default function App() {
         retryTimer = window.setTimeout(() => void poll(), 100);
       } catch (error) {
         if (cancelled) return;
+        // A transient IPC failure must not permanently lock the gated tree.
+        // Reuse the startup deadline; a persistent failure still exposes reload.
+        if (Date.now() < deadline) {
+          retryTimer = window.setTimeout(() => void poll(), 250);
+          return;
+        }
         console.warn("Unable to read native mobile startup status", error);
         setMobileStartup({
           phase: "degraded",
           failures: [error instanceof Error ? error.message : String(error)],
+          coreReady: false,
         });
       }
     };
@@ -668,13 +678,13 @@ export default function App() {
     messages: appUpdateMessages,
     beforeRestart: beforeAppRestart,
   });
-  // Native command state is registered during setup. Mounting ChatPage or the
-  // closed settings sheet before that work finishes lets their effects race
-  // history/settings commands and can replace the entire mobile UI with an
-  // error boundary. Keep the native component tree inert until both the
-  // platform and persisted settings are ready.
+  // Mobile history and other command state finish on a background worker.
+  // Settings can load first, so mounting ChatPage before that worker settles
+  // lets its initial history requests race native service registration.
   const appContentReady =
-    platformResolved && settingsReady && (!nativeMobile || settingsHydratedRef.current);
+    platformResolved &&
+    settingsReady &&
+    (!nativeMobile || (settingsHydratedRef.current && mobileStartup.coreReady));
   useEffect(() => {
     if (platformResolved && settingsReady) finishLaunch(settingsHydratedRef.current);
   }, [platformResolved, settingsReady]);
@@ -850,6 +860,12 @@ export default function App() {
                     settingsFailure={
                       nativeMobile && settingsReady && settingsSaveState.status === "error"
                         ? settingsSaveState.message
+                        : undefined
+                    }
+                    startupFailure={
+                      nativeMobile && mobileStartup.phase !== "starting" && !mobileStartup.coreReady
+                        ? mobileStartup.failures.join(" · ") ||
+                          translate("app.mobileStartupDegraded", settings.locale)
                         : undefined
                     }
                   />

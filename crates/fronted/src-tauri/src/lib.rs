@@ -1085,14 +1085,19 @@ fn initialize_mobile_services(
     app_data_dir: std::path::PathBuf,
     proxy_server: Option<Arc<services::proxy::ProxyServerState>>,
     mut failures: Vec<String>,
-) -> Vec<String> {
-    if let Err(error) = commands::history_db::initialize_history_db() {
-        record_mobile_startup_failure(
-            &mut failures,
-            "initialize chat history database failed",
-            error,
-        );
-    }
+) -> (Vec<String>, bool) {
+    let history_ready = match commands::history_db::initialize_history_db() {
+        Ok(()) => true,
+        Err(error) => {
+            record_mobile_startup_failure(
+                &mut failures,
+                "initialize chat history database failed",
+                error,
+            );
+            false
+        }
+    };
+    let core_ready = history_ready && proxy_server.is_some();
     if let Err(error) = commands::settings::initialize_system_proxy_from_db() {
         record_mobile_startup_failure(
             &mut failures,
@@ -1223,7 +1228,7 @@ fn initialize_mobile_services(
         record_mobile_startup_failure(&mut failures, "seed builtin skills failed", error);
     }
 
-    failures
+    (failures, core_ready)
 }
 
 #[cfg(mobile)]
@@ -1257,7 +1262,7 @@ pub fn run() {
             let storage = match initialize_mobile_storage(&app_handle) {
                 Ok(storage) => storage,
                 Err(error) => {
-                    startup_state.finish(vec![error]);
+                    startup_state.finish(vec![error], false);
                     return Ok(());
                 }
             };
@@ -1280,12 +1285,13 @@ pub fn run() {
                 }
             };
             tauri::async_runtime::spawn_blocking(move || {
-                startup_state.finish(initialize_mobile_services(
+                let (failures, core_ready) = initialize_mobile_services(
                     app_handle,
                     storage,
                     proxy_server,
                     failures,
-                ));
+                );
+                startup_state.finish(failures, core_ready);
             });
             Ok(())
         })

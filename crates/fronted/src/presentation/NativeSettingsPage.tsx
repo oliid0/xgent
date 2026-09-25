@@ -137,6 +137,9 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [providerId, setProviderId] = useState("");
+  const [providerUrlDraft, setProviderUrlDraft] = useState<{ id: string; value: string } | null>(
+    null,
+  );
   const [modelId, setModelId] = useState("");
   const [providerDeletePending, setProviderDeletePending] = useState(false);
   const [mcpId, setMcpId] = useState("");
@@ -166,6 +169,10 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [backupPassword, setBackupPassword] = useState("");
   const c = presentationControls();
   const provider = settings.customProviders.find((item) => item.id === providerId);
+  // Keep the entered endpoint like the desktop provider form. Persistence strips
+  // API suffixes in base-URL mode; switching to an exact endpoint must restore it.
+  const providerUrl =
+    providerUrlDraft?.id === providerId ? providerUrlDraft.value : (provider?.baseUrl ?? "");
   const returnToSettings = () => {
     setPage(nativeMobile ? returnPage : "system");
     setReturnPage("");
@@ -806,9 +813,10 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             })),
             (type) => patchProvider({ type: type as CustomProvider["type"] }),
           ),
-          c.input("provider-url", "Base URL", provider.baseUrl, (baseUrl) =>
-            patchProvider({ baseUrl }),
-          ),
+          c.input("provider-url", "Base URL", providerUrl, (baseUrl) => {
+            setProviderUrlDraft({ id: provider.id, value: baseUrl });
+            patchProvider({ baseUrl });
+          }),
           ...(provider.type === "gemini"
             ? []
             : [
@@ -823,7 +831,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             "full-url",
             t("settings.native.exactEndpoint"),
             provider.isFullUrl,
-            (isFullUrl) => patchProvider({ isFullUrl }),
+            (isFullUrl) => patchProvider({ isFullUrl, baseUrl: providerUrl }),
           ),
           c.input(
             "provider-key",

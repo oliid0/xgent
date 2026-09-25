@@ -11,6 +11,7 @@ pub struct RuntimePlatformResponse {
 pub struct MobileStartupStatus {
     pub phase: String,
     pub failures: Vec<String>,
+    pub core_ready: bool,
 }
 
 pub struct MobileStartupState(Mutex<MobileStartupStatus>);
@@ -20,12 +21,13 @@ impl Default for MobileStartupState {
         Self(Mutex::new(MobileStartupStatus {
             phase: "starting".to_string(),
             failures: Vec::new(),
+            core_ready: false,
         }))
     }
 }
 
 impl MobileStartupState {
-    pub(crate) fn finish(&self, failures: Vec<String>) {
+    pub(crate) fn finish(&self, failures: Vec<String>, core_ready: bool) {
         let mut status = self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         status.phase = if failures.is_empty() {
             "ready".to_string()
@@ -33,6 +35,7 @@ impl MobileStartupState {
             "degraded".to_string()
         };
         status.failures = failures;
+        status.core_ready = core_ready;
     }
 
     fn snapshot(&self) -> MobileStartupStatus {

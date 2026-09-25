@@ -22,7 +22,7 @@ function loadStartupModule(resolveInvoke) {
 }
 
 test("mobile startup status uses the native readiness command", async () => {
-  const expected = { phase: "degraded", failures: ["memory unavailable"] };
+  const expected = { phase: "degraded", failures: ["memory unavailable"], coreReady: true };
   const { calls, module } = loadStartupModule(() => expected);
 
   assert.deepEqual(await module.readMobileStartupStatus(), expected);
@@ -31,6 +31,15 @@ test("mobile startup status uses the native readiness command", async () => {
 
 test("mobile startup status rejects malformed native responses", async () => {
   const { module } = loadStartupModule(() => ({ phase: "complete", failures: [] }));
+
+  await assert.rejects(
+    () => module.readMobileStartupStatus(),
+    /invalid mobile startup status/,
+  );
+});
+
+test("mobile startup status requires an explicit core service result", async () => {
+  const { module } = loadStartupModule(() => ({ phase: "ready", failures: [] }));
 
   await assert.rejects(
     () => module.readMobileStartupStatus(),

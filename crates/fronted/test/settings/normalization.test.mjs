@@ -76,6 +76,26 @@ test("custom provider routing strips endpoint suffixes and filters inactive mode
   assert.deepEqual(provider.activeModels, ["gpt-a"]);
 });
 
+test("an explicit OpenAI endpoint overrides the default request format", () => {
+  const draft = settings.normalizeCustomProvider({ id: "relay", type: "codex" });
+  assert.equal(draft.requestFormat, "openai-responses");
+
+  const completions = settings.normalizeCustomProvider({
+    ...draft,
+    baseUrl: "https://relay.example/v1/chat/completions",
+  });
+  assert.equal(completions.baseUrl, "https://relay.example/v1");
+  assert.equal(completions.requestFormat, "openai-completions");
+
+  const exact = settings.normalizeCustomProvider({
+    ...draft,
+    baseUrl: "https://relay.example/v1/chat/completions?channel=mobile",
+    isFullUrl: true,
+  });
+  assert.equal(exact.baseUrl, "https://relay.example/v1/chat/completions?channel=mobile");
+  assert.equal(exact.requestFormat, "openai-completions");
+});
+
 test("provider usage scripts survive switching query modes and settings normalization", () => {
   const general = settings.normalizeUsageQueryConfig({ mode: "general", script: "general script" });
   const newapi = settings.switchUsageQueryMode(general, "newapi");

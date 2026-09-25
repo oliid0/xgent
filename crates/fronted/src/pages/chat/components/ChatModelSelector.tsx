@@ -98,7 +98,7 @@ function ModelSelectorContent(props: {
   );
 
   return (
-    <VStack gap={3} width="var(--xgent-model-selector-width)">
+    <VStack className="xgent-model-selector-content" gap={3} width="100%">
       <TextInput
         label={t("chat.searchModel")}
         isLabelHidden
@@ -161,7 +161,7 @@ function ModelSelectorContent(props: {
                   trigger={
                     <HStack gap={2} width="100%" vAlign="center">
                       <ProviderBrandIcon type={group.providerType} />
-                      <Text type="body" weight="medium">
+                      <Text type="body" weight="medium" className="xgent-model-option-label">
                         {group.name}
                       </Text>
                       <Badge variant="neutral" label={group.opts.length} />
@@ -174,7 +174,11 @@ function ModelSelectorContent(props: {
                       return (
                         <ListItem
                           key={option.value}
-                          label={option.model}
+                          label={
+                            <Text type="body" className="xgent-model-option-label">
+                              {option.model}
+                            </Text>
+                          }
                           startContent={<ProviderBrandIcon type={option.providerType} />}
                           endContent={isSelected ? <Check size={16} /> : undefined}
                           isSelected={isSelected}

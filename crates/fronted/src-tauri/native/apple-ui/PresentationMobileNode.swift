@@ -480,9 +480,15 @@ struct XgentIOSNode: View {
 
     @ViewBuilder private var textEntry: some View {
         if node.secure == true {
-            SecureField(node.text ?? "", text: textBinding).accessibilityLabel(node.label ?? "")
+            SecureField(node.text ?? "", text: textBinding)
+                .accessibilityLabel(node.label ?? "")
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
         } else {
-            TextField(node.text ?? "", text: textBinding).accessibilityLabel(node.label ?? "")
+            TextField(node.text ?? "", text: textBinding)
+                .accessibilityLabel(node.label ?? "")
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
         }
     }
 

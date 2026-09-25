@@ -94,6 +94,17 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal((await dispatch("add-provider")).ok, true);
   assert.equal(settings.customProviders.length, count + 1);
   await dispatch("provider-name", "Local relay");
+  const endpoint = "https://example.test/v1/chat/completions";
+  await dispatch("provider-url", endpoint);
+  assert.equal(settings.customProviders.at(-1).baseUrl, "https://example.test/v1");
+  assert.equal(settings.customProviders.at(-1).requestFormat, "openai-completions");
+  await dispatch("full-url", true);
+  assert.equal(settings.customProviders.at(-1).baseUrl, endpoint,
+    "enabling exact URL after entering it must preserve its endpoint suffix");
+  await dispatch("full-url", false);
+  assert.equal(settings.customProviders.at(-1).baseUrl, "https://example.test/v1");
+  const urlField = document.nodes.flatMap((node) => node.children ?? []).find((node) => node.id === "provider-url");
+  assert.equal(urlField.value, endpoint, "editing retains the entered endpoint across normalization");
   await dispatch("provider-url", "https://example.test/v1");
   await dispatch("provider-models-url", "https://catalog.example.test/v1/models");
   assert.equal((await dispatch("fetch-models")).ok, true);

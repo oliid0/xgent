@@ -700,13 +700,13 @@ function normalizeCodexRouting(
 
   if (routePath.endsWith(CODEX_CHAT_COMPLETIONS_SUFFIX)) {
     if (!isFullUrl) baseUrl = baseUrl.slice(0, -CODEX_CHAT_COMPLETIONS_SUFFIX.length);
-    requestFormat ??= "openai-completions";
+    requestFormat = "openai-completions";
   } else if (routePath.endsWith(CODEX_RESPONSES_SUFFIX)) {
     if (!isFullUrl) baseUrl = baseUrl.slice(0, -CODEX_RESPONSES_SUFFIX.length);
-    requestFormat ??= "openai-responses";
+    requestFormat = "openai-responses";
   } else if (routePath.endsWith(CODEX_RESPONSE_SUFFIX)) {
     if (!isFullUrl) baseUrl = baseUrl.slice(0, -CODEX_RESPONSE_SUFFIX.length);
-    requestFormat ??= "openai-responses";
+    requestFormat = "openai-responses";
   }
 
   return {
