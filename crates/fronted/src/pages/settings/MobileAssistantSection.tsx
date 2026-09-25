@@ -130,11 +130,10 @@ export function MobileAssistantSection({ settings, setSettings }: SettingsSectio
     setBusy((current) => current || "refresh");
     setError("");
     try {
-      const [nextStatus, nextPermissions] = await Promise.all([
-        mobileAssistantStatus(),
-        checkMobileAssistantPermissions(),
-      ]);
+      const nextStatus = await mobileAssistantStatus();
       setStatus(nextStatus);
+      // Native status queries can fail independently of capability discovery.
+      const nextPermissions = await checkMobileAssistantPermissions();
       setPermissions(normalizeMobileAssistantPermissions(nextStatus, nextPermissions));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));

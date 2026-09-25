@@ -231,11 +231,10 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   }
 
   async function refreshPermissions() {
-    const [next, states] = await Promise.all([
-      mobileAssistantStatus(),
-      checkMobileAssistantPermissions(),
-    ]);
+    const next = await mobileAssistantStatus();
     setStatus(next);
+    // Show supported permissions even if an OS authorization status query fails.
+    const states = await checkMobileAssistantPermissions();
     setPermissions(normalizeMobileAssistantPermissions(next, states));
   }
   async function work(run: () => Promise<unknown>) {

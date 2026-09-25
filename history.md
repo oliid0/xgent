@@ -10,9 +10,11 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Native provider model discovery now activates fetched models, matching desktop behavior and preserving other providers. The settings flow test covers this path.
 - First discovered or manually added iOS model now becomes the chat selection when none was selected; an empty discovery result reports the existing no-model message. Existing selections remain intact.
 - Mobile native voice enablement now persists in the existing local UI settings instead of invoking desktop-only STT commands; a regression test covers the default-disabled state, enable/reload and desktop STT storage.
+- Mobile assistant capability rows now render as soon as native status resolves in both settings views, even when the independent OS permission-state query fails; its error remains visible.
 
 ## Remaining
 - Provider/model/chat failure and roughly three-second blank startup need device error/timing evidence; no speculative network/startup edit. A question about the exact model-fetch error and blank API key is pending.
+- Confirm native permission discovery, provider input and model fetch on the user's installed iOS build. The installed build may predate local unpushed fixes.
 - HealthKit signing, SwiftUI layer behavior, settings navigation, WebDAV backup and Android/iOS builds require device/CI verification. Mobile local backup file picker/export and background sync remain unimplemented.
 - Continue broader yy mobile and xx PC functional review, Android shell and visual parity with narrow PC. Do not push until full acceptance.
 
@@ -20,6 +22,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Screenshots 1133–1141 show blank startup, full-page More, floating composer/store cards over sidebar, HealthKit entitlement error, backup command missing and empty provider model list.
 - NativeSettingsPage swapped NativeSurface owners on section changes; SwiftUI sheet identity followed surface ID. Session sharing keeps it stable. Astryx MCP/CLI and Apple Swift docs informed drawer/sheet behavior.
 - Backup WebDAV functions existed only behind desktop cfg; rfd 0.17.2 officially supports desktop platforms, so mobile local file actions were omitted instead of left dead.
+- Apple HealthKit authorization status is an independent asynchronous callback. The previous Promise.all withheld all permission rows until it resolved; the native iOS plugin always supplies capability aliases from status.
 
 ## Verification and CI
 - Current local revision: 1,276 non-Cargo tests passed; pnpm check/lint and native:check passed. Full diff against origin/main passed git diff --check. No Cargo/build tools per instructions.
