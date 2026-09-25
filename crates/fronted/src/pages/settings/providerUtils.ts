@@ -448,10 +448,13 @@ export async function fetchModelsFromApi(
   const exactModelsUrl = options?.modelsUrl?.trim();
   const normalizedApiKey = apiKey.trim();
   const attempts = buildProviderModelsAttempts(type, normalizedUrl, normalizedApiKey, options);
+  // Match the 10-second total discovery deadline used by the xx native client.
+  const discoverySignal = AbortSignal.timeout(10_000);
   const failures: ProviderModelsFailure[] = [];
   let emptyResult: ProviderModelConfig[] | null = null;
 
   for (const attempt of attempts) {
+    if (discoverySignal.aborted) throw new Error("Model list request timed out after 10 seconds");
     const proxyRequest = await prepareProxyRequest(
       type,
       exactModelsUrl || normalizedUrl,
@@ -475,8 +478,10 @@ export async function fetchModelsFromApi(
     for (let page = 0; page < 100; page += 1) {
       let response: Response;
       try {
-        response = await fetch(requestUrl, { headers: requestHeaders });
+        response = await fetch(requestUrl, { headers: requestHeaders, signal: discoverySignal });
       } catch (error) {
+        if (discoverySignal.aborted)
+          throw new Error("Model list request timed out after 10 seconds");
         failures.push({
           status: null,
           message: error instanceof Error ? error.message : String(error),
@@ -498,6 +503,8 @@ export async function fetchModelsFromApi(
       try {
         data = await response.json();
       } catch {
+        if (discoverySignal.aborted)
+          throw new Error("Model list request timed out after 10 seconds");
         failures.push({ status: null, message: "Model list response is not valid JSON" });
         attemptFailed = true;
         break;
