@@ -244,14 +244,16 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       await run();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
+      throw cause;
     } finally {
       setBusy(false);
     }
   }
   useEffect(() => {
     if ((page === "mobileAssistant" || page === "voice") && nativeMobile)
-      void work(refreshPermissions);
-    if (page === "mobileExecution" && nativeMobile) void work(refreshShell);
+      void work(refreshPermissions).catch(() => undefined);
+    if (page === "mobileExecution" && nativeMobile)
+      void work(refreshShell).catch(() => undefined);
     if (page === "access") {
       void work(async () => {
         const nextVault = await invoke<CloudSecretVaultStatus>("cloud_secret_vault_status");
@@ -269,19 +271,20 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         setAccessStatus(
           `${lan.paired ? t("settings.accessComputerPaired") : t("settings.accessComputerNotPaired")} · ${nextVault.githubTokenConfigured ? t("settings.accessTokenConfigured") : t("settings.accessTokenMissing")}`,
         );
-      });
+      }).catch(() => undefined);
     }
     if (page === "backup") {
       void work(async () => {
         setBackupConfig(await loadSyncConfig());
         setBackupPassword("");
-      });
+      }).catch(() => undefined);
     }
   }, [page, nativeMobile]);
   useEffect(() => {
     if (page !== "mobileAssistant" || !nativeMobile) return;
     const refresh = () => {
-      if (document.visibilityState === "visible") void work(refreshPermissions);
+      if (document.visibilityState === "visible")
+        void work(refreshPermissions).catch(() => undefined);
     };
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
