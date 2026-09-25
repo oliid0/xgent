@@ -252,8 +252,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   useEffect(() => {
     if ((page === "mobileAssistant" || page === "voice") && nativeMobile)
       void work(refreshPermissions).catch(() => undefined);
-    if (page === "mobileExecution" && nativeMobile)
-      void work(refreshShell).catch(() => undefined);
+    if (page === "mobileExecution" && nativeMobile) void work(refreshShell).catch(() => undefined);
     if (page === "access") {
       void work(async () => {
         const nextVault = await invoke<CloudSecretVaultStatus>("cloud_secret_vault_status");

@@ -19,7 +19,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - The desktop composer execution selector now uses up to 448px for its option descriptions instead of the shared 320px selector cap, while staying inside the viewport; Astryx Selector/Popover source and MCP/CLI confirmed the positioning path.
 - The native mobile System settings page now exposes the existing persisted theme selector. A settings load/save error is visible even on the mobile settings root, so a failed initialization no longer leaves the first settings page falsely quiet.
 - The iOS settings sheet now resolves document updates by its own stable surface ID; unrelated sheet documents can no longer replace the content of an already open settings sheet.
-- Native settings actions now reject on failure after recording the inline error, so the existing SwiftUI action alert reports failed provider discovery, permission, backup and shell operations instead of acknowledging success. Background status refreshes consume their own rejection.
+- Native settings actions now reject on failure after recording the inline error, so the existing SwiftUI action alert reports failed provider discovery, permission, backup and shell operations instead of acknowledging success. Background status refreshes consume their own rejection; formatting follows the repository lint rule.
 - Provider model discovery now uses xx's 10-second total request deadline through the existing browser proxy flow; unresponsive endpoints return a specific timeout instead of leaving the native action busy indefinitely.
 
 ## Remaining
