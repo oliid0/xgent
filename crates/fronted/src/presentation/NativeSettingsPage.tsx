@@ -809,6 +809,16 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           c.input("provider-url", "Base URL", provider.baseUrl, (baseUrl) =>
             patchProvider({ baseUrl }),
           ),
+          ...(provider.type === "gemini"
+            ? []
+            : [
+                c.input(
+                  "provider-models-url",
+                  t("settings.providerModelsUrl"),
+                  provider.modelsUrl ?? "",
+                  (modelsUrl) => patchProvider({ modelsUrl: modelsUrl.trim() || undefined }),
+                ),
+              ]),
           c.toggle(
             "full-url",
             t("settings.native.exactEndpoint"),
@@ -872,7 +882,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
                       };
                 });
               }),
-            !busy && !!provider.baseUrl.trim(),
+            !busy && !!(provider.baseUrl.trim() || provider.modelsUrl?.trim()),
           ),
         ]),
       );

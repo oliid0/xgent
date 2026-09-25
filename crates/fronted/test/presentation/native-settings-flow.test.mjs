@@ -4,6 +4,7 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 test("native settings mirrors compact navigation and persists shared system, provider, model and policy edits", async () => {
   const providerUtils = createTsModuleLoader().loadModule("src/pages/settings/providerUtils.ts");
+  let discoveryOptions;
   const states = [];
   let cursor = 0;
   const locale = {
@@ -25,7 +26,10 @@ test("native settings mirrors compact navigation and persists shared system, pro
     "./nativeTheme": { createNativePresentationTheme: () => ({ marker: "theme" }) },
     "../pages/settings/providerUtils": {
       ...providerUtils,
-      fetchModelsFromApi: async () => [providerUtils.createDraftModelConfig("codex", "fetched-model")],
+      fetchModelsFromApi: async (_type, _baseUrl, _apiKey, options) => {
+        discoveryOptions = options;
+        return [providerUtils.createDraftModelConfig("codex", "fetched-model")];
+      },
     },
     "../pages/settings/CronSection": { CronSection: "CronSection" },
     "../pages/settings/SshSettingsSection": { SshSettingsSection: "SshSettingsSection" },
@@ -91,7 +95,9 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(settings.customProviders.length, count + 1);
   await dispatch("provider-name", "Local relay");
   await dispatch("provider-url", "https://example.test/v1");
+  await dispatch("provider-models-url", "https://catalog.example.test/v1/models");
   assert.equal((await dispatch("fetch-models")).ok, true);
+  assert.equal(discoveryOptions.modelsUrl, "https://catalog.example.test/v1/models");
   assert.ok(settings.customProviders.at(-1).activeModels.includes("fetched-model"));
   assert.deepEqual(settings.selectedModel, {
     customProviderId: settings.customProviders.at(-1).id,
