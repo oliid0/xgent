@@ -90,8 +90,10 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
           setSelectedEntry(null);
         }
       }
+      return true;
     } catch (err) {
       setError(formatMemoryError(err));
+      return false;
     } finally {
       setLoading(false);
     }
@@ -136,7 +138,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         body: draft.body,
         actor: "user",
       });
-      await reload(result.slug);
+      if (!(await reload(result.slug))) return false;
       setNotice(t("settings.memoryCreated"));
       return true;
     } catch (err) {
@@ -165,8 +167,9 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         actor: "user",
       });
       setEditDraft((prev) => ({ ...prev, appendBody: "" }));
-      await reload(selectedEntry ? entryKey(selectedEntry) : result.slug);
-      setNotice(t("settings.saved"));
+      if (await reload(selectedEntry ? entryKey(selectedEntry) : result.slug)) {
+        setNotice(t("settings.saved"));
+      }
     } catch (err) {
       setError(formatMemoryError(err));
     } finally {
@@ -186,8 +189,9 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         workdir: selectedEntryWorkdir(selectedEntry, workdir),
         workdirHash: selectedEntry?.scope === "project" ? selectedEntry.workdirHash : undefined,
       });
-      await reload(selectedEntry ? entryKey(selectedEntry) : selected.slug);
-      setNotice(t("settings.memoryAccepted"));
+      if (await reload(selectedEntry ? entryKey(selectedEntry) : selected.slug)) {
+        setNotice(t("settings.memoryAccepted"));
+      }
     } catch (err) {
       setError(formatMemoryError(err));
     } finally {
@@ -210,8 +214,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
       });
       setSelected(null);
       setSelectedEntry(null);
-      await reload();
-      setNotice(t("settings.memoryDeleted"));
+      if (await reload()) setNotice(t("settings.memoryDeleted"));
     } catch (err) {
       setError(formatMemoryError(err));
     } finally {
