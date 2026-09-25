@@ -23,6 +23,7 @@ Finish iOS/mobile and PC repairs using yy/xx evidence, then align mobile/narrow 
 - Provider model discovery now uses xx's 10-second total request deadline through the existing browser proxy flow; unresponsive endpoints return a specific timeout instead of leaving the native action busy indefinitely.
 - iOS settings root now renders its existing save/load failure node; the SwiftUI sheet only moves that node into the header on child pages that have a Back control.
 - Skill Store completion now records a job as handled only after its installed skills can be enabled in settings; a failed settings write stays visible and can be retried on reentry.
+- Mobile local proxy now advertises its bound IPv4 loopback address instead of localhost, so model discovery and chat cannot be sent to an unbound IPv6 loopback socket. Existing provider tests and xx use the bound address; Apple ATS documentation confirms the configured local-network exception allows IP literals.
 
 ## Remaining
 - Confirm provider/model/chat, action delivery, permission discovery and roughly three-second blank startup on a new iOS build with device timing/errors. The latest successful remote IPA predates all local fixes.

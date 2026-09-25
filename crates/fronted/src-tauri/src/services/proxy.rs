@@ -116,9 +116,8 @@ pub fn start_proxy_server(
         .local_addr()
         .map_err(|err| format!("读取本地代理地址失败：{err}"))?;
 
-    #[cfg(mobile)]
-    let proxy_base_url = format!("http://localhost:{}", addr.port());
-    #[cfg(desktop)]
+    // Advertise the same IPv4 loopback address the listener actually binds.
+    // Resolving localhost to ::1 on mobile cannot reach this socket.
     let proxy_base_url = format!("http://{addr}");
 
     let state = Arc::new(ProxyServerState {
