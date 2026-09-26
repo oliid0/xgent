@@ -930,6 +930,8 @@ jobs:
                   "Frameworks/python3_ios.framework/python3_ios",
                   "Frameworks/python3_ios-_ssl.framework/python3_ios-_ssl",
                   "Frameworks/python3_ios-_sqlite3.framework/python3_ios-_sqlite3",
+                  "commandDictionary.plist",
+                  "extraCommandsDictionary.plist",
                   "assets/mobile-execution/commandDictionary.plist",
                   "assets/mobile-execution/extraCommandsDictionary.plist",
                   "assets/mobile-execution/python/lib/python3.9/os.py",

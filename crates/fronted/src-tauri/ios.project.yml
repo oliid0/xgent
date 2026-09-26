@@ -46,6 +46,12 @@ targets:
       {{~#each ios-additional-targets}}
       - path: {{prefix-path this}}{{/each}}
       - path: ../../LaunchScreen.storyboard
+      # ios_system 3.0.4 bootstraps its registry from Bundle.main's root.
+      # Tauri's assets/mobile-execution copy alone cannot initialize it.
+      - path: ../../../../mobile-execution/ios/Sources/Resources/commandDictionary.plist
+        buildPhase: resources
+      - path: ../../../../mobile-execution/ios/Sources/Resources/extraCommandsDictionary.plist
+        buildPhase: resources
     info:
       path: {{app.name}}_iOS/Info.plist
       properties:

@@ -164,6 +164,12 @@ test("the complete iOS application surface is handwritten and bypasses generated
     assert.doesNotMatch(source, /XgentNodeView|XgentNodeChildren|generatedContent/);
   }
   assert.match(nativeViewSource, /#if os\(iOS\)\s*XgentIOSSheetPresentation/);
+  assert.match(nativeMobileSource, /sheets\.firstIndex\(where: \{ \$0\.id == document\.id \}\)/);
+  assert.match(nativeMobileSource, /return sheets\[index \+ 1\]/);
+  assert.match(nativeMobileSource, /\.sheet\(item: Binding\(get: \{ nextSheet \}/);
+  assert.match(nativeMobileSource, /model\.dismiss\(nextSheet\)/);
+  assert.match(nativeMobileSource, /AnyView\(XgentIOSSheetPresentation\(initialDocument: next, model: model\)\)/);
+  assert.match(nativeMobileSource, /XgentAlerts\(model: model, enabled: nextSheet == nil\)/);
   assert.match(
     nativeLayoutSource,
     /root\.formFactor == \.mobile[\s\S]*?XgentIOSRootPresentation[\s\S]*?XgentIOSWorkspacePresentation/,

@@ -277,8 +277,9 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                     "detail": "a-Shell passed filesystem, Python, JavaScript, FFmpeg and package-manager verification",
                 ])
             } catch {
-                UserDefaults.standard.set(false, forKey: self.installationPreferenceKey)
-                UserDefaults.standard.removeObject(forKey: self.installationVerificationKey)
+                // Resource activation rolls back on failure. Keep the previous
+                // verification receipt; environmentInstalled also validates the
+                // restored files, so a failed first install cannot become ready.
                 invoke.reject("iOS shell installation failed: \(error.localizedDescription)")
             }
         }
@@ -631,6 +632,14 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 throw MobileExecutionError.io("Could not load \(resource).plist: \(error.localizedDescription)")
             }
         }
+        // addCommandList returns nil even when the upstream bootstrap dictionary
+        // was absent and its merge was a no-op. Verify the actual registry.
+        let commands = Set(commandsAsArray() as? [String] ?? [])
+        let requiredCommands = ["dash", "cat", "python3", "jsc", "ffmpeg"]
+        let missingCommands = requiredCommands.filter { !commands.contains($0) }
+        guard missingCommands.isEmpty else {
+            throw MobileExecutionError.io("The bundled command registry is incomplete: \(missingCommands.joined(separator: ", "))")
+        }
         replaceCommand("rehash", "xgent_rehash", true)
         initialized = true
     }
@@ -926,6 +935,9 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             "commandDictionary.plist", "extraCommandsDictionary.plist",
             "vim/syntax/syntax.vim", "terminfo", "python/lib/python3.9/os.py",
         ].filter { !FileManager.default.fileExists(atPath: resources.appendingPathComponent($0).path) }
+        if Bundle.main.url(forResource: "commandDictionary", withExtension: "plist") == nil {
+            missing.append("commandDictionary.plist at the app bundle root")
+        }
         for file in ["cacert.pem", "bin/pkg"] {
             if (try? Data(contentsOf: resources.appendingPathComponent(file)).isEmpty) != false {
                 missing.append(file)

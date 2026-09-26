@@ -253,6 +253,24 @@ test("release packaging preserves native runtime resources without ABI drift", (
   assert.doesNotMatch(androidProotPreparation, /i386:x86-64/);
   assert.match(workflow, /payload\.startswith\(b"\\x1f\\x8b"\)/);
   assert.match(workflow, /assets\/mobile-execution\/commandDictionary\.plist/);
+  for (const dictionary of ["commandDictionary", "extraCommandsDictionary"]) {
+    const source = `../../../../mobile-execution/ios/Sources/Resources/${dictionary}.plist`;
+    assert.ok(iosProjectTemplate.includes(`- path: ${source}\n        buildPhase: resources`),
+      "ios_system requires a root-level Copy Bundle Resources entry, not just Tauri assets");
+    assert.ok(workflow.includes(`"${dictionary}.plist",`), "IPA verification checks the bootstrap dictionary");
+    assert.ok(readFileSync(path.resolve(repoRoot, "crates/fronted/src-tauri/gen/apple", source), "utf8").includes("<plist"));
+  }
+  assert.match(iosPlugin, /let commands = Set\(commandsAsArray\(\)/);
+  assert.match(iosPlugin, /guard missingCommands\.isEmpty else/);
+  const commandDictionary = readFileSync(path.join(repoRoot, "crates/mobile-execution/ios/Sources/Resources/commandDictionary.plist"), "utf8");
+  const requiredCommands = JSON.parse(iosPlugin.match(/let requiredCommands = (\[[^\n]+\])/)[1]);
+  for (const command of requiredCommands) {
+    assert.ok(commandDictionary.includes(`<key>${command}</key>`),
+      `the native registry probe must check registered commands, not shell builtins: ${command}`);
+  }
+  const install = iosPlugin.slice(iosPlugin.indexOf("@objc func install("), iosPlugin.indexOf("@objc func installToolchains("));
+  assert.doesNotMatch(install, /set\(false, forKey: self\.installationPreferenceKey\)|removeObject\(forKey: self\.installationVerificationKey\)/,
+    "failed reinstall must preserve the verification receipt of the rolled-back environment");
 
   assert.match(windowsBrowserBackend, /core\.CanGoForward\(&mut value\)\?/);
   assert.match(windowsBrowserBackend, /core\.CanGoBack\(&mut value\)\?/);

@@ -524,6 +524,11 @@ struct XgentIOSSheetPresentation: View {
         model.documents.first { $0.mode == .sheet && $0.id == initialDocument.id }
             ?? initialDocument
     }
+    private var nextSheet: XgentDocument? {
+        let sheets = model.documents.filter { $0.mode == .sheet }
+        guard let index = sheets.firstIndex(where: { $0.id == document.id }), index + 1 < sheets.count else { return nil }
+        return sheets[index + 1]
+    }
     private var back: XgentNode? { document.nodes.first { $0.id == "back" } }
     private var saveStatus: XgentNode? { document.nodes.first { $0.id == "save-status" } }
     private var visibleNodes: [XgentNode] {
@@ -603,7 +608,10 @@ struct XgentIOSSheetPresentation: View {
         .presentationDragIndicator(.hidden)
         .preferredColorScheme(document.colorScheme)
         .interactiveDismissDisabled(document.dismissAction == nil)
-        .modifier(XgentAlerts(model: model, enabled: true))
+        .sheet(item: Binding(get: { nextSheet }, set: { if $0 == nil, let nextSheet { model.dismiss(nextSheet) } })) { next in
+            AnyView(XgentIOSSheetPresentation(initialDocument: next, model: model))
+        }
+        .modifier(XgentAlerts(model: model, enabled: nextSheet == nil))
         .modifier(XgentPresentationThemeModifier(theme: document.theme ?? .fallback,
                                                   appearance: document.appearance))
     }
