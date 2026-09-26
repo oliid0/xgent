@@ -4,6 +4,38 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 const { startSettingsHydration } = createTsModuleLoader().loadModule("src/lib/settings/hydration.ts");
+const { createSettingsReloader } = createTsModuleLoader().loadModule("src/lib/settings/hydration.ts");
+
+test("opening settings cannot overwrite a provider key, language or theme edited during reload", async () => {
+  for (const edit of [{ apiKey: "new-key" }, { locale: "zh-CN" }, { theme: "dark" }]) {
+    const pending = Promise.withResolvers();
+    const reload = createSettingsReloader();
+    let revision = 0;
+    let settings = { apiKey: "old-key", locale: "en-US", theme: "system" };
+    const oldSettings = settings;
+    const reading = reload({ load: () => pending.promise, revision: () => revision,
+      apply: value => { settings = value; } });
+    settings = { ...settings, ...edit };
+    revision++;
+    pending.resolve(oldSettings);
+    await reading;
+    assert.deepEqual(settings, { ...oldSettings, ...edit });
+  }
+});
+
+test("only the newest settings reload can apply data or report a read failure", async () => {
+  const reload = createSettingsReloader();
+  const pending = Promise.withResolvers();
+  let settings;
+  const apply = value => { settings = value; };
+  const oldRead = reload({ load: () => pending.promise, revision: () => 0, apply });
+  await reload({ load: async () => "new settings", revision: () => 0, apply });
+  pending.reject(new Error("obsolete read failed"));
+  await oldRead;
+  assert.equal(settings, "new settings");
+  await assert.rejects(reload({ load: async () => { throw new Error("database unavailable"); },
+    revision: () => 0, apply }), /database unavailable/);
+});
 
 function createHarness() {
   const pending = Promise.withResolvers();

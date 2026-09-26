@@ -4,7 +4,6 @@ import { Button } from "@astryxdesign/core/Button";
 import { ContextMenu } from "@astryxdesign/core/ContextMenu";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { Spinner } from "@astryxdesign/core/Spinner";
 import { StackItem, VStack } from "@astryxdesign/core/Stack";
 import { ToastViewport } from "@astryxdesign/core/Toast";
 import { Theme } from "@astryxdesign/core/theme";
@@ -49,9 +48,10 @@ import {
   subscribeToSystemThemePreference,
 } from "./lib/settings";
 import { getSettingsErrorMessage, SettingsStorageError } from "./lib/settings/errors";
-import { startSettingsHydration } from "./lib/settings/hydration";
+import { createSettingsReloader, startSettingsHydration } from "./lib/settings/hydration";
 import {
   loadPersistedSettingsWithDefaults,
+  type PersistedSettingsLoadResult,
   persistSettings,
   type SettingsSaveState,
 } from "./lib/settings/storage";
@@ -146,12 +146,9 @@ function AppStartupSurface(props: {
         }
       />
     );
-  if (props.failures.length === 0)
-    return (
-      <VStack width="100%" height="100%" hAlign="center" vAlign="center">
-        <Spinner size="lg" label={translate("app.loading", props.locale)} />
-      </VStack>
-    );
+  // Keep the launch background until the real application is ready, without
+  // introducing a separate loading page or mounting editable fallback settings.
+  if (props.failures.length === 0) return null;
   return <MobileStartupWarning failures={props.failures} locale={props.locale} />;
 }
 
@@ -283,6 +280,7 @@ export default function App() {
   const { confirm: requestRestartConfirm, dialog: restartConfirmDialog } = useConfirmDialog();
 
   const saveSequenceRef = useRef(0);
+  const [reloadSettings] = useState(() => createSettingsReloader<PersistedSettingsLoadResult>());
   const saveChainRef = useRef<Promise<unknown>>(Promise.resolve());
   const defaultWorkdirRef = useRef("");
   // Mirrors `settings` so setSettings/queueSettingsSave can read the latest value
@@ -597,15 +595,22 @@ export default function App() {
   const getToolPolicies = useCallback(() => settingsRef.current.system.toolPolicies, []);
 
   const reloadPersistedSettings = useCallback(async () => {
-    await saveChainRef.current.catch(() => undefined);
-    const { settings: loaded, defaultWorkdir } = await loadPersistedSettingsWithDefaults();
-    defaultWorkdirRef.current = defaultWorkdir;
-    const loadedWithDefaults = applyRuntimeSystemDefaults(loaded, defaultWorkdir);
-    settingsHydratedRef.current = true;
-    settingsRef.current = loadedWithDefaults;
-    setSettingsState(loadedWithDefaults);
-    setSettingsSaveState({ status: "saved" });
-  }, []);
+    await reloadSettings({
+      revision: () => saveSequenceRef.current,
+      load: async () => {
+        await saveChainRef.current.catch(() => undefined);
+        return loadPersistedSettingsWithDefaults();
+      },
+      apply: ({ settings: loaded, defaultWorkdir }) => {
+        defaultWorkdirRef.current = defaultWorkdir;
+        const loadedWithDefaults = applyRuntimeSystemDefaults(loaded, defaultWorkdir);
+        settingsHydratedRef.current = true;
+        settingsRef.current = loadedWithDefaults;
+        setSettingsState(loadedWithDefaults);
+        setSettingsSaveState({ status: "saved" });
+      },
+    });
+  }, [reloadSettings]);
 
   const openSettings = useCallback(
     (section: SectionId = "system", options?: SettingsOpenOptions) => {

@@ -1,3 +1,23 @@
+/** A reload must not overwrite edits made while its native read is pending. */
+export function createSettingsReloader<T>() {
+  let request = 0;
+  return async (options: {
+    load: () => Promise<T>;
+    revision: () => number;
+    apply: (value: T) => void;
+  }) => {
+    const currentRequest = ++request;
+    const currentRevision = options.revision();
+    const isCurrent = () => currentRequest === request && currentRevision === options.revision();
+    try {
+      const value = await options.load();
+      if (isCurrent()) options.apply(value);
+    } catch (error) {
+      if (isCurrent()) throw error;
+    }
+  };
+}
+
 /** A slow native IPC read is still authoritative when it eventually finishes. */
 export function startSettingsHydration<T>(options: {
   load: () => Promise<T>;

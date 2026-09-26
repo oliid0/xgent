@@ -132,7 +132,7 @@ test("the complete iOS application surface is handwritten and bypasses generated
   assert.match(nativeMobileSource, /struct XgentIOSPagePresentation: View/);
   assert.match(nativeMobileSource, /struct XgentIOSSheetPresentation: View/);
   assert.doesNotMatch(nativeMobileSource, /\.safeAreaInset\(edge: \.bottom/);
-  assert.match(nativeMobileSource, /if let composer \{\s*XgentIOSComposer\(node: composer/);
+  assert.match(nativeMobileSource, /if !isObscured, let composer \{\s*XgentIOSComposer\(node: composer/);
   assert.doesNotMatch(nativeMobileSource, /NavigationStack \{/);
   assert.doesNotMatch(nativeMobileSource, /@ToolbarContentBuilder/);
   assert.doesNotMatch(nativeMobileSource, /ToolbarItem\(placement:/);
@@ -170,6 +170,7 @@ test("the complete iOS application surface is handwritten and bypasses generated
   assert.match(nativeMobileSource, /model\.dismiss\(nextSheet\)/);
   assert.match(nativeMobileSource, /AnyView\(XgentIOSSheetPresentation\(initialDocument: next, model: model\)\)/);
   assert.match(nativeMobileSource, /XgentAlerts\(model: model, enabled: nextSheet == nil\)/);
+  assert.match(nativeMobileSource, /XgentIOSChatPresentation\(document: document, model: model, isObscured: sidebar != nil\)/);
   assert.match(
     nativeLayoutSource,
     /root\.formFactor == \.mobile[\s\S]*?XgentIOSRootPresentation[\s\S]*?XgentIOSWorkspacePresentation/,

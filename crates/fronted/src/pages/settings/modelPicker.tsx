@@ -94,7 +94,7 @@ function ModelPickerContent(props: {
   };
 
   return (
-    <VStack gap={3} width="var(--xgent-model-selector-width)">
+    <VStack className="xgent-model-selector-content" gap={3} width="100%">
       <TextInput
         label={t("chat.searchModel")}
         isLabelHidden
@@ -106,7 +106,13 @@ function ModelPickerContent(props: {
         startIcon={<Search size={16} />}
         onKeyDown={(event) => event.stopPropagation()}
       />
-      <VStack gap={1} isScrollable style={{ maxHeight: "var(--xgent-model-selector-list-height)" }}>
+      <VStack
+        className="xgent-model-selector-list"
+        width="100%"
+        gap={1}
+        isScrollable
+        style={{ maxHeight: "var(--xgent-model-selector-list-height)" }}
+      >
         {props.noneLabel && !normalizedSearch ? (
           <List density="compact">
             <ListItem
@@ -142,7 +148,7 @@ function ModelPickerContent(props: {
                   trigger={
                     <HStack gap={2} width="100%" vAlign="center">
                       <ProviderBrandIcon type={group.providerType} />
-                      <Text type="body" weight="medium">
+                      <Text type="body" weight="medium" className="xgent-model-option-label">
                         {group.name}
                       </Text>
                       <Badge variant="neutral" label={group.opts.length} />
@@ -155,7 +161,11 @@ function ModelPickerContent(props: {
                       return (
                         <ListItem
                           key={option.value}
-                          label={option.label}
+                          label={
+                            <Text type="body" className="xgent-model-option-label">
+                              {option.label}
+                            </Text>
+                          }
                           startContent={<ProviderBrandIcon type={option.providerType} />}
                           endContent={isSelected ? <Check size={16} /> : undefined}
                           isSelected={isSelected}

@@ -70,6 +70,8 @@ export const xgentTheme = defineTheme({
   },
   components: {
     button: { base: { borderRadius: "var(--radius-element)" } },
+    section: { base: { borderRadius: "var(--radius-container)" } },
+    list: { base: { borderRadius: "var(--radius-container)" } },
     card: {
       base: {
         borderRadius: "var(--radius-container)",

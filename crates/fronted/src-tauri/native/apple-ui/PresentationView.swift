@@ -373,6 +373,10 @@ struct XgentPresentationView: View {
     private var sheet: XgentDocument? { model.documents.first { $0.mode == .sheet } }
 
     @ViewBuilder private var groupedRoot: some View {
+        #if os(iOS)
+        // Keep drawer and page materials in their own presentation layers.
+        XgentRootLayout(model: model)
+        #else
         #if compiler(>=6.2)
         if #available(iOS 26.0, macOS 26.0, *) {
             GlassEffectContainer(spacing: CGFloat((root?.theme ?? .fallback).spacing.sm)) {
@@ -383,6 +387,7 @@ struct XgentPresentationView: View {
         }
         #else
         XgentRootLayout(model: model)
+        #endif
         #endif
     }
 

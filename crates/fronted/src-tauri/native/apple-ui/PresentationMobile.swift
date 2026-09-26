@@ -38,7 +38,7 @@ struct XgentIOSRootPresentation: View {
             // public contract also caps the drawer at 85vw on narrow screens.
             let drawerWidth = min(320, geometry.size.width * 0.85)
             ZStack(alignment: .leading) {
-                XgentIOSChatPresentation(document: document, model: model)
+                XgentIOSChatPresentation(document: document, model: model, isObscured: sidebar != nil)
                     // Liquid Glass floats above sibling layers on recent iOS.
                     // Hide the underlying page while its navigation drawer is open.
                     .opacity(sidebar == nil ? 1 : 0)
@@ -199,6 +199,7 @@ struct XgentIOSPagePresentation: View {
 private struct XgentIOSChatPresentation: View {
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    let isObscured: Bool
     private var chat: XgentNode? { document.nodes.first { $0.kind == .chatLayout } }
     private var toolbar: XgentNode? { chat?.child(id: "toolbar") }
     private var sidebarControl: XgentNode? { toolbar?.child(id: "sidebar") }
@@ -238,8 +239,12 @@ private struct XgentIOSChatPresentation: View {
             } else {
                 Spacer(minLength: 0)
             }
-            if let composer {
+            // Retire the material and keyboard while navigation is open.
+            // Ancestor opacity leaves this glass shape in its container.
+            // Drafts remain in the shared presentation model.
+            if !isObscured, let composer {
                 XgentIOSComposer(node: composer, document: document, model: model)
+                    .transition(.identity)
             }
         }
         .background { XgentThemeBackground().ignoresSafeArea() }
