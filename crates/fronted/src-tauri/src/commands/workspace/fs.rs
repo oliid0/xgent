@@ -3856,17 +3856,21 @@ fn workspace_open_command(target: &Path, mode: &str) -> Command {
 
 #[cfg(target_os = "macos")]
 pub(crate) fn spawn_workspace_open_command(target: &Path, mode: &str) -> Result<(), String> {
-    workspace_open_command(target, mode)
-        .spawn()
+    let mut command = workspace_open_command(target, mode);
+    crate::runtime::process::spawn_and_reap(&mut command)
         .map(|_| ())
         .map_err(|e| format!("Failed to open path with macOS open: {e}"))
 }
 
 #[cfg(target_os = "windows")]
 fn workspace_open_command(target: &Path, mode: &str) -> Command {
+    use std::os::windows::process::CommandExt;
+
     let mut command = Command::new("explorer.exe");
     if mode == "reveal" {
-        command.arg(format!("/select,{}", target.display()));
+        // Explorer parses /select separately from the path. Quote only the
+        // path so folders containing spaces remain a single target.
+        command.raw_arg(format!("/select,\"{}\"", target.display()));
     } else {
         command.arg(target);
     }
@@ -3875,8 +3879,8 @@ fn workspace_open_command(target: &Path, mode: &str) -> Command {
 
 #[cfg(target_os = "windows")]
 pub(crate) fn spawn_workspace_open_command(target: &Path, mode: &str) -> Result<(), String> {
-    workspace_open_command(target, mode)
-        .spawn()
+    let mut command = workspace_open_command(target, mode);
+    crate::runtime::process::spawn_and_reap(&mut command)
         .map(|_| ())
         .map_err(|e| format!("Failed to open path with Windows Explorer: {e}"))
 }
@@ -3895,8 +3899,8 @@ fn workspace_open_command(target: &Path, mode: &str) -> Command {
 
 #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
 pub(crate) fn spawn_workspace_open_command(target: &Path, mode: &str) -> Result<(), String> {
-    workspace_open_command(target, mode)
-        .spawn()
+    let mut command = workspace_open_command(target, mode);
+    crate::runtime::process::spawn_and_reap(&mut command)
         .map(|_| ())
         .map_err(|e| format!("Failed to open path with xdg-open: {e}"))
 }
@@ -4395,11 +4399,13 @@ fn build_workspace_walker(
     let mut builder = WalkBuilder::new(base);
     builder
         .hidden(!visibility.include_system_hidden)
+        // Ignore rules above the selected workspace must not hide its files.
+        .parents(false)
         .ignore(!visibility.include_ignored)
         .git_ignore(!visibility.include_ignored)
         .git_global(!visibility.include_ignored)
         .git_exclude(!visibility.include_ignored)
-        .require_git(false)
+        .require_git(true)
         .follow_links(false);
     let filter_macos_hidden = cfg!(target_os = "macos") && !visibility.include_system_hidden;
     if filter_macos_hidden || skip_common_dirs {
@@ -5243,6 +5249,10 @@ mod tests {
         std::env::temp_dir().join(format!("xgent-{name}-{suffix}"))
     }
 
+    fn init_fake_git_repo(workdir: &Path) {
+        fs::create_dir_all(workdir.join(".git")).expect("create fake .git");
+    }
+
     fn list_test_entries(workdir: &Path, show_hidden: Option<bool>) -> Vec<ListEntry> {
         fs_list_sync(
             workdir.display().to_string(),
@@ -5366,7 +5376,24 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(command.get_program(), std::ffi::OsStr::new("explorer.exe"));
-        assert_eq!(args, vec![r"/select,C:\work\Dangerous.bundle"]);
+        assert_eq!(args, vec![r#"/select,"C:\work\Dangerous.bundle""#]);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_reveal_quotes_paths_with_spaces() {
+        let target = Path::new(r"D:\Videos\JianyingPro Materials\clip 01.mp4");
+        let command = workspace_open_command(target, "reveal");
+        let args = command
+            .get_args()
+            .map(|value| value.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(command.get_program(), std::ffi::OsStr::new("explorer.exe"));
+        assert_eq!(
+            args,
+            vec![r#"/select,"D:\Videos\JianyingPro Materials\clip 01.mp4""#]
+        );
     }
 
     #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
@@ -6238,6 +6265,7 @@ mod tests {
     #[test]
     fn list_respects_gitignore_and_rejects_outside_paths() {
         let workdir = unique_test_workdir("list-ignore");
+        init_fake_git_repo(&workdir);
         fs::create_dir_all(workdir.join("src")).expect("create src");
         fs::create_dir_all(workdir.join("ignored_dir")).expect("create ignored dir");
         fs::write(
@@ -6293,8 +6321,50 @@ mod tests {
     }
 
     #[test]
+    fn plain_workspace_gitignore_does_not_hide_files_or_mentions() {
+        let workdir = unique_test_workdir("list-nongit-gitignore");
+        fs::create_dir_all(workdir.join("2024-01")).expect("create digit dir");
+        fs::write(workdir.join("2024-01/note.md"), "note").expect("write note");
+        fs::write(workdir.join("alpha.txt"), "alpha").expect("write other file");
+        fs::write(workdir.join(".gitignore"), "[0-9]*\n").expect("write gitignore");
+
+        for paths in [
+            list_test_entries(&workdir, Some(false))
+                .into_iter()
+                .map(|entry| entry.path)
+                .collect::<Vec<_>>(),
+            mention_test_entries(&workdir, Some(false))
+                .into_iter()
+                .map(|entry| entry.path)
+                .collect::<Vec<_>>(),
+        ] {
+            assert!(paths.contains(&"2024-01".to_string()), "missing folder: {paths:?}");
+            assert!(paths.contains(&"2024-01/note.md".to_string()), "missing note: {paths:?}");
+            assert!(paths.contains(&"alpha.txt".to_string()));
+        }
+        let _ = fs::remove_dir_all(workdir);
+    }
+
+    #[test]
+    fn ancestor_gitignore_cannot_filter_selected_workspace() {
+        let parent = unique_test_workdir("list-parent-gitignore");
+        let workdir = parent.join("sub");
+        init_fake_git_repo(&parent);
+        fs::create_dir_all(workdir.join("10-notes")).expect("create digit dir");
+        fs::write(parent.join(".gitignore"), "[0-9]*\n").expect("write parent gitignore");
+
+        let paths = list_test_entries(&workdir, Some(false))
+            .into_iter()
+            .map(|entry| entry.path)
+            .collect::<Vec<_>>();
+        assert!(paths.contains(&"10-notes".to_string()), "ancestor ignore leaked: {paths:?}");
+        let _ = fs::remove_dir_all(parent);
+    }
+
+    #[test]
     fn list_hidden_toggle_includes_and_marks_ignored_and_dot_entries() {
         let workdir = unique_test_workdir("list-hidden-toggle");
+        init_fake_git_repo(&workdir);
         fs::create_dir_all(workdir.join(".hidden_dir")).expect("create hidden dir");
         fs::create_dir_all(workdir.join("ignored_dir")).expect("create ignored dir");
         fs::write(workdir.join(".gitignore"), "ignored_dir/\nignored.txt\n")
@@ -6455,8 +6525,9 @@ mod tests {
     }
 
     #[test]
-    fn mention_list_respects_gitignore_without_git_repository() {
+    fn mention_list_respects_gitignore_inside_git_repository() {
         let workdir = unique_test_workdir("mention-gitignore");
+        init_fake_git_repo(&workdir);
         fs::create_dir_all(workdir.join("src")).expect("create src");
         fs::create_dir_all(workdir.join("ignored_dir")).expect("create ignored dir");
         fs::write(
@@ -6490,6 +6561,7 @@ mod tests {
     #[test]
     fn mention_list_hidden_toggle_includes_and_marks_filtered_entries() {
         let workdir = unique_test_workdir("mention-hidden-toggle");
+        init_fake_git_repo(&workdir);
         fs::create_dir_all(workdir.join("node_modules/pkg")).expect("create node_modules");
         fs::create_dir_all(workdir.join("ignored_dir")).expect("create ignored dir");
         fs::write(workdir.join(".gitignore"), "ignored_dir/\n").expect("write gitignore");

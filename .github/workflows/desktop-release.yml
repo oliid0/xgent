@@ -15,10 +15,10 @@ on:
         type: boolean
         default: false
       smoke:
-        description: Run optional device interaction diagnostics (does not block packages)
+        description: Run device interaction diagnostics for manual builds (on by default)
         required: false
         type: boolean
-        default: false
+        default: true
       sign:
         description: Apple-sign/notarize macOS and sign Tauri updater artifacts (requires release settings)
         required: false
@@ -713,7 +713,7 @@ jobs:
           test "$alignment_failed" -eq 0
 
       - name: Enable Android emulator acceleration
-        if: inputs.smoke == true
+        if: github.event_name == 'push' || inputs.publish == true || inputs.smoke == true
         continue-on-error: true
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
@@ -722,8 +722,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Smoke launch signed Android APK
-        if: inputs.smoke == true
-        continue-on-error: true
+        if: github.event_name == 'push' || inputs.publish == true || inputs.smoke == true
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
@@ -735,7 +734,7 @@ jobs:
           script: bash scripts/release/smoke-launch-android.sh
 
       - name: Upload Android launch evidence
-        if: always() && inputs.smoke == true
+        if: always() && (github.event_name == 'push' || inputs.publish == true || inputs.smoke == true)
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
@@ -956,8 +955,7 @@ jobs:
             > dist/iOS-signing.txt
 
       - name: Build iOS simulator smoke target
-        if: inputs.smoke == true
-        continue-on-error: true
+        if: github.event_name == 'push' || inputs.publish == true || inputs.smoke == true
         working-directory: crates/fronted
         shell: bash
         run: |
@@ -973,8 +971,7 @@ jobs:
           fi
 
       - name: Smoke launch iOS simulator app
-        if: inputs.smoke == true
-        continue-on-error: true
+        if: github.event_name == 'push' || inputs.publish == true || inputs.smoke == true
         shell: bash
         run: |
           set -euo pipefail
@@ -1066,7 +1063,7 @@ jobs:
           xcrun simctl terminate "$simulator_udid" "$bundle_id"
 
       - name: Upload iOS launch evidence
-        if: always() && inputs.smoke == true
+        if: always() && (github.event_name == 'push' || inputs.publish == true || inputs.smoke == true)
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:

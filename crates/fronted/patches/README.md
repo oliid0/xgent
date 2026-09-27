@@ -35,3 +35,10 @@ public API. An upgrade must verify closed layers, menu positioning, dismissal,
 settings navigation and touch input on an older supported WebView, including
 menus inside dialogs. The exact-version patch intentionally requires review
 when upgrading Astryx.
+
+2026-09-27 interaction fixes: the compatibility portal must resolve a containing
+`dialog` before `showModal()` adds its `open` attribute. Resolving only open
+dialogs at initial mount sends settings menus to the inert body. BottomSheet's
+Escape handler must also respect `defaultPrevented` when a child layer already
+handled the key. Both failures were reproduced in Edge; the browser regression
+fixture covers wide and compact settings presentations without changing styles.

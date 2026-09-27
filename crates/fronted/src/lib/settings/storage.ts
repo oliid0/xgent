@@ -71,6 +71,7 @@ type SshPatchApplyResponse = {
 
 export type PersistSettingsResult = {
   ssh?: AppSettings["ssh"];
+  stt?: AppSettings["stt"];
   conflict?: "ssh_settings_changed";
 };
 
@@ -349,9 +350,11 @@ export async function persistSettings(
 
   if (hasChanged(prev.stt, next.stt) && !isNativeMobileRuntime()) {
     tasks.push(
-      invoke("settings_save_stt", {
+      invoke<unknown>("settings_save_stt", {
         payload: { ...next.stt, allowIncomplete: true },
-      } as any),
+      }).then((response) => {
+        if (response) result.stt = normalizeSttSettings(response);
+      }),
     );
   }
 
@@ -383,21 +386,29 @@ export async function persistSettings(
     hasChanged(prev.closeWindowBehavior, next.closeWindowBehavior) ||
     hasChanged(prev.retryErrorSettings, next.retryErrorSettings)
   ) {
-    writeLocalUiSettings({
-      stt: next.stt,
-      skills: next.skills,
-      chatRuntimeControls: next.chatRuntimeControls,
-      customSettings: next.customSettings,
-      updates: next.updates,
-      selectedModel: next.selectedModel,
-      theme: next.theme,
-      locale: next.locale,
-      closeWindowBehavior: next.closeWindowBehavior,
-      retryErrorSettings: next.retryErrorSettings,
-    });
+    tasks.push(
+      Promise.resolve().then(() =>
+        writeLocalUiSettings({
+          stt: next.stt,
+          skills: next.skills,
+          chatRuntimeControls: next.chatRuntimeControls,
+          customSettings: next.customSettings,
+          updates: next.updates,
+          selectedModel: next.selectedModel,
+          theme: next.theme,
+          locale: next.locale,
+          closeWindowBehavior: next.closeWindowBehavior,
+          retryErrorSettings: next.retryErrorSettings,
+        }),
+      ),
+    );
   }
 
-  await Promise.all(tasks);
+  // App serializes saves. A rejected branch must not release that queue while
+  // another native write from the same snapshot can still overwrite the next one.
+  const outcomes = await Promise.allSettled(tasks);
+  const failure = outcomes.find((outcome) => outcome.status === "rejected");
+  if (failure?.status === "rejected") throw failure.reason;
   if (hasChanged(prev.skills, next.skills) && isTauriRuntime() && !isNativeMobileRuntime()) {
     await markBackupDirty(next.skills);
   }

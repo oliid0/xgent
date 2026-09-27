@@ -46,3 +46,25 @@ test("real task updates retain their subject and pending/completed state", () =>
   assert.equal(view.props.snapshot.tasks[0].status, "in_progress");
   assert.equal(view.props.snapshot.revision, 2);
 });
+
+test("TodoWrite results restore progress, explicit clears remove it and errors do not replace it", () => {
+  const todo = (id, todos, isError = false) => ({ kind: "tool", item: {
+    toolCall: { id, name: "TodoWrite" },
+    toolResult: { details: { kind: "todo_write", todos }, isError },
+  } });
+  const todos = [{ content: "Verify models", activeForm: "Verifying models", status: "in_progress" }];
+  const first = todo("first", todos);
+  assert.equal(render([{ blocks: [first] }]).props.snapshot.tasks[0].subject, "Verify models");
+  assert.equal(render([{ blocks: [first, todo("error", [], true)] }]).props.snapshot.tasks.length, 1);
+  assert.equal(render([{ blocks: [first, todo("clear", [])] }]).props.snapshot.tasks.length, 0);
+});
+
+test("an older persisted run cannot hide tasks from the current live turn", () => {
+  const tasks = [{ id: "1", subject: "Current task", description: "", activeForm: "Working", status: "in_progress" }];
+  const view = render([{ blocks: [{ kind: "tool", item: {
+    toolCall: { id: "new", name: "TaskCreate" },
+    toolResult: { details: { kind: "task_list", runId: "new", revision: 1, tasks } },
+  } }] }], { runId: "old", revision: 9, tasks: [] });
+  assert.equal(view.props.snapshot.runId, "new");
+  assert.equal(view.props.snapshot.tasks.length, 1);
+});

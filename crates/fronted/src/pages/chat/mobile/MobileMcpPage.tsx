@@ -708,7 +708,12 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
   if (view === "store") {
     return (
       <VStack as="section" gap={0} height="100%" minHeight={0} className="relative">
-        <MobileHubHeader title="MCP" onOpenSidebar={props.onOpenSidebar} />
+        <MobileHubHeader
+          title="MCP"
+          onOpenSidebar={props.onOpenSidebar}
+          backToSettings={props.presentationMode === "sheet"}
+          backLabel={t("settings.mobile.backToSettings")}
+        />
         <HStack gap={2} paddingInline={4} paddingBlock={2}>
           <Button
             label={t("mcpHub.tabInstalled")}
@@ -735,6 +740,8 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
       <MobileHubHeader
         title="MCP"
         onOpenSidebar={props.onOpenSidebar}
+        backToSettings={props.presentationMode === "sheet"}
+        backLabel={t("settings.mobile.backToSettings")}
         trailing={
           <IconButton
             label={t("mcpHub.add")}

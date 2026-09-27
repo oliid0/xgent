@@ -84,6 +84,36 @@ test("rapid switches invalidate the earlier open", async () => {
   assert.equal(states.at(-1).phase, "ready");
 });
 
+test("post-open project activation runs only after the selected conversation loads", async () => {
+  const resolvers = new Map();
+  const activated = [];
+  const { controller } = createHarness({
+    openInitial: (id) => new Promise((resolve) => resolvers.set(id, resolve)),
+  });
+  controller.open("first", { afterPaint: () => activated.push("first") });
+  controller.open("second", { afterPaint: () => activated.push("second") });
+  resolvers.get("first")("painted");
+  await sleep(0);
+  assert.deepEqual(activated, []);
+  resolvers.get("second")("painted");
+  await sleep(0);
+  assert.deepEqual(activated, ["second"]);
+});
+
+test("post-open project failure does not discard the loaded conversation", async () => {
+  const { controller, states } = createHarness();
+  const previousLog = console.error;
+  console.error = () => {};
+  try {
+    controller.open("conv", { afterPaint: () => { throw new Error("workspace failed"); } });
+    await sleep(20);
+    assert.equal(states.at(-1).phase, "ready");
+    assert.equal(states.at(-1).errorCode, null);
+  } finally {
+    console.error = previousLog;
+  }
+});
+
 test("initial-slice failure surfaces openFailed", async () => {
   const { controller, states } = createHarness({
     openInitial: async () => {

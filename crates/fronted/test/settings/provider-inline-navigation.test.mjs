@@ -62,13 +62,15 @@ test("provider API key uses the shared Astryx secret-field composition", () => {
   assert.match(secretTextInputSource, /label=\{visibilityLabel\}/);
 });
 
-test("settings navigation is flat and hides removed project, skill, and MCP entries", () => {
+test("settings navigation keeps functional skill and MCP destinations reachable", () => {
   const navigationDefinitions = settingsPageSource.slice(
     settingsPageSource.indexOf("const NAV_ITEMS"),
     settingsPageSource.indexOf("function normalizeSettingsSection"),
   );
   assert.doesNotMatch(navigationDefinitions, /labelKey|settings\.group/);
-  assert.doesNotMatch(navigationDefinitions, /id: "(?:projectRoots|skills|mcp)"/);
+  assert.doesNotMatch(navigationDefinitions, /id: "projectRoots"/);
+  assert.match(navigationDefinitions, /id: "skills"/);
+  assert.match(navigationDefinitions, /id: "mcp"/);
 });
 
 test("nested settings workflows render as content layers instead of nested dialogs", () => {

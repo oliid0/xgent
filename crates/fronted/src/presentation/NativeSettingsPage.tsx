@@ -134,9 +134,15 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [shellRunId, setShellRunId] = useState("");
   const [shellInstallStage, setShellInstallStage] = useState<"rootfs" | "essentials" | "">("");
   const [shellWorkspaces, setShellWorkspaces] = useState<ExternalMobileWorkspace[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [busyScope, setBusyScope] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [providerId, setProviderId] = useState("");
+  // A stalled Shell/status request must not disable provider controls after
+  // navigation. Only the latest operation in the current route owns feedback.
+  const [operations] = useState(() => ({ scope: "", revision: 0 }));
+  const operationScope = `${page}:${providerId}`;
+  operations.scope = operationScope;
+  const busy = busyScope === operationScope;
   const [providerUrlDraft, setProviderUrlDraft] = useState<{ id: string; value: string } | null>(
     null,
   );
@@ -245,15 +251,18 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     setPermissions(normalizeMobileAssistantPermissions(next, states));
   }
   async function work(run: () => Promise<unknown>) {
-    setBusy(true);
+    const revision = ++operations.revision;
+    setBusyScope(operationScope);
     setError("");
     try {
       await run();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-      throw cause;
+      if (operations.scope === operationScope && operations.revision === revision) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+        throw cause;
+      }
     } finally {
-      setBusy(false);
+      if (operations.revision === revision) setBusyScope(null);
     }
   }
   useEffect(() => {
@@ -496,7 +505,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           ? props.saveState.message
           : t(props.saveState.status === "saving" ? "settings.saving" : "settings.saved"),
     });
-  if (error) nodes.push({ id: "error", kind: "Text", text: error });
+  if (error) nodes.push({ id: "error", kind: "Banner", label: error, status: "error" });
   if (busy)
     nodes.push({
       id: "busy",
@@ -523,6 +532,44 @@ export function NativeSettingsPage(props: SettingsPageProps) {
 
   if (!page && nativeMobile) {
     nodes.push(
+      c.group("mobile-theme", t("settings.native.theme"), [
+        c.select(
+          "theme",
+          t("settings.native.appearance"),
+          settings.theme,
+          [
+            { value: "system", label: t("settings.native.system") },
+            { value: "light", label: t("settings.native.light") },
+            { value: "dark", label: t("settings.native.dark") },
+          ],
+          (theme) =>
+            setSettings((previous) => ({ ...previous, theme: theme as typeof previous.theme })),
+        ),
+        c.select(
+          "appearance-preset",
+          t("settings.ui.preset"),
+          settings.customSettings.appearance.preset,
+          UI_THEME_PRESETS.map((value) => ({
+            value,
+            label:
+              value === "current"
+                ? t("settings.ui.current")
+                : value === "stone"
+                  ? "Stone"
+                  : "Matcha",
+          })),
+          (preset) =>
+            setSettings((previous) =>
+              updateCustomSettings(previous, {
+                appearance: {
+                  ...previous.customSettings.appearance,
+                  preset: preset as typeof previous.customSettings.appearance.preset,
+                  customized: false,
+                },
+              }),
+            ),
+        ),
+      ]),
       c.group("mobile-appearance", t("settings.mobile.appearanceGroup"), [
         ...(visible("system")
           ? [navigate("system", "slider.horizontal.3", t("settings.mobile.systemDescription"))]
@@ -538,6 +585,9 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         ...(visible("memory")
           ? [navigate("memory", "brain", t("settings.mobile.memoryDescription"))]
           : []),
+        ...(visible("skills")
+          ? [navigate("skills", "sparkles", t("settings.mobile.skillsDescription"))]
+          : []),
       ]),
       c.group("mobile-capabilities", t("settings.mobile.capabilitiesGroup"), [
         ...(visible("mobileAssistant")
@@ -549,6 +599,10 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         ...(visible("mobileExecution")
           ? [navigate("mobileExecution", "terminal", t("settings.native.shellEnvironment"))]
           : []),
+        ...(visible("mcp")
+          ? [navigate("mcp", "puzzlepiece.extension", t("settings.mobile.mcpDescription"))]
+          : []),
+        ...(visible("voice") ? [navigate("voice", "mic", t("settings.stt.desc"))] : []),
         ...(visible("other")
           ? [navigate("other", "terminal", t("settings.mobile.otherDescription"))]
           : []),

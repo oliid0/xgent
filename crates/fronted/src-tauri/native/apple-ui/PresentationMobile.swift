@@ -328,18 +328,11 @@ private struct XgentIOSComposer: View {
                 }
             }
             if let actions {
-                HStack(spacing: 6) {
-                    ForEach(actions.children ?? []) { child in
-                        if child.id == "context-usage" {
-                            XgentIOSContextUsage(node: child)
-                        } else if child.id == "model" {
-                            XgentIOSNode(node: child, document: document, model: model,
-                                         parentAxis: .horizontal)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            XgentIOSNode(node: child, document: document, model: model,
-                                         parentAxis: .horizontal)
-                        }
+                ViewThatFits(in: .horizontal) {
+                    actionRow(actions.children ?? [])
+                    VStack(alignment: .leading, spacing: 6) {
+                        actionRow((actions.children ?? []).filter { ["model", "context-usage"].contains($0.id) })
+                        actionRow((actions.children ?? []).filter { !["model", "context-usage"].contains($0.id) })
                     }
                 }
             }
@@ -348,6 +341,21 @@ private struct XgentIOSComposer: View {
         .modifier(XgentGlassSurface(radius: 26, floating: true))
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+    }
+
+    private func actionRow(_ nodes: [XgentNode]) -> some View {
+        HStack(spacing: 6) {
+            ForEach(nodes) { child in
+                if child.id == "context-usage" {
+                    XgentIOSContextUsage(node: child)
+                } else if child.id == "model" {
+                    XgentIOSNode(node: child, document: document, model: model, parentAxis: .horizontal)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    XgentIOSNode(node: child, document: document, model: model, parentAxis: .horizontal)
+                }
+            }
+        }
     }
 }
 
@@ -595,16 +603,37 @@ struct XgentIOSSheetPresentation: View {
                 .padding(.bottom, 2)
                 .accessibilityHidden(true)
             header
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: grouped ? 24 : 12) {
-                    XgentIOSNodes(nodes: contentNodes, document: document, model: model)
+            if grouped {
+                Form {
+                    ForEach(contentNodes) { node in
+                        if node.kind == .settingsGroup {
+                            Section {
+                                XgentIOSNodes(nodes: node.children ?? [], document: document, model: model)
+                            } header: {
+                                if let label = node.label, !label.isEmpty {
+                                    Text(label)
+                                }
+                            }
+                        } else {
+                            XgentIOSNode(node: node, document: document, model: model)
+                        }
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
+                .formStyle(.grouped)
+                .id(document.id)
+                .scrollDismissesKeyboard(.interactively)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        XgentIOSNodes(nodes: contentNodes, document: document, model: model)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
+                }
+                .id(document.id)
+                .scrollDismissesKeyboard(.interactively)
             }
-            .id(document.id)
-            .scrollDismissesKeyboard(.interactively)
         }
         .background { XgentThemeBackground().ignoresSafeArea() }
         // Astryx menus use the capped sheet budget while settings and detail

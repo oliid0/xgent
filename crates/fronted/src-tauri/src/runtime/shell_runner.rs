@@ -919,11 +919,6 @@ where
         for (key, value) in &system_proxy_envs {
             c.env(key, value);
         }
-        c.envs(
-            envs.iter()
-                .chain(extra_envs.iter())
-                .map(|(key, value)| (key.as_str(), value.as_str())),
-        );
         if candidate.augment_macos_path {
             maybe_augment_macos_path(&mut c);
         }
@@ -953,6 +948,11 @@ where
             .unwrap_or_else(||std::env::var_os("PATH").unwrap_or_default());
         paths.extend(std::env::split_paths(&inherited_path));
         if let Ok(value) = std::env::join_paths(paths) { c.env("PATH", value); }
+        c.envs(
+            envs.iter()
+                .chain(extra_envs.iter())
+                .map(|(key, value)| (key.as_str(), value.as_str())),
+        );
         configure_child_process_group(&mut c);
         let spawn_result = c
             .current_dir(cwd)
@@ -1150,7 +1150,8 @@ process output to a log file, for example: `nohup command > /tmp/xgent-task.log 
 mod tests {
     use super::{
         default_platform_shell_profile, is_loader_failure_exit, normalize_timeout_ms,
-        run_shell_script, sandbox_probe_verdict, sanitize_rel_path_core, ShellRunRegistry,
+        run_shell_script, run_shell_script_with_envs, sandbox_probe_verdict,
+        sanitize_rel_path_core, ShellRunRegistry,
         DEFAULT_SHELL_TIMEOUT_MS, MAX_SHELL_TIMEOUT_MS, MIN_SHELL_TIMEOUT_MS,
     };
     use std::fs;
@@ -1338,6 +1339,30 @@ mod tests {
         assert!(token.is_cancelled());
         registry.unregister("run-1", &token);
         assert!(!registry.cancel("run-1"));
+    }
+
+    #[test]
+    fn explicit_command_environment_overrides_project_package_defaults() {
+        let workdir = tempfile::tempdir().expect("workdir");
+        let command = if cfg!(windows) {
+            "Write-Output $env:npm_config_prefix"
+        } else {
+            "printf %s \"$npm_config_prefix\""
+        };
+        let result = run_shell_script_with_envs(
+            workdir.path().display().to_string(),
+            command.to_string(),
+            None,
+            Some(10_000),
+            None,
+            None,
+            None,
+            &[("npm_config_prefix".to_string(), "xgent-explicit-prefix".to_string())],
+            None,
+        )
+        .expect("shell run");
+        assert_eq!(result.exit_code, 0, "{}", result.stderr);
+        assert_eq!(result.stdout.trim(), "xgent-explicit-prefix");
     }
 
     #[test]

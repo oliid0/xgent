@@ -1,6 +1,6 @@
 import type { TaskItem, TaskListResultDetails, TaskListState } from "../tools/builtinTypes";
 import type { RenderTimelineItem } from "./conversation/conversationState";
-import type { LiveRound, UiRound } from "./messages/uiMessages";
+import type { LiveRound, ToolTraceItem, UiRound } from "./messages/uiMessages";
 
 export type TaskProgressSnapshot = {
   runId: string;
@@ -8,7 +8,7 @@ export type TaskProgressSnapshot = {
   tasks: TaskItem[];
 };
 
-const TASK_TOOL_NAMES = new Set(["TaskCreate", "TaskUpdate", "TaskList"]);
+const TASK_TOOL_NAMES = new Set(["TaskCreate", "TaskUpdate", "TaskList", "TodoWrite"]);
 
 /** Task tools are summarized by CurrentTaskProgress and should not also show
  * as ordinary transcript tool cards. Mixed tool groups remain visible. */
@@ -66,12 +66,40 @@ function taskSnapshotFromState(value?: TaskListState): TaskProgressSnapshot | nu
   };
 }
 
+function todoSnapshot(item: ToolTraceItem): TaskProgressSnapshot | null {
+  const details = item.toolResult?.details as { kind?: string; todos?: unknown[] } | undefined;
+  if (
+    item.toolCall.name !== "TodoWrite" ||
+    details?.kind !== "todo_write" ||
+    !Array.isArray(details.todos)
+  )
+    return null;
+  const tasks = details.todos.map((value, index) => {
+    const todo = value as Record<string, unknown> | null;
+    return {
+      id: `${item.toolCall.id}:${index}`,
+      subject: todo?.content,
+      description: todo?.content,
+      activeForm: todo?.activeForm,
+      status: todo?.status,
+    };
+  });
+  if (!tasks.every(isTaskItem)) return null;
+  return { runId: `todo:${item.toolCall.id}`, revision: 0, tasks };
+}
+
 function snapshotsFromRounds(rounds: readonly UiRound[]) {
   const snapshots: TaskProgressSnapshot[] = [];
   for (const round of rounds) {
     for (const block of round.blocks) {
-      if (block.kind !== "tool") continue;
-      const snapshot = taskSnapshotFromDetails(block.item.toolResult?.details);
+      if (
+        block.kind !== "tool" ||
+        block.item.toolResult?.isError ||
+        !TASK_TOOL_NAMES.has(block.item.toolCall.name)
+      )
+        continue;
+      const snapshot =
+        todoSnapshot(block.item) ?? taskSnapshotFromDetails(block.item.toolResult?.details);
       if (snapshot) snapshots.push(snapshot);
     }
   }
@@ -85,11 +113,14 @@ export function selectLatestTaskProgress(
 ): TaskProgressSnapshot | null {
   const candidates: TaskProgressSnapshot[] = [];
   for (const item of historyItems) {
+    if (item.kind === "user") candidates.length = 0;
     if (item.kind === "assistant") candidates.push(...snapshotsFromRounds(item.rounds));
   }
-  candidates.push(...snapshotsFromRounds(liveRounds));
   const persisted = taskSnapshotFromState(persistedState);
   if (persisted) candidates.push(persisted);
+  // The live tail belongs to the current turn; an older persisted run cannot
+  // replace it. xx uses the same history-baseline / live-override ordering.
+  candidates.push(...snapshotsFromRounds(liveRounds));
   return candidates.reduce<TaskProgressSnapshot | null>((latest, candidate) => {
     if (!latest) return candidate;
     if (candidate.runId !== latest.runId) return candidate;

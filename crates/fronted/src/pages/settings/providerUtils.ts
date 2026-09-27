@@ -444,12 +444,37 @@ export async function fetchModelsFromApi(
   apiKey: string,
   options?: ProviderModelsAuthOptions & { useSystemProxy?: boolean },
 ): Promise<ProviderModelConfig[]> {
+  // Bound the whole discovery operation, including native connection setup.
+  // A fetch-only signal leaves the settings action busy forever if IPC stalls.
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error("Model list request timed out after 10 seconds"));
+    }, 10_000);
+  });
+  try {
+    return await Promise.race([
+      discoverModelsFromApi(type, baseUrl, apiKey, options, controller.signal),
+      deadline,
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function discoverModelsFromApi(
+  type: ProviderId,
+  baseUrl: string,
+  apiKey: string,
+  options: (ProviderModelsAuthOptions & { useSystemProxy?: boolean }) | undefined,
+  discoverySignal: AbortSignal,
+): Promise<ProviderModelConfig[]> {
   const normalizedUrl = normalizeProviderModelsBaseUrl(type, baseUrl, options?.isFullUrl === true);
   const exactModelsUrl = options?.modelsUrl?.trim();
   const normalizedApiKey = apiKey.trim();
   const attempts = buildProviderModelsAttempts(type, normalizedUrl, normalizedApiKey, options);
-  // Match the 10-second total discovery deadline used by the xx native client.
-  const discoverySignal = AbortSignal.timeout(10_000);
   const failures: ProviderModelsFailure[] = [];
   let emptyResult: ProviderModelConfig[] | null = null;
 
@@ -476,6 +501,7 @@ export async function fetchModelsFromApi(
     const seenCursors = new Set<string>();
 
     for (let page = 0; page < 100; page += 1) {
+      if (discoverySignal.aborted) throw new Error("Model list request timed out after 10 seconds");
       let response: Response;
       try {
         response = await fetch(requestUrl, { headers: requestHeaders, signal: discoverySignal });

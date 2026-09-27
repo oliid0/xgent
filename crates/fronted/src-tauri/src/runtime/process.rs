@@ -82,6 +82,25 @@ pub(crate) fn kill_child_process_tree_best_effort(child: &mut Child) {
     let _ = child.wait();
 }
 
+/// Launch a system opener without waiting for it, then reap the child when it exits.
+pub(crate) fn spawn_and_reap(command: &mut Command) -> io::Result<u32> {
+    let child = command.spawn()?;
+    let pid = child.id();
+    spawn_child_reaper(child);
+    Ok(pid)
+}
+
+fn spawn_child_reaper(mut child: Child) {
+    let spawned = std::thread::Builder::new()
+        .name("child-reaper".to_string())
+        .spawn(move || {
+            let _ = child.wait();
+        });
+    if let Err(error) = spawned {
+        eprintln!("spawn child reaper failed (child may stay defunct): {error}");
+    }
+}
+
 /// Terminates a process tree identified only by its group-leader pid (no
 /// Child handle): TERM to the group, bounded grace while probing the leader,
 /// then an unconditional KILL sweep so group members that outlived the

@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   acknowledgeApplePresentation,
   publishApplePresentation,
@@ -15,7 +15,6 @@ const sessionRevisions = new Map<string, number>();
 const sessionRemovalTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let subscriberCount = 0;
 let unsubscribe: (() => void) | undefined;
-let pageSession: string | undefined;
 
 function nextSessionRevision(surface: string) {
   const revision = (sessionRevisions.get(surface) ?? 0) + 1;
@@ -74,11 +73,9 @@ export function NativeSurface(props: {
   onError: (error: unknown) => void;
   sessionSurface?: string;
 }) {
-  const localId = useId();
-  const [surface] = useState(() => {
-    pageSession ??= crypto.randomUUID();
-    return props.sessionSurface ?? `${pageSession}:${localId}`;
-  });
+  // A route can mount again at the same React position. Its old native
+  // document still owns the previous revision, so each mount needs a fresh ID.
+  const [surface] = useState(() => props.sessionSurface ?? crypto.randomUUID());
   const [channel] = useState(() =>
     props.sessionSurface
       ? sessionChannel(props.sessionSurface)

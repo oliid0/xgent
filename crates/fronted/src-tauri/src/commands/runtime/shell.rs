@@ -156,31 +156,37 @@ pub(crate) async fn run_mobile_shell(
             );
         }
     }
-    let mobile_execution = app.mobile_execution();
-    let status = mobile_execution.status().map_err(|error| error.to_string())?;
-    if !status.available {
-        return Err(status
-            .detail
-            .unwrap_or_else(|| "The mobile shell backend is unavailable in this build".to_string()));
-    }
-    if !status.installed {
-        return Err(
-            "Install and verify the mobile Shell environment in Settings before using it"
-                .to_string(),
-        );
-    }
-
-    let mut response = mobile_execution
-        .run(MobileRunRequest {
-            run_id,
-            workdir,
-            command,
-            cwd,
-            timeout_ms: effective_timeout_ms,
-            stdin_base64: None,
-            wasi: None,
-        })
-        .map_err(|error| error.to_string())?;
+    // run_mobile_plugin waits synchronously for Swift/Kotlin. Keep the runtime
+    // available to model traffic, cancellation and unrelated mobile commands
+    // while a shell command is running (as the plugin commands do).
+    let mut response = tauri::async_runtime::spawn_blocking(move || {
+        let mobile_execution = app.mobile_execution();
+        let status = mobile_execution.status().map_err(|error| error.to_string())?;
+        if !status.available {
+            return Err(status.detail.unwrap_or_else(|| {
+                "The mobile shell backend is unavailable in this build".to_string()
+            }));
+        }
+        if !status.installed {
+            return Err(
+                "Install and verify the mobile Shell environment in Settings before using it"
+                    .to_string(),
+            );
+        }
+        mobile_execution
+            .run(MobileRunRequest {
+                run_id,
+                workdir,
+                command,
+                cwd,
+                timeout_ms: effective_timeout_ms,
+                stdin_base64: None,
+                wasi: None,
+            })
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| format!("mobile shell worker failed: {error}"))??;
     if let Some(error) = lan_fallback_error {
         let notice = format!(
             "LAN computer was unavailable, so Xgent used the mobile shell instead: {error}"
@@ -339,6 +345,20 @@ pub async fn shell_cancel(
         .map(|state| Arc::clone(state.inner()));
     let run_id = run_id.trim().to_string();
     let native_cancelled = super::mobile_ssh::cancel(&run_id);
+    // Stop a local fallback immediately. An unavailable paired computer may
+    // take time to answer its separate cancellation request.
+    let mobile_cancelled = tauri::async_runtime::spawn_blocking({
+        let app = app.clone();
+        let run_id = run_id.clone();
+        move || {
+            app.mobile_execution()
+                .cancel(MobileCancelRequest { run_id })
+                .map(|response| response.cancelled)
+                .unwrap_or(false)
+        }
+    })
+    .await
+    .map_err(|error| format!("mobile shell cancel worker failed: {error}"))?;
     let settings = crate::commands::settings::open_db()
         .and_then(|connection| crate::commands::settings::load_access_settings(&connection))
         .ok();
@@ -359,13 +379,7 @@ pub async fn shell_cancel(
         false
     };
     Ok(ShellCancelResponse {
-        cancelled: native_cancelled
-            || remote_cancelled
-            || app
-                .mobile_execution()
-                .cancel(MobileCancelRequest { run_id })
-                .map(|response| response.cancelled)
-                .unwrap_or(false),
+        cancelled: native_cancelled || remote_cancelled || mobile_cancelled,
     })
 }
 

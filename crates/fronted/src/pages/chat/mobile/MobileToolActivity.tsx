@@ -160,13 +160,7 @@ export function MobileToolActivity({
     frameIndex >= 0
       ? frames[frameIndex]
       : !selection && activeItem
-        ? [...frames]
-            .reverse()
-            .find(
-              (frame) =>
-                frame.toolCallId === activeItem.toolCall.id ||
-                (frame.kind === "cua" && frame.id.startsWith("monitor:")),
-            )
+        ? [...frames].reverse().find((frame) => frame.toolCallId === activeItem.toolCall.id)
         : selectedItem
           ? [...frames].reverse().find((frame) => frame.toolCallId === selectedItem.toolCall.id)
           : frames.at(-1);
@@ -202,9 +196,11 @@ export function MobileToolActivity({
     : undefined;
   const assistanceActive =
     browserState.humanAssistance?.sessionId === activeBrowserSession?.sessionId;
-  const previewTarget = [...frames]
-    .reverse()
-    .find((frame) => frame.kind === "cua" && frame.app)?.app;
+  const capsuleCallId = capsuleItem?.toolCall.id;
+  const previewTarget =
+    capsuleKind === "cua" && typeof capsuleItem?.toolCall.arguments?.app === "string"
+      ? capsuleItem.toolCall.arguments.app
+      : [...frames].reverse().find((frame) => frame.kind === "cua" && frame.app)?.app;
   const monitoring = open || !snapshot.isSettled;
   const selectedKind =
     selectedFrame?.kind ?? (selectedItem ? activityKind(selectedItem.toolCall.name) : "tool");
@@ -269,6 +265,7 @@ export function MobileToolActivity({
             throw new Error(observation.text || "Preview unavailable");
           executionActivityStore.record(conversationId, {
             id: `monitor:${previewTarget}`,
+            toolCallId: capsuleCallId,
             kind: "cua",
             app: previewTarget,
             title: previewTarget,
@@ -285,6 +282,7 @@ export function MobileToolActivity({
           executionActivityStore.record(conversationId, {
             ...previous,
             id,
+            toolCallId: capsuleCallId,
             kind: "cua",
             app: previewTarget,
             title: previewTarget,
@@ -302,7 +300,16 @@ export function MobileToolActivity({
       disposed = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [conversationId, previewTarget, monitoring, open, view, capsuleKind, snapshot.isSettled]);
+  }, [
+    conversationId,
+    previewTarget,
+    monitoring,
+    open,
+    view,
+    capsuleKind,
+    capsuleCallId,
+    snapshot.isSettled,
+  ]);
 
   useEffect(() => {
     if (
@@ -337,7 +344,9 @@ export function MobileToolActivity({
     if (view !== "capsule" || capsuleKind !== "browser" || !browserPreview || !activeBrowserSession)
       return;
     executionActivityStore.record(conversationId, {
-      id: `browser:${activeBrowserSession.sessionId}:${activeItem?.toolCall.id ?? "view"}`,
+      id: `browser:${activeBrowserSession.sessionId}:${capsuleCallId ?? "view"}`,
+      toolCallId: capsuleCallId,
+      sessionId: activeBrowserSession.sessionId,
       kind: "browser",
       title: activeBrowserSession.url,
       text: capsuleDetail,
@@ -350,6 +359,7 @@ export function MobileToolActivity({
     browserPreview,
     activeBrowserSession,
     activeItem,
+    capsuleCallId,
     capsuleDetail,
     view,
   ]);

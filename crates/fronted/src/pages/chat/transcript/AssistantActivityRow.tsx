@@ -7,11 +7,12 @@ import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { HistoryMessageRef } from "../../../lib/chat/conversation/conversationState";
 import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
+import { toolStepLabel } from "../../../lib/chat/toolActivityNavigation";
 import { ToolStepRow } from "../components/assistant-bubble/ToolCallItem";
 import { AssistantRenderUnit } from "./AssistantRenderUnit";
 import type { AssistantActivityRow as AssistantActivityRowModel } from "./rowModel";
 import { useTranscriptPreferences } from "./TranscriptPreferences";
-import { workDuration, workRecord } from "./workRecord";
+import { groupWorkTools, workDuration, workRecord } from "./workRecord";
 
 export const AssistantActivityRow = memo(function AssistantActivityRow(props: {
   row: AssistantActivityRowModel;
@@ -46,11 +47,11 @@ export const AssistantActivityRow = memo(function AssistantActivityRow(props: {
   const { t } = useLocale();
   const { showThinking } = useTranscriptPreferences();
   const { work, answer } = workRecord(row.units, showThinking);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(row.live);
   const started = useRef(Date.now());
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    setExpanded(false);
+    setExpanded(row.live);
     if (!row.live) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
@@ -65,8 +66,10 @@ export const AssistantActivityRow = memo(function AssistantActivityRow(props: {
         {flat &&
         unit.unit.kind === "block" &&
         (unit.unit.block.kind === "tool" || unit.unit.block.kind === "toolGroup") ? (
-          (unit.unit.block.kind === "tool" ? [unit.unit.block.item] : unit.unit.block.items).map(
-            (item) => (
+          groupWorkTools(
+            unit.unit.block.kind === "tool" ? [unit.unit.block.item] : unit.unit.block.items,
+          ).map((items) => {
+            const steps = items.map((item) => (
               <ToolStepRow
                 key={item.toolCall.id}
                 item={item}
@@ -76,8 +79,18 @@ export const AssistantActivityRow = memo(function AssistantActivityRow(props: {
                   unit.unit.runningToolCallIds.includes(item.toolCall.id)
                 }
               />
-            ),
-          )
+            ));
+            if (items.length === 1) return steps[0];
+            const first = items[0];
+            return (
+              <Collapsible
+                key={first.toolCall.id}
+                trigger={`${toolStepLabel(first, first.toolCall.name)} (${items.length})`}
+              >
+                <VStack gap={1}>{steps}</VStack>
+              </Collapsible>
+            );
+          })
         ) : (
           <AssistantRenderUnit
             row={unit}

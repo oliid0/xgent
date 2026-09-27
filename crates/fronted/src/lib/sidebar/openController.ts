@@ -14,7 +14,7 @@ export type ConversationOpenState = {
 };
 
 export type ConversationOpenController = {
-  open(conversationId: string): void;
+  open(conversationId: string, options?: { afterPaint?: () => void }): void;
   cancel(): void;
   getSequence(): number;
   getState(): ConversationOpenState;
@@ -95,7 +95,7 @@ export function createConversationOpenController(
   };
 
   return {
-    open: (conversationId) => {
+    open: (conversationId, options) => {
       sequence += 1;
       const seq = sequence;
       clearOverlayTimer();
@@ -112,6 +112,13 @@ export function createConversationOpenController(
         .then((result) => {
           if (seq !== sequence) return;
           clearOverlayTimer();
+          try {
+            options?.afterPaint?.();
+          } catch (error) {
+            // A workspace follow-up must not turn a painted conversation into
+            // an open failure or discard its transcript.
+            console.error("Conversation post-open action failed", error);
+          }
           if (result === "cache-hit") {
             setState({ conversationId, phase: "ready", showOverlay: false, errorCode: null });
             return;

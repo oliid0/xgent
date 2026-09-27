@@ -472,6 +472,7 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
       action = requiredAction(args.action);
       executionActivityStore.record(options.conversationId, {
         id: activityId,
+        toolCallId: toolCall.id,
         kind: "browser",
         title: `${action} · ${args.url ?? sessionId}`,
         text: "",
@@ -652,6 +653,8 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
 
       executionActivityStore.record(options.conversationId, {
         id: activityId,
+        toolCallId: toolCall.id,
+        sessionId,
         kind: "browser",
         title: `${action} · ${sessionId}`,
         text: formatResult(action, sessionId, result),
@@ -720,6 +723,8 @@ export function createBrowserUseTools(options: BrowserUseToolsOptions = {}): Bui
       const message = error instanceof Error ? error.message : String(error);
       executionActivityStore.record(options.conversationId, {
         id: activityId,
+        toolCallId: toolCall.id,
+        sessionId,
         kind: "browser",
         title: `${action ?? "browser"} · ${sessionId}`,
         text: message,

@@ -12,12 +12,16 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { AdaptiveDialog } from "../../../components/astryx/AdaptiveDialog";
 import { useLocale } from "../../../i18n";
 import { listGitRemoteBranches, startGitClone } from "../../../lib/git/tauriGitClient";
+import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
+import type { AppSettings } from "../../../lib/settings";
 import { presentationControls } from "../../../presentation/controls";
 import { NativeSurface } from "../../../presentation/NativeSurface";
+import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
 import type { PresentationNode } from "../../../presentation/types";
 import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 
 type MobileWorkspaceCreateDialogProps = {
+  settings: AppSettings;
   open: boolean;
   parent: string;
   onCreated: (path: string, kind: "managed" | "folder") => void;
@@ -157,7 +161,9 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
         ),
         c.action("choose", t("chat.mobileWorkspace.chooseFolder"), pickExternal, !busy),
       ]),
-      ...(error ? [{ id: "error", kind: "Text" as const, text: error }] : []),
+      ...(error
+        ? [{ id: "error", kind: "Banner" as const, status: "error" as const, label: error }]
+        : []),
       ...(busy
         ? [{ id: "busy", kind: "Progress" as const, label: t("chat.mobileWorkspace.creating") }]
         : []),
@@ -167,7 +173,13 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
         document={{
           mode: "sheet",
           title: t("chat.mobileWorkspace.new"),
-          appearance: "system",
+          appearance: props.settings.theme,
+          formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
+          theme: createNativePresentationTheme(
+            props.settings,
+            isNativeMobileRuntime(),
+            "workspaceTools",
+          ),
           nodes,
           dismissAction: busy ? undefined : "close",
         }}

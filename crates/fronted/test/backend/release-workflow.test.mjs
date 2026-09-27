@@ -327,11 +327,29 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(windowsLaunchSmoke, /finally[\s\S]*Stop-Process/);
   assert.match(android, /android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d/);
   assert.match(android, /script: bash scripts\/release\/smoke-launch-android\.sh/);
+  const androidSmokeStep = android.slice(
+    android.indexOf("- name: Smoke launch signed Android APK"),
+    android.indexOf("- name: Upload Android launch evidence"),
+  );
+  assert.match(androidSmokeStep, /if: github\.event_name == 'push' \|\| inputs\.publish == true \|\| inputs\.smoke == true/);
+  assert.doesNotMatch(androidSmokeStep, /continue-on-error/);
   const androidSmoke = readFileSync(path.join(repoRoot, "scripts/release/smoke-launch-android.sh"), "utf8");
   assert.match(androidSmoke, /adb shell pidof com\.ohi\.xgent/);
   assert.match(androidSmoke, /adb logcat -d AndroidRuntime:E '\*:S'/);
+  assert.match(androidSmoke, /smoke-android-interactions\.py/);
+  const androidInteractions = readFileSync(path.join(repoRoot, "scripts/release/smoke-android-interactions.py"), "utf8");
+  assert.match(androidInteractions, /Install base environment/);
+  assert.match(androidInteractions, /Run command/);
   assert.match(android, /xgent-android-launch-evidence/);
   assert.match(ios, /--target aarch64-sim/);
+  for (const [name, next] of [
+    ["Build iOS simulator smoke target", "Smoke launch iOS simulator app"],
+    ["Smoke launch iOS simulator app", "Upload iOS launch evidence"],
+  ]) {
+    const step = ios.slice(ios.indexOf(`- name: ${name}`), ios.indexOf(`- name: ${next}`));
+    assert.match(step, /if: github\.event_name == 'push' \|\| inputs\.publish == true \|\| inputs\.smoke == true/);
+    assert.doesNotMatch(step, /continue-on-error/);
+  }
   assert.match(ios, /xcrun simctl launch --terminate-running-process/);
   assert.doesNotMatch(ios, /simctl spawn .* ps -p/);
   assert.match(ios, /xcrun simctl io "\$simulator_udid" screenshot/);

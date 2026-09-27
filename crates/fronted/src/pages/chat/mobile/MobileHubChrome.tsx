@@ -5,11 +5,13 @@ import { Switch } from "@astryxdesign/core/Switch";
 import { Heading } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import type { ReactNode } from "react";
-import { MobileMenu, Search } from "../../../components/icons";
+import { ArrowLeft, MobileMenu, Search } from "../../../components/icons";
 
 type MobileHubHeaderProps = {
   title: string;
   onOpenSidebar: () => void;
+  backToSettings?: boolean;
+  backLabel?: string;
   trailing?: ReactNode;
 };
 
@@ -35,9 +37,9 @@ export function MobileHubHeader(props: MobileHubHeaderProps) {
         width="100%"
       >
         <IconButton
-          label={props.title}
-          tooltip={props.title}
-          icon={<MobileMenu />}
+          label={props.backToSettings ? (props.backLabel ?? props.title) : props.title}
+          tooltip={props.backToSettings ? (props.backLabel ?? props.title) : props.title}
+          icon={props.backToSettings ? <ArrowLeft /> : <MobileMenu />}
           size="lg"
           variant="secondary"
           onClick={props.onOpenSidebar}

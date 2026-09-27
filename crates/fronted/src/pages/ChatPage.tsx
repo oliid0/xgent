@@ -1066,7 +1066,10 @@ export function ChatPage(props: ChatPageProps) {
   );
 
   const activateWorkspaceProject = useCallback(
-    (project: WorkspaceProject, options?: { startConversation?: boolean }) => {
+    (
+      project: WorkspaceProject,
+      options?: { startConversation?: boolean; preserveMissing?: boolean },
+    ) => {
       const pathKey = project.path.trim();
       if (!pathKey) return;
       const normalizedPathKey = workspaceProjectPathKey(pathKey);
@@ -1129,9 +1132,11 @@ export function ChatPage(props: ChatPageProps) {
             hiddenWorkspaceProjectPaths: prev.system.hiddenWorkspaceProjectPaths.filter(
               (path) => workspaceProjectPathKey(path) !== normalizedPathKey,
             ),
-            missingWorkspaceProjectPaths: prev.system.missingWorkspaceProjectPaths.filter(
-              (path) => workspaceProjectPathKey(path) !== normalizedPathKey,
-            ),
+            missingWorkspaceProjectPaths: options?.preserveMissing
+              ? prev.system.missingWorkspaceProjectPaths
+              : prev.system.missingWorkspaceProjectPaths.filter(
+                  (path) => workspaceProjectPathKey(path) !== normalizedPathKey,
+                ),
             // Activating a workspace always brings it back from the archive.
             archivedWorkspaceProjectPaths: prev.system.archivedWorkspaceProjectPaths.filter(
               (path) => workspaceProjectPathKey(path) !== normalizedPathKey,
@@ -1150,6 +1155,25 @@ export function ChatPage(props: ChatPageProps) {
       }
     },
     [setSettings, workspaceProjects, activeWorkspaceProjectId, settings.system],
+  );
+
+  const activateConversationWorkspace = useCallback(
+    (cwd?: string) => {
+      const path = cwd?.trim() ?? "";
+      if (
+        !path ||
+        workspaceProjectPathKey(path) === workspaceProjectPathKey(activeWorkspaceProjectPath)
+      ) {
+        return;
+      }
+      const project =
+        workspaceProjects.find(
+          (item) => workspaceProjectPathKey(item.path) === workspaceProjectPathKey(path),
+        ) ?? createWorkspaceProjectFromPath(path, "history");
+      // A history record remains readable even when its original directory is gone.
+      activateWorkspaceProject(project, { preserveMissing: true });
+    },
+    [activeWorkspaceProjectPath, activateWorkspaceProject, workspaceProjects],
   );
 
   const handleSelectWorkspaceProject = useCallback(
@@ -5291,13 +5315,29 @@ export function ChatPage(props: ChatPageProps) {
       }
       setRightSidebarPresentation("side");
       prepareComposerForConversationChange();
-      openController.open(targetConversationId);
+      openController.open(targetConversationId, {
+        afterPaint: () => {
+          if (!isAgentMode) return;
+          const workdir =
+            conversationRuntimeCacheRef.current.get(targetConversationId)?.workdir?.trim() ||
+            sidebarStore.peek(targetConversationId)?.cwd?.trim() ||
+            "";
+          activateConversationWorkspace(workdir);
+        },
+      });
       restoreCachedComposerDraft(targetConversationId);
       if (compactViewport) {
         setSidebarOpen(false);
       }
     },
-    [compactViewport, openController],
+    [
+      activateConversationWorkspace,
+      compactViewport,
+      conversationRuntimeCacheRef,
+      isAgentMode,
+      openController,
+      sidebarStore,
+    ],
   );
 
   useEffect(() => {
@@ -6028,7 +6068,11 @@ export function ChatPage(props: ChatPageProps) {
           conversationId={currentConversationId ?? ""}
           mobileExperience={mobileExperience}
           store={liveTranscriptStore}
-          open={mobileActivityOpen}
+          open={
+            mobileActivityOpen &&
+            (mobileExperience ||
+              (rightSidebarOpen && resolvedRightSidebarActiveTabId === "activity"))
+          }
           onOpen={handleOpenMobileActivity}
           onOpenBrowser={handleOpenBrowser}
           progressContent={taskProgressContent}
@@ -6233,6 +6277,7 @@ export function ChatPage(props: ChatPageProps) {
           historyItems={historyRenderItems}
           liveTranscriptStore={liveTranscriptStore}
           modelOptions={modelOptions}
+          enabledSkills={enabledComposerSkills}
           selectedValue={selectedValue}
           contextUsageTokensSource={contextUsageTokensSource}
           contextWindow={currentModelContextWindow}
@@ -6332,6 +6377,7 @@ export function ChatPage(props: ChatPageProps) {
           onClose={() => setMobileWorkspaceDestination(null)}
         />
         <MobileWorkspaceCreateDialog
+          settings={settings}
           open={mobileWorkspaceCreateOpen}
           parent={parentWorkspacePath(getDefaultWorkspaceProjectPath(settings.system))}
           onCreated={(path, kind) => {
@@ -7210,6 +7256,7 @@ export function ChatPage(props: ChatPageProps) {
       ) : null}
       {nativeMobile || desktopBridgeEnabled ? (
         <MobileWorkspaceCreateDialog
+          settings={settings}
           open={mobileWorkspaceCreateOpen}
           parent={parentWorkspacePath(getDefaultWorkspaceProjectPath(settings.system))}
           cloneAvailable={desktopBridgeEnabled}

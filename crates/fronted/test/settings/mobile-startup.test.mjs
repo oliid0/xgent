@@ -46,3 +46,12 @@ test("mobile startup status requires an explicit core service result", async () 
     /invalid mobile startup status/,
   );
 });
+
+test("completed degraded startup still releases independent mobile functions", () => {
+  const { module } = loadStartupModule(() => undefined);
+  assert.equal(module.mobileStartupFinished({ phase: "starting", failures: [], coreReady: false }), false);
+  assert.equal(module.mobileStartupFinished({ phase: "ready", failures: [], coreReady: true }), true);
+  assert.equal(module.mobileStartupFinished({
+    phase: "degraded", failures: ["chat history database unavailable"], coreReady: false,
+  }), true);
+});

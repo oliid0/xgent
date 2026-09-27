@@ -1,4 +1,29 @@
+import type { ToolTraceItem } from "../../../lib/chat/messages/uiMessages";
 import type { AssistantUnitRow } from "./rowModel";
+
+/** Only consecutive operations on the same file and explicit step are grouped.
+ * Called within one round so unrelated turns are never merged by filename.
+ */
+export function groupWorkTools(items: readonly ToolTraceItem[]) {
+  const groups: ToolTraceItem[][] = [];
+  let previousKey: string | null = null;
+  for (const item of items) {
+    const args = item.toolCall.arguments ?? {};
+    const path = args.file_path ?? args.path;
+    const key =
+      typeof path === "string" && path.trim()
+        ? JSON.stringify([
+            item.toolCall.name,
+            path,
+            args.brief ?? args.description ?? args.title ?? "",
+          ])
+        : null;
+    if (key !== null && key === previousKey) groups[groups.length - 1].push(item);
+    else groups.push([item]);
+    previousKey = key;
+  }
+  return groups;
+}
 
 /** Keep the final answer and interactive questions outside the work disclosure. */
 export function workRecord(units: readonly AssistantUnitRow[], showThinking: boolean) {

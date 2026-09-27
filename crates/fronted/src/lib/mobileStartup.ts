@@ -8,6 +8,11 @@ export type MobileStartupStatus = {
   coreReady: boolean;
 };
 
+/** Completed native startup may be degraded without blocking independent features. */
+export function mobileStartupFinished(status: MobileStartupStatus): boolean {
+  return status.phase !== "starting";
+}
+
 export async function readMobileStartupStatus(): Promise<MobileStartupStatus> {
   const status = await invoke<MobileStartupStatus>("app_mobile_startup_status");
   if (

@@ -13,6 +13,7 @@ import {
 } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Section } from "@astryxdesign/core/Section";
+import { Selector } from "@astryxdesign/core/Selector";
 import { StatusDot, type StatusDotVariant } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -27,6 +28,7 @@ import {
   Info,
   Keyboard,
   Mic,
+  Plug,
   Settings2,
   Shield,
   Sparkles,
@@ -36,6 +38,11 @@ import {
 
 import { useLocale } from "../i18n";
 import { useCompactViewport } from "../lib/responsive/compactViewport";
+import { THEME_OPTIONS, updateCustomSettings } from "../lib/settings";
+import { UI_THEME_PRESETS } from "../lib/settings/appearance";
+import { isLanPcCommandHostReady } from "../runtime/lanPcCommandHost";
+import { MobileMcpPage } from "./chat/mobile/MobileMcpPage";
+import { MobileSkillsPage } from "./chat/mobile/MobileSkillsPage";
 import { AboutSection } from "./settings/AboutSection";
 import { AccessSection } from "./settings/AccessSection";
 import { BackupSyncSection } from "./settings/BackupSyncSection";
@@ -53,6 +60,7 @@ import { SkillsSettingsForm } from "./settings/SkillsSettingsForm";
 import { SoulSection } from "./settings/SoulSection";
 import { SttSettingsSection } from "./settings/SttSettingsSection";
 import { SystemSettingsForm } from "./settings/SystemSettingsForm";
+import { SettingsRow, SettingsRowGroup } from "./settings/shared";
 import { ToolPermissionsSection } from "./settings/ToolPermissionsSection";
 import type { SectionId, SettingsPageProps } from "./settings/types";
 
@@ -186,6 +194,16 @@ const NAV_ITEMS: NavDefinition[] = [
     descriptionKey: "settings.mobile.memoryDescription",
   },
   {
+    id: "skills",
+    icon: Sparkles,
+    descriptionKey: "settings.mobile.skillsDescription",
+  },
+  {
+    id: "mcp",
+    icon: Plug,
+    descriptionKey: "settings.mobile.mcpDescription",
+  },
+  {
     id: "other",
     icon: Terminal,
     descriptionKey: "settings.mobile.otherDescription",
@@ -302,12 +320,13 @@ export function SettingsPage(props: SettingsPageProps) {
         },
         {
           label: t("settings.mobile.personalGroup"),
-          ids: new Set<SectionId>(["soul", "memory", "mobileAssistant"]),
+          ids: new Set<SectionId>(["soul", "memory", "skills", "mobileAssistant"]),
         },
         {
           label: t("settings.mobile.capabilitiesGroup"),
           ids: new Set<SectionId>([
             "mobileExecution",
+            "mcp",
             "computerUse",
             "toolPermissions",
             "shortcuts",
@@ -340,7 +359,13 @@ export function SettingsPage(props: SettingsPageProps) {
   }, [navItems, section]);
 
   const saveIndicator = getSaveIndicator(saveState, t);
-  const sectionManagesScroll = section === "providers" || section === "memory" || section === "mcp";
+  const compactHubDetail =
+    compactSettings && mobileDetailOpen && (section === "skills" || section === "mcp");
+  const sectionManagesScroll =
+    section === "providers" ||
+    section === "memory" ||
+    section === "mcp" ||
+    (compactSettings && section === "skills");
   const sectionContent = (() => {
     // Resolve hidden destinations before mounting their effects, including deep links.
     if (!navItems.some((item) => item.id === section)) return null;
@@ -389,9 +414,26 @@ export function SettingsPage(props: SettingsPageProps) {
           />
         );
       case "skills":
-        return <SkillsSettingsForm settings={settings} setSettings={setSettings} />;
+        return compactSettings ? (
+          <MobileSkillsPage
+            settings={settings}
+            setSettings={setSettings}
+            onOpenSidebar={() => setMobileDetailOpen(false)}
+            presentationMode="sheet"
+          />
+        ) : (
+          <SkillsSettingsForm settings={settings} setSettings={setSettings} />
+        );
       case "mcp":
-        return (
+        return compactSettings ? (
+          <MobileMcpPage
+            settings={settings}
+            setSettings={setSettings}
+            onOpenSidebar={() => setMobileDetailOpen(false)}
+            allowStdio={!nativeMobile || isLanPcCommandHostReady()}
+            presentationMode="sheet"
+          />
+        ) : (
           <McpSettingsSection
             settings={settings}
             setSettings={setSettings}
@@ -443,7 +485,7 @@ export function SettingsPage(props: SettingsPageProps) {
             className="settings-page settings-page-compact"
             data-edge-swipe-ignore
             header={
-              detailLayerDepth > 0 ? undefined : (
+              detailLayerDepth > 0 || compactHubDetail ? undefined : (
                 <VStack className="mobile-panel-header" width="100%" gap={0}>
                   <DialogHeader
                     title={mobileDetailOpen ? sectionLabels[section] : t("settings.title")}
@@ -483,20 +525,24 @@ export function SettingsPage(props: SettingsPageProps) {
                 <LayoutContent
                   key={section}
                   data-settings-section={section}
-                  padding={4}
+                  padding={compactHubDetail ? 0 : 4}
                   isScrollable={!sectionManagesScroll}
                   className="settings-section-enter"
                 >
-                  <VStack
-                    width="100%"
-                    maxWidth="var(--xgent-settings-content-max-width)"
-                    height={sectionManagesScroll ? "100%" : undefined}
-                    minHeight={sectionManagesScroll ? 0 : undefined}
-                    className="settings-section-shell"
-                    style={{ marginInline: "auto" }}
-                  >
-                    {sectionContent}
-                  </VStack>
+                  {compactHubDetail ? (
+                    sectionContent
+                  ) : (
+                    <VStack
+                      width="100%"
+                      maxWidth="var(--xgent-settings-content-max-width)"
+                      height={sectionManagesScroll ? "100%" : undefined}
+                      minHeight={sectionManagesScroll ? 0 : undefined}
+                      className="settings-section-shell"
+                      style={{ marginInline: "auto" }}
+                    >
+                      {sectionContent}
+                    </VStack>
+                  )}
                 </LayoutContent>
               ) : (
                 <LayoutContent padding={4} label={t("settings.title")}>
@@ -506,6 +552,53 @@ export function SettingsPage(props: SettingsPageProps) {
                     gap={5}
                     style={{ marginInline: "auto" }}
                   >
+                    <SettingsRowGroup title={t("settings.native.theme")}>
+                      <SettingsRow label={t("settings.native.appearance")}>
+                        <Selector
+                          label={t("settings.native.appearance")}
+                          isLabelHidden
+                          value={settings.theme}
+                          options={THEME_OPTIONS.map((value) => ({
+                            value,
+                            label: t(`settings.native.${value}`),
+                          }))}
+                          onChange={(theme) =>
+                            setSettings((previous) => ({
+                              ...previous,
+                              theme: theme as typeof previous.theme,
+                            }))
+                          }
+                        />
+                      </SettingsRow>
+                      <SettingsRow label={t("settings.ui.preset")}>
+                        <Selector
+                          label={t("settings.ui.preset")}
+                          isLabelHidden
+                          value={settings.customSettings.appearance.preset}
+                          options={UI_THEME_PRESETS.map((value) => ({
+                            value,
+                            label:
+                              value === "current"
+                                ? t("settings.ui.current")
+                                : value === "stone"
+                                  ? "Stone"
+                                  : "Matcha",
+                          }))}
+                          onChange={(preset) =>
+                            setSettings((previous) =>
+                              updateCustomSettings(previous, {
+                                appearance: {
+                                  ...previous.customSettings.appearance,
+                                  preset:
+                                    preset as typeof previous.customSettings.appearance.preset,
+                                  customized: false,
+                                },
+                              }),
+                            )
+                          }
+                        />
+                      </SettingsRow>
+                    </SettingsRowGroup>
                     {mobileNavGroups.map((group) => (
                       <VStack key={group.label} width="100%" gap={2}>
                         <Heading level={3} className="text-muted-foreground">

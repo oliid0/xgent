@@ -141,7 +141,9 @@ test("the complete iOS application surface is handwritten and bypasses generated
   assert.match(nativeMobileSource, /\.safeAreaBar\(edge: \.bottom/);
   assert.match(nativeMobileSource, /\.onScrollGeometryChange\(for: Bool\.self\)/);
   assert.match(nativeMobileSource, /\.onScrollPhaseChange/);
-  assert.doesNotMatch(nativeMobileSource, /Form \{|\.formStyle\(|\.listStyle\(/);
+  assert.match(nativeMobileSource, /if grouped \{\s*Form \{[\s\S]*?if node\.kind == \.settingsGroup \{\s*Section \{/);
+  assert.match(nativeMobileSource, /\.formStyle\(\.grouped\)/);
+  assert.match(nativeMobileNodeSource, /Picker\(node\.label \?\? "", selection: textBinding\) \{ pickerOptions \}[\s\S]*?\.pickerStyle\(\.menu\)/);
   assert.match(
     nativeMobileSource,
     /list == nil \? \[\.large\] : \[\.fraction\(0\.62\), \.large\][\s\S]*?\.presentationDetents\(detents\)/,

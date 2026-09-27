@@ -104,6 +104,43 @@ test("native edits reach the shared composer used by send and conversation draft
   assert.equal((await h.dispatch("send")).ok, false);
 });
 
+test("native skill menu inserts rich references into the sent draft and rejects removed or disabled choices", async () => {
+  const skill = { name: "review", description: "Review changes", skillFile: "/skills/review/SKILL.md", baseDir: "/skills/review" };
+  const sent = [];
+  let managed = 0;
+  const h = harness({ enabledSkills: [skill], onOpenSkillsHub: () => managed++,
+    onSend: () => sent.push(h.props.composerRef.current.getDraft()) }, { mobile: true });
+  await h.dispatch("draft", "Check this ");
+  assert.equal((await h.dispatch("mention-skill:review")).ok, true);
+  h.render();
+  assert.equal((await h.dispatch("send")).ok, true);
+  assert.deepEqual(sent[0].skillMentions, [skill]);
+  assert.ok(sent[0].text.startsWith("Check this "));
+  assert.equal((await h.dispatch("manage-skills")).ok, true);
+  assert.equal(managed, 1);
+  h.props.inputDisabled = true;
+  h.render();
+  assert.equal((await h.dispatch("mention-skill:review")).ok, false);
+  h.props.inputDisabled = false;
+  h.props.enabledSkills = [];
+  h.render();
+  assert.equal((await h.dispatch("mention-skill:review")).ok, false);
+  h.unmount();
+});
+
+test("native attachment selection cannot import into a conversation opened after the picker", async () => {
+  const imported = [];
+  const h = harness({ onImportFiles: async (files) => imported.push(files.map((file) => file.name)) }, { mobile: true });
+  const payload = JSON.stringify([{ fileName: "note.txt", mimeType: "text/plain", contentBase64: "aGk=" }]);
+  h.props.conversationId = "next-conversation";
+  h.render();
+  assert.equal((await h.dispatch("attach:conversation", payload)).ok, false);
+  assert.deepEqual(imported, []);
+  assert.equal((await h.dispatch("attach:next-conversation", payload)).ok, true);
+  assert.deepEqual(imported, [["note.txt"]]);
+  h.unmount();
+});
+
 test("native chat exposes downloaded cloud artifacts as working file actions", async () => {
   const calls = [];
   const h = harness({}, { mobile: true, invoke: async (command, args) => {
@@ -530,13 +567,13 @@ test("native controls enforce busy, model and attachment constraints at dispatch
   await h.dispatch("draft", "Ready");
   h.props.inputDisabled = true;
   h.render();
-  for (const [action, value] of [["draft", "Blocked"], ["send", null], ["attach", null]]) {
+  for (const [action, value] of [["draft", "Blocked"], ["send", null], ["attach:conversation", null]]) {
     assert.equal((await h.dispatch(action, value)).ok, false);
   }
   h.props.inputDisabled = false;
   h.props.attachmentsEnabled = false;
   h.render();
-  assert.equal((await h.dispatch("attach")).ok, false);
+  assert.equal((await h.dispatch("attach:conversation")).ok, false);
   assert.equal((await h.dispatch("model", "unknown")).ok, false);
   assert.equal((await h.dispatch("model", "provider::model")).ok, true);
   assert.deepEqual(selected, [{ customProviderId: "provider", model: "model" }]);
@@ -545,7 +582,7 @@ test("native controls enforce busy, model and attachment constraints at dispatch
   assert.equal((await h.dispatch("send")).ok, false);
   h.props.attachmentsEnabled = true;
   h.render();
-  assert.equal((await h.dispatch("attach", "[]")).ok, true);
+  assert.equal((await h.dispatch("attach:conversation", "[]")).ok, true);
   assert.equal(picked, 1);
   h.unmount();
 });

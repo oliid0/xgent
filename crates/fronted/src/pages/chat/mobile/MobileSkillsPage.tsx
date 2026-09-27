@@ -109,7 +109,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
   }, [props.setSettings]);
 
   useEffect(() => {
-    if (!isApplePresentationRuntime() || props.initialSkills) return;
+    if (props.initialSkills) return;
     let active = true;
     setRefreshing(true);
     void discoverSkills({ force: true })
@@ -702,6 +702,8 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
       <MobileHubHeader
         title={t("sidebar.mobile.plugins")}
         onOpenSidebar={props.onOpenSidebar}
+        backToSettings={props.presentationMode === "sheet"}
+        backLabel={t("settings.mobile.backToSettings")}
         trailing={
           <IconButton
             label={t("settings.skillsRescan")}

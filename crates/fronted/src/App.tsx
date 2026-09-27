@@ -30,7 +30,11 @@ import {
 import { useAppUpdateController } from "./lib/appUpdates";
 import { initAutomation } from "./lib/automation";
 import { mobileExecutionStatus } from "./lib/mobileExecution";
-import { type MobileStartupStatus, readMobileStartupStatus } from "./lib/mobileStartup";
+import {
+  type MobileStartupStatus,
+  mobileStartupFinished,
+  readMobileStartupStatus,
+} from "./lib/mobileStartup";
 import { trackMobileViewport } from "./lib/mobileViewport";
 import { setRetryErrorExtension } from "./lib/providers/runtime/streamRetry";
 import {
@@ -223,7 +227,9 @@ export default function App() {
           if (!startupDelayReported) {
             startupDelayReported = true;
             console.warn("Mobile service initialization is taking longer than expected", failures);
-            setMobileStartup({ phase: "starting", failures, coreReady: false });
+            // Command registration is already complete. Keep polling for recovery,
+            // but let independent pages open instead of trapping the whole app.
+            setMobileStartup({ phase: "degraded", failures, coreReady: false });
           }
           retryTimer = window.setTimeout(() => void poll(), 1_000);
           return;
@@ -489,6 +495,10 @@ export default function App() {
       load: loadPersistedSettingsWithDefaults,
       retryCount: nativeMobile ? 1 : 0,
       onLoaded: ({ settings: loaded, defaultWorkdir }) => {
+        // A settings-page retry may have hydrated the app while this first
+        // native request was still pending. Its older snapshot cannot replace
+        // newer settings or edits.
+        if (settingsHydratedRef.current) return;
         defaultWorkdirRef.current = defaultWorkdir;
         const loadedWithDefaults = applyRuntimeSystemDefaults(loaded, defaultWorkdir);
         settingsHydratedRef.current = true;
@@ -497,6 +507,7 @@ export default function App() {
         setSettingsSaveState({ status: "saved" });
       },
       onError: (error) => {
+        if (settingsHydratedRef.current) return;
         const fallback = getDefaultSettings();
         settingsRef.current = fallback;
         setSettingsState(fallback);
@@ -511,11 +522,16 @@ export default function App() {
         });
       },
       onSlow: nativeMobile
-        ? () =>
+        ? () => {
             setMobileStartup((status) => ({
               ...status,
               failures: [...status.failures, MOBILE_SETTINGS_DELAY_NOTICE],
-            }))
+            }));
+            // A native settings read can remain pending indefinitely. Open
+            // independent pages while it continues; setSettings still blocks
+            // writes until onLoaded supplies authoritative values.
+            setSettingsReady(true);
+          }
         : undefined,
       onSettled: () => {
         if (nativeMobile) {
@@ -538,10 +554,14 @@ export default function App() {
         .catch(() => undefined)
         .then(() => persistSettings(prev, next))
         .then((persistResult) => {
-          if (persistResult.ssh && saveSequenceRef.current === saveSequence) {
+          if (
+            (persistResult.ssh || persistResult.stt) &&
+            saveSequenceRef.current === saveSequence
+          ) {
             const merged = normalizeSettings({
               ...settingsRef.current,
-              ssh: persistResult.ssh,
+              ...(persistResult.ssh ? { ssh: persistResult.ssh } : {}),
+              ...(persistResult.stt ? { stt: persistResult.stt } : {}),
             });
             settingsRef.current = merged;
             setSettingsState(merged);
@@ -570,9 +590,18 @@ export default function App() {
   const setSettings = useCallback(
     (updater: (prev: AppSettings) => AppSettings) => {
       // A failed read must never turn fallback defaults into persisted settings.
-      // Opening settings retries the read and enables writes after it succeeds.
+      // Keep the native root usable: opening settings retries the read, then
+      // writes become available after the authoritative values arrive.
       if (!settingsHydratedRef.current) {
-        throw new Error(translate("app.settingsLoadFailed", settingsRef.current.locale));
+        setSettingsSaveState((current) =>
+          current.status === "error"
+            ? current
+            : {
+                status: "error",
+                message: translate("app.settingsLoadFailed", settingsRef.current.locale),
+              },
+        );
+        return;
       }
       const prev = settingsRef.current;
       const updated = updater(prev);
@@ -683,13 +712,12 @@ export default function App() {
     messages: appUpdateMessages,
     beforeRestart: beforeAppRestart,
   });
-  // Mobile history and other command state finish on a background worker.
-  // Settings can load first, so mounting ChatPage before that worker settles
-  // lets its initial history requests race native service registration.
+  // Wait for native registration and the first settings read to settle before
+  // ChatPage's initial reads. A failed read still needs the native root to
+  // mount so Settings can retry; setSettings keeps writes blocked until a
+  // successful authoritative read.
   const appContentReady =
-    platformResolved &&
-    settingsReady &&
-    (!nativeMobile || (settingsHydratedRef.current && mobileStartup.coreReady));
+    platformResolved && settingsReady && (!nativeMobile || mobileStartupFinished(mobileStartup));
   useEffect(() => {
     if (platformResolved && settingsReady) finishLaunch(settingsHydratedRef.current);
   }, [platformResolved, settingsReady]);
@@ -752,8 +780,8 @@ export default function App() {
               <SoulProvider>
                 {appContentReady ? (
                   <>
-                    {settingsReady ? <CronPromptRunner settings={settings} /> : null}
-                    {settingsReady ? (
+                    {settingsHydratedRef.current ? <CronPromptRunner settings={settings} /> : null}
+                    {settingsHydratedRef.current ? (
                       <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
                     ) : null}
                     <AppErrorBoundary>

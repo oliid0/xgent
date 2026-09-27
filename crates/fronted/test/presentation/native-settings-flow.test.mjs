@@ -5,6 +5,8 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 test("native settings mirrors compact navigation and persists shared system, provider, model and policy edits", async () => {
   const providerUtils = createTsModuleLoader().loadModule("src/pages/settings/providerUtils.ts");
   let discoveryOptions;
+  let discoveryError;
+  let discoveryPause;
   const states = [];
   let cursor = 0;
   const locale = {
@@ -28,6 +30,8 @@ test("native settings mirrors compact navigation and persists shared system, pro
       ...providerUtils,
       fetchModelsFromApi: async (_type, _baseUrl, _apiKey, options) => {
         discoveryOptions = options;
+        if (discoveryPause) await discoveryPause;
+        if (discoveryError) throw discoveryError;
         return [providerUtils.createDraftModelConfig("codex", "fetched-model")];
       },
     },
@@ -69,25 +73,30 @@ test("native settings mirrors compact navigation and persists shared system, pro
       group.children.map((node) => node.id),
     ]),
     [
+      ["mobile-theme", "settings.native.theme", ["theme", "appearance-preset"]],
       ["mobile-appearance", "settings.mobile.appearanceGroup", ["nav:system", "nav:providers"]],
-      ["mobile-personal", "settings.mobile.personalGroup", ["nav:soul", "nav:memory"]],
+      ["mobile-personal", "settings.mobile.personalGroup", ["nav:soul", "nav:memory", "nav:skills"]],
       ["mobile-capabilities", "settings.mobile.capabilitiesGroup", [
-        "nav:mobileAssistant", "nav:toolPermissions", "nav:mobileExecution", "nav:other", "nav:access", "nav:backup", "nav:about",
+        "nav:mobileAssistant", "nav:toolPermissions", "nav:mobileExecution", "nav:mcp", "nav:voice", "nav:other", "nav:access", "nav:backup", "nav:about",
       ]],
     ],
   );
   assert.ok(!document.nodes.some((node) => node.id === "save-status"));
-  const navigationRows = document.nodes.flatMap((node) => node.children ?? []);
+  const navigationRows = document.nodes.flatMap((node) => node.children ?? []).filter((node) => node.kind === "NavigationRow");
   assert.ok(navigationRows.every((node) => node.text), "compact navigation keeps row descriptions");
   assert.equal(document.formFactor, "mobile");
   assert.deepEqual(document.theme, { marker: "theme" });
+  assert.equal((await dispatch("theme", "light")).ok, true);
+  assert.equal(settings.theme, "light");
+  assert.equal((await dispatch("appearance-preset", "stone")).ok, true);
+  assert.equal(settings.customSettings.appearance.preset, "stone");
   await dispatch("nav:system");
   assert.ok(document.nodes.some((node) => node.id === "save-status"));
   assert.equal((await dispatch("language", "zh-CN")).ok, true);
   assert.equal((await dispatch("mode", "text")).ok, true);
   assert.equal(settings.locale, "zh-CN");
   assert.equal(settings.system.executionMode, "text");
-  assert.equal(settings.theme, "system", "native mobile preserves the system appearance contract");
+  assert.equal(settings.theme, "light", "system navigation preserves the root appearance selection");
   await dispatch("back");
   await dispatch("nav:providers");
   const count = settings.customProviders.length;
@@ -107,6 +116,13 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(urlField.value, endpoint, "editing retains the entered endpoint across normalization");
   await dispatch("provider-url", "https://example.test/v1");
   await dispatch("provider-models-url", "https://catalog.example.test/v1/models");
+  discoveryError = new Error("Model list request timed out after 10 seconds");
+  assert.equal((await dispatch("fetch-models")).ok, false);
+  assert.equal(document.nodes.find(node => node.id === "error").label, discoveryError.message);
+  assert.equal(document.nodes.find(node => node.id === "error").kind, "Banner");
+  assert.ok(!document.nodes.some(node => node.id === "busy"));
+  assert.ok(rendered.props.handlers.get("fetch-models").enabled, "failure releases the action for retry");
+  discoveryError = undefined;
   assert.equal((await dispatch("fetch-models")).ok, true);
   assert.equal(discoveryOptions.modelsUrl, "https://catalog.example.test/v1/models");
   assert.ok(settings.customProviders.at(-1).activeModels.includes("fetched-model"));
@@ -114,6 +130,23 @@ test("native settings mirrors compact navigation and persists shared system, pro
     customProviderId: settings.customProviders.at(-1).id,
     model: "fetched-model",
   });
+  const fetchingProviderId = settings.customProviders.at(-1).id;
+  let releaseDiscovery;
+  discoveryPause = new Promise(resolve => { releaseDiscovery = resolve; });
+  const pendingDiscovery = registry.dispatch({ surface: "settings", action: "fetch-models", value: null, requestId: String(++request) });
+  await Promise.resolve();
+  render();
+  assert.ok(document.nodes.some(node => node.id === "busy"));
+  await dispatch("back");
+  assert.ok(!document.nodes.some(node => node.id === "busy"), "pending work on a detail page must not lock the settings root");
+  const otherProvider = settings.customProviders.find(item => item.id !== fetchingProviderId);
+  await dispatch(`provider:${otherProvider.id}`);
+  assert.ok(rendered.props.handlers.get("fetch-models").enabled, "one provider request must not disable another provider");
+  releaseDiscovery();
+  await pendingDiscovery;
+  discoveryPause = undefined;
+  await dispatch("back");
+  await dispatch(`provider:${fetchingProviderId}`);
   await dispatch("model-id", "example-model");
   assert.equal((await dispatch("add-model")).ok, true);
   const provider = settings.customProviders.at(-1);
@@ -146,6 +179,13 @@ test("native settings mirrors compact navigation and persists shared system, pro
     assert.equal(document.mode, "sheet");
     assert.ok(document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === `nav:${section}`), "return to the invoking settings category");
   }
+  await dispatch("back");
+  await dispatch("nav:skills");
+  assert.equal(rendered.type, "MobileSkillsPage");
+  rendered.props.onOpenSidebar();
+  render();
+  await dispatch("nav:mcp");
+  assert.equal(rendered.type, "MobileMcpPage");
 });
 
 test("system picker payload rejects malformed files and preserves bytes and MIME type", () => {

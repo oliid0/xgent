@@ -16,6 +16,24 @@ const loader = createTsModuleLoader({
 });
 const providerUtils = loader.loadModule("src/pages/settings/providerUtils.ts");
 
+test("model discovery times out stalled native setup and ignores a late connection", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let release;
+  let fetches = 0;
+  t.mock.method(globalThis, "fetch", async () => { fetches++; return jsonResponse(200, { data: [] }); });
+  const nativeLoader = createTsModuleLoader({ mocks: {
+    "@tauri-apps/api/core": { invoke: () => new Promise(resolve => { release = resolve; }) },
+  } });
+  const pending = nativeLoader.loadModule("src/pages/settings/providerUtils.ts")
+    .fetchModelsFromApi("codex", "https://example.test/v1", "key");
+  const rejected = assert.rejects(pending, /timed out after 10 seconds/);
+  t.mock.timers.tick(10_000);
+  await rejected;
+  release({ baseUrl: "http://127.0.0.1:9999", token: "test-token" });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fetches, 0, "a timed-out action must not issue a late model request");
+});
+
 function jsonResponse(status, payload) {
   return {
     ok: status >= 200 && status < 300,

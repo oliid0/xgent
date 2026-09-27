@@ -385,6 +385,7 @@ struct XgentIOSNode: View {
                 model: model,
                 controlSize: CGFloat(theme.control.small)
             )
+                .id(node.action)
                 .buttonStyle(.plain)
         }
     }
@@ -587,34 +588,9 @@ struct XgentIOSNode: View {
             }
             .buttonStyle(.plain)
         } else {
-            Menu {
-                ForEach(node.options ?? []) { option in
-                    Button {
-                        model.send(node, in: document, value: .string(option.value), editing: true)
-                    } label: {
-                        if option.value == textBinding.wrappedValue {
-                            Label(option.label, systemImage: "checkmark")
-                        } else {
-                            Text(option.label)
-                        }
-                    }
-                    .disabled(option.disabled == true)
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    Text(node.label ?? "").foregroundStyle(Color(xgentHex: palette.text))
-                    Spacer(minLength: 12)
-                    Text(selectedOptionLabel)
-                        .foregroundStyle(Color(xgentHex: palette.secondaryText))
-                        .lineLimit(1)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(Color(xgentHex: palette.secondaryText))
-                }
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+            Picker(node.label ?? "", selection: textBinding) { pickerOptions }
+                .pickerStyle(.menu)
+                .frame(minHeight: 44)
         }
     }
 
@@ -646,7 +622,12 @@ struct XgentIOSNode: View {
 
     @ViewBuilder private var nativeMenu: some View {
         Menu { menuItems } label: {
-            if node.id == "tools" || node.variant == "secondary" {
+            if node.variant == "compact" {
+                Image(systemName: node.icon ?? "ellipsis")
+                    .font(.system(size: 20))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            } else if node.id == "tools" || node.variant == "secondary" {
                 Image(systemName: node.icon ?? "ellipsis")
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(Color(xgentHex: palette.text))

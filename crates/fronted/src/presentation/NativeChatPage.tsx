@@ -11,7 +11,10 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import type { MentionComposerHandle } from "../components/chat/MentionComposer";
+import type {
+  MentionComposerHandle,
+  MentionComposerSkill,
+} from "../components/chat/MentionComposer";
 import { useLocale } from "../i18n";
 import { collectActivityItems } from "../lib/chat/activityTimeline";
 import { contextUsageRatio } from "../lib/chat/contextUsage";
@@ -218,6 +221,7 @@ export type NativeChatPageProps = {
   historyItems: RenderTimelineItem[];
   liveTranscriptStore: LiveTranscriptStore;
   modelOptions: ModelOption[];
+  enabledSkills?: MentionComposerSkill[];
   selectedValue?: string;
   contextUsageTokensSource: {
     subscribe: (listener: () => void) => () => void;
@@ -595,7 +599,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
     live.liveRounds,
     props.taskList,
   );
-  const taskProgressNode: PresentationNode | undefined = taskProgress
+  const taskProgressNode: PresentationNode | undefined = taskProgress?.tasks.length
     ? {
         id: `task-progress:${taskProgress.runId}`,
         kind: "TaskProgress",
@@ -844,11 +848,43 @@ export function NativeChatPage(props: NativeChatPageProps) {
                   })),
                   disabled: !props.attachmentsEnabled || props.isUploading || props.inputDisabled,
                   action: change(
-                    "attach",
+                    `attach:${props.conversationId}`,
                     async (value) => props.onImportFiles(decodeNativeFiles(value)),
                     undefined,
                     props.attachmentsEnabled && !props.isUploading && !props.inputDisabled,
                   ),
+                },
+                {
+                  id: "skill-mentions",
+                  kind: "Menu",
+                  variant: "compact",
+                  icon: "at",
+                  label: t("chat.composer.plugins"),
+                  disabled: props.inputDisabled,
+                  children: [
+                    ...(props.enabledSkills ?? []).map((skill) => ({
+                      ...button(
+                        `mention-skill:${skill.name}`,
+                        skill.name,
+                        () => composer.handle.insertSkillMention(skill),
+                        !props.inputDisabled,
+                      ),
+                      icon: "sparkles",
+                      text: skill.description,
+                    })),
+                    ...(props.enabledSkills?.length
+                      ? [{ id: "skill-menu-divider", kind: "Divider" as const }]
+                      : []),
+                    {
+                      ...button(
+                        "manage-skills",
+                        t("settings.navSkills"),
+                        props.onOpenSkillsHub,
+                        !props.inputDisabled,
+                      ),
+                      icon: "slider.horizontal.3",
+                    },
+                  ],
                 },
                 {
                   id: "model",
