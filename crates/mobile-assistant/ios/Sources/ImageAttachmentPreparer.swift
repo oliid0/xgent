@@ -9,7 +9,7 @@ private struct ImageAttachmentArgs: Decodable {
 }
 
 enum ImageAttachmentPreparer {
-    private static let maxInputBytes = 20 * 1024 * 1024
+    private static let maxInputBytes = 32 * 1024 * 1024
     private static let maxOutputBytes = 5 * 1024 * 1024
     private static let extensions = [
         "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif",
@@ -32,7 +32,7 @@ enum ImageAttachmentPreparer {
               CGImageSourceGetCount(source) > 0,
               let identifier = CGImageSourceGetType(source),
               let type = UTType(identifier as String) else {
-            throw failure("Invalid photo or photo exceeds the 20 MB import limit")
+            throw failure("Invalid photo or photo exceeds the 32 MB import limit")
         }
         if let mimeType = type.preferredMIMEType, extensions[mimeType] != nil, bytes.count <= maxOutputBytes {
             return result(fileName: fileName, mimeType: mimeType, bytes: bytes)

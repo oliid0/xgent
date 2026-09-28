@@ -7,7 +7,9 @@ type UploadedReadableFileInput = {
   contentBase64: string;
 };
 
-const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+// This path base64-encodes the original across Tauri IPC. Native photo pickers
+// can accept larger sources because they downsample before crossing the bridge.
+const MAX_IMAGE_BYTES = 32 * 1024 * 1024;
 const MAX_PREVIEW_BYTES = 5 * 1024 * 1024;
 const supportedImageMimes = new Set([
   "image/png",
@@ -36,7 +38,7 @@ async function fileToUploadInput(file: File): Promise<UploadedReadableFileInput>
     !svg &&
     (file.type.startsWith("image/") ||
       /\.(png|jpe?g|gif|webp|avif|bmp|ico|heic|heif|tiff?)$/i.test(file.name));
-  if (nativeImage && file.size > MAX_IMAGE_BYTES) throw new Error("照片超过 20 MB 导入上限");
+  if (nativeImage && file.size > MAX_IMAGE_BYTES) throw new Error("照片超过 32 MB 导入上限");
   const input = {
     fileName: file.name,
     mimeType: file.type || undefined,

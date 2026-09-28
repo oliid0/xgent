@@ -19,7 +19,7 @@ import java.nio.ByteBuffer
 class ImageAttachmentArgs { var fileName: String = ""; var contentBase64: String = "" }
 
 internal object ImageAttachmentPreparer {
-    private const val MAX_INPUT_BYTES = 20 * 1024 * 1024
+    private const val MAX_INPUT_BYTES = 32 * 1024 * 1024
     private const val MAX_OUTPUT_BYTES = 5 * 1024 * 1024
     private const val MAX_EDGE = 2048
     private val extensions = mapOf(
@@ -39,10 +39,10 @@ internal object ImageAttachmentPreparer {
 
     fun prepare(fileName: String, contentBase64: String): JSObject {
         require(contentBase64.isNotEmpty() && contentBase64.length <= ((MAX_INPUT_BYTES + 2) / 3) * 4) {
-            "Photo exceeds the 20 MB import limit or is empty"
+            "Photo exceeds the 32 MB import limit or is empty"
         }
         val bytes = Base64.decode(contentBase64, Base64.NO_WRAP)
-        require(bytes.isNotEmpty() && bytes.size <= MAX_INPUT_BYTES) { "Photo exceeds the 20 MB import limit" }
+        require(bytes.isNotEmpty() && bytes.size <= MAX_INPUT_BYTES) { "Photo exceeds the 32 MB import limit" }
         // Header-only detection avoids decoding an already supported photo at full resolution.
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)

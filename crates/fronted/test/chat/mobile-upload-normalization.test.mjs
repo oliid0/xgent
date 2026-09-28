@@ -116,10 +116,13 @@ test("native preparation rejects malformed responses and precise output-size ove
     assert.match(prepared.skipped[0], /照片转换未返回受支持的图片/);
   }
   const h = harness();
-  const large = { name: "large.heic", type: "image/heic", size: 20 * 1024 * 1024 + 1,
+  const compressible = new File([Buffer.alloc(20 * 1024 * 1024 + 1)], "compressible.heic", { type: "image/heic" });
+  assert.deepEqual(await h.prepareReadableUploads([compressible]), { files: [normalized], skipped: [] });
+  assert.equal(h.calls[0].command, "plugin:mobile-assistant|prepare_image_attachment");
+  const large = { name: "large.heic", type: "image/heic", size: 32 * 1024 * 1024 + 1,
     arrayBuffer: () => { throw new Error("Oversized photos must be rejected before reading"); } };
-  assert.match((await h.prepareReadableUploads([large])).skipped[0], /20 MB/);
-  assert.equal(h.calls.length, 0);
+  assert.match((await h.prepareReadableUploads([large])).skipped[0], /32 MB/);
+  assert.equal(h.calls.length, 1);
 });
 
 test("the upload hook merges normalized files and skip reasons, and releases busy state", async () => {
