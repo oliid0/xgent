@@ -2,15 +2,17 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 import { ArrowLeft } from "../../../components/icons";
 import { cn } from "../../../lib/shared/utils";
+import { useMobileBackNavigation } from "../../../lib/useMobileBackNavigation";
 
 type MobileFullscreenPanelProps = {
   open: boolean;
   children: ReactNode;
   label: string;
   keepMounted?: boolean;
+  onBack: () => void;
 };
 
 /**
@@ -18,10 +20,13 @@ type MobileFullscreenPanelProps = {
  * transforms, overflow and desktop split panes can never reduce a tool to a responsive drawer.
  */
 export function MobileFullscreenPanel(props: MobileFullscreenPanelProps) {
+  const panelRef = useRef<HTMLElement>(null);
+  useMobileBackNavigation(props.open, props.onBack, 20, () => panelRef.current);
   if (!props.open && !props.keepMounted) return null;
   return (
     <VStack
       as="section"
+      ref={panelRef}
       gap={0}
       width="100vw"
       height="var(--xgent-viewport-height)"

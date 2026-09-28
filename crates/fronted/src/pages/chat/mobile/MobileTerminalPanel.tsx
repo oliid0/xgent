@@ -408,7 +408,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   }
 
   return (
-    <MobileFullscreenPanel open label={panelTitle}>
+    <MobileFullscreenPanel open label={panelTitle} onBack={onClose}>
       <HStack
         as="header"
         gap={2}

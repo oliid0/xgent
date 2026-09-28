@@ -35,8 +35,15 @@ export function createPresentationActionRegistry() {
         try {
           if (!handler?.enabled) throw new Error("This action is no longer available.");
           if (!handler.accepts(event.value)) throw new Error("Invalid action value.");
-          await handler.run(event.value);
-          return { surface: event.surface, requestId: event.requestId, ok: true };
+          const value = handler.normalize ? handler.normalize(event.value) : event.value;
+          if (!handler.accepts(value)) throw new Error("Invalid normalized action value.");
+          await handler.run(value);
+          return {
+            surface: event.surface,
+            requestId: event.requestId,
+            ok: true,
+            ...(handler.normalize ? { acceptedValue: value } : {}),
+          };
         } catch (error) {
           return {
             surface: event.surface,

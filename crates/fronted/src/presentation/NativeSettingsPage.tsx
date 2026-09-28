@@ -878,7 +878,10 @@ export function NativeSettingsPage(props: SettingsPageProps) {
                   "provider-models-url",
                   t("settings.providerModelsUrl"),
                   provider.modelsUrl ?? "",
-                  (modelsUrl) => patchProvider({ modelsUrl: modelsUrl.trim() || undefined }),
+                  (modelsUrl) => patchProvider({ modelsUrl: modelsUrl || undefined }),
+                  false,
+                  true,
+                  (value) => value.trim(),
                 ),
               ]),
           c.toggle(
@@ -1620,8 +1623,14 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             settings.access.lanControlUrl,
             (lanControlUrl) => patchAccess({ lanControlUrl }),
           ),
-          c.input("lan-pairing-code", t("settings.accessLanPairingCode"), lanPairingCode, (value) =>
-            setLanPairingCode(value.replace(/\D/g, "").slice(0, 6)),
+          c.input(
+            "lan-pairing-code",
+            t("settings.accessLanPairingCode"),
+            lanPairingCode,
+            setLanPairingCode,
+            false,
+            true,
+            (value) => value.replace(/\D/g, "").slice(0, 6),
           ),
           c.input(
             "lan-device-name",

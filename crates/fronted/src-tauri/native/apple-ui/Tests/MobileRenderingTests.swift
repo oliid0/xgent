@@ -65,6 +65,7 @@ final class MobileRenderingTests: XCTestCase {
     func testModelGroupsAndLongSettingsHeader() async throws {
         let model = XgentPresentationModel()
         let chat = try document(mode: "root", appearance: "dark", nodes: chatNodes)
+        model.update(chat)
         let composer = try XCTUnwrap(chat.nodes.first?.children?.first { $0.id == "composer" })
         let actions = try XCTUnwrap(composer.children?.first { $0.id == "composer-actions" })
         let modelNode = try XCTUnwrap(actions.children?.first { $0.id == "model" })

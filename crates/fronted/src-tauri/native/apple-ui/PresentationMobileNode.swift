@@ -385,7 +385,7 @@ struct XgentIOSNode: View {
                 node: node,
                 document: document,
                 model: model,
-                controlSize: CGFloat(theme.control.small)
+                controlSize: max(44, CGFloat(theme.control.small))
             )
                 .id(node.action)
                 .buttonStyle(.plain)

@@ -27,6 +27,7 @@ import {
 import { imageActivitySelection } from "../../../lib/chat/imageActivityNavigation";
 import { summarizeToolCall, toolResultMessageToText } from "../../../lib/chat/messages/uiMessages";
 import { toolActivitySelection, toolStepLabel } from "../../../lib/chat/toolActivityNavigation";
+import { useMobileBackNavigation } from "../../../lib/useMobileBackNavigation";
 import { ToolCallDetail } from "../components/assistant-bubble/ToolCallItem";
 import { ActivityTerminal } from "./ActivityTerminal";
 
@@ -90,6 +91,15 @@ export function MobileToolActivity({
 }: MobileToolActivityProps) {
   const { t } = useLocale();
   const panelRef = useRef<HTMLElement>(null);
+  useMobileBackNavigation(
+    view === "panel" && open && mobileExperience,
+    () => {
+      imageActivitySelection.select(conversationId, null);
+      onClose();
+    },
+    20,
+    () => panelRef.current,
+  );
   useEffect(() => {
     if (view !== "panel" || !open || !mobileExperience) return;
     const previous = document.activeElement;

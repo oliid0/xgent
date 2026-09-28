@@ -17,7 +17,7 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { StatusDot, type StatusDotVariant } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   ArrowLeft,
@@ -40,6 +40,7 @@ import { useLocale } from "../i18n";
 import { useCompactViewport } from "../lib/responsive/compactViewport";
 import { THEME_OPTIONS, updateCustomSettings } from "../lib/settings";
 import { UI_THEME_PRESETS } from "../lib/settings/appearance";
+import { useMobileBackNavigation } from "../lib/useMobileBackNavigation";
 import { isLanPcCommandHostReady } from "../runtime/lanPcCommandHost";
 import { MobileMcpPage } from "./chat/mobile/MobileMcpPage";
 import { MobileSkillsPage } from "./chat/mobile/MobileSkillsPage";
@@ -475,10 +476,21 @@ export function SettingsPage(props: SettingsPageProps) {
     }
   })();
 
+  const mobileBackRef = useRef<HTMLElement>(null);
+  useMobileBackNavigation(
+    compactSettings,
+    () => {
+      if (mobileDetailOpen) setMobileDetailOpen(false);
+      else onBack();
+    },
+    10,
+    () => mobileBackRef.current,
+  );
+
   if (compactSettings) {
     return (
       <SettingsDetailLayerProvider onLayerChange={handleDetailLayerChange}>
-        <Section width="100%" height="100%" padding={0}>
+        <Section ref={mobileBackRef} width="100%" height="100%" padding={0}>
           <Layout
             height="fill"
             padding={0}

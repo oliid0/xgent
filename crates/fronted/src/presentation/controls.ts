@@ -8,8 +8,9 @@ export function presentationControls() {
     run: (value: PresentationValue) => unknown,
     accepts: PresentationHandler["accepts"],
     enabled = true,
+    normalize?: PresentationHandler["normalize"],
   ) {
-    handlers.set(id, { run, accepts, enabled });
+    handlers.set(id, { run, accepts, enabled, normalize });
     return { action: id, disabled: !enabled };
   }
   return {
@@ -24,6 +25,7 @@ export function presentationControls() {
       run: (value: string) => unknown,
       secure = false,
       enabled = true,
+      normalize?: (value: string) => string,
     ): PresentationNode {
       return {
         id,
@@ -36,6 +38,7 @@ export function presentationControls() {
           (next) => run(next as string),
           (next) => typeof next === "string",
           enabled,
+          normalize ? (next) => normalize(next as string) : undefined,
         ),
       };
     },
@@ -52,8 +55,10 @@ export function presentationControls() {
         value,
         ...bind(
           id,
-          (next) => run((next as string).toLowerCase()),
+          (next) => run(next as string),
           (next) => typeof next === "string" && /^#[\da-f]{6}$/i.test(next),
+          true,
+          (next) => (next as string).toLowerCase(),
         ),
       };
     },

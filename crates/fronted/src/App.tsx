@@ -29,6 +29,7 @@ import {
 } from "./i18n";
 import { useAppUpdateController } from "./lib/appUpdates";
 import { initAutomation } from "./lib/automation";
+import { installMobileBackNavigation } from "./lib/mobileBackNavigation";
 import { mobileExecutionStatus } from "./lib/mobileExecution";
 import {
   type MobileStartupStatus,
@@ -84,6 +85,10 @@ function AppChrome(props: { children: ReactNode; nativeMobile?: boolean }) {
   useEffect(() => {
     if (!props.nativeMobile) return;
     return trackMobileViewport(window, document.documentElement.style);
+  }, [props.nativeMobile]);
+  useEffect(() => {
+    if (!props.nativeMobile || inferRuntimePlatform() !== "android") return;
+    return installMobileBackNavigation(window, document);
   }, [props.nativeMobile]);
   // Plain inputs get a shared cut/copy/paste menu; everything else keeps the
   // suppressed native menu (surfaces with their own menus opt out upstream).

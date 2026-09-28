@@ -248,7 +248,7 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
 
   return (
     <WorkspaceToolsContext.Provider value={context}>
-      <MobileFullscreenPanel open label={t("sidebar.myFiles")}>
+      <MobileFullscreenPanel open label={t("sidebar.myFiles")} onBack={onClose}>
         <HubHeader
           icon={<FolderTree className="h-5 w-5" />}
           title={t("sidebar.myFiles")}

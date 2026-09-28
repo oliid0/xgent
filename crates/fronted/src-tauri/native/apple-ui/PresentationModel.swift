@@ -197,6 +197,17 @@ struct XgentDocument: Decodable, Identifiable {
     let removed: Bool?
     var id: String { surface }
 
+    func node(id: String) -> XgentNode? {
+        func find(_ nodes: [XgentNode]) -> XgentNode? {
+            for node in nodes {
+                if node.id == id { return node }
+                if let child = find(node.children ?? []) { return child }
+            }
+            return nil
+        }
+        return find(nodes)
+    }
+
     var colorScheme: ColorScheme? {
         switch appearance {
         case .system: return nil
@@ -266,6 +277,7 @@ struct XgentActionResult: Decodable {
     let requestId: String
     let ok: Bool
     let error: String?
+    var acceptedValue: XgentValue? = nil
 }
 
 @MainActor
@@ -349,7 +361,8 @@ final class XgentPresentationModel: ObservableObject {
     }
 
     func value(_ node: XgentNode, in document: XgentDocument) -> XgentValue {
-        edits[key(document.surface, node.id)] ?? node.value ?? .null
+        let current = documents.first { $0.surface == document.surface }?.node(id: node.id)
+        return edits[key(document.surface, node.id)] ?? current?.value ?? node.value ?? .null
     }
 
     func send(_ node: XgentNode, in document: XgentDocument, value: XgentValue = .null, editing: Bool = false) {
@@ -415,6 +428,7 @@ final class XgentPresentationModel: ObservableObject {
         busy.remove(request.node)
         if editRequests[request.node] == result.requestId {
             if result.ok {
+                if let value = result.acceptedValue { edits[request.node] = value }
                 // An action acknowledgement can precede React's next document. Keep the
                 // local edit until the shared value arrives to avoid jumping the caret.
                 acknowledgedEdits.insert(request.node)

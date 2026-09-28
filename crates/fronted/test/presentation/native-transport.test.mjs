@@ -95,6 +95,26 @@ test("native handler failures return an error acknowledgement and registry snaps
   });
 });
 
+test("normalized native inputs acknowledge the accepted value, preserving validation and replay safety", async () => {
+  const { presentationControls } = loader.loadModule("src/presentation/controls.ts");
+  const controls = presentationControls();
+  const registry = createPresentationActionRegistry();
+  const values = [];
+  controls.input("code", "Pairing code", "", (value) => values.push(value), false, true,
+    (value) => value.replace(/\D/g, "").slice(0, 6));
+  controls.color("accent", "Accent", "#ffffff", (value) => values.push(value));
+  registry.register("chat", controls.handlers);
+  const input = event("code-input", "code", "12a34567");
+  const result = await registry.dispatch(input);
+  assert.deepEqual(result, { surface: "chat", requestId: "code-input", ok: true, acceptedValue: "123456" });
+  assert.deepEqual(await registry.dispatch(input), result);
+  assert.deepEqual(values, ["123456"]);
+  assert.equal((await registry.dispatch(event("bad-code", "code", null))).ok, false);
+  assert.equal((await registry.dispatch(event("color", "accent", "#AAbbCC"))).acceptedValue, "#aabbcc");
+  assert.equal((await registry.dispatch(event("bad-color", "accent", "white"))).ok, false);
+  assert.deepEqual(values, ["123456", "#aabbcc"]);
+});
+
 test("streaming snapshots coalesce behind one native invocation and removal arrives last", async () => {
   const deliveries = [];
   const work = deferred();

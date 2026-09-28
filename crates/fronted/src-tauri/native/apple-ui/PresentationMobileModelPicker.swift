@@ -8,8 +8,13 @@ struct XgentIOSModelPicker: View {
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
 
+    private var currentDocument: XgentDocument? {
+        model.documents.first { $0.surface == document.surface }
+    }
+    private var currentNode: XgentNode? { currentDocument?.node(id: node.id) }
+
     private var groups: [XgentModelOptionGroup] {
-        XgentModelOptions.groups(node.options ?? [], query: query)
+        XgentModelOptions.groups(currentNode?.options ?? [], query: query)
     }
 
     var body: some View {
@@ -19,7 +24,8 @@ struct XgentIOSModelPicker: View {
                     Section {
                         ForEach(group.options) { option in
                             Button {
-                                model.send(node, in: document, value: .string(option.value), editing: true)
+                                guard let currentNode, let currentDocument else { return }
+                                model.send(currentNode, in: currentDocument, value: .string(option.value), editing: true)
                                 dismiss()
                             } label: {
                                 HStack(spacing: 12) {
@@ -27,14 +33,14 @@ struct XgentIOSModelPicker: View {
                                         .foregroundStyle(.primary)
                                         .fixedSize(horizontal: false, vertical: true)
                                     Spacer(minLength: 8)
-                                    if option.value == model.value(node, in: document).text {
+                                    if let currentNode, option.value == model.value(currentNode, in: document).text {
                                         Image(systemName: "checkmark").foregroundStyle(.tint)
                                     }
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                                 .contentShape(Rectangle())
                             }
-                            .disabled(option.disabled == true || node.disabled == true)
+                            .disabled(option.disabled == true || currentNode == nil || currentNode?.disabled == true)
                             .accessibilityIdentifier("model-option:\(option.value)")
                         }
                     } header: {
@@ -47,16 +53,16 @@ struct XgentIOSModelPicker: View {
             .background { XgentThemeBackground().ignoresSafeArea() }
             .overlay {
                 if groups.isEmpty {
-                    let empty = node.children?.first { $0.kind == .emptyState }
+                    let empty = currentNode?.children?.first { $0.kind == .emptyState }
                     ContentUnavailableView {
                         Label(empty?.label ?? "No matching models", systemImage: "magnifyingglass")
                     }
                 }
             }
-            .navigationTitle(node.label ?? "Model")
+            .navigationTitle(currentNode?.label ?? node.label ?? "Model")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always),
-                        prompt: Text(node.text ?? node.label ?? "Model"))
+                        prompt: Text(currentNode?.text ?? node.text ?? node.label ?? "Model"))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { dismiss() } label: { Image(systemName: "xmark") }
@@ -65,8 +71,11 @@ struct XgentIOSModelPicker: View {
             }
         }
         .presentationDetents([.large])
-        .modifier(XgentPresentationThemeModifier(theme: document.theme ?? .fallback,
-                                                  appearance: document.appearance))
+        .onChange(of: currentNode == nil || currentNode?.disabled == true) { _, unavailable in
+            if unavailable { dismiss() }
+        }
+        .modifier(XgentPresentationThemeModifier(theme: currentDocument?.theme ?? document.theme ?? .fallback,
+                                                  appearance: currentDocument?.appearance ?? document.appearance))
     }
 }
 #endif

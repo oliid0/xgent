@@ -114,10 +114,12 @@ export type PresentationActionResult = {
   requestId: string;
   ok: boolean;
   error?: string;
+  acceptedValue?: PresentationValue;
 };
 
 export type PresentationHandler = {
   enabled: boolean;
   accepts: (value: PresentationValue) => boolean;
+  normalize?: (value: PresentationValue) => PresentationValue;
   run: (value: PresentationValue) => unknown | Promise<unknown>;
 };

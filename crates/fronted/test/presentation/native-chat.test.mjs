@@ -91,10 +91,15 @@ test("native edits reach the shared composer used by send and conversation draft
   const sent = [];
   const h = harness({ onSend: () => sent.push(h.props.composerRef.current.getDraft().text) });
   assert.equal((await h.dispatch("send")).ok, false);
-  assert.equal((await h.dispatch("draft", "Hello\r\nmodel")).ok, true);
+  const edit = await h.dispatch("draft", "Hello\r\nmodel");
+  assert.equal(edit.ok, true);
+  assert.equal(edit.acceptedValue, "Hello\nmodel", "Swift receives the shared newline spelling");
   h.render();
   assert.equal((await h.dispatch("send")).ok, true);
   assert.deepEqual(sent, ["Hello\nmodel"]);
+  h.props.composerRef.current.clear();
+  assert.equal(h.render().nodes[0].children.find(node => node.id === "composer")
+    .children.find(node => node.id === "draft").value, "");
   h.props.onSelectConversation = () => h.props.composerRef.current.setText("Restored draft");
   h.props.sidebarStore.getSnapshot = () => ({ conversations: [{ id: "next", title: "Next" }] });
   assert.equal((await h.dispatch("sidebar")).ok, true);

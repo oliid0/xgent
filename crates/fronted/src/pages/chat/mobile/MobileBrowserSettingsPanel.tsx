@@ -134,7 +134,7 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
   }
 
   return (
-    <MobileFullscreenPanel open label={t("chat.mobileMenu.browserSettings")}>
+    <MobileFullscreenPanel open label={t("chat.mobileMenu.browserSettings")} onBack={props.onClose}>
       <MobilePanelHeader
         title={t("chat.mobileMenu.browserSettings")}
         backLabel={t("settings.close")}

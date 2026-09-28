@@ -275,7 +275,12 @@ export function MobileBackgroundTasksPanel(props: MobileBackgroundTasksPanelProp
   }
 
   return (
-    <MobileFullscreenPanel open={props.open} keepMounted label={t("sidebar.backgroundTasks")}>
+    <MobileFullscreenPanel
+      open={props.open}
+      keepMounted
+      label={t("sidebar.backgroundTasks")}
+      onBack={props.onClose}
+    >
       <MobilePanelHeader
         title={t("sidebar.backgroundTasks")}
         backLabel={t("settings.close")}

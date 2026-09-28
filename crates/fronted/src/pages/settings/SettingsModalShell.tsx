@@ -1,6 +1,7 @@
 import type { DialogPurpose } from "@astryxdesign/core/Dialog";
 import { VStack } from "@astryxdesign/core/Layout";
-import { createContext, type ReactNode, useCallback, useContext, useEffect } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef } from "react";
+import { useMobileBackNavigation } from "../../lib/useMobileBackNavigation";
 
 const SettingsDetailLayerContext = createContext<((delta: 1 | -1) => void) | null>(null);
 
@@ -37,11 +38,21 @@ type SettingsModalShellProps = {
 /** Shared Astryx content boundary for nested settings workflows. */
 export function SettingsModalShell({
   children,
+  onClose,
   purpose = "info",
   ariaLabel,
   panelClassName,
 }: SettingsModalShellProps) {
   const onLayerChange = useContext(SettingsDetailLayerContext);
+  const panelRef = useRef<HTMLElement>(null);
+  useMobileBackNavigation(
+    true,
+    () => {
+      if (purpose !== "required") onClose();
+    },
+    30,
+    () => panelRef.current,
+  );
 
   useEffect(() => {
     onLayerChange?.(1);
@@ -50,6 +61,7 @@ export function SettingsModalShell({
 
   return (
     <VStack
+      ref={panelRef}
       width="100%"
       height="100%"
       minHeight={0}

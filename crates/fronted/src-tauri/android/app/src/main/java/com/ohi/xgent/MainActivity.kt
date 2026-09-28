@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.OnBackPressedCallback
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -40,6 +41,29 @@ class MainActivity : TauriActivity() {
 
   override fun onWebViewCreate(webView: WebView) {
     super.onWebViewCreate(webView)
+    // Register after Tauri's plugin callbacks. Claim an in-app destination in
+    // JavaScript first; at the chat root Tauri retains its native back behavior.
+    webView.post {
+      if (!isFinishing && !isDestroyed) {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+          private var pending = false
+          override fun handleOnBackPressed() {
+            if (pending) return
+            pending = true
+            webView.evaluateJavascript("""
+              !window.dispatchEvent(new Event('xgent:mobile-back', {cancelable: true}))
+            """.trimIndent()) { handled ->
+              pending = false
+              if (handled != "true" && !isFinishing && !isDestroyed) {
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+                isEnabled = true
+              }
+            }
+          }
+        })
+      }
+    }
     webView.setBackgroundColor(android.graphics.Color.rgb(247, 247, 245))
     Log.i("XgentStartup", "WebView created: ${WebView.getCurrentWebViewPackage()?.versionName}")
     // Bounded startup diagnostics: readiness/geometry only, never chat content.

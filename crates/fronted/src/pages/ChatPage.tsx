@@ -279,6 +279,7 @@ import {
 } from "../lib/trajectory/recorderRegistry";
 import { buildTrayMenuModel, syncTrayMenu } from "../lib/tray/trayMenu";
 import { useTrayPrefs } from "../lib/tray/trayPrefs";
+import { useMobileBackNavigation } from "../lib/useMobileBackNavigation";
 import { tauriWorkspaceActivityClient } from "../lib/workspace-activity/tauriWorkspaceActivityClient";
 import {
   fallbackWorkspaceProjectName,
@@ -5090,6 +5091,7 @@ export function ChatPage(props: ChatPageProps) {
   const handleCloseSidebar = useCallback(() => {
     setSidebarOpen(false);
   }, []);
+  useMobileBackNavigation(mobileExperience && sidebarOpen, handleCloseSidebar);
 
   const handleToggleSidebar = useCallback(() => {
     setSidebarOpen((prev) => !prev);

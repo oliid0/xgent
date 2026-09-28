@@ -367,7 +367,17 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
   }
 
   return (
-    <MobileFullscreenPanel open label={t("chat.mobileSsh.title")}>
+    <MobileFullscreenPanel
+      open
+      label={t("chat.mobileSsh.title")}
+      onBack={() => {
+        if (!selectedHost) return onClose();
+        if (activeRunId) return;
+        setSelectedHostId("");
+        setKeyboardResponse("");
+        setEntries([]);
+      }}
+    >
       <HStack
         as="header"
         gap={2}

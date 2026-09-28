@@ -115,7 +115,8 @@ test("native settings mirrors compact navigation and persists shared system, pro
   const urlField = document.nodes.flatMap((node) => node.children ?? []).find((node) => node.id === "provider-url");
   assert.equal(urlField.value, endpoint, "editing retains the entered endpoint across normalization");
   await dispatch("provider-url", "https://example.test/v1");
-  await dispatch("provider-models-url", "https://catalog.example.test/v1/models");
+  const modelsUrlEdit = await dispatch("provider-models-url", " https://catalog.example.test/v1/models ");
+  assert.equal(modelsUrlEdit.acceptedValue, "https://catalog.example.test/v1/models");
   discoveryError = new Error("Model list request timed out after 10 seconds");
   assert.equal((await dispatch("fetch-models")).ok, false);
   assert.equal(document.nodes.find(node => node.id === "error").label, discoveryError.message);

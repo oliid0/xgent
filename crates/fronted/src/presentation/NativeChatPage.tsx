@@ -27,6 +27,7 @@ import {
 } from "../lib/chat/layoutPreferences";
 import { collectChangedFiles } from "../lib/chat/messages/changedFiles";
 import { collectCloudArtifacts } from "../lib/chat/messages/cloudArtifacts";
+import { normalizeLogicalLineEndings } from "../lib/chat/messages/composerText";
 import { collectPreviewedFiles } from "../lib/chat/messages/previewedFiles";
 import { readStreamPreviewMeta } from "../lib/chat/messages/toolPreview";
 import {
@@ -466,11 +467,13 @@ export function NativeChatPage(props: NativeChatPageProps) {
     run: (value: string) => unknown,
     accepts: (value: string) => boolean = () => true,
     enabled = true,
+    normalize?: (value: string) => string,
   ) => {
     handlers.set(id, {
       enabled,
       accepts: (value: PresentationValue) => typeof value === "string" && accepts(value),
       run: (value) => run(value as string),
+      normalize: normalize ? (value) => normalize(value as string) : undefined,
     });
     return id;
   };
@@ -831,7 +834,13 @@ export function NativeChatPage(props: NativeChatPageProps) {
               label: props.inputPlaceholder,
               value: draft.text,
               disabled: props.inputDisabled,
-              action: change("draft", composer.replaceEditorText, undefined, !props.inputDisabled),
+              action: change(
+                "draft",
+                composer.replaceEditorText,
+                undefined,
+                !props.inputDisabled,
+                normalizeLogicalLineEndings,
+              ),
             },
             ...(voiceError
               ? [

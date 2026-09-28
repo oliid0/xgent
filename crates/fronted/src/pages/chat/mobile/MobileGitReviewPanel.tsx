@@ -643,7 +643,16 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
   }
 
   return (
-    <MobileFullscreenPanel open label={t("chat.mobileGit.title")}>
+    <MobileFullscreenPanel
+      open
+      label={t("chat.mobileGit.title")}
+      onBack={() => {
+        if (!showingDetail) return onClose();
+        setSelectedPath("");
+        setSelectedCommit(null);
+        setDetail("");
+      }}
+    >
       <HStack
         as="header"
         gap={2}
