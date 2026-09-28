@@ -2,14 +2,17 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { Collapsible, CollapsibleGroup } from "@astryxdesign/core/Collapsible";
 import { ComplexSelector } from "@astryxdesign/core/ComplexSelector";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { RadioList, RadioListItem } from "@astryxdesign/core/RadioList";
+import { Selector } from "@astryxdesign/core/Selector";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { memo, useMemo, useState } from "react";
 
 import {
+  ArrowDownAZ,
   Check,
   ClaudeIcon,
   GeminiIcon,
@@ -18,6 +21,7 @@ import {
   Sparkle,
 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
+import { filterModelPickerGroups } from "../../../lib/chat/modelPickerGroups";
 import { groupModelOptionsByProvider } from "../../../lib/chat/page/chatPageHelpers";
 import { type ModelOption, parseModelValue } from "../../../lib/providers/llm";
 import type {
@@ -63,10 +67,17 @@ function ModelSelectorContent(props: {
   onChange: (value: string) => void;
   close: () => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [modelSearch, setModelSearch] = useState("");
+  const [providerFilter, setProviderFilter] = useState("");
+  const [sortByName, setSortByName] = useState(false);
+  const [autoFocusSearch] = useState(
+    () =>
+      typeof window === "undefined" ||
+      !window.matchMedia("(hover: none) and (pointer: coarse)").matches,
+  );
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  const normalizedSearch = modelSearch.trim().toLowerCase();
+  const normalizedSearch = modelSearch.trim();
   const groups = useMemo(
     () => groupModelOptionsByProvider(props.modelOptions),
     [props.modelOptions],
@@ -81,28 +92,19 @@ function ModelSelectorContent(props: {
     ? props.chatRuntimeControls.reasoning
     : (visibleReasoningOptions[0] ?? "minimal");
   const filteredGroups = useMemo(
-    () =>
-      normalizedSearch
-        ? groups
-            .map((group) => ({
-              ...group,
-              opts: group.opts.filter(
-                (option) =>
-                  option.model.toLowerCase().includes(normalizedSearch) ||
-                  option.providerName.toLowerCase().includes(normalizedSearch),
-              ),
-            }))
-            .filter((group) => group.opts.length > 0)
-        : groups,
-    [groups, normalizedSearch],
+    () => filterModelPickerGroups(groups, normalizedSearch, providerFilter, sortByName, locale),
+    [groups, normalizedSearch, providerFilter, sortByName, locale],
   );
+  const activeProviderFilter = groups.some((group) => group.id === providerFilter)
+    ? providerFilter
+    : "";
 
   return (
     <VStack className="xgent-model-selector-content" gap={3} width="100%">
       <TextInput
         label={t("chat.searchModel")}
         isLabelHidden
-        hasAutoFocus
+        hasAutoFocus={autoFocusSearch}
         value={modelSearch}
         onChange={setModelSearch}
         placeholder={t("chat.searchModel")}
@@ -112,6 +114,29 @@ function ModelSelectorContent(props: {
         onKeyDown={(event) => event.stopPropagation()}
         onKeyUp={(event) => event.stopPropagation()}
       />
+      {groups.length > 1 ? (
+        <HStack gap={2} width="100%" vAlign="center">
+          <Selector
+            label={t("chat.filterProviders")}
+            isLabelHidden
+            value={activeProviderFilter}
+            onChange={setProviderFilter}
+            options={[
+              { value: "", label: t("chat.allProviders") },
+              ...groups.map((group) => ({ value: group.id, label: group.name })),
+            ]}
+            size="sm"
+            className="xgent-model-provider-filter"
+          />
+          <IconButton
+            label={t("chat.sortProvidersByName")}
+            icon={<ArrowDownAZ size={16} />}
+            aria-pressed={sortByName}
+            variant={sortByName ? "secondary" : "ghost"}
+            onClick={() => setSortByName((current) => !current)}
+          />
+        </HStack>
+      ) : null}
       {visibleReasoningOptions.length > 0 ? (
         <RadioList
           label={t("chat.runtime.reasoning")}
@@ -149,6 +174,7 @@ function ModelSelectorContent(props: {
             {filteredGroups.map((group) => {
               const isExpanded =
                 normalizedSearch.length > 0 ||
+                activeProviderFilter === group.id ||
                 (expandedGroups[group.id] ?? group.id === selectedGroupId);
               return (
                 <Collapsible

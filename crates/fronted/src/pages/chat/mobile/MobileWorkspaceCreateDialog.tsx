@@ -130,6 +130,20 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
     }
   };
 
+  const changeRemoteUrl = (value: string) => {
+    setRemoteUrl(value);
+    setRemoteBranches([]);
+    if (!name.trim()) {
+      const inferred = value
+        .trim()
+        .replace(/[\\/]+$/, "")
+        .split(/[\\/]/)
+        .pop()
+        ?.replace(/\.git$/i, "");
+      if (inferred) setName(inferred);
+    }
+  };
+
   const pickExternal = async () => {
     if (busy) return;
     setBusy(true);
@@ -150,16 +164,100 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
     const c = presentationControls();
     c.handlers.set("close", { enabled: !busy, accepts: (value) => value === null, run: onClose });
     const nodes: PresentationNode[] = [
+      { id: "project-hint", kind: "Text", text: t("chat.mobileWorkspace.hint"), secondary: true },
+      ...(cloneAvailable
+        ? [
+            {
+              ...c.select(
+                "project-mode",
+                t("chat.mobileWorkspace.new"),
+                mode,
+                [
+                  { value: "new", label: t("chat.clone.newTab") },
+                  { value: "clone", label: t("chat.clone.cloneTab") },
+                ],
+                (value) => {
+                  setMode(value as "new" | "clone");
+                  setError("");
+                },
+                !busy && !loadingBranches,
+              ),
+              kind: "SegmentedControl" as const,
+            },
+          ]
+        : []),
+      ...(mode === "clone"
+        ? [
+            c.group("clone", t("chat.clone.title"), [
+              c.input(
+                "remote-url",
+                t("chat.clone.remoteUrl"),
+                remoteUrl,
+                changeRemoteUrl,
+                false,
+                !busy && !loadingBranches,
+              ),
+              c.input(
+                "branch",
+                t("chat.clone.branch"),
+                branch,
+                setBranch,
+                false,
+                !busy && !loadingBranches,
+              ),
+              ...(remoteBranches.length
+                ? [
+                    c.select(
+                      "branch-choice",
+                      t("chat.clone.branch"),
+                      remoteBranches.includes(branch) ? branch : "",
+                      [
+                        { value: "", label: t("chat.clone.defaultBranch") },
+                        ...remoteBranches.map((value) => ({ value, label: value })),
+                      ],
+                      setBranch,
+                      !busy && !loadingBranches,
+                    ),
+                  ]
+                : []),
+              c.action(
+                "load-branches",
+                t("chat.clone.loadBranches"),
+                loadBranches,
+                !!remoteUrl.trim() && !busy && !loadingBranches,
+              ),
+              ...(loadingBranches
+                ? [{ id: "branches-loading", kind: "Progress" as const, label: t("app.loading") }]
+                : []),
+            ]),
+          ]
+        : []),
       c.group("project", t("chat.mobileWorkspace.new"), [
-        c.input("name", t("chat.mobileWorkspace.name"), name, setName),
+        c.input("name", t("chat.mobileWorkspace.name"), name, setName, false, !busy),
         { id: "destination", kind: "Text", text: destination, secondary: true },
         c.action(
           "create",
-          t("chat.mobileWorkspace.create"),
+          t(mode === "clone" ? "chat.clone.start" : "chat.mobileWorkspace.create"),
           () => submit(),
-          !!name.trim() && !!destination && !busy,
+          !!name.trim() &&
+            !!destination &&
+            !busy &&
+            !loadingBranches &&
+            (mode !== "clone" || !!remoteUrl.trim()),
         ),
-        c.action("choose", t("chat.mobileWorkspace.chooseFolder"), pickExternal, !busy),
+        ...(cloneAvailable
+          ? [
+              c.action(
+                "choose-destination",
+                t("chat.clone.chooseDestination"),
+                pickDestination,
+                !busy,
+              ),
+            ]
+          : []),
+        ...(mode === "new"
+          ? [c.action("choose", t("chat.mobileWorkspace.chooseFolder"), pickExternal, !busy)]
+          : []),
       ]),
       ...(error
         ? [{ id: "error", kind: "Banner" as const, status: "error" as const, label: error }]
@@ -172,7 +270,7 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
       <NativeSurface
         document={{
           mode: "sheet",
-          title: t("chat.mobileWorkspace.new"),
+          title: t(mode === "clone" ? "chat.clone.title" : "chat.mobileWorkspace.new"),
           appearance: props.settings.theme,
           formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
           theme: createNativePresentationTheme(
@@ -225,18 +323,8 @@ export function MobileWorkspaceCreateDialog(props: MobileWorkspaceCreateDialogPr
                 label={t("chat.clone.remoteUrl")}
                 hasAutoFocus
                 value={remoteUrl}
-                onChange={(value) => {
-                  setRemoteUrl(value);
-                  if (!name.trim()) {
-                    const inferred = value
-                      .trim()
-                      .replace(/[\\/]+$/, "")
-                      .split(/[\\/]/)
-                      .pop()
-                      ?.replace(/\.git$/i, "");
-                    if (inferred) setName(inferred);
-                  }
-                }}
+                onChange={changeRemoteUrl}
+                isDisabled={busy || loadingBranches}
                 placeholder="https://github.com/owner/repository.git"
                 size="lg"
                 width="100%"

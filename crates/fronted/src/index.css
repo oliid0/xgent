@@ -4295,6 +4295,11 @@ dialog[open] > [popover][data-layer-ready="true"][data-layer-positioning="anchor
   min-width: 0;
 }
 
+.xgent-model-provider-filter {
+  min-width: 0;
+  flex: 1;
+}
+
 .xgent-model-option-label {
   min-width: 0;
   white-space: normal;

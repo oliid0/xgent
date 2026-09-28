@@ -52,18 +52,33 @@ struct XgentAttachmentPicker: View {
         node.options?.contains { $0.value == value } ?? true
     }
 
+    private func disabled(_ value: String) -> Bool {
+        node.options?.first { $0.value == value }?.disabled == true
+    }
+
     var body: some View {
         Menu {
             #if os(iOS)
             if includes("camera") && UIImagePickerController.isSourceTypeAvailable(.camera) {
                 Button { requestCamera() } label: { Label(label("camera", "Camera"), systemImage: "camera") }
+                    .disabled(disabled("camera"))
             }
             #endif
             if includes("photos") {
                 Button { pickingPhotos = true } label: { Label(label("photos", "Photos"), systemImage: "photo.on.rectangle") }
+                    .disabled(disabled("photos"))
             }
             if includes("files") {
                 Button { pickingFiles = true } label: { Label(label("files", "Files"), systemImage: "folder") }
+                    .disabled(disabled("files"))
+            }
+            if !(node.children ?? []).isEmpty {
+                Divider()
+                #if os(iOS)
+                XgentIOSMenuItems(nodes: node.children ?? [], document: document, model: model)
+                #else
+                XgentNodeChildren(nodes: node.children ?? [], document: document, model: model)
+                #endif
             }
         } label: {
             if importing { ProgressView().frame(width: controlSize, height: controlSize) }

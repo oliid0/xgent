@@ -258,22 +258,8 @@ extension XgentNodeView {
     }
 
     var nativeCodeBlock: some View {
-        ScrollView(.horizontal) {
-            Text(node.text ?? "")
-                .font(.system(size: CGFloat(presentationTheme.typography.supporting * presentationTheme.fontScale),
-                              design: .monospaced))
-                .foregroundStyle(Color(xgentHex: palette.text))
-                .textSelection(.enabled)
-                .padding(CGFloat(presentationTheme.spacing.md))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(xgentHex: palette.background),
-                    in: RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element), style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element), style: .continuous)
-                .stroke(Color(xgentHex: palette.border), lineWidth: 1)
-        }
-        .accessibilityLabel(node.label ?? node.language ?? "Code")
+        XgentCodeBlock(text: node.text ?? "", language: node.language, label: node.label)
+            .accessibilityLabel(node.label ?? node.language ?? "Code")
     }
 
     var nativeBadge: some View {

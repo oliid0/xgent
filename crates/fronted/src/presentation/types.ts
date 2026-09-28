@@ -75,7 +75,13 @@ export type PresentationNode = {
   step?: number;
   current?: number;
   total?: number;
-  options?: { value: string; label: string; disabled?: boolean }[];
+  options?: {
+    value: string;
+    label: string;
+    disabled?: boolean;
+    group?: string;
+    groupLabel?: string;
+  }[];
   accessibilityLabel?: string;
   accessibilityHint?: string;
   accessibilityValue?: string;

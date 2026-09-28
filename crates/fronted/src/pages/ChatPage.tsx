@@ -6302,6 +6302,10 @@ export function ChatPage(props: ChatPageProps) {
           historyItems={historyRenderItems}
           liveTranscriptStore={liveTranscriptStore}
           modelOptions={modelOptions}
+          chatRuntimeControls={chatRuntimeControlsForCurrentProvider}
+          reasoningOptions={chatRuntimeReasoningOptions}
+          thinkingAlwaysOn={chatRuntimeThinkingAlwaysOn}
+          onChatRuntimeControlsChange={handleChatRuntimeControlsChange}
           enabledSkills={enabledComposerSkills}
           selectedValue={selectedValue}
           contextUsageTokensSource={contextUsageTokensSource}

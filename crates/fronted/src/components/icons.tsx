@@ -8,6 +8,7 @@ import OpenAISource from "~icons/logos/openai-icon";
 import ActivitySource from "~icons/lucide/activity";
 import ArchiveSource from "~icons/lucide/archive";
 import ArchiveRestoreSource from "~icons/lucide/archive-restore";
+import ArrowDownAZSource from "~icons/lucide/arrow-down-a-z";
 import AtSignSource from "~icons/lucide/at-sign";
 import BanSource from "~icons/lucide/ban";
 import BlendSource from "~icons/lucide/blend";
@@ -511,6 +512,7 @@ export const Lightbulb = createIcon(LightbulbSource);
 export const LightbulbOff = createIcon(LightbulbOffSource);
 export const List = createIcon(ListSource);
 export const ListChecks = createIcon(ListChecksSource);
+export const ArrowDownAZ = createIcon(ArrowDownAZSource);
 function LoadingSpinner({ className, style, "aria-label": ariaLabel }: SVGProps<SVGSVGElement>) {
   const nativeClassName = className
     ?.split(/\s+/)

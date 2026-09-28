@@ -23,6 +23,7 @@ export function presentationControls() {
       value: string,
       run: (value: string) => unknown,
       secure = false,
+      enabled = true,
     ): PresentationNode {
       return {
         id,
@@ -34,6 +35,7 @@ export function presentationControls() {
           id,
           (next) => run(next as string),
           (next) => typeof next === "string",
+          enabled,
         ),
       };
     },
@@ -81,6 +83,7 @@ export function presentationControls() {
       value: string,
       options: { value: string; label: string }[],
       run: (value: string) => unknown,
+      enabled = true,
     ): PresentationNode {
       return {
         id,
@@ -92,6 +95,7 @@ export function presentationControls() {
           id,
           (next) => run(next as string),
           (next) => options.some((option) => option.value === next),
+          enabled,
         ),
       };
     },

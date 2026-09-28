@@ -45,7 +45,13 @@ import {
 } from "../lib/mobileAssistant";
 import { type ModelOption, parseModelValue } from "../lib/providers/llm";
 import { isNativeMobileRuntime } from "../lib/runtimePlatform";
-import type { AppSettings, SelectedModel, WorkspaceProject } from "../lib/settings";
+import type {
+  AppSettings,
+  ChatRuntimeControls,
+  ReasoningLevel,
+  SelectedModel,
+  WorkspaceProject,
+} from "../lib/settings";
 import type { SidebarStore } from "../lib/sidebar/store";
 import { type DesktopSttCapture, startDesktopSttCapture } from "../lib/stt/desktopAudioCapture";
 import type {
@@ -57,6 +63,7 @@ import type { PendingToolApprovalSummary, ToolApprovalDecision } from "../lib/to
 import { createNativeComposerStore } from "./composerStore";
 import { presentationControls } from "./controls";
 import { NativeSurface } from "./NativeSurface";
+import { createNativeChatRuntimeControls } from "./nativeChatRuntimeControls";
 import { decodeNativeFiles } from "./nativeFiles";
 import { createNativePresentationTheme } from "./nativeTheme";
 import type { PresentationHandler, PresentationNode, PresentationValue } from "./types";
@@ -221,6 +228,10 @@ export type NativeChatPageProps = {
   historyItems: RenderTimelineItem[];
   liveTranscriptStore: LiveTranscriptStore;
   modelOptions: ModelOption[];
+  chatRuntimeControls: ChatRuntimeControls;
+  reasoningOptions: ReasoningLevel[];
+  thinkingAlwaysOn: boolean;
+  onChatRuntimeControlsChange: (patch: Partial<ChatRuntimeControls>) => void;
   enabledSkills?: MentionComposerSkill[];
   selectedValue?: string;
   contextUsageTokensSource: {
@@ -671,6 +682,18 @@ export function NativeChatPage(props: NativeChatPageProps) {
           accessibilityValue: `${usedTokens.toLocaleString()} / ${contextWindow.toLocaleString()} tokens (${Math.round(contextRatio * 100)}%)`,
         }
       : null;
+  const runtime = createNativeChatRuntimeControls(
+    {
+      controls: props.chatRuntimeControls,
+      reasoningOptions: props.reasoningOptions,
+      thinkingAlwaysOn: props.thinkingAlwaysOn,
+      agentMode: props.settings.system.executionMode !== "text",
+      disabled: props.inputDisabled,
+      onChange: props.onChatRuntimeControlsChange,
+    },
+    t,
+  );
+  for (const [id, handler] of runtime.handlers) handlers.set(id, handler);
   const nodes: PresentationNode[] = [
     {
       id: "chat",
@@ -845,8 +868,22 @@ export function NativeChatPage(props: NativeChatPageProps) {
                   options: ["camera", "photos", "files"].map((value) => ({
                     value,
                     label: t("chat.upload." + value),
+                    disabled: !props.attachmentsEnabled,
                   })),
-                  disabled: !props.attachmentsEnabled || props.isUploading || props.inputDisabled,
+                  disabled: props.isUploading || props.inputDisabled,
+                  children: [
+                    {
+                      ...button(
+                        "attach-plugins",
+                        t("chat.composer.plugins"),
+                        props.onOpenSkillsHub,
+                        !props.inputDisabled,
+                      ),
+                      icon: "puzzlepiece.extension",
+                    },
+                    { id: "attach-runtime-divider", kind: "Divider" },
+                    ...runtime.nodes,
+                  ],
                   action: change(
                     `attach:${props.conversationId}`,
                     async (value) => props.onImportFiles(decodeNativeFiles(value)),
@@ -892,12 +929,23 @@ export function NativeChatPage(props: NativeChatPageProps) {
                   variant: "compact",
                   icon: "sparkles",
                   label: t("chat.model"),
+                  text: t("chat.searchModel"),
                   value: props.selectedValue ?? "",
                   disabled: props.modelOptions.length === 0,
                   options: props.modelOptions.map((option) => ({
                     value: option.value,
                     label: `${option.providerName} · ${option.label}`,
+                    group: option.providerId,
+                    groupLabel: option.providerName,
                   })),
+                  children: [
+                    {
+                      id: "model-empty",
+                      kind: "EmptyState",
+                      label: t("chat.noModelFound"),
+                      icon: "magnifyingglass",
+                    },
+                  ],
                   action: change(
                     "model",
                     (value) => {

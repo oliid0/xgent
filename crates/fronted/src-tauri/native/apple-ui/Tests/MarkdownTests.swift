@@ -39,6 +39,7 @@ final class MarkdownTests: XCTestCase {
                 let result = XgentSwiftHighlighter(dark: dark).attributedCode(code, language: "SWIFT")
                 XCTAssertEqual(result.string, code)
                 XCTAssertNotNil(result.attribute(.foregroundColor, at: prefix.utf16.count, effectiveRange: nil))
+                XCTAssertNil(result.attribute(.font, at: prefix.utf16.count, effectiveRange: nil))
             }
         }
     }

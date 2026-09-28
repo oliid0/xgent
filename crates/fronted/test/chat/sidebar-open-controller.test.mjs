@@ -28,6 +28,7 @@ function createHarness(overrides = {}) {
     },
     onStateChange: (state) => {
       states.push(state);
+      overrides.onStateChange?.(state);
     },
     overlayDelayMs: overrides.overlayDelayMs ?? 20,
   });
@@ -101,12 +102,17 @@ test("post-open project activation runs only after the selected conversation loa
 });
 
 test("post-open project failure does not discard the loaded conversation", async () => {
-  const { controller, states } = createHarness();
+  const ready = Promise.withResolvers();
+  const { controller, states } = createHarness({
+    onStateChange: (state) => {
+      if (state.phase === "ready") ready.resolve();
+    },
+  });
   const previousLog = console.error;
   console.error = () => {};
   try {
     controller.open("conv", { afterPaint: () => { throw new Error("workspace failed"); } });
-    await sleep(20);
+    await ready.promise;
     assert.equal(states.at(-1).phase, "ready");
     assert.equal(states.at(-1).errorCode, null);
   } finally {

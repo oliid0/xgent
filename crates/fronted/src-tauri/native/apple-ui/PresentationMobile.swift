@@ -40,9 +40,11 @@ struct XgentIOSRootPresentation: View {
             let drawerWidth = min(320, geometry.size.width * 0.85)
             ZStack(alignment: .leading) {
                 XgentIOSChatPresentation(document: document, model: model, isObscured: sidebar != nil)
-                    // Liquid Glass floats above sibling layers on recent iOS.
-                    // Hide the underlying page while its navigation drawer is open.
-                    .opacity(sidebar == nil ? 1 : 0)
+                    // The composer retires its glass/keyboard while obscured.
+                    // Keep the rounded page edge visible beside the drawer.
+                    .clipShape(RoundedRectangle(cornerRadius: sidebar == nil ? 0 : 26,
+                                                style: .continuous))
+                    .offset(x: sidebar == nil ? 0 : drawerWidth)
                     .accessibilityIdentifier("xgent-native-root")
                     .accessibilityHidden(sidebar != nil)
                     .allowsHitTesting(sidebar == nil)
@@ -374,17 +376,16 @@ private struct XgentIOSSidebarPresentation: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 12) {
-                    if let title { XgentIOSNode(node: title, document: document, model: model) }
-                    HStack(spacing: 8) {
-                        if let mode {
-                            XgentIOSNode(node: mode, document: document, model: model)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        if let searchToggle {
-                            XgentIOSNode(node: searchToggle, document: document, model: model)
-                        }
-                    }
+                if let title {
+                    Text(title.text ?? title.label ?? "Xgent")
+                        .font(.title2.weight(.bold))
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityAddTraits(.isHeader)
+                } else { Spacer(minLength: 0) }
+                if let searchToggle {
+                    XgentIOSNode(node: searchToggle, document: document, model: model)
+                        .modifier(XgentIOSNavigationControl())
                 }
                 Button { model.dismiss(document) } label: {
                     Image(systemName: "xmark")
@@ -398,6 +399,12 @@ private struct XgentIOSSidebarPresentation: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            if let mode {
+                XgentIOSNode(node: mode, document: document, model: model)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+            }
             if let search {
                 XgentIOSNode(node: search, document: document, model: model)
                     .padding(.horizontal, 16)
@@ -446,9 +453,7 @@ private struct XgentIOSSidebarFooter: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .foregroundStyle(.white)
-                        .background(Color(xgentHex: palette.accent), in: RoundedRectangle(
-                            cornerRadius: 12, style: .continuous
-                        ))
+                        .background(Color(xgentHex: palette.accent), in: Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(newChat.accessibilityLabel ?? newChat.label ?? "")
@@ -507,21 +512,26 @@ private struct XgentIOSPageHeader: View {
     @ObservedObject var model: XgentPresentationModel
 
     var body: some View {
-        ZStack {
-            Text(title).font(.headline).lineLimit(1)
-            HStack {
-                Spacer()
-                if document.dismissAction != nil {
-                    Button { model.dismiss(document) } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 17, weight: .semibold))
-                            .frame(width: 44, height: 44)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .modifier(XgentIOSNavigationControl())
-                    .accessibilityLabel(Text("Close"))
+        HStack(spacing: 8) {
+            Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+            Text(title)
+                .font(.headline)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .accessibilityAddTraits(.isHeader)
+            if document.dismissAction != nil {
+                Button { model.dismiss(document) } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
                 }
+                .buttonStyle(.plain)
+                .modifier(XgentIOSNavigationControl())
+                .accessibilityLabel(Text("Close"))
+            } else {
+                Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
             }
         }
         .frame(minHeight: 68)
@@ -559,36 +569,44 @@ struct XgentIOSSheetPresentation: View {
     }
 
     private var header: some View {
-        ZStack {
-            Text(document.title).font(.headline).lineLimit(1)
-            HStack {
-                if let back {
-                    Button { model.send(back, in: document) } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .semibold))
-                            .frame(width: 44, height: 44)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .modifier(XgentIOSNavigationControl())
-                    .accessibilityLabel(back.label ?? "Back")
+        HStack(spacing: 8) {
+            if let back {
+                Button { model.send(back, in: document) } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
                 }
-                Spacer()
-                if let saveStatus, back != nil {
-                    Text(saveStatus.text ?? "")
-                        .font(.subheadline)
-                        .foregroundStyle(saveStatus.secondary == true ? Color.secondary : Color.red)
-                } else if document.dismissAction != nil {
-                    Button { model.dismiss(document) } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 17, weight: .semibold))
-                            .frame(width: 44, height: 44)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .modifier(XgentIOSNavigationControl())
-                    .accessibilityLabel(Text("Close"))
+                .buttonStyle(.plain)
+                .modifier(XgentIOSNavigationControl())
+                .accessibilityLabel(back.label ?? "Back")
+            } else {
+                Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+            }
+            Text(document.title)
+                .font(.headline)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .accessibilityAddTraits(.isHeader)
+            if let saveStatus, back != nil {
+                Text(saveStatus.text ?? "")
+                    .font(.subheadline)
+                    .foregroundStyle(saveStatus.secondary == true ? Color.secondary : Color.red)
+                    .lineLimit(2)
+                    .frame(minWidth: 44, maxWidth: 96)
+            } else if document.dismissAction != nil {
+                Button { model.dismiss(document) } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
                 }
+                .buttonStyle(.plain)
+                .modifier(XgentIOSNavigationControl())
+                .accessibilityLabel(Text("Close"))
+            } else {
+                Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
             }
         }
         .frame(minHeight: 68)

@@ -97,10 +97,9 @@ test("model pickers search models and providers", () => {
   assert.match(modelSelectorSource, /<TextInput/);
   assert.match(modelSelectorSource, /hasAutoFocus/);
   assert.match(modelSelectorSource, /placeholder=\{t\("chat\.searchModel"\)\}/);
-  assert.match(modelSelectorSource, /\w+\.model\.toLowerCase\(\)\.includes\(normalizedSearch\)/);
   assert.match(
     modelSelectorSource,
-    /\w+\.providerName\.toLowerCase\(\)\.includes\(normalizedSearch\)/,
+    /filterModelPickerGroups\(groups, normalizedSearch, providerFilter, sortByName, locale\)/,
   );
   assert.match(modelSelectorSource, /t\("chat\.noModelFound"\)/);
 });

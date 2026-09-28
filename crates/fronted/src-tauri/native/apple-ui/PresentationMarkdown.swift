@@ -37,30 +37,8 @@ struct XgentMarkdown: View {
             .markdownInlineImageProvider(XgentMarkdownImageFallback())
             .markdownCodeSyntaxHighlighter(XgentSwiftHighlighter(dark: colorScheme == .dark))
             .markdownBlockStyle(\.codeBlock) { configuration in
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack {
-                        Text(configuration.language ?? "Code").font(.caption.monospaced())
-                        Spacer(minLength: 8)
-                        Button { copyCode(configuration.content) } label: {
-                            Image(systemName: "doc.on.doc")
-                        }
-                        .buttonStyle(.plain)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .accessibilityLabel(Text("Copy code"))
-                    }
-                    .padding(.horizontal, 12)
-                    Divider()
-                    ScrollView(.horizontal) {
-                        configuration.label
-                            .markdownTextStyle {
-                                FontFamilyVariant(.monospaced)
-                                FontSize(.em(0.85))
-                            }
-                            .padding(12)
-                    }
-                }
-                .background(Color(xgentHex: palette.muted), in: RoundedRectangle(cornerRadius: 14))
-                .markdownMargin(top: 0, bottom: 12)
+                XgentCodeBlock(text: configuration.content, language: configuration.language)
+                    .markdownMargin(top: 0, bottom: 12)
             }
             .markdownBlockStyle(\.table) { configuration in
                 ScrollView(.horizontal) {
@@ -75,8 +53,11 @@ struct XgentMarkdown: View {
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
 
-    private func copyCode(_ text: String) {
+@MainActor
+enum XgentCodeClipboard {
+    static func copy(_ text: String) {
         #if os(iOS)
         UIPasteboard.general.string = text
         #else
@@ -114,6 +95,9 @@ struct XgentSwiftHighlighter: CodeSyntaxHighlighter {
         guard highlighted.string == code else { return NSAttributedString(string: content) }
         let result = NSMutableAttributedString(string: prefix)
         result.append(highlighted)
+        // Let the SwiftUI font scale with Dynamic Type rather than keeping
+        // Splash's fixed platform font on every token.
+        result.removeAttribute(.font, range: NSRange(location: 0, length: result.length))
         return result
     }
 

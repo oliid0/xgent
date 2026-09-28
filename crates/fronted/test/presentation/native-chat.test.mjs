@@ -45,7 +45,9 @@ function harness(overrides = {}, options = {}) {
     composerRef: { current: null },
     sidebarStore: { subscribe: () => () => {}, getSnapshot: () => ({ conversations: [], hasMore: false }) },
     historyItems: [], liveTranscriptStore: createLiveTranscriptStore(),
-    modelOptions: [{ value: "provider::model", providerName: "Provider", label: "Model" }],
+    modelOptions: [{ value: "provider::model", providerId: "provider", providerName: "Provider", label: "Model" }],
+    chatRuntimeControls: { thinkingEnabled: false, nativeWebSearchEnabled: false, planModeEnabled: false, reasoning: "low" },
+    reasoningOptions: ["low", "high"], thinkingAlwaysOn: false, onChatRuntimeControlsChange() {},
     selectedValue: "provider::model",
     contextUsageTokensSource: { subscribe: () => () => {}, getContextUsageTokens: () => 45_000 },
     contextWindow: 100_000,
@@ -102,6 +104,37 @@ test("native edits reach the shared composer used by send and conversation draft
   h.unmount();
   assert.equal(h.props.composerRef.current, null);
   assert.equal((await h.dispatch("send")).ok, false);
+});
+
+test("native attachment menu keeps runtime controls usable without attachment support", async () => {
+  const patches = [];
+  let plugins = 0;
+  let imports = 0;
+  const h = harness({
+    attachmentsEnabled: false,
+    onOpenSkillsHub: () => { plugins += 1; },
+    onImportFiles: async () => { imports += 1; },
+    onChatRuntimeControlsChange: (patch) => patches.push(JSON.parse(JSON.stringify(patch))),
+  }, { mobile: true });
+  const composer = h.render().nodes[0].children.find((node) => node.id === "composer");
+  const footer = composer.children.find((node) => node.id === "composer-actions");
+  const attach = footer.children.find((node) => node.id === "attach");
+  const model = footer.children.find((node) => node.id === "model");
+  assert.equal(attach.disabled, false);
+  assert.equal(attach.options.every((option) => option.disabled), true);
+  assert.equal(model.options[0].group, "provider");
+  assert.equal(model.options[0].groupLabel, "Provider");
+  assert.equal((await h.dispatch("attach-plugins")).ok, true);
+  assert.equal(plugins, 1);
+  assert.equal((await h.dispatch("runtime-web-search", true)).ok, true);
+  assert.deepEqual(patches, [{ nativeWebSearchEnabled: true }]);
+  assert.equal((await h.dispatch("attach:conversation", "[]")).ok, false);
+  assert.equal(imports, 0);
+  h.props.inputDisabled = true;
+  h.render();
+  assert.equal((await h.dispatch("runtime-web-search", false)).ok, false);
+  assert.equal((await h.dispatch("attach-plugins")).ok, false);
+  h.unmount();
 });
 
 test("native skill menu inserts rich references into the sent draft and rejects removed or disabled choices", async () => {

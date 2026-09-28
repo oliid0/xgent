@@ -2049,8 +2049,19 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         selected: page === id,
       }),
     );
+  const settingIcons: Record<string, string> = {
+    theme: "sun.max",
+    "appearance-preset": "paintpalette",
+    language: "globe",
+    thinking: "brain",
+  };
   const renderedNodes: PresentationNode[] = nativeMobile
-    ? nodes
+    ? nodes.map((node) => ({
+        ...node,
+        children: node.children?.map((child) =>
+          settingIcons[child.id] ? { ...child, icon: settingIcons[child.id] } : child,
+        ),
+      }))
     : [
         {
           id: "settings-layout",

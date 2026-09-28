@@ -37,7 +37,15 @@ struct XgentOption: Decodable, Identifiable {
     let value: String
     let label: String
     let disabled: Bool?
+    let group: String?
+    let groupLabel: String?
     var id: String { value }
+
+    var displayLabel: String {
+        guard let groupLabel else { return label }
+        let prefix = groupLabel + " · "
+        return label.hasPrefix(prefix) ? String(label.dropFirst(prefix.count)) : label
+    }
 }
 
 struct XgentPalette: Decodable {
