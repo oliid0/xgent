@@ -12,11 +12,19 @@ enum XgentImageRequests {
         return ImagePipeline {
             $0.imageCache = cache
             $0.dataCache = nil
+            let bitmapDecoder = $0.makeImageDecoder
+            $0.makeImageDecoder = { context in
+                if let svg = context.request.userInfo[XgentSVGImageDecoder.requestKey] as? XgentSVGImageDecoder {
+                    return svg
+                }
+                return bitmapDecoder(context)
+            }
         }
     }()
 
     // Base64 decoding and content hashing happen away from SwiftUI's render path.
     nonisolated static func prepare(_ encoded: String, maximumPixelSize: Float) async throws -> ImageRequest {
+        try Task.checkCancellation()
         let task = Task.detached(priority: .userInitiated) {
             try Task.checkCancellation()
             guard maximumPixelSize.isFinite, maximumPixelSize > 0 else { throw ImageError.invalid }
@@ -36,6 +44,10 @@ enum XgentImageRequests {
             // Pixel size is part of the identity so LazyImage also refreshes after resizing.
             var request = ImageRequest(id: "xgent-image:\(digest):\(pixels)", data: { bytes }, options: [.disableDiskCache])
             request.thumbnail = .init(maxPixelSize: Float(pixels))
+            if let svg = XgentSVGImageDecoder(data: bytes, maximumPixelSize: pixels) {
+                request.userInfo[XgentSVGImageDecoder.requestKey] = svg
+            }
+            try Task.checkCancellation()
             return request
         }
         return try await withTaskCancellationHandler(operation: {

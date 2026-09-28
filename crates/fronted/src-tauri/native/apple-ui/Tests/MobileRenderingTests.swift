@@ -117,6 +117,33 @@ final class MobileRenderingTests: XCTestCase {
     }
 
     @MainActor
+    func testSVGPreviewAndThumbnailsAtNarrowWideAndAccessibleSizes() async throws {
+        let svg = nativeSVGFixture(width: 800, height: 400, contents: """
+        <defs><linearGradient id="g"><stop offset="0" stop-color="#2563eb"/>
+          <stop offset="1" stop-color="#9333ea"/></linearGradient></defs>
+        <rect x="40" y="40" width="720" height="320" rx="48" fill="url(#g)"/>
+        <path d="M 160 200 L 320 120 L 480 280 L 640 160" fill="none" stroke="white" stroke-width="16"/>
+        """).base64EncodedString()
+        for (name, width, typeSize) in [
+            ("svg-narrow", CGFloat(320), DynamicTypeSize.large),
+            ("svg-wide", CGFloat(768), DynamicTypeSize.large),
+            ("svg-accessible", CGFloat(390), DynamicTypeSize.accessibility2),
+        ] {
+            let page = try document(mode: "page", appearance: "light", nodes: [
+                node("file", "BrowserLayout", ["fill": true, "children": [
+                    node("title", "Heading", ["text": "Workspace SVG"]),
+                    node("thumbnail", "ActivityPreview", ["label": "Vector drawing", "value": svg, "action": "preview"]),
+                    node("image", "MediaPreview", ["label": "diagram.svg", "language": "image/svg+xml", "value": svg, "fill": true]),
+                ]]),
+            ], title: "SVG")
+            let model = XgentPresentationModel()
+            model.update(page)
+            try await capture(XgentIOSPagePresentation(document: page, sidebar: nil, model: model).dynamicTypeSize(typeSize),
+                              name: name, width: width)
+        }
+    }
+
+    @MainActor
     func testGroupedSettingsAndSidebar() async throws {
         let model = XgentPresentationModel()
         let settings = try document(mode: "sheet", appearance: "dark", nodes: [

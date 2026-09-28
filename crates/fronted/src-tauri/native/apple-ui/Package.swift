@@ -12,6 +12,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-collections", exact: "1.2.1"),
         .package(url: "https://github.com/siteline/swiftui-introspect", exact: "26.0.1"),
         .package(url: "https://github.com/kean/Nuke", exact: "13.2.0"),
+        .package(url: "https://github.com/swhitty/SwiftDraw", exact: "0.29.0"),
     ],
     targets: [
         .target(name: "XgentNativeUI", dependencies: [
@@ -22,6 +23,7 @@ let package = Package(
             .product(name: "SwiftUIIntrospect", package: "swiftui-introspect"),
             .product(name: "Nuke", package: "Nuke"),
             .product(name: "NukeUI", package: "Nuke"),
+            .product(name: "SwiftDraw", package: "SwiftDraw"),
         ], path: ".", exclude: ["Tests"]),
         .testTarget(name: "XgentNativeUITests", dependencies: [
             "XgentNativeUI", .product(name: "MarkdownUI", package: "swift-markdown-ui"),
