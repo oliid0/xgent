@@ -127,7 +127,7 @@ pub(crate) async fn run_mobile_shell(
                             json!({
                                 "workdir": remote_workdir,
                                 "command": &command,
-                                "cwd": null,
+                                "cwd": cwd.as_deref(),
                                 "timeout_ms": effective_timeout_ms,
                                 "max_timeout_ms": maximum,
                                 "provider_id": provider_id.as_deref(),
