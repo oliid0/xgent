@@ -78,7 +78,7 @@ final class MobileRenderingTests: XCTestCase {
             ("images-wide", CGFloat(768), DynamicTypeSize.large),
             ("images-accessible", CGFloat(390), DynamicTypeSize.accessibility2),
         ] {
-            let page = try document(mode: "page", appearance: "light", nodes: [
+            let page = try document(mode: "root", appearance: "light", nodes: [
                 node("file", "BrowserLayout", ["fill": true, "children": [
                     node("title", "Heading", ["text": "Workspace image"]),
                     node("activity", "HStack", ["children": [
@@ -90,24 +90,54 @@ final class MobileRenderingTests: XCTestCase {
             ], title: "Image")
             let model = XgentPresentationModel()
             model.update(page)
-            try await capture(XgentIOSPagePresentation(document: page, sidebar: nil, model: model).dynamicTypeSize(typeSize),
+            try await capture(XgentIOSWorkspacePresentation(document: page, model: model).dynamicTypeSize(typeSize),
                               name: name, width: width)
         }
-        let page = try document(mode: "page", appearance: "dark", nodes: [
+        let page = try document(mode: "root", appearance: "dark", nodes: [
             node("broken", "MediaPreview", ["label": "broken.png", "language": "image/png", "value": "invalid-image", "fill": true]),
         ], title: "Image")
         let model = XgentPresentationModel()
         model.update(page)
-        try await capture(XgentIOSPagePresentation(document: page, sidebar: nil, model: model),
+        try await capture(XgentIOSWorkspacePresentation(document: page, model: model),
                           name: "image-error-narrow", width: 320)
         let html = Data("<html><body><h1>Workspace document</h1><p>Native document preview</p></body></html>".utf8)
-        let office = try document(mode: "page", appearance: "light", nodes: [
+        let office = try document(mode: "root", appearance: "light", nodes: [
             node("document", "MediaPreview", ["label": "report.doc", "language": "text/html", "value": html.base64EncodedString(), "fill": true]),
         ], title: "Document")
         let officeModel = XgentPresentationModel()
         officeModel.update(office)
         try await capture(XgentIOSPagePresentation(document: office, sidebar: nil, model: officeModel),
                           name: "office-preview-narrow", width: 320)
+    }
+
+    @MainActor
+    func testWorkspaceCodeEditorAtNarrowWideAccessibleAndDarkSizes() async throws {
+        let source = """
+        import Foundation
+
+        struct Workspace {
+            let title = "你好 👋"
+            let longLine = "\(String(repeating: "source text ", count: 24))"
+        }
+        """
+        for (name, width, appearance, typeSize) in [
+            ("editor-narrow", CGFloat(320), "light", DynamicTypeSize.large),
+            ("editor-wide", CGFloat(768), "light", DynamicTypeSize.large),
+            ("editor-accessible", CGFloat(390), "light", DynamicTypeSize.accessibility2),
+            ("editor-dark", CGFloat(390), "dark", DynamicTypeSize.large),
+        ] {
+            let page = try document(mode: "root", appearance: appearance, nodes: [
+                node("file", "BrowserLayout", ["fill": true, "children": [
+                    node("title", "Heading", ["text": "Example.swift"]),
+                    node("code", "TextArea", ["label": "Example.swift", "language": "swift", "value": source,
+                        "action": "edit", "fill": true]),
+                ]]),
+            ], title: "File")
+            let model = XgentPresentationModel()
+            model.update(page)
+            let view = XgentRootLayout(model: model).dynamicTypeSize(typeSize)
+            try await capture(view, name: name, width: width)
+        }
     }
 
     @MainActor
@@ -129,7 +159,7 @@ final class MobileRenderingTests: XCTestCase {
             ("svg-wide", CGFloat(768), DynamicTypeSize.large),
             ("svg-accessible", CGFloat(390), DynamicTypeSize.accessibility2),
         ] {
-            let page = try document(mode: "page", appearance: "light", nodes: [
+            let page = try document(mode: "root", appearance: "light", nodes: [
                 node("file", "BrowserLayout", ["fill": true, "children": [
                     node("title", "Heading", ["text": "Workspace SVG"]),
                     node("thumbnail", "ActivityPreview", ["label": "Vector drawing", "value": svg, "action": "preview"]),
@@ -138,7 +168,7 @@ final class MobileRenderingTests: XCTestCase {
             ], title: "SVG")
             let model = XgentPresentationModel()
             model.update(page)
-            try await capture(XgentIOSPagePresentation(document: page, sidebar: nil, model: model).dynamicTypeSize(typeSize),
+            try await capture(XgentIOSWorkspacePresentation(document: page, model: model).dynamicTypeSize(typeSize),
                               name: name, width: width)
         }
     }

@@ -546,20 +546,26 @@ struct XgentIOSNode: View {
     private var textArea: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let label = node.label, !label.isEmpty { Text(label).font(.subheadline) }
-            TextEditor(text: textBinding)
-                .scrollContentBackground(.hidden)
-                .introspect(.textEditor, on: .iOS(.v26)) { textView in
-                    textView.keyboardDismissMode = .interactive
-                }
-                .frame(minHeight: 112)
-                .padding(8)
-                .background(Color(xgentHex: palette.surface), in: RoundedRectangle(
-                    cornerRadius: CGFloat(theme.radius.element), style: .continuous
-                ))
-                .overlay {
-                    RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
-                        .stroke(Color(xgentHex: palette.border), lineWidth: 1)
-                }
+            if let language = node.language, !language.isEmpty {
+                XgentCodeEditor(text: textBinding, language: language, label: node.label ?? language,
+                                enabled: node.disabled != true, wrapText: node.wrap ?? true)
+                    .id("\(document.surface):\(node.id)")
+            } else {
+                TextEditor(text: textBinding)
+                    .scrollContentBackground(.hidden)
+                    .introspect(.textEditor, on: .iOS(.v26)) { textView in
+                        textView.keyboardDismissMode = .interactive
+                    }
+                    .frame(minHeight: 112)
+                    .padding(8)
+                    .background(Color(xgentHex: palette.surface), in: RoundedRectangle(
+                        cornerRadius: CGFloat(theme.radius.element), style: .continuous
+                    ))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
+                            .stroke(Color(xgentHex: palette.border), lineWidth: 1)
+                    }
+            }
         }
     }
 

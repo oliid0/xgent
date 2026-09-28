@@ -383,7 +383,10 @@ final class XgentPresentationModel: ObservableObject {
 
     func send(_ node: XgentNode, in document: XgentDocument, value: XgentValue = .null, editing: Bool = false) {
         guard active else { return }
-        guard node.disabled != true, let action = node.action else { return }
+        guard node.disabled != true,
+              let current = documents.first(where: { $0.surface == document.surface })?.node(id: node.id),
+              current.kind == node.kind, current.action == node.action,
+              current.disabled != true, let action = current.action else { return }
         let nodeKey = key(document.surface, node.id)
         if !editing && busy.contains(nodeKey) { return }
         let requestId = UUID().uuidString

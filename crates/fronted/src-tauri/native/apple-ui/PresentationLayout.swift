@@ -787,18 +787,26 @@ extension XgentNodeView {
     var nativeTextArea: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let label = node.label, !label.isEmpty { Text(label).font(.subheadline) }
-            TextEditor(text: textBinding)
-                .scrollContentBackground(.hidden)
-                .frame(minHeight: 100)
-                .padding(8)
-                .background(Color(xgentHex: palette.surface),
-                            in: RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element),
-                                                 style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element), style: .continuous)
-                        .stroke(Color(xgentHex: palette.border), lineWidth: 1)
-                }
-                .accessibilityLabel(node.label ?? node.text ?? "")
+            if let language = node.language, !language.isEmpty {
+                XgentCodeEditor(text: textBinding, language: language, label: node.label ?? language,
+                                enabled: node.disabled != true,
+                                wrapText: node.wrap ?? (document.formFactor != .desktop),
+                                showsMinimap: document.formFactor == .desktop)
+                    .id("\(document.surface):\(node.id)")
+            } else {
+                TextEditor(text: textBinding)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 100)
+                    .padding(8)
+                    .background(Color(xgentHex: palette.surface),
+                                in: RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element),
+                                                     style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element), style: .continuous)
+                            .stroke(Color(xgentHex: palette.border), lineWidth: 1)
+                    }
+                    .accessibilityLabel(node.label ?? node.text ?? "")
+            }
         }
     }
 

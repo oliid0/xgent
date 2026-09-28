@@ -19,6 +19,23 @@ private final class ActionWebView: WKWebView {
 
 final class PresentationModelTests: XCTestCase {
     @MainActor
+    func testStaleControlsCannotEmitEditsAfterTheyAreDisabledOrReplaced() throws {
+        for current in [try document(2, value: "Current", disabled: true),
+                        try document(2, value: "Current", focusRequest: 0),
+                        try document(2, value: "Current", action: "replacement")] {
+            let model = XgentPresentationModel()
+            let webview = ActionWebView()
+            model.webview = webview
+            let initial = try document(1, value: "Initial")
+            model.update(initial)
+            model.update(current)
+            model.send(try XCTUnwrap(initial.node(id: "input")), in: initial, value: .string("stale"), editing: true)
+            XCTAssertTrue(webview.actions.isEmpty)
+            XCTAssertTrue(model.edits.isEmpty)
+        }
+    }
+
+    @MainActor
     func testNormalizedAcknowledgementBeforeDocumentDoesNotObscureLaterClear() throws {
         let model = XgentPresentationModel()
         let webview = ActionWebView()
@@ -201,10 +218,10 @@ final class PresentationModelTests: XCTestCase {
     }
 
     private func document(_ revision: Int, value: String, focusRequest: Int? = nil,
-                          disabled: Bool = false, surface: String = "test") throws -> XgentDocument {
+                          disabled: Bool = false, surface: String = "test", action: String = "input") throws -> XgentDocument {
         var input: [String: Any] = [
             "id": "input", "kind": focusRequest == nil ? "TextInput" : "ComposerInput",
-            "value": value, "action": "input", "disabled": disabled,
+            "value": value, "action": action, "disabled": disabled,
         ]
         if let focusRequest { input["focusRequest"] = focusRequest }
         let result = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: [

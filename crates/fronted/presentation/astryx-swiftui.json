@@ -181,7 +181,7 @@
     "Table": { "swiftUI": "Table on desktop or adaptive List on mobile", "kind": "composed" },
     "TabList": { "swiftUI": "segmented Picker or TabView", "kind": "composed" },
     "Text": { "swiftUI": "Text", "kind": "primitive" },
-    "TextArea": { "swiftUI": "TextEditor", "kind": "primitive" },
+    "TextArea": { "swiftUI": "TextEditor or CodeEditorView for source files", "kind": "primitive" },
     "TextInput": { "swiftUI": "TextField or SecureField", "kind": "primitive" },
     "Thumbnail": { "swiftUI": "resizable Image with clipped aspect ratio", "kind": "composed" },
     "TimeInput": { "swiftUI": "DatePicker with hour-and-minute components", "kind": "primitive" },

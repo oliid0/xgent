@@ -13,6 +13,7 @@ let package = Package(
         .package(url: "https://github.com/siteline/swiftui-introspect", exact: "26.0.1"),
         .package(url: "https://github.com/kean/Nuke", exact: "13.2.0"),
         .package(url: "https://github.com/swhitty/SwiftDraw", exact: "0.29.0"),
+        .package(url: "https://github.com/mchakravarty/CodeEditorView", exact: "0.16.0"),
     ],
     targets: [
         .target(name: "XgentNativeUI", dependencies: [
@@ -24,10 +25,13 @@ let package = Package(
             .product(name: "Nuke", package: "Nuke"),
             .product(name: "NukeUI", package: "Nuke"),
             .product(name: "SwiftDraw", package: "SwiftDraw"),
+            .product(name: "CodeEditorView", package: "CodeEditorView"),
+            .product(name: "LanguageSupport", package: "CodeEditorView"),
         ], path: ".", exclude: ["Tests"]),
         .testTarget(name: "XgentNativeUITests", dependencies: [
             "XgentNativeUI", .product(name: "MarkdownUI", package: "swift-markdown-ui"),
             .product(name: "Nuke", package: "Nuke"),
+            .product(name: "LanguageSupport", package: "CodeEditorView"),
         ],
                     path: "Tests"),
     ],

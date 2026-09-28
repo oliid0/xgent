@@ -245,11 +245,12 @@ private struct XgentNodeBoundsFrameModifier: ViewModifier {
 
 private struct XgentNodeTextLayoutModifier: ViewModifier {
     let node: XgentNode
+    private var editorOwnsWrapping: Bool { node.kind == .textArea && node.language?.isEmpty == false }
 
     func body(content: Content) -> some View {
         content
             .lineLimit(node.maxLines)
-            .fixedSize(horizontal: node.wrap == false, vertical: false)
+            .fixedSize(horizontal: node.wrap == false && !editorOwnsWrapping, vertical: false)
     }
 }
 
