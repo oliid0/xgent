@@ -33,6 +33,31 @@ struct XgentGlassCircle: ViewModifier {
     }
 }
 
+@MainActor
+struct XgentAttachmentOwner {
+    let id = UUID()
+    let node: XgentNode
+    let document: XgentDocument
+    let option: String
+
+    @MainActor func isCurrent(in model: XgentPresentationModel) -> Bool {
+        guard let action = node.action,
+              let current = model.documents.first(where: { $0.surface == document.surface })?.node(id: node.id),
+              current.kind == .filePicker, current.action == action, current.disabled != true else { return false }
+        if let options = current.options {
+            guard let choice = options.first(where: { $0.value == option }), choice.disabled != true else { return false }
+        }
+        return true
+    }
+
+    @MainActor func send(_ files: [[String: String]], in model: XgentPresentationModel) throws {
+        guard isCurrent(in: model) else { throw AttachmentError.destination }
+        guard !files.isEmpty else { return }
+        let data = try JSONSerialization.data(withJSONObject: files)
+        model.send(node, in: document, value: .string(String(decoding: data, as: UTF8.self)))
+    }
+}
+
 // System pickers feed the same attachment import action as all other renderers.
 struct XgentAttachmentPicker: View {
     let node: XgentNode
@@ -43,8 +68,13 @@ struct XgentAttachmentPicker: View {
     @State private var pickingPhotos = false
     @State private var photos: [PhotosPickerItem] = []
     @State private var importing = false
+    @State private var fileOwner: XgentAttachmentOwner?
+    @State private var photoOwner: XgentAttachmentOwner?
+    @State private var importID: UUID?
+    @State private var importTask: Task<Void, Never>?
     #if os(iOS)
     @State private var takingPhoto = false
+    @State private var cameraOwner: XgentAttachmentOwner?
     #endif
 
     private func label(_ value: String, _ fallback: String) -> String {
@@ -68,11 +98,19 @@ struct XgentAttachmentPicker: View {
             }
             #endif
             if includes("photos") {
-                Button { pickingPhotos = true } label: { Label(label("photos", "Photos"), systemImage: "photo.on.rectangle") }
+                Button {
+                    guard let owner = capture("photos") else { return }
+                    photoOwner = owner
+                    pickingPhotos = true
+                } label: { Label(label("photos", "Photos"), systemImage: "photo.on.rectangle") }
                     .disabled(disabled("photos"))
             }
             if includes("files") {
-                Button { pickingFiles = true } label: { Label(label("files", "Files"), systemImage: "folder") }
+                Button {
+                    guard let owner = capture("files") else { return }
+                    fileOwner = owner
+                    pickingFiles = true
+                } label: { Label(label("files", "Files"), systemImage: "folder") }
                     .disabled(disabled("files"))
             }
             if !(node.children ?? []).isEmpty {
@@ -94,65 +132,127 @@ struct XgentAttachmentPicker: View {
         }
         .menuStyle(.borderlessButton).disabled(importing || node.disabled == true)
         .accessibilityLabel(node.label ?? "Attach files")
-        .fileImporter(isPresented: $pickingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
-            importing = true
-            Task { @MainActor in
-                defer { importing = false }
-                do {
-                    let urls = try result.get()
-                    let files = try await Task.detached {
-                        guard urls.count <= 9 else { throw AttachmentError.limit }
-                        return try urls.map { try XgentAttachmentPayload.file($0) }
-                    }.value
-                    try send(files)
-                } catch {
-                    if !XgentAttachmentPayload.isCancellation(error) { model.error = error.localizedDescription }
+        .fileImporter(isPresented: $pickingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true,
+                      onCompletion: { result in
+            guard let owner = fileOwner else { return }
+            fileOwner = nil
+            startImport(owner) {
+                let urls = try result.get()
+                return try await XgentAttachmentPayload.prepare {
+                    guard urls.count <= 9 else { throw AttachmentError.limit }
+                    return try urls.map {
+                        try Task.checkCancellation()
+                        return try XgentAttachmentPayload.file($0)
+                    }
                 }
             }
-        }
+        }, onCancellation: { fileOwner = nil })
         .photosPicker(isPresented: $pickingPhotos, selection: $photos, maxSelectionCount: 9, matching: .images)
         .onChange(of: photos) { _, selection in
             guard !selection.isEmpty else { return }
-            importing = true
-            Task { @MainActor in
-                defer { importing = false; photos = [] }
-                do {
-                    var files: [[String: String]] = []
-                    for item in selection {
-                        guard let data = try await item.loadTransferable(type: Data.self) else { throw AttachmentError.unavailable }
-                        let payload = try await Task.detached {
-                            try XgentAttachmentPayload.photo(data, name: "photo-\(UUID().uuidString)")
-                        }.value
-                        files.append(payload)
+            let owner = photoOwner
+            photoOwner = nil
+            photos = []
+            guard let owner else { return }
+            startImport(owner) {
+                var files: [[String: String]] = []
+                for item in selection {
+                    try Task.checkCancellation()
+                    guard let data = try await item.loadTransferable(type: Data.self) else { throw AttachmentError.unavailable }
+                    let payload = try await XgentAttachmentPayload.prepare {
+                        try XgentAttachmentPayload.photo(data, name: "photo-\(UUID().uuidString)")
                     }
-                    try send(files)
-                } catch { model.error = error.localizedDescription }
+                    files.append(payload)
+                }
+                return files
             }
         }
+        .onChange(of: node.action) { _, _ in cancelSelection() }
+        .onChange(of: node.disabled) { _, disabled in if disabled == true { cancelSelection() } }
         #if os(iOS)
-        .fullScreenCover(isPresented: $takingPhoto) {
+        .fullScreenCover(isPresented: $takingPhoto, onDismiss: { cameraOwner = nil }) {
+            let owner = cameraOwner
             XgentCamera { data in
                 takingPhoto = false
-                guard let data else { return }
-                do { try send([XgentAttachmentPayload.photo(data, name: "camera-\(UUID().uuidString)")]) }
-                catch { model.error = error.localizedDescription }
+                cameraOwner = nil
+                guard let data, let owner else { return }
+                startImport(owner) {
+                    try await XgentAttachmentPayload.prepare {
+                        [try XgentAttachmentPayload.photo(data, name: "camera-\(UUID().uuidString)")]
+                    }
+                }
             }.ignoresSafeArea()
         }
         #endif
     }
 
-    private func send(_ files: [[String: String]]) throws {
-        guard !files.isEmpty else { return }
-        let data = try JSONSerialization.data(withJSONObject: files)
-        model.send(node, in: document, value: .string(String(decoding: data, as: UTF8.self)))
+    private func capture(_ option: String) -> XgentAttachmentOwner? {
+        guard !importing, !pickingFiles, !pickingPhotos else { return nil }
+        #if os(iOS)
+        guard cameraOwner == nil else { return nil }
+        #endif
+        let owner = XgentAttachmentOwner(node: node, document: document, option: option)
+        guard owner.isCurrent(in: model) else { return nil }
+        fileOwner = nil
+        photoOwner = nil
+        return owner
+    }
+
+    private func startImport(_ owner: XgentAttachmentOwner,
+                             operation: @escaping @MainActor () async throws -> [[String: String]]) {
+        guard !importing, owner.isCurrent(in: model) else { return }
+        importing = true
+        importID = owner.id
+        importTask = Task { @MainActor in
+            defer {
+                if importID == owner.id {
+                    importing = false
+                    importID = nil
+                    importTask = nil
+                }
+            }
+            do {
+                try Task.checkCancellation()
+                let files = try await operation()
+                try Task.checkCancellation()
+                guard importID == owner.id else { return }
+                try owner.send(files, in: model)
+            } catch {
+                if importID == owner.id, owner.isCurrent(in: model),
+                   !XgentAttachmentPayload.isCancellation(error) { model.error = error.localizedDescription }
+            }
+        }
+    }
+
+    private func cancelSelection() {
+        importTask?.cancel()
+        importTask = nil
+        importID = nil
+        importing = false
+        fileOwner = nil
+        photoOwner = nil
+        pickingFiles = false
+        pickingPhotos = false
+        photos = []
+        #if os(iOS)
+        cameraOwner = nil
+        takingPhoto = false
+        #endif
     }
 
     #if os(iOS)
     private func requestCamera() {
+        guard let owner = capture("camera") else { return }
+        cameraOwner = owner
         AVCaptureDevice.requestAccess(for: .video) { allowed in
             DispatchQueue.main.async {
+                guard cameraOwner?.id == owner.id else { return }
+                guard owner.isCurrent(in: model) else { cameraOwner = nil; return }
                 if allowed { takingPhoto = true }
-                else { model.error = "Camera access is disabled. Enable it in system settings." }
+                else {
+                    cameraOwner = nil
+                    model.error = "Camera access is disabled. Enable it in system settings."
+                }
             }
         }
     }
@@ -161,6 +261,19 @@ struct XgentAttachmentPicker: View {
 
 enum XgentAttachmentPayload {
     static let maximumBytes = 20 * 1024 * 1024
+
+    nonisolated static func prepare<T: Sendable>(_ operation: @escaping @Sendable () throws -> T) async throws -> T {
+        try Task.checkCancellation()
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            return try operation()
+        }
+        return try await withTaskCancellationHandler(operation: {
+            let result = try await worker.value
+            try Task.checkCancellation()
+            return result
+        }, onCancel: { worker.cancel() })
+    }
 
     nonisolated static func file(_ url: URL) throws -> [String: String] {
         let scoped = url.startAccessingSecurityScopedResource()
@@ -222,12 +335,13 @@ enum XgentAttachmentPayload {
 }
 
 private enum AttachmentError: LocalizedError {
-    case limit, size, unavailable
+    case limit, size, unavailable, destination
     var errorDescription: String? {
         switch self {
         case .limit: return "Select up to 9 files."
         case .size: return "Each attachment must be 20 MB or smaller."
         case .unavailable: return "The selected photo could not be loaded."
+        case .destination: return "The attachment destination changed. Select the files again."
         }
     }
 }

@@ -6298,6 +6298,7 @@ export function ChatPage(props: ChatPageProps) {
       <>
         <NativeChatPage
           conversationId={currentConversationId}
+          uploadWorkdir={workdir}
           settings={settings}
           composerRef={composerRef}
           sidebarStore={sidebarStore}

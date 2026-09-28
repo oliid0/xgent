@@ -224,6 +224,7 @@ function toolEvidenceNodes(
 
 export type NativeChatPageProps = {
   conversationId: string;
+  uploadWorkdir: string;
   settings: AppSettings;
   composerRef: MutableRefObject<MentionComposerHandle | null>;
   sidebarStore: SidebarStore;
@@ -402,6 +403,19 @@ export function NativeChatPage(props: NativeChatPageProps) {
     () => executionActivityStore.getSnapshot(props.conversationId),
     () => executionActivityStore.getSnapshot(props.conversationId),
   );
+  const attachmentContext = useRef({
+    conversationId: props.conversationId,
+    workdir: props.uploadWorkdir,
+    revision: 0,
+  }).current;
+  if (
+    attachmentContext.conversationId !== props.conversationId ||
+    attachmentContext.workdir !== props.uploadWorkdir
+  ) {
+    attachmentContext.conversationId = props.conversationId;
+    attachmentContext.workdir = props.uploadWorkdir;
+    attachmentContext.revision += 1;
+  }
   const [sidebarOpen, setSidebarOpen] = useState(
     () => !compact && readChatLayoutPreferences().leftSidebarOpen,
   );
@@ -992,7 +1006,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                     ...runtime.nodes,
                   ],
                   action: change(
-                    `attach:${props.conversationId}`,
+                    `attach:${props.conversationId}:${attachmentContext.revision}`,
                     async (value) => props.onImportFiles(decodeNativeFiles(value)),
                     undefined,
                     props.attachmentsEnabled && !props.isUploading && !props.inputDisabled,

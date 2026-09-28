@@ -24,7 +24,10 @@ function harness() {
         if (!(index in states)) states[index] = initial;
         return [states[index], (value) => { states[index] = typeof value === "function" ? value(states[index]) : value; }];
       },
-      useRef: (current) => ({ current }),
+      useRef(current) {
+        const index = cursor++;
+        return states[index] ??= { current };
+      },
       useMemo: (create) => create(), useCallback: (callback) => callback, useEffect() {},
     },
     "@astryxdesign/core/Banner": {}, "@astryxdesign/core/Layout": {},
@@ -38,6 +41,11 @@ function harness() {
     "../../../presentation/nativeTheme": { createNativePresentationTheme: () => ({}) },
     "../../../runtime/applePresentation": { isApplePresentationRuntime: () => true },
     "./MobilePanelScaffold": {},
+    "@tauri-apps/api/core": { async invoke(command, args) {
+      assert.equal(command, "fs_import_file");
+      calls.push([command, args]);
+      return { path: [args.directory, args.file_name].filter(Boolean).join("/") };
+    } },
   } });
   const props = {
     open: true, projectPathKey: "/project", cwd: "/project", settings: { theme: "light" },
@@ -55,7 +63,15 @@ function harness() {
     assert.ok(handler.accepts(value));
     await handler.run(value);
   };
-  return { data, props, calls, dispatch };
+  const { createPresentationActionRegistry } = loader.loadModule("src/presentation/actionRegistry.ts");
+  const registry = createPresentationActionRegistry();
+  let request = 0;
+  const dispatchNative = (action, value) => {
+    const surface = render();
+    registry.register(surface.document.surface, surface.handlers);
+    return registry.dispatch({ surface: surface.document.surface, action, value, requestId: String(++request) });
+  };
+  return { data, props, calls, dispatch, render, dispatchNative };
 }
 
 test("native Files renames and deletes a search result without loading its parent tree", async () => {
@@ -90,4 +106,44 @@ test("native Files uses a selected search file's parent for a new folder", async
   await h.dispatch("files-name", "attachments");
   await h.dispatch("files-save-action");
   assert.deepEqual(h.calls.at(-1), ["create", "dir", "nested", "attachments"]);
+});
+
+test("native Files selections cannot move to another directory or workspace after the picker opens", async t => {
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", { configurable: true, writable: true, value: { btoa } });
+  t.after(() => {
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else delete globalThis.window;
+  });
+  const h = harness();
+  const find = nodes => {
+    for (const node of nodes) {
+      if (node.id === "files-import") return node;
+      const match = find(node.children ?? []);
+      if (match) return match;
+    }
+  };
+  const action = () => find(h.render().document.nodes).action;
+  const initial = action();
+  const payload = JSON.stringify([{ fileName: "note.txt", mimeType: "text/plain", contentBase64: "aGk=" }]);
+  await h.dispatch("file-search:dir:nested/reports");
+  const selectedDirectory = action();
+  assert.equal((await h.dispatchNative(initial, payload)).ok, false);
+  assert.equal((await h.dispatchNative(selectedDirectory, payload)).ok, true);
+  let writes = h.calls.filter(([command]) => command === "fs_import_file");
+  assert.equal(writes[0][1].workdir, "/project");
+  assert.equal(writes[0][1].directory, "nested/reports");
+  assert.equal(writes[0][1].file_name, "note.txt");
+  assert.equal(writes[0][1].content_base64, "aGk=");
+  h.props.cwd = "/new-project"; h.props.projectPathKey = "/new-project";
+  const newProject = action();
+  assert.equal((await h.dispatchNative(selectedDirectory, payload)).ok, false);
+  assert.equal((await h.dispatchNative(newProject, payload)).ok, true);
+  writes = h.calls.filter(([command]) => command === "fs_import_file");
+  assert.equal(writes.length, 2);
+  assert.equal(writes[1][1].workdir, "/new-project");
+  h.props.cwd = "/project"; h.props.projectPathKey = "/project";
+  action();
+  assert.equal((await h.dispatchNative(initial, payload)).ok, false);
+  assert.equal((await h.dispatchNative(selectedDirectory, payload)).ok, false);
 });

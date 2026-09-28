@@ -41,6 +41,7 @@ function harness(overrides = {}, options = {}) {
   const registry = createPresentationActionRegistry();
   const props = {
     conversationId: "conversation",
+    uploadWorkdir: "/project",
     settings: { theme: "system", system: { executionMode: "text" }, customSettings: { appearance: { showThinking: true } } },
     composerRef: { current: null },
     sidebarStore: { subscribe: () => () => {}, getSnapshot: () => ({ conversations: [], hasMore: false }) },
@@ -224,7 +225,7 @@ test("native attachment menu keeps runtime controls usable without attachment su
   assert.equal(plugins, 1);
   assert.equal((await h.dispatch("runtime-web-search", true)).ok, true);
   assert.deepEqual(patches, [{ nativeWebSearchEnabled: true }]);
-  assert.equal((await h.dispatch("attach:conversation", "[]")).ok, false);
+  assert.equal((await h.dispatch("attach:conversation:0", "[]")).ok, false);
   assert.equal(imports, 0);
   h.props.inputDisabled = true;
   h.render();
@@ -263,10 +264,25 @@ test("native attachment selection cannot import into a conversation opened after
   const payload = JSON.stringify([{ fileName: "note.txt", mimeType: "text/plain", contentBase64: "aGk=" }]);
   h.props.conversationId = "next-conversation";
   h.render();
-  assert.equal((await h.dispatch("attach:conversation", payload)).ok, false);
+  assert.equal((await h.dispatch("attach:conversation:0", payload)).ok, false);
   assert.deepEqual(imported, []);
-  assert.equal((await h.dispatch("attach:next-conversation", payload)).ok, true);
+  assert.equal((await h.dispatch("attach:next-conversation:1", payload)).ok, true);
   assert.deepEqual(imported, [["note.txt"]]);
+  h.unmount();
+});
+
+test("native attachment ownership changes with workspace and never reuses a returned target", async () => {
+  const imported = [];
+  const h = harness({ onImportFiles: async files => imported.push(files.map(file => file.name)) }, { mobile: true });
+  const payload = JSON.stringify([{ fileName: "note.txt", mimeType: "text/plain", contentBase64: "aGk=" }]);
+  h.props.uploadWorkdir = "/another-project"; h.render();
+  assert.equal((await h.dispatch("attach:conversation:0", payload)).ok, false);
+  assert.equal((await h.dispatch("attach:conversation:1", payload)).ok, true);
+  h.props.uploadWorkdir = "/project"; h.render();
+  assert.equal((await h.dispatch("attach:conversation:0", payload)).ok, false);
+  assert.equal((await h.dispatch("attach:conversation:1", payload)).ok, false);
+  assert.equal((await h.dispatch("attach:conversation:2", payload)).ok, true);
+  assert.deepEqual(imported, [["note.txt"], ["note.txt"]]);
   h.unmount();
 });
 
@@ -696,13 +712,13 @@ test("native controls enforce busy, model and attachment constraints at dispatch
   await h.dispatch("draft", "Ready");
   h.props.inputDisabled = true;
   h.render();
-  for (const [action, value] of [["draft", "Blocked"], ["send", null], ["attach:conversation", null]]) {
+  for (const [action, value] of [["draft", "Blocked"], ["send", null], ["attach:conversation:0", null]]) {
     assert.equal((await h.dispatch(action, value)).ok, false);
   }
   h.props.inputDisabled = false;
   h.props.attachmentsEnabled = false;
   h.render();
-  assert.equal((await h.dispatch("attach:conversation")).ok, false);
+  assert.equal((await h.dispatch("attach:conversation:0")).ok, false);
   assert.equal((await h.dispatch("model", "unknown")).ok, false);
   assert.equal((await h.dispatch("model", "provider::model")).ok, true);
   assert.deepEqual(selected, [{ customProviderId: "provider", model: "model" }]);
@@ -711,7 +727,7 @@ test("native controls enforce busy, model and attachment constraints at dispatch
   assert.equal((await h.dispatch("send")).ok, false);
   h.props.attachmentsEnabled = true;
   h.render();
-  assert.equal((await h.dispatch("attach:conversation", "[]")).ok, true);
+  assert.equal((await h.dispatch("attach:conversation:0", "[]")).ok, true);
   assert.equal(picked, 1);
   h.unmount();
 });

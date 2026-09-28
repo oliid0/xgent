@@ -19,6 +19,7 @@ type UploadTarget = {
   targetConversationId: string;
   targetWorkdir: string;
   remainingFileSlots: number;
+  contextRevision: number;
 };
 
 type UsePendingUploadsParams = {
@@ -40,7 +41,7 @@ type WebViewFilePickerOptions = {
 };
 
 function pickFilesFromWebView(options: WebViewFilePickerOptions = {}): Promise<File[]> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = options.multiple ?? true;
@@ -61,8 +62,16 @@ function pickFilesFromWebView(options: WebViewFilePickerOptions = {}): Promise<F
       once: true,
     });
     input.addEventListener("cancel", () => finish([]), { once: true });
-    document.body.appendChild(input);
-    input.click();
+    try {
+      document.body.appendChild(input);
+      input.click();
+    } catch (error) {
+      if (!settled) {
+        settled = true;
+        input.remove();
+        reject(error);
+      }
+    }
   });
 }
 
@@ -81,15 +90,24 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
   const uploadTaskActiveRef = useRef(false);
   const pendingUploadsByConversationRef = useRef(new Map<string, PendingUploadedFile[]>());
   const pendingUploadedFilesRef = useRef(pendingUploadedFiles);
-  // An in-flight import must still see the latest workspace before accepting
-  // files. Execution mode is deliberately absent: attachments belong to the
-  // conversation/workspace and remain valid when Chat and Agent are toggled.
-  const workdirRef = useRef(workdir);
-  workdirRef.current = workdir;
-  const uploadContextRef = useRef<{
-    workdir: string;
-    conversationId: string;
-  } | null>(null);
+  // Keep invalidation for each conversation even while another one is displayed.
+  const uploadContextsRef = useRef(
+    new Map<
+      string,
+      {
+        workdir: string;
+        revision: number;
+      }
+    >(),
+  );
+  const conversationKey = conversationId.trim();
+  const previousContext = uploadContextsRef.current.get(conversationKey);
+  const workspaceChanged = Boolean(previousContext && previousContext.workdir !== workdir);
+  const context =
+    !previousContext || workspaceChanged
+      ? { workdir, revision: (previousContext?.revision ?? -1) + 1 }
+      : previousContext;
+  uploadContextsRef.current.set(conversationKey, context);
 
   const getPendingUploadsForConversation = useCallback(
     (conversationId: string) => {
@@ -132,25 +150,18 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
 
   useEffect(() => {
     const targetConversationId = conversationId.trim();
+    if (workspaceChanged) pendingUploadsByConversationRef.current.delete(targetConversationId);
     const nextFiles = targetConversationId
       ? (pendingUploadsByConversationRef.current.get(targetConversationId) ?? [])
       : [];
     pendingUploadedFilesRef.current = nextFiles;
     setPendingUploadedFiles(nextFiles);
-  }, [conversationId]);
+  }, [conversationId, workdir, workspaceChanged]);
 
-  useEffect(() => {
-    const previous = uploadContextRef.current;
-    uploadContextRef.current = { workdir, conversationId };
-    if (!previous) return;
-    // Switching conversations must not invalidate any conversation's
-    // uploads — each entry is relative to its own workdir. Only a workdir
-    // change within the same conversation (a draft switching projects)
-    // makes that conversation's relative paths stale.
-    if (previous.conversationId !== conversationId) return;
-    if (previous.workdir === workdir) return;
-    setPendingUploadsForConversation(conversationId, []);
-  }, [workdir, conversationId, setPendingUploadsForConversation]);
+  const isUploadTargetCurrent = useCallback((target: UploadTarget) => {
+    const current = uploadContextsRef.current.get(target.targetConversationId);
+    return current?.workdir === target.targetWorkdir && current.revision === target.contextRevision;
+  }, []);
 
   const captureUploadTarget = useCallback((): UploadTarget | null => {
     const targetConversationId = currentConversationIdRef.current.trim();
@@ -170,6 +181,7 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
       targetConversationId,
       targetWorkdir: workdir,
       remainingFileSlots,
+      contextRevision: uploadContextsRef.current.get(targetConversationId)?.revision ?? 0,
     };
   }, [
     addNotify,
@@ -190,11 +202,9 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
       // An import that settles after its upload context was invalidated must
       // not resurrect cleared attachments: the files landed under the old
       // workdir, so their relative paths are stale there.
-      if (isTargetDisplayed && workdirRef.current !== targetWorkdir) {
+      if (result.files.length === 0 && result.skipped.length === 0) return;
+      if (!isUploadTargetCurrent(target)) {
         addNotify("warning", "上传目标已失效，已忽略本次导入的文件");
-        return;
-      }
-      if (result.files.length === 0 && result.skipped.length === 0) {
         return;
       }
       if (result.files.length > 0) {
@@ -228,6 +238,7 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
       composerRef,
       currentConversationIdRef,
       getPendingUploadsForConversation,
+      isUploadTargetCurrent,
       setErrorMessage,
       setPendingUploadsForConversation,
     ],
@@ -245,7 +256,7 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
         addNotify("warning", "当前正在上传文件，请稍候");
         return;
       }
-      if (!workdir) {
+      if (!workdir.trim()) {
         setErrorMessage("请先在项目栏选择或创建项目后再上传文件。");
         return;
       }
@@ -299,42 +310,64 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
     [runUploadTask],
   );
 
+  const importFilesForTarget = useCallback(
+    async (files: File[], target: UploadTarget): Promise<SystemPickReadableFilesResponse> => {
+      if (files.length === 0) return { files: [], skipped: [] };
+      if (!isUploadTargetCurrent(target)) {
+        addNotify("warning", "上传目标已失效，已忽略本次导入的文件");
+        return { files: [], skipped: [] };
+      }
+      const { targetWorkdir, remainingFileSlots } = target;
+      const importBatch = files.slice(0, remainingFileSlots);
+      const ignoredForLimit = files.length - importBatch.length;
+      if (ignoredForLimit > 0) {
+        addNotify(
+          "warning",
+          `最多上传 ${MAX_UPLOAD_FILES} 个文件，已忽略 ${ignoredForLimit} 个额外文件`,
+        );
+      }
+      const prepared = await prepareReadableUploads(importBatch);
+      if (!prepared.files.length) return { files: [], skipped: prepared.skipped };
+      if (!isUploadTargetCurrent(target)) {
+        addNotify("warning", "上传目标已失效，已忽略本次导入的文件");
+        return { files: [], skipped: [] };
+      }
+      const result = await invoke<SystemPickReadableFilesResponse>(
+        "system_import_uploaded_readable_files",
+        { workdir: targetWorkdir, files: prepared.files, maxFiles: remainingFileSlots },
+      );
+      return { ...result, skipped: [...prepared.skipped, ...result.skipped] };
+    },
+    [addNotify, isUploadTargetCurrent],
+  );
+
   const importReadableFiles = useCallback(
     async (files: File[]) => {
       if (files.length === 0) return;
       await runUploadTask({
         emptySelectionMessage: "剪贴板文件均不受当前 Read 支持",
         errorFallback: "导入剪贴板文件失败",
-        importer: async ({ targetWorkdir, remainingFileSlots }) => {
-          const importBatch = files.slice(0, remainingFileSlots);
-          const ignoredForLimit = files.length - importBatch.length;
-          if (ignoredForLimit > 0) {
-            addNotify(
-              "warning",
-              `最多上传 ${MAX_UPLOAD_FILES} 个文件，已忽略 ${ignoredForLimit} 个额外文件`,
-            );
-          }
-          const prepared = await prepareReadableUploads(importBatch);
-          if (!prepared.files.length) return { files: [], skipped: prepared.skipped };
-          const result = await invoke<SystemPickReadableFilesResponse>(
-            "system_import_uploaded_readable_files",
-            {
-              workdir: targetWorkdir,
-              files: prepared.files,
-              maxFiles: remainingFileSlots,
-            },
-          );
-          return { ...result, skipped: [...prepared.skipped, ...result.skipped] };
-        },
+        importer: (target) => importFilesForTarget(files, target),
       });
     },
-    [addNotify, runUploadTask],
+    [importFilesForTarget, runUploadTask],
+  );
+
+  const pickReadableFilesFromWebView = useCallback(
+    (options: WebViewFilePickerOptions = {}) =>
+      runUploadTask({
+        emptySelectionMessage: "所选文件均不受当前 Read 支持",
+        errorFallback: "导入文件失败",
+        // Pin ownership and reserve the single-flight slot before opening the picker.
+        importer: async (target) =>
+          importFilesForTarget(await pickFilesFromWebView(options), target),
+      }),
+    [importFilesForTarget, runUploadTask],
   );
 
   const pickReadableFiles = useCallback(async () => {
     if (nativeMobileRuntime || !isTauriRuntime()) {
-      const files = await pickFilesFromWebView();
-      await importReadableFiles(files);
+      await pickReadableFilesFromWebView();
       return;
     }
     await runUploadTask({
@@ -346,21 +379,19 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
           maxFiles: remainingFileSlots,
         }),
     });
-  }, [importReadableFiles, nativeMobileRuntime, runUploadTask]);
+  }, [pickReadableFilesFromWebView, nativeMobileRuntime, runUploadTask]);
 
   const pickReadablePhotos = useCallback(async () => {
-    const files = await pickFilesFromWebView({ accept: "image/*", multiple: true });
-    await importReadableFiles(files);
-  }, [importReadableFiles]);
+    await pickReadableFilesFromWebView({ accept: "image/*", multiple: true });
+  }, [pickReadableFilesFromWebView]);
 
   const captureReadablePhoto = useCallback(async () => {
-    const files = await pickFilesFromWebView({
+    await pickReadableFilesFromWebView({
       accept: "image/*",
       capture: "environment",
       multiple: false,
     });
-    await importReadableFiles(files);
-  }, [importReadableFiles]);
+  }, [pickReadableFilesFromWebView]);
 
   const removePendingUpload = useCallback(
     (relativePath: string) => {

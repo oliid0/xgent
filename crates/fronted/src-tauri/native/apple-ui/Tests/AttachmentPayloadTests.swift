@@ -61,6 +61,22 @@ final class AttachmentPayloadTests: XCTestCase {
         XCTAssertEqual(payload["fileName"], "rotated.jpg")
     }
 
+    @MainActor
+    func testCancelledPreparationDoesNotStartDetachedFileWork() async {
+        let task = Task {
+            try await XgentAttachmentPayload.prepare {
+                XCTFail("Cancelled selections must not start file work")
+                return "unexpected"
+            }
+        }
+        task.cancel()
+        do {
+            _ = try await task.value
+            XCTFail("A cancelled selection must not deliver a payload")
+        } catch is CancellationError {
+        } catch { XCTFail("Expected cancellation, got \(error)") }
+    }
+
     func testInvalidOversizedAndCancelledSelectionsHaveDistinctOutcomes() throws {
         XCTAssertThrowsError(try XgentAttachmentPayload.photo(Data("invalid".utf8), name: "photo"))
         XCTAssertThrowsError(try XgentAttachmentPayload.payload(

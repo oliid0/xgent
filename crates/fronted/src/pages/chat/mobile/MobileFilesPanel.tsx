@@ -465,6 +465,17 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
     }
   };
 
+  const importDirectory = selectedNode?.kind === "dir" ? selectedPath : dirname(selectedPath);
+  const importContext = useRef({
+    key: JSON.stringify([props.projectPathKey, props.cwd, importDirectory]),
+    revision: 0,
+  }).current;
+  const importKey = JSON.stringify([props.projectPathKey, props.cwd, importDirectory]);
+  if (importContext.key !== importKey) {
+    importContext.key = importKey;
+    importContext.revision += 1;
+  }
+
   const handlers = new Map<string, PresentationHandler>();
   const bind = (
     id: string,
@@ -625,7 +636,7 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
               options: [{ value: "files", label: t("chat.upload.files") }],
               disabled: !projectReady || busyAction,
               action: bind(
-                "files-import",
+                `files-import:${importContext.revision}`,
                 (value) => importFiles(value as string),
                 (value) => typeof value === "string",
                 projectReady && !busyAction,

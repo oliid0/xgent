@@ -137,6 +137,69 @@ final class PresentationModelTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testAttachmentOwnerSurvivesOrdinaryDocumentUpdatesAndEmitsTheCapturedAction() throws {
+        let model = XgentPresentationModel()
+        let webview = ActionWebView()
+        model.webview = webview
+        let initial = try attachmentDocument(1, action: "attach:conversation:0")
+        model.update(initial)
+        let owner = XgentAttachmentOwner(node: try XCTUnwrap(initial.node(id: "attach")), document: initial, option: "files")
+        model.update(try attachmentDocument(2, action: "attach:conversation:0"))
+        XCTAssertTrue(owner.isCurrent(in: model))
+        let files = [["fileName": "note.txt", "mimeType": "text/plain", "contentBase64": "aGk="]]
+        try owner.send(files, in: model)
+        XCTAssertEqual(webview.actions.count, 1)
+        XCTAssertEqual(webview.actions[0]["action"] as? String, "attach:conversation:0")
+        let value = try XCTUnwrap(webview.actions[0]["value"] as? String)
+        XCTAssertEqual(try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [[String: String]], files)
+    }
+
+    @MainActor
+    func testAttachmentOwnerRejectsChangedAndReturnedTargets() throws {
+        let model = XgentPresentationModel()
+        let webview = ActionWebView()
+        model.webview = webview
+        let initial = try attachmentDocument(1, action: "attach:conversation:0")
+        model.update(initial)
+        let owner = XgentAttachmentOwner(node: try XCTUnwrap(initial.node(id: "attach")), document: initial, option: "files")
+        for (index, action) in ["attach:other:1", "attach:conversation:2"].enumerated() {
+            model.update(try attachmentDocument(index + 2, action: action))
+            XCTAssertFalse(owner.isCurrent(in: model))
+            XCTAssertThrowsError(try owner.send([["fileName": "old.txt"]], in: model))
+        }
+        XCTAssertTrue(webview.actions.isEmpty)
+    }
+
+    @MainActor
+    func testAttachmentOwnerRejectsDisabledChoicesRemovedPickersAndInvalidatedModels() throws {
+        for (disabled, optionDisabled, kind) in [(true, false, "FilePicker"), (false, true, "FilePicker"), (false, false, "TextInput")] {
+            let model = XgentPresentationModel()
+            let initial = try attachmentDocument(1, action: "attach:conversation:0")
+            model.update(initial)
+            let owner = XgentAttachmentOwner(node: try XCTUnwrap(initial.node(id: "attach")), document: initial, option: "files")
+            model.update(try attachmentDocument(2, action: "attach:conversation:0", disabled: disabled,
+                                               optionDisabled: optionDisabled, kind: kind))
+            XCTAssertFalse(owner.isCurrent(in: model))
+            XCTAssertThrowsError(try owner.send([["fileName": "old.txt"]], in: model))
+            model.invalidate()
+            XCTAssertFalse(owner.isCurrent(in: model))
+        }
+    }
+
+    private func attachmentDocument(_ revision: Int, action: String, disabled: Bool = false,
+                                    optionDisabled: Bool = false, kind: String = "FilePicker") throws -> XgentDocument {
+        let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: [
+            "version": 1, "surface": "test", "revision": revision, "mode": "root",
+            "title": "Attachments", "appearance": "system", "nodes": [
+                ["id": "attach", "kind": kind, "action": action, "disabled": disabled,
+                 "options": [["value": "files", "label": "Files", "disabled": optionDisabled]]],
+            ],
+        ]))
+        try document.validate()
+        return document
+    }
+
     private func document(_ revision: Int, value: String, focusRequest: Int? = nil,
                           disabled: Bool = false, surface: String = "test") throws -> XgentDocument {
         var input: [String: Any] = [
