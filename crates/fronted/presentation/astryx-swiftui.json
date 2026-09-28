@@ -22,6 +22,7 @@
     "text": { "wireType": "string", "swift": "Text, AttributedString markdown, placeholder or supporting text" },
     "value": { "wireType": "string|number|boolean|null", "swift": "typed Binding backed by XgentPresentationModel" },
     "action": { "wireType": "string", "swift": "validated XgentAction dispatched to the shared TypeScript handler" },
+    "focusRequest": { "wireType": "nonnegative-integer", "swift": "one-shot ComposerInput FocusState request, consumed per surface and node", "range": [0, 9007199254740991] },
     "disabled": { "wireType": "boolean", "swift": ".disabled plus busy-state gating" },
     "destructive": { "wireType": "boolean", "swift": "ButtonRole.destructive and destructive semantic color" },
     "prominent": { "wireType": "boolean", "swift": "glassProminent or borderedProminent style" },

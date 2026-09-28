@@ -38,7 +38,7 @@ export function generateNativeComponents(registry) {
     throw new Error("Incomplete native mapping contract");
   }
   const nodeProperties = [
-    "label", "text", "value", "action", "disabled", "destructive", "prominent", "secure",
+    "label", "text", "value", "action", "focusRequest", "disabled", "destructive", "prominent", "secure",
     "secondary", "spacing", "padding", "indent", "fill", "alignment", "width", "minWidth",
     "maxWidth", "height", "minHeight", "maxHeight", "maxLines", "wrap", "variant", "size",
     "icon", "selected", "role", "status", "language", "minimum", "maximum", "step", "current",

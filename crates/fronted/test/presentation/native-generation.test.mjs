@@ -52,7 +52,7 @@ test("checked-in native declarations agree with the mapping and installed Astryx
   }
   assert.equal(registry.version, 2);
   assert.equal(registry.astryxVersion, "0.6.0");
-  assert.equal(Object.keys(registry.propertyMappings).length, 39);
+  assert.equal(Object.keys(registry.propertyMappings).length, 40);
   assert.ok(Object.keys(registry.tokens).length >= 35);
   assert.equal(registry.tokens["--color-accent"].target, "palette.accent");
   assert.equal(registry.tokens["--duration-medium"].target, "motion.medium");

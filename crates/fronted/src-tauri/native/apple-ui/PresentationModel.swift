@@ -143,6 +143,7 @@ struct XgentNode: Decodable, Identifiable {
     let text: String?
     let value: XgentValue?
     let action: String?
+    let focusRequest: Int?
     let disabled: Bool?
     let destructive: Bool?
     let prominent: Bool?
@@ -235,6 +236,7 @@ struct XgentDocument: Decodable, Identifiable {
                       node.alignment.map({ ["leading", "center", "trailing"].contains($0) }) ?? true,
                       node.size.map({ ["small", "medium", "large"].contains($0) }) ?? true,
                       node.maxLines.map({ (1...10000).contains($0) }) ?? true,
+                      node.focusRequest.map({ node.kind == .composerInput && (0...9_007_199_254_740_991).contains($0) }) ?? true,
                       node.action == nil || !node.kind.eventSemantics.isEmpty else {
                     throw XgentProtocolError.invalid
                 }
@@ -291,6 +293,7 @@ final class XgentPresentationModel: ObservableObject {
     private var pending: [String: (surface: String, node: String, revision: Int)] = [:]
     private var editRequests: [String: String] = [:]
     private var acknowledgedEdits: Set<String> = []
+    private var consumedFocusRequests: [String: Int] = [:]
     private var active = true
 
     func invalidate() {
@@ -299,6 +302,7 @@ final class XgentPresentationModel: ObservableObject {
         pending.removeAll()
         editRequests.removeAll()
         acknowledgedEdits.removeAll()
+        consumedFocusRequests.removeAll()
         revisions.removeAll()
         busy.removeAll()
         edits.removeAll()
@@ -320,6 +324,7 @@ final class XgentPresentationModel: ObservableObject {
             edits = edits.filter { !$0.key.hasPrefix(prefix) }
             editRequests = editRequests.filter { !$0.key.hasPrefix(prefix) }
             acknowledgedEdits = acknowledgedEdits.filter { !$0.hasPrefix(prefix) }
+            consumedFocusRequests = consumedFocusRequests.filter { !$0.key.hasPrefix(prefix) }
             return
         }
         if let index = documents.firstIndex(where: { $0.surface == document.surface }) {
@@ -363,6 +368,17 @@ final class XgentPresentationModel: ObservableObject {
     func value(_ node: XgentNode, in document: XgentDocument) -> XgentValue {
         let current = documents.first { $0.surface == document.surface }?.node(id: node.id)
         return edits[key(document.surface, node.id)] ?? current?.value ?? node.value ?? .null
+    }
+
+    func consumeFocusRequest(_ node: XgentNode, in document: XgentDocument) -> Bool {
+        guard active,
+              let current = documents.first(where: { $0.surface == document.surface })?.node(id: node.id),
+              current.kind == .composerInput, current.disabled != true,
+              let request = current.focusRequest, request > 0 else { return false }
+        let nodeKey = key(document.surface, node.id)
+        guard request > (consumedFocusRequests[nodeKey] ?? 0) else { return false }
+        consumedFocusRequests[nodeKey] = request
+        return true
     }
 
     func send(_ node: XgentNode, in document: XgentDocument, value: XgentValue = .null, editing: Bool = false) {

@@ -45,6 +45,7 @@ export type PresentationNode = {
   text?: string;
   value?: PresentationValue;
   action?: string;
+  focusRequest?: number;
   disabled?: boolean;
   destructive?: boolean;
   prominent?: boolean;

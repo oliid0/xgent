@@ -267,6 +267,53 @@ private struct XgentNodeControlModifier: ViewModifier {
     }
 }
 
+struct XgentComposerFocusModifier: ViewModifier {
+    let node: XgentNode
+    let document: XgentDocument
+    @ObservedObject var model: XgentPresentationModel
+    @FocusState private var isFocused: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .focused($isFocused)
+            .onAppear { applyRequest() }
+            .onChange(of: node.focusRequest) { _, _ in applyRequest() }
+            .onChange(of: node.disabled) { _, _ in applyRequest() }
+    }
+
+    private func applyRequest() {
+        if model.consumeFocusRequest(node, in: document) { isFocused = true }
+    }
+}
+
+struct XgentDisclosure: View {
+    let node: XgentNode
+    let document: XgentDocument
+    @ObservedObject var model: XgentPresentationModel
+    @State private var expanded: Bool
+
+    init(node: XgentNode, document: XgentDocument, model: XgentPresentationModel) {
+        self.node = node
+        self.document = document
+        self.model = model
+        _expanded = State(initialValue: node.id == "queued-turns")
+    }
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $expanded) {
+            VStack(alignment: .leading, spacing: 8) {
+                #if os(iOS)
+                XgentIOSNodes(nodes: node.children ?? [], document: document, model: model)
+                #else
+                XgentNodeChildren(nodes: node.children ?? [], document: document, model: model)
+                #endif
+            }.padding(.top, 8)
+        } label: {
+            Text(node.label ?? "").font(.subheadline.weight(.medium))
+        }
+    }
+}
+
 struct XgentNodeView: View {
     let node: XgentNode
     let document: XgentDocument

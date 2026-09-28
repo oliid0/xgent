@@ -239,6 +239,7 @@ private struct XgentIOSChatPresentation: View {
             }
             if let transcript {
                 XgentIOSTranscript(node: transcript, document: document, model: model)
+                    .id(transcript.value?.text ?? transcript.id)
             } else {
                 Spacer(minLength: 0)
             }
@@ -307,16 +308,21 @@ private struct XgentIOSComposer: View {
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
     private var activity: XgentNode? { node.child(id: "activity-strip") }
+    private var queue: XgentNode? { node.child(id: "queued-turns") }
     private var input: XgentNode? { node.child(id: "draft") }
     private var actions: XgentNode? { node.child(id: "composer-actions") }
     private var supporting: [XgentNode] {
         (node.children ?? []).filter {
-            !["activity-strip", "draft", "composer-actions"].contains($0.id)
+            !["queued-turns", "activity-strip", "draft", "composer-actions"].contains($0.id)
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let queue {
+                XgentIOSNode(node: queue, document: document, model: model)
+                    .id(queue.value?.text ?? queue.id)
+            }
             if let activity {
                 HFlow(itemSpacing: 8, rowSpacing: 8) {
                     XgentIOSNodes(nodes: activity.children ?? [], document: document, model: model)

@@ -24,6 +24,59 @@ final class MobileRenderingTests: XCTestCase {
     }
 
     @MainActor
+    func testStreamingQueueAtNarrowAndAccessibleSizes() async throws {
+        for (name, width, typeSize) in [
+            ("queue-narrow", CGFloat(320), DynamicTypeSize.large),
+            ("queue-wide", CGFloat(768), DynamicTypeSize.large),
+            ("queue-accessible", CGFloat(390), DynamicTypeSize.accessibility2),
+        ] {
+            let model = XgentPresentationModel()
+            model.update(try document(mode: "root", appearance: "light", nodes: queuedChatNodes))
+            try await capture(XgentRootLayout(model: model).dynamicTypeSize(typeSize),
+                              name: name, width: width)
+        }
+    }
+
+    @MainActor
+    func testComposerFocusRequestDoesNotReopenDismissedKeyboard() async throws {
+        let model = XgentPresentationModel()
+        let controller = UIHostingController(rootView: XgentRootLayout(model: model))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        func inputDocument(_ revision: Int, request: Int) throws -> XgentDocument {
+            try document(mode: "root", appearance: "light", nodes: [
+                node("chat", "ChatLayout", ["children": [
+                    node("transcript", "ScrollView", ["value": "conversation", "children": []]),
+                    node("composer", "Composer", ["children": [
+                        node("draft", "ComposerInput", ["value": "Edit queued instruction", "action": "draft", "focusRequest": request]),
+                    ]]),
+                ]]),
+            ], revision: revision)
+        }
+        model.update(try inputDocument(1, request: 0))
+        try await Task.sleep(nanoseconds: 500_000_000)
+        XCTAssertNil(firstResponder(in: window))
+        model.update(try inputDocument(2, request: 1))
+        try await Task.sleep(nanoseconds: 500_000_000)
+        XCTAssertNotNil(firstResponder(in: window), "Editing a queued draft restores the native keyboard")
+        window.endEditing(true)
+        model.update(try inputDocument(3, request: 1))
+        try await Task.sleep(nanoseconds: 500_000_000)
+        XCTAssertNil(firstResponder(in: window), "An ordinary update must preserve keyboard dismissal")
+        model.update(try inputDocument(4, request: 2))
+        try await Task.sleep(nanoseconds: 500_000_000)
+        XCTAssertNotNil(firstResponder(in: window))
+    }
+
+    @MainActor
+    private func firstResponder(in view: UIView) -> UIView? {
+        if view.isFirstResponder { return view }
+        return view.subviews.lazy.compactMap { firstResponder(in: $0) }.first
+    }
+
+    @MainActor
     func testGroupedSettingsAndSidebar() async throws {
         let model = XgentPresentationModel()
         let settings = try document(mode: "sheet", appearance: "dark", nodes: [
@@ -188,15 +241,47 @@ final class MobileRenderingTests: XCTestCase {
         properties.merging(["id": id, "kind": kind]) { _, value in value }
     }
 
-    private func document(mode: String, appearance: String, nodes: [[String: Any]], title: String = "Settings") throws -> XgentDocument {
+    private func document(mode: String, appearance: String, nodes: [[String: Any]], title: String = "Settings", revision: Int = 1) throws -> XgentDocument {
         let json: [String: Any] = [
-            "version": 1, "surface": "fixture-\(mode)", "revision": 1, "mode": mode,
+            "version": 1, "surface": "fixture-\(mode)", "revision": revision, "mode": mode,
             "title": title, "appearance": appearance, "formFactor": "mobile",
             "dismissAction": "dismiss", "nodes": nodes,
         ]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: json))
         try document.validate()
         return document
+    }
+
+    private var queuedChatNodes: [[String: Any]] {
+        [node("chat", "ChatLayout", ["children": [
+            node("transcript", "ScrollView", ["value": "conversation", "children": [
+                node("answer", "ChatMessage", ["role": "assistant", "children": [
+                    node("stream", "Markdown", ["text": "Working on the current request…"]),
+                ]]),
+            ]]),
+            node("composer", "Composer", ["children": [
+                node("queued-turns", "Collapsible", ["label": "Queue 2", "value": "conversation", "children": [
+                    node("queued-turns-list", "ScrollView", ["maxHeight": 160, "children": [
+                        node("queued-first", "HStack", ["children": [
+                            node("queued-preview", "Text", ["text": "Review the narrow layout with a long instruction", "maxLines": 2]),
+                            node("queued-menu", "Menu", ["label": "Queued instruction", "icon": "ellipsis", "variant": "compact", "children": [
+                                node("edit", "Button", ["label": "Edit", "action": "edit", "icon": "square.and.pencil"]),
+                                node("run", "Button", ["label": "Interrupt and run", "action": "run", "icon": "play"]),
+                                node("remove", "Button", ["label": "Remove", "action": "remove", "icon": "trash", "destructive": true]),
+                            ]]),
+                        ]]),
+                        node("queued-attachment", "Text", ["text": "Attachment message · 2 attachments", "maxLines": 2]),
+                    ]]),
+                ]]),
+                node("draft", "ComposerInput", ["label": "Message Xgent", "value": "Next instruction", "action": "draft", "focusRequest": 0]),
+                node("composer-actions", "HStack", ["children": [
+                    node("attach", "FilePicker", ["label": "Attach", "action": "attach", "options": [["value": "files", "label": "Files"]]]),
+                    node("composer-spacer", "Spacer"),
+                    node("send", "IconButton", ["label": "Add to queue", "icon": "arrow.up", "action": "send", "prominent": true]),
+                    node("stop", "IconButton", ["label": "Stop generation", "icon": "stop.fill", "action": "stop"]),
+                ]]),
+            ]]),
+        ]])]
     }
 
     private var chatNodes: [[String: Any]] {

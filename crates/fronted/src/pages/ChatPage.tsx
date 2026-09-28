@@ -6326,6 +6326,11 @@ export function ChatPage(props: ChatPageProps) {
           isUploading={isUploadingFiles}
           onSend={handleSend}
           onStop={handleStopSending}
+          queuedTurns={queuedChatTurnsForCurrentConversation}
+          onRunQueuedTurnNow={runQueuedTurnNow}
+          onMoveQueuedTurnUp={moveQueuedTurnUp}
+          onEditQueuedTurn={editQueuedTurn}
+          onRemoveQueuedTurn={removeQueuedTurn}
           onSelectModel={handleSelectModel}
           onSelectConversation={(id) => {
             setActiveView("chat");

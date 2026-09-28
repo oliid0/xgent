@@ -41,6 +41,14 @@ export function validatePresentationDocument(
         if (!handlers.has(node.action))
           throw new Error(`Missing native action handler: ${node.action}`);
       }
+      if (
+        node.focusRequest !== undefined &&
+        (node.kind !== "ComposerInput" ||
+          !Number.isSafeInteger(node.focusRequest) ||
+          node.focusRequest < 0)
+      ) {
+        throw new Error(`Invalid native focus request: ${node.id}`);
+      }
       const dimensions = [
         node.spacing,
         node.padding,

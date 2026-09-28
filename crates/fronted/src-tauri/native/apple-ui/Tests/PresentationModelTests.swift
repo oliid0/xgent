@@ -90,12 +90,65 @@ final class PresentationModelTests: XCTestCase {
         XCTAssertTrue(model.documents.isEmpty)
     }
 
-    private func document(_ revision: Int, value: String) throws -> XgentDocument {
+    @MainActor
+    func testFocusRequestsAreExplicitOnceOnlyAndWaitForEnabledInput() throws {
+        let model = XgentPresentationModel()
+        let initial = try document(1, value: "", focusRequest: 0)
+        let input = try XCTUnwrap(initial.node(id: "input"))
+        model.update(initial)
+        XCTAssertFalse(model.consumeFocusRequest(input, in: initial))
+        model.update(try document(2, value: "Queued draft", focusRequest: 1, disabled: true))
+        XCTAssertFalse(model.consumeFocusRequest(input, in: initial))
+        model.update(try document(3, value: "Queued draft", focusRequest: 1))
+        XCTAssertTrue(model.consumeFocusRequest(input, in: initial))
+        XCTAssertFalse(model.consumeFocusRequest(input, in: initial))
+        // Ordinary updates and a recreated view do not reopen the keyboard.
+        model.update(try document(4, value: "Edited", focusRequest: 1))
+        XCTAssertFalse(model.consumeFocusRequest(input, in: initial))
+        model.update(try document(5, value: "Another edit", focusRequest: 2))
+        XCTAssertTrue(model.consumeFocusRequest(input, in: initial))
+    }
+
+    @MainActor
+    func testFocusConsumptionIsScopedToSurfaceAndDropsOnRemoval() throws {
+        let model = XgentPresentationModel()
+        let first = try document(1, value: "", focusRequest: 1)
+        let second = try document(1, value: "", focusRequest: 1, surface: "other")
+        let input = try XCTUnwrap(first.node(id: "input"))
+        model.update(first)
+        model.update(second)
+        XCTAssertTrue(model.consumeFocusRequest(input, in: first))
+        XCTAssertTrue(model.consumeFocusRequest(input, in: second))
+        let removal = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: [
+            "version": 1, "surface": "test", "revision": 2, "mode": "root",
+            "title": "Test", "appearance": "system", "nodes": [], "removed": true,
+        ]))
+        model.update(removal)
+        XCTAssertFalse(model.consumeFocusRequest(input, in: first))
+        model.update(try document(3, value: "", focusRequest: 1))
+        XCTAssertTrue(model.consumeFocusRequest(input, in: first))
+        model.invalidate()
+        XCTAssertFalse(model.consumeFocusRequest(input, in: second))
+    }
+
+    func testFocusValidationRejectsUnsafeTokens() throws {
+        for request in [-1, 9_007_199_254_740_992] {
+            XCTAssertThrowsError(try document(1, value: "", focusRequest: request))
+        }
+    }
+
+    private func document(_ revision: Int, value: String, focusRequest: Int? = nil,
+                          disabled: Bool = false, surface: String = "test") throws -> XgentDocument {
+        var input: [String: Any] = [
+            "id": "input", "kind": focusRequest == nil ? "TextInput" : "ComposerInput",
+            "value": value, "action": "input", "disabled": disabled,
+        ]
+        if let focusRequest { input["focusRequest"] = focusRequest }
         let result = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: [
-            "version": 1, "surface": "test", "revision": revision, "mode": "root",
+            "version": 1, "surface": surface, "revision": revision, "mode": "root",
             "title": "Test", "appearance": "system", "nodes": [
                 ["id": "group", "kind": "VStack", "children": [
-                    ["id": "input", "kind": "TextInput", "value": value, "action": "input"],
+                    input,
                 ]],
             ],
         ]))

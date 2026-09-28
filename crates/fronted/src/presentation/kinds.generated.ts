@@ -55,6 +55,7 @@ export const presentationMappedProperties = [
   "text",
   "value",
   "action",
+  "focusRequest",
   "disabled",
   "destructive",
   "prominent",

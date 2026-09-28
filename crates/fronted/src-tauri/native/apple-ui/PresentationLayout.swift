@@ -349,11 +349,8 @@ extension XgentNodeView {
     }
 
     var nativeCollapsible: some View {
-        DisclosureGroup(isExpanded: $expanded) {
-            VStack(alignment: .leading, spacing: 8) { children }.padding(.top, 8)
-        } label: {
-            Text(node.label ?? "").font(.subheadline.weight(.medium))
-        }
+        XgentDisclosure(node: node, document: document, model: model)
+            .id(node.value?.text ?? node.id)
     }
 
     @ViewBuilder var nativeChatMessage: some View {
@@ -859,6 +856,7 @@ extension XgentNodeView {
 
     var composerInput: some View {
         TextField(node.label ?? "", text: textBinding, axis: .vertical)
+            .modifier(XgentComposerFocusModifier(node: node, document: document, model: model))
             .lineLimit(1...6).textFieldStyle(.plain)
             .font(.body).padding(.vertical, 8)
             .accessibilityLabel(node.label ?? "")

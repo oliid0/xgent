@@ -13,6 +13,7 @@ enum XgentMappedProperty: String, CaseIterable {
     case text
     case value
     case action
+    case focusRequest
     case disabled
     case destructive
     case prominent

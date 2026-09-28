@@ -56,3 +56,19 @@ test("native documents reject unknown properties, missing handlers, and actions 
     /mapped event/,
   );
 });
+
+test("focus requests accept safe nonnegative composer tokens and reject unsupported targets", () => {
+  for (const focusRequest of [0, 1, Number.MAX_SAFE_INTEGER]) {
+    assert.doesNotThrow(() => validatePresentationDocument(
+      document({ id: "draft", kind: "ComposerInput", focusRequest }), new Map(),
+    ));
+  }
+  for (const focusRequest of [-1, 0.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1, "1"]) {
+    assert.throws(() => validatePresentationDocument(
+      document({ id: "draft", kind: "ComposerInput", focusRequest }), new Map(),
+    ), /focus request/);
+  }
+  assert.throws(() => validatePresentationDocument(
+    document({ id: "text", kind: "Text", focusRequest: 1 }), new Map(),
+  ), /focus request/);
+});

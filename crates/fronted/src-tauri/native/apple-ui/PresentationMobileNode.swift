@@ -328,11 +328,8 @@ struct XgentIOSNode: View {
         case .slider:
             slider
         case .collapsible:
-            DisclosureGroup(isExpanded: $expanded) {
-                VStack(alignment: .leading, spacing: 8) { children }.padding(.top, 8)
-            } label: {
-                Text(node.label ?? "").font(.subheadline.weight(.medium))
-            }
+            XgentDisclosure(node: node, document: document, model: model)
+                .id(node.value?.text ?? node.id)
         case .markdown:
             XgentMarkdown(text: node.text ?? "")
         case .codeBlock:
@@ -353,6 +350,7 @@ struct XgentIOSNode: View {
             VStack(alignment: .leading, spacing: CGFloat(theme.spacing.sm)) { children }
         case .composerInput:
             TextField(node.label ?? "", text: textBinding, axis: .vertical)
+                .modifier(XgentComposerFocusModifier(node: node, document: document, model: model))
                 .lineLimit(1 ... 6)
                 .textFieldStyle(.plain)
                 .font(.body)

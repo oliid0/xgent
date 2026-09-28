@@ -61,6 +61,7 @@ import type {
   WriteResultDetails,
 } from "../lib/tools/builtinTypes";
 import type { PendingToolApprovalSummary, ToolApprovalDecision } from "../lib/tools/toolApproval";
+import type { ChatQueueTurnPreview } from "../pages/chat/components/ChatComposerBar";
 import { createNativeComposerStore } from "./composerStore";
 import { presentationControls } from "./controls";
 import { NativeSurface } from "./NativeSurface";
@@ -254,6 +255,11 @@ export type NativeChatPageProps = {
   isUploading: boolean;
   onSend: () => void;
   onStop: () => void;
+  queuedTurns: ChatQueueTurnPreview[];
+  onRunQueuedTurnNow: (id: string) => void;
+  onMoveQueuedTurnUp: (id: string) => void;
+  onEditQueuedTurn: (id: string) => void;
+  onRemoveQueuedTurn: (id: string) => void;
   onSelectModel: (selection: SelectedModel) => void;
   onSelectConversation: (id: string) => void;
   onSelectProject: (project: WorkspaceProject) => void;
@@ -667,6 +673,78 @@ export function NativeChatPage(props: NativeChatPageProps) {
         }
       : undefined;
   const draft = composer.handle.getDraft();
+  const canSend =
+    !props.inputDisabled &&
+    !props.isUploading &&
+    props.modelOptions.length > 0 &&
+    (!draft.isEmpty || props.uploads.length > 0);
+  const queuedTurns: PresentationNode[] = props.queuedTurns.map((turn, index) => {
+    const prefix = `queue:${props.conversationId}:${turn.id}`;
+    const queueAction = (
+      name: string,
+      icon: string,
+      run: (id: string) => void,
+      enabled = true,
+    ): PresentationNode => ({
+      ...button(`${prefix}:${name}`, t(`chat.queue.${name}`), () => run(turn.id), enabled),
+      icon,
+      destructive: name === "delete",
+    });
+    return {
+      id: prefix,
+      kind: "HStack",
+      spacing: 8,
+      children: [
+        {
+          id: `${prefix}:preview`,
+          kind: "VStack",
+          spacing: 4,
+          children: [
+            {
+              id: `${prefix}:text`,
+              kind: "Text",
+              text: turn.previewText || t("chat.queue.emptyMessage"),
+              maxLines: 2,
+            },
+            ...(turn.fileCount > 0
+              ? [
+                  {
+                    id: `${prefix}:files`,
+                    kind: "Text" as const,
+                    secondary: true,
+                    text: t("chat.queue.fileCount").replace("{count}", String(turn.fileCount)),
+                  },
+                ]
+              : []),
+          ],
+        },
+        { id: `${prefix}:spacer`, kind: "Spacer" },
+        {
+          id: `${prefix}:actions`,
+          kind: "Menu",
+          variant: "compact",
+          icon: "ellipsis",
+          label: turn.previewText || t("chat.queue.emptyMessage"),
+          children: [
+            ...(index > 0 ? [queueAction("moveUp", "arrow.up", props.onMoveQueuedTurnUp)] : []),
+            queueAction(
+              "edit",
+              "square.and.pencil",
+              props.onEditQueuedTurn,
+              !props.inputDisabled && !props.isUploading,
+            ),
+            queueAction(
+              "runNow",
+              "play",
+              props.onRunQueuedTurnNow,
+              !props.inputDisabled && !props.isUploading && props.modelOptions.length > 0,
+            ),
+            queueAction("delete", "trash", props.onRemoveQueuedTurn),
+          ],
+        },
+      ],
+    };
+  });
   const contextWindow =
     typeof props.contextWindow === "number" && Number.isFinite(props.contextWindow)
       ? Math.max(0, Math.floor(props.contextWindow))
@@ -752,6 +830,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
         {
           id: "transcript",
           kind: "ScrollView",
+          value: props.conversationId,
           fill: true,
           children: [
             ...(props.modelOptions.length === 0
@@ -812,6 +891,24 @@ export function NativeChatPage(props: NativeChatPageProps) {
           id: "composer",
           kind: "Composer",
           children: [
+            ...(queuedTurns.length > 0
+              ? [
+                  {
+                    id: "queued-turns",
+                    kind: "Collapsible" as const,
+                    label: t("chat.queue.title").replace("{count}", String(queuedTurns.length)),
+                    value: props.conversationId,
+                    children: [
+                      {
+                        id: "queued-turns-list",
+                        kind: "ScrollView" as const,
+                        maxHeight: 160,
+                        children: queuedTurns,
+                      },
+                    ],
+                  },
+                ]
+              : []),
             ...(activityPreviewNode || taskProgressNode
               ? [
                   {
@@ -831,6 +928,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
             {
               id: "draft",
               kind: "ComposerInput",
+              focusRequest: composer.getFocusRevision(),
               label: props.inputPlaceholder,
               value: draft.text,
               disabled: props.inputDisabled,
@@ -1044,34 +1142,31 @@ export function NativeChatPage(props: NativeChatPageProps) {
                       },
                     ]
                   : []),
-                ...(compact && props.isSending
+                ...(!compact || !props.isSending || canSend
                   ? [
-                      {
-                        ...button("stop", t("chat.stopGeneration"), props.onStop),
-                        prominent: true,
-                        kind: "IconButton" as const,
-                        icon: "stop.fill",
-                      },
-                    ]
-                  : [
                       {
                         ...button(
                           "send",
-                          t("chat.send"),
+                          t(props.isSending ? "chat.queue.addToQueue" : "chat.send"),
                           props.onSend,
-                          !props.inputDisabled &&
-                            !props.isUploading &&
-                            props.modelOptions.length > 0 &&
-                            (!draft.isEmpty || props.uploads.length > 0),
+                          canSend,
                         ),
                         prominent: true,
                         kind: "IconButton" as const,
                         icon: "arrow.up",
                       },
-                      ...(props.isSending
-                        ? [button("stop", t("chat.stopGeneration"), props.onStop)]
-                        : []),
-                    ]),
+                    ]
+                  : []),
+                ...(props.isSending
+                  ? [
+                      {
+                        ...button("stop", t("chat.stopGeneration"), props.onStop),
+                        prominent: compact,
+                        kind: compact ? ("IconButton" as const) : ("Button" as const),
+                        icon: compact ? "stop.fill" : undefined,
+                      },
+                    ]
+                  : []),
               ],
             },
           ],

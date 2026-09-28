@@ -55,6 +55,7 @@ function harness(overrides = {}, options = {}) {
     isSending: false, errorMessage: null, hasMoreHistory: false, pendingApprovals: [],
     projects: [], attachmentsEnabled: true, uploads: [], isUploading: false,
     onSend() {}, onStop() {}, onSelectModel() {}, onSelectConversation() {}, onSelectProject() {},
+    queuedTurns: [], onRunQueuedTurnNow() {}, onMoveQueuedTurnUp() {}, onEditQueuedTurn() {}, onRemoveQueuedTurn() {},
     onNewConversation() {}, onOpenSettings() {}, onOpenRemote() {}, onOpenBrowser() {},
     onOpenSkillsHub() {}, onOpenMcpHub() {},
     onOpenBrowserSettings() {}, onOpenGitReview() {}, onOpenBackgroundTasks() {}, onOpenFiles() {},
@@ -109,6 +110,96 @@ test("native edits reach the shared composer used by send and conversation draft
   h.unmount();
   assert.equal(h.props.composerRef.current, null);
   assert.equal((await h.dispatch("send")).ok, false);
+});
+
+test("native mobile can queue a new draft while generation remains stoppable", async () => {
+  let sends = 0;
+  let stops = 0;
+  const h = harness({ isSending: true, onSend: () => sends++, onStop: () => stops++ }, { mobile: true });
+  assert.equal((await h.dispatch("send")).ok, false);
+  assert.equal((await h.dispatch("draft", "Next instruction")).ok, true);
+  const composer = h.render().nodes[0].children.find(node => node.id === "composer");
+  const actions = composer.children.find(node => node.id === "composer-actions").children;
+  assert.equal(actions.find(node => node.id === "send").label, "chat.queue.addToQueue");
+  assert.ok(actions.some(node => node.id === "stop"));
+  assert.equal((await h.dispatch("send")).ok, true);
+  h.props.isUploading = true;
+  h.render();
+  assert.equal((await h.dispatch("send")).ok, false);
+  assert.equal((await h.dispatch("stop")).ok, true);
+  assert.equal(sends, 1);
+  assert.equal(stops, 1);
+  h.unmount();
+});
+
+test("native queued items route all operations and reject removed or previous-conversation actions", async () => {
+  const calls = [];
+  const h = harness({
+    queuedTurns: [{ id: "a", previewText: "First", fileCount: 0 }, { id: "b", previewText: "", fileCount: 2 }],
+    onRunQueuedTurnNow: id => calls.push(["run", id]),
+    onMoveQueuedTurnUp: id => calls.push(["move", id]),
+    onEditQueuedTurn: id => calls.push(["edit", id]),
+    onRemoveQueuedTurn: id => calls.push(["remove", id]),
+  }, { mobile: true });
+  const queue = h.render().nodes[0].children.find(node => node.id === "composer")
+    .children.find(node => node.id === "queued-turns");
+  assert.equal(queue.children[0].maxHeight, 160);
+  assert.equal(queue.children[0].children[1].children[0].children[0].text, "chat.queue.emptyMessage");
+  assert.equal((await h.dispatch("queue:conversation:a:moveUp")).ok, false);
+  for (const verb of ["moveUp", "edit", "runNow", "delete"]) {
+    assert.equal((await h.dispatch(`queue:conversation:b:${verb}`)).ok, true);
+  }
+  assert.deepEqual(calls, [["move", "b"], ["edit", "b"], ["run", "b"], ["remove", "b"]]);
+  h.props.queuedTurns = h.props.queuedTurns.slice(0, 1);
+  h.render();
+  assert.equal((await h.dispatch("queue:conversation:b:runNow")).ok, false);
+  h.props.conversationId = "next";
+  h.render();
+  assert.equal((await h.dispatch("queue:conversation:a:delete")).ok, false);
+  assert.equal((await h.dispatch("queue:next:a:delete")).ok, true);
+  h.props.queuedTurns = [];
+  assert.ok(!h.render().nodes[0].children.find(node => node.id === "composer")
+    .children.some(node => node.id === "queued-turns"));
+  h.unmount();
+});
+
+test("native queued edit and run wait for usable input while cleanup remains available", async () => {
+  const calls = [];
+  const h = harness({
+    queuedTurns: [{ id: "a", previewText: "First", fileCount: 0 }],
+    onRunQueuedTurnNow: () => calls.push("run"), onEditQueuedTurn: () => calls.push("edit"),
+    onRemoveQueuedTurn: () => calls.push("remove"),
+  });
+  for (const state of [{ isUploading: true }, { isUploading: false, inputDisabled: true }]) {
+    Object.assign(h.props, state);
+    h.render();
+    assert.equal((await h.dispatch("queue:conversation:a:edit")).ok, false);
+    assert.equal((await h.dispatch("queue:conversation:a:runNow")).ok, false);
+    assert.equal((await h.dispatch("queue:conversation:a:delete")).ok, true);
+  }
+  Object.assign(h.props, { inputDisabled: false, modelOptions: [] });
+  h.render();
+  assert.equal((await h.dispatch("queue:conversation:a:runNow")).ok, false);
+  assert.equal((await h.dispatch("queue:conversation:a:edit")).ok, true);
+  assert.deepEqual(calls, ["remove", "remove", "edit"]);
+  h.unmount();
+});
+
+test("native focus is explicit and transcript scroll identity follows the conversation", () => {
+  const h = harness();
+  const input = () => h.render().nodes[0].children.find(node => node.id === "composer")
+    .children.find(node => node.id === "draft");
+  assert.equal(input().focusRequest, 0);
+  h.props.composerRef.current.setText("Restored");
+  assert.equal(input().focusRequest, 0);
+  h.props.composerRef.current.focus();
+  assert.equal(input().focusRequest, 1);
+  assert.equal(input().focusRequest, 1);
+  const transcript = () => h.render().nodes[0].children.find(node => node.id === "transcript");
+  assert.equal(transcript().value, "conversation");
+  h.props.conversationId = "another-conversation";
+  assert.equal(transcript().value, "another-conversation");
+  h.unmount();
 });
 
 test("native attachment menu keeps runtime controls usable without attachment support", async () => {
