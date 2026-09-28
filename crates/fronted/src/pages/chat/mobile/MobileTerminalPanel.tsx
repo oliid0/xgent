@@ -157,7 +157,25 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   const [previousSessionCwd, setPreviousSessionCwd] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoRunKeyRef = useRef("");
-  const activeRunRef = useRef("");
+  const runScopeKey = JSON.stringify([open, mode, workdir]);
+  const runScope = useRef({
+    key: runScopeKey,
+    revision: 0,
+    active: true,
+    runId: "",
+    pendingCancelIds: [] as string[],
+  }).current;
+  if (runScope.key !== runScopeKey) {
+    if (runScope.runId) runScope.pendingCancelIds.push(runScope.runId);
+    runScope.key = runScopeKey;
+    runScope.revision += 1;
+    runScope.runId = "";
+    autoRunKeyRef.current = "";
+  }
+  const runRevision = runScope.revision;
+  const isCurrentScope = () =>
+    open && runScope.active && runScope.key === runScopeKey && runScope.revision === runRevision;
+  const isCurrentRun = (id: string) => isCurrentScope() && runScope.runId === id;
 
   const presets = useMemo<ShellPreset[]>(() => {
     if (mode === "git") {
@@ -212,7 +230,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   const runCommand = useCallback(
     async (rawCommand: string) => {
       const nextCommand = rawCommand.trim();
-      if (!nextCommand || activeRunRef.current || !workdir.trim()) return;
+      if (!nextCommand || !isCurrentScope() || runScope.runId || !workdir.trim()) return;
       const id = createRunId();
       const cdTarget = simpleCdTarget(nextCommand);
       let nextCwd = sessionCwd;
@@ -220,18 +238,20 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
         try {
           nextCwd = normalizedRelativeCwd(sessionCwd, cdTarget, workdir, previousSessionCwd);
         } catch (cause) {
-          setEntries((current) => [
-            ...current,
-            {
-              id,
-              command: nextCommand,
-              error: cause instanceof Error ? cause.message : String(cause),
-            },
-          ]);
+          if (isCurrentScope()) {
+            setEntries((current) => [
+              ...current,
+              {
+                id,
+                command: nextCommand,
+                error: cause instanceof Error ? cause.message : String(cause),
+              },
+            ]);
+          }
           return;
         }
       }
-      activeRunRef.current = id;
+      runScope.runId = id;
       setCommand("");
       setActiveRunId(id);
       setEntries((current) => [...current.slice(-19), { id, command: nextCommand }]);
@@ -247,61 +267,58 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           sandbox: false,
           sandbox_allow_network: true,
         });
+        if (!isCurrentRun(id)) return;
         setEntries((current) =>
           current.map((entry) => (entry.id === id ? { ...entry, response } : entry)),
         );
         const exitCode = response.exitCode ?? response.exit_code;
-        if (activeRunRef.current === id && cdTarget !== null && exitCode === 0) {
+        if (cdTarget !== null && exitCode === 0 && !response.cancelled) {
           setPreviousSessionCwd(sessionCwd);
           setSessionCwd(nextCwd);
         }
       } catch (cause) {
+        if (!isCurrentRun(id)) return;
         const error = cause instanceof Error ? cause.message : String(cause);
         setEntries((current) =>
           current.map((entry) => (entry.id === id ? { ...entry, error } : entry)),
         );
       } finally {
-        if (activeRunRef.current === id) {
-          activeRunRef.current = "";
+        if (isCurrentRun(id)) {
+          runScope.runId = "";
           setActiveRunId("");
         }
       }
     },
-    [previousSessionCwd, sessionCwd, workdir],
+    [previousSessionCwd, sessionCwd, workdir, runRevision, runScopeKey],
   );
 
   useEffect(() => {
-    if (!open) {
-      autoRunKeyRef.current = "";
-      return;
-    }
     setCommand(initialCommand);
-  }, [initialCommand, mode, open]);
+  }, [initialCommand, runScopeKey]);
 
   useEffect(() => {
-    if (!open && activeRunRef.current) {
-      void invoke("shell_cancel", { run_id: activeRunRef.current }).catch(() => undefined);
+    runScope.active = true;
+    for (const runId of runScope.pendingCancelIds.splice(0)) {
+      void invoke("shell_cancel", { run_id: runId }).catch(() => undefined);
     }
-  }, [open]);
-
-  useEffect(() => {
     return () => {
-      const runId = activeRunRef.current;
-      activeRunRef.current = "";
+      runScope.active = false;
+      const runId = runScope.runId;
+      runScope.runId = "";
       if (runId) void invoke("shell_cancel", { run_id: runId }).catch(() => undefined);
     };
-  }, [mode, workdir]);
+  }, [runScope, runScopeKey]);
 
   useEffect(() => {
     setActiveRunId("");
     setSessionCwd("");
     setPreviousSessionCwd("");
     setEntries([]);
-  }, [mode, workdir]);
+  }, [runScopeKey]);
 
   useEffect(() => {
     if (!open) return;
-    const autoRunKey = `${workdir}\n${initialCommand}`;
+    const autoRunKey = `${mode}\n${workdir}\n${initialCommand}`;
     if (
       autoRunInitialCommand &&
       initialCommand.trim() &&
@@ -311,7 +328,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
       autoRunKeyRef.current = autoRunKey;
       void runCommand(initialCommand);
     }
-  }, [autoRunInitialCommand, initialCommand, open, runCommand, workdir]);
+  }, [autoRunInitialCommand, initialCommand, mode, open, runCommand, workdir]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -325,13 +342,20 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   };
 
   const cancel = async () => {
-    if (!activeRunId) return;
-    await invoke("shell_cancel", { run_id: activeRunId }).catch(() => undefined);
+    const runId = runScope.runId;
+    if (!runId || !isCurrentRun(runId)) return;
+    await invoke("shell_cancel", { run_id: runId }).catch(() => undefined);
   };
 
   if (isApplePresentationRuntime()) {
     const c = presentationControls();
-    c.handlers.set("close", { enabled: true, accepts: (value) => value === null, run: onClose });
+    c.handlers.set("close", {
+      enabled: true,
+      accepts: (value) => value === null,
+      run: () => {
+        if (isCurrentScope()) onClose();
+      },
+    });
     const nodes: PresentationNode[] = [
       {
         id: "cwd",
@@ -343,8 +367,13 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
         c.action(
           preset.id,
           preset.label,
-          () => (preset.runImmediately ? runCommand(preset.command) : setCommand(preset.command)),
-          !activeRunId,
+          () => {
+            if (isCurrentScope())
+              return preset.runImmediately
+                ? runCommand(preset.command)
+                : setCommand(preset.command);
+          },
+          !activeRunId && isCurrentScope(),
         ),
       ),
       ...entries.map(
@@ -372,18 +401,22 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
       ...(activeRunId
         ? [{ id: "running", kind: "Progress" as const, label: t("chat.mobileTerminal.running") }]
         : []),
-      c.input("command", "Command", command, setCommand),
+      c.input("command", "Command", command, (value) => {
+        if (isCurrentScope()) setCommand(value);
+      }),
       c.action(
         "run",
         t("chat.send"),
         () => runCommand(command),
-        !!command.trim() && !!workdir.trim() && !activeRunId,
+        !!command.trim() && !!workdir.trim() && !activeRunId && isCurrentScope(),
       ),
       c.action("cancel", t("chat.stopGeneration"), cancel, !!activeRunId),
       c.action(
         "clear",
         t("chat.mobileTerminal.clear"),
-        () => setEntries([]),
+        () => {
+          if (isCurrentScope()) setEntries([]);
+        },
         !activeRunId && entries.length > 0,
       ),
     ];
@@ -397,12 +430,13 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           dismissAction: "close",
         }}
         handlers={c.handlers}
-        onError={(cause) =>
-          setEntries((current) => [
-            ...current,
-            { id: createRunId(), command: "", error: String(cause) },
-          ])
-        }
+        onError={(cause) => {
+          if (isCurrentScope())
+            setEntries((current) => [
+              ...current,
+              { id: createRunId(), command: "", error: String(cause) },
+            ]);
+        }}
       />
     );
   }
