@@ -37,6 +37,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::bluetooth_gatt,
             commands::list_photos,
             commands::read_photo,
+            commands::prepare_image_attachment,
             commands::scan_bluetooth,
             commands::read_clipboard,
             commands::write_clipboard,

@@ -8,16 +8,11 @@ import {
   type PendingUploadedFile,
 } from "../../../lib/chat/messages/uploadedFiles";
 import { invalidateUploadedImagePreviewCache } from "../transcript/uploadedImagePreview";
+import { prepareReadableUploads } from "./readableUploadInput";
 
 type SystemPickReadableFilesResponse = {
   files: PendingUploadedFile[];
   skipped: string[];
-};
-
-type SystemUploadedReadableFileInput = {
-  fileName: string;
-  mimeType?: string;
-  contentBase64: string;
 };
 
 type UploadTarget = {
@@ -37,25 +32,6 @@ type UsePendingUploadsParams = {
 };
 
 export const MAX_UPLOAD_FILES = 9;
-
-function arrayBufferToBase64(buffer: ArrayBuffer) {
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 0x8000;
-  let binary = "";
-  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-    const chunk = bytes.subarray(offset, offset + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
-}
-
-async function fileToUploadInput(file: File): Promise<SystemUploadedReadableFileInput> {
-  return {
-    fileName: file.name,
-    mimeType: file.type || undefined,
-    contentBase64: arrayBufferToBase64(await file.arrayBuffer()),
-  };
-}
 
 type WebViewFilePickerOptions = {
   accept?: string;
@@ -338,12 +314,17 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
               `最多上传 ${MAX_UPLOAD_FILES} 个文件，已忽略 ${ignoredForLimit} 个额外文件`,
             );
           }
-          const uploadFiles = await Promise.all(importBatch.map(fileToUploadInput));
-          return invoke<SystemPickReadableFilesResponse>("system_import_uploaded_readable_files", {
-            workdir: targetWorkdir,
-            files: uploadFiles,
-            maxFiles: remainingFileSlots,
-          });
+          const prepared = await prepareReadableUploads(importBatch);
+          if (!prepared.files.length) return { files: [], skipped: prepared.skipped };
+          const result = await invoke<SystemPickReadableFilesResponse>(
+            "system_import_uploaded_readable_files",
+            {
+              workdir: targetWorkdir,
+              files: prepared.files,
+              maxFiles: remainingFileSlots,
+            },
+          );
+          return { ...result, skipped: [...prepared.skipped, ...result.skipped] };
         },
       });
     },

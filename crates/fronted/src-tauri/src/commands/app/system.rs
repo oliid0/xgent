@@ -179,7 +179,7 @@ fn infer_image_upload_kind(path: &Path) -> Option<&'static str> {
         .as_deref()
     {
         Some("png") | Some("jpg") | Some("jpeg") | Some("gif") | Some("webp") | Some("bmp")
-        | Some("svg") | Some("ico") => Some("image"),
+        | Some("avif") | Some("svg") | Some("ico") => Some("image"),
         _ => None,
     }
 }
@@ -195,6 +195,7 @@ fn infer_image_upload_mime(path: &Path) -> Option<&'static str> {
         Some("jpg") | Some("jpeg") => Some("image/jpeg"),
         Some("gif") => Some("image/gif"),
         Some("webp") => Some("image/webp"),
+        Some("avif") => Some("image/avif"),
         Some("bmp") => Some("image/bmp"),
         Some("svg") => Some("image/svg+xml"),
         Some("ico") => Some("image/x-icon"),

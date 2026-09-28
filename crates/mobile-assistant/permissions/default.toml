@@ -6,6 +6,7 @@ permissions = [
   "allow-bluetooth-gatt",
   "allow-list-photos",
   "allow-read-photo",
+  "allow-prepare-image-attachment",
   "allow-scan-bluetooth",
   "allow-read-clipboard",
   "allow-write-clipboard",

@@ -154,6 +154,13 @@ export function readMobilePhoto(id: string) {
   }>(`${PLUGIN_COMMAND}read_photo`, { request: { id } });
 }
 
+export function prepareMobileImageAttachment(request: { fileName: string; contentBase64: string }) {
+  return invoke<{ fileName: string; mimeType: string; contentBase64: string }>(
+    `${PLUGIN_COMMAND}prepare_image_attachment`,
+    { request },
+  );
+}
+
 export type MobileBluetoothDevice = {
   id: string;
   name?: string | null;

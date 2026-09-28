@@ -2,6 +2,7 @@ const COMMANDS: &[&str] = &[
     "bluetooth_gatt",
     "list_photos",
     "read_photo",
+    "prepare_image_attachment",
     "scan_bluetooth",
     "read_clipboard",
     "write_clipboard",

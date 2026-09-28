@@ -1,0 +1,11 @@
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-prepare-image-attachment"
+description = "Allows preparing user-selected image bytes for readable attachments without photo library access."
+commands.allow = ["prepare_image_attachment"]
+
+[[permission]]
+identifier = "deny-prepare-image-attachment"
+description = "Denies native image attachment preparation."
+commands.deny = ["prepare_image_attachment"]

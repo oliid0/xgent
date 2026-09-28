@@ -24,6 +24,11 @@ pub(crate) async fn read_photo<R: Runtime>(app: AppHandle<R>, request: crate::Ph
     on_worker(move || app.mobile_assistant().read_photo(request)).await
 }
 
+#[command]
+pub(crate) async fn prepare_image_attachment<R: Runtime>(app: AppHandle<R>, request: crate::ImageAttachmentRequest) -> Result<crate::ImageAttachmentResult> {
+    on_worker(move || app.mobile_assistant().prepare_image_attachment(request)).await
+}
+
 // Native permission, speech and location callbacks can wait for user input.
 // Keep their synchronous mobile IPC off the executor that serves model traffic.
 async fn on_worker<T: Send + 'static>(

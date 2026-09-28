@@ -33,6 +33,9 @@ impl<R: Runtime> MobileAssistant<R> {
     pub fn read_photo(&self, _request: crate::PhotoReadRequest) -> Result<crate::PhotoReadResult> {
         Err(Error::Unavailable("photo library access is only available on mobile".into()))
     }
+    pub fn prepare_image_attachment(&self, _request: crate::ImageAttachmentRequest) -> Result<crate::ImageAttachmentResult> {
+        Err(Error::Unavailable("native image preparation is only available on mobile".into()))
+    }
     pub fn request_health_metric_permission(&self, _request: crate::HealthMetricRequest) -> Result<MobilePermissionStates> {
         Err(Error::Unavailable("health data access is only available on mobile".into()))
     }

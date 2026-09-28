@@ -261,6 +261,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
 
     @objc func listPhotos(_ invoke: Invoke) throws { try PhotoLibrary.list(invoke) }
     @objc func readPhoto(_ invoke: Invoke) throws { try PhotoLibrary.read(invoke) }
+    @objc func prepareImageAttachment(_ invoke: Invoke) throws { try ImageAttachmentPreparer.run(invoke) }
 
     @objc override public func checkPermissions(_ invoke: Invoke) {
         let payload = permissionPayload()

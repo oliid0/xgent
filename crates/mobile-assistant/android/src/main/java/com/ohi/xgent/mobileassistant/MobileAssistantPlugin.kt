@@ -151,6 +151,8 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
     fun listPhotos(invoke: Invoke) { photos.list(invoke) }
     @Command
     fun readPhoto(invoke: Invoke) { photos.read(invoke) }
+    @Command
+    fun prepareImageAttachment(invoke: Invoke) { ImageAttachmentPreparer.run(invoke) }
     private val bluetooth = BluetoothDiscovery(activity)
     private val bluetoothGattAccess = BluetoothGattAccess(activity)
 

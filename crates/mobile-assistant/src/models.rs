@@ -305,6 +305,21 @@ pub struct PhotoReadRequest {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ImageAttachmentRequest {
+    pub file_name: String,
+    pub content_base64: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageAttachmentResult {
+    pub file_name: String,
+    pub mime_type: String,
+    pub content_base64: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BluetoothGattRequest {
     pub operation: String,
     pub device_id: String,

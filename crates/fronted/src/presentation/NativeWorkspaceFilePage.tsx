@@ -59,6 +59,12 @@ type LoadedFile = {
 
 type PendingConfirmation = "close" | "reload" | null;
 
+type FileDraft = Pick<LoadedFile, "content" | "savedContent" | "mtimeMs" | "contentHash">;
+type FileDraftCache = {
+  drafts: Map<string, FileDraft>;
+  pendingWrites: Map<string, Promise<void>>;
+};
+
 function basename(path: string) {
   const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "");
   return normalized.slice(normalized.lastIndexOf("/") + 1) || normalized;
@@ -91,6 +97,9 @@ type NativeWorkspaceFilePageProps = {
 };
 
 export function NativeWorkspaceFilePage(props: NativeWorkspaceFilePageProps) {
+  // File views have separate lifetimes; unsaved text belongs to the workspace.
+  // Keep no media bytes here and do not evict another file's unsaved edits.
+  const cache = useRef<FileDraftCache>({ drafts: new Map(), pendingWrites: new Map() });
   const activeRequest = props.previewOpen
     ? props.previewRequest
     : props.editorOpen
@@ -110,6 +119,12 @@ export function NativeWorkspaceFilePage(props: NativeWorkspaceFilePageProps) {
       {...props}
       activeRequest={activeRequest}
       activeMode={activeMode}
+      draftKey={JSON.stringify([
+        activeRequest.projectPathKey,
+        activeRequest.workdir,
+        activeRequest.path,
+      ])}
+      draftCache={cache.current}
     />
   );
 }
@@ -118,6 +133,8 @@ function NativeWorkspaceFileSession(
   props: NativeWorkspaceFilePageProps & {
     activeRequest: WorkspaceCodeEditorOpenRequest | WorkspaceFilePreviewOpenRequest;
     activeMode: LoadedFile["mode"];
+    draftKey: string;
+    draftCache: FileDraftCache;
   },
 ) {
   const { t } = useLocale();
@@ -125,6 +142,7 @@ function NativeWorkspaceFileSession(
   const initialRequest = useRef({ ...props.activeRequest });
   const activeRequest = initialRequest.current;
   const activeMode = props.activeMode;
+  const { draftCache, draftKey } = props;
   const locale = useRef(t);
   locale.current = t;
   const [loaded, setLoadedState] = useState<LoadedFile | null>(null);
@@ -133,9 +151,21 @@ function NativeWorkspaceFileSession(
     (next: LoadedFile | null | ((current: LoadedFile | null) => LoadedFile | null)) => {
       const value = typeof next === "function" ? next(loadedRef.current) : next;
       loadedRef.current = value;
+      if (value?.content !== null && value?.content !== undefined) {
+        if (value.content !== value.savedContent || draftCache.pendingWrites.has(draftKey)) {
+          draftCache.drafts.set(draftKey, {
+            content: value.content,
+            savedContent: value.savedContent,
+            mtimeMs: value.mtimeMs,
+            contentHash: value.contentHash,
+          });
+        } else {
+          draftCache.drafts.delete(draftKey);
+        }
+      }
       setLoadedState(value);
     },
-    [],
+    [draftCache, draftKey],
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -171,43 +201,60 @@ function NativeWorkspaceFileSession(
       setFailure(null);
       setLoaded(null);
       try {
+        // Reopening the same file waits for its previous session's write and
+        // reads the final version. Other files remain independently usable.
+        await draftCache.pendingWrites.get(draftKey);
+        if (!current()) return;
+        const restoreDraft = (file: LoadedFile): LoadedFile => {
+          const draft = draftCache.drafts.get(draftKey);
+          if (!draft || file.content === null || draft.content === file.content) return file;
+          if (draft.contentHash !== file.contentHash) {
+            setFailure(locale.current("workspaceEditor.conflictMessage"));
+          }
+          // An external edit must still fail the original optimistic write guard.
+          return { ...file, ...draft };
+        };
         if (mode === "editor" || isWorkspaceEditablePreviewPath(request.path)) {
           const response = await invokeFs<ReadEditableTextResponse>("fs_read_editable_text", {
             workdir: request.workdir,
             path: request.path,
           });
           if (!current()) return;
-          setLoaded({
-            request,
-            mode,
-            path: response.path || request.path,
-            mimeType: "text/plain",
-            data: null,
-            content: response.content,
-            savedContent: response.content,
-            mtimeMs: response.mtimeMs,
-            contentHash: response.contentHash,
-            sizeBytes: response.sizeBytes,
-            totalLines: response.totalLines,
-          });
+          setLoaded(
+            restoreDraft({
+              request,
+              mode,
+              path: response.path || request.path,
+              mimeType: "text/plain",
+              data: null,
+              content: response.content,
+              savedContent: response.content,
+              mtimeMs: response.mtimeMs,
+              contentHash: response.contentHash,
+              sizeBytes: response.sizeBytes,
+              totalLines: response.totalLines,
+            }),
+          );
         } else {
           const response = await invokeFs<ReadWorkspacePreviewResponse>("fs_read_workspace_image", {
             workdir: request.workdir,
             path: request.path,
           });
           if (!current()) return;
-          setLoaded({
-            request,
-            mode,
-            path: response.path || request.path,
-            mimeType: response.mimeType,
-            data: response.data,
-            content: response.content ?? null,
-            savedContent: response.content ?? null,
-            mtimeMs: response.mtimeMs,
-            contentHash: response.contentHash,
-            sizeBytes: response.sizeBytes,
-          });
+          setLoaded(
+            restoreDraft({
+              request,
+              mode,
+              path: response.path || request.path,
+              mimeType: response.mimeType,
+              data: response.data,
+              content: response.content ?? null,
+              savedContent: response.content ?? null,
+              mtimeMs: response.mtimeMs,
+              contentHash: response.contentHash,
+              sizeBytes: response.sizeBytes,
+            }),
+          );
         }
         setConfirmation(null);
       } catch (error) {
@@ -225,7 +272,7 @@ function NativeWorkspaceFileSession(
         if (current()) setLoading(false);
       }
     },
-    [setLoaded],
+    [draftCache, draftKey, setLoaded],
   );
 
   useEffect(() => {
@@ -247,6 +294,11 @@ function NativeWorkspaceFileSession(
     if (!snapshot || snapshot.content === null || snapshot.content === snapshot.savedContent)
       return true;
     savingRef.current = true;
+    let finishWrite = () => {};
+    const completion = new Promise<void>((resolve) => {
+      finishWrite = resolve;
+    });
+    draftCache.pendingWrites.set(draftKey, completion);
     setSaving(true);
     setFailure(null);
     try {
@@ -273,6 +325,20 @@ function NativeWorkspaceFileSession(
           expected_content_hash: snapshot.contentHash,
         });
       }
+      // A background acknowledgement advances this file's cached baseline,
+      // including edits made after the write started or after switching away.
+      const draft = draftCache.drafts.get(draftKey);
+      if (draft) {
+        if (draft.content === snapshot.content) draftCache.drafts.delete(draftKey);
+        else {
+          draftCache.drafts.set(draftKey, {
+            ...draft,
+            savedContent: snapshot.content,
+            mtimeMs: response.mtimeMs,
+            contentHash: response.contentHash,
+          });
+        }
+      }
       if (!mounted.current) return false;
       setLoaded((current) =>
         current
@@ -297,9 +363,13 @@ function NativeWorkspaceFileSession(
       return false;
     } finally {
       savingRef.current = false;
+      draftCache.pendingWrites.delete(draftKey);
+      const draft = draftCache.drafts.get(draftKey);
+      if (draft && draft.content === draft.savedContent) draftCache.drafts.delete(draftKey);
+      finishWrite();
       if (mounted.current) setSaving(false);
     }
-  }, [setLoaded, t]);
+  }, [draftCache, draftKey, setLoaded, t]);
 
   const requestClose = () => {
     if (savingRef.current) return;
@@ -324,6 +394,7 @@ function NativeWorkspaceFileSession(
   const confirmDiscard = () => {
     if (savingRef.current) return;
     const pending = confirmation;
+    draftCache.drafts.delete(draftKey);
     setConfirmation(null);
     if (pending === "close") closeNow();
     else if (pending === "reload" && loaded) void load(loaded.request, loaded.mode);
