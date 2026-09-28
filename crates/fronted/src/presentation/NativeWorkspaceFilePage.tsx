@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorkspaceCodeEditorOpenRequest } from "../components/workspace-editor/WorkspaceCodeEditorOverlay";
 import type { WorkspaceFilePreviewOpenRequest } from "../components/workspace-editor/WorkspaceFilePreviewOverlay";
 import {
@@ -25,10 +25,13 @@ type ReadEditableTextResponse = {
 
 type WriteTextResponse = {
   path: string;
+  bytesWritten: number;
   mtimeMs: number;
   contentHash: string;
   totalLines: number;
 };
+
+type WriteDocumentResponse = Omit<WriteTextResponse, "totalLines">;
 
 type ReadWorkspacePreviewResponse = {
   path: string;
@@ -77,7 +80,7 @@ function isConflict(error: unknown) {
  * Native file viewer/editor. Reads and writes through the same guarded Rust FS
  * commands as the Astryx editor; only the visible presentation is SwiftUI.
  */
-export function NativeWorkspaceFilePage(props: {
+type NativeWorkspaceFilePageProps = {
   settings: AppSettings;
   editorRequest: WorkspaceCodeEditorOpenRequest | null;
   editorOpen: boolean;
@@ -85,22 +88,73 @@ export function NativeWorkspaceFilePage(props: {
   previewOpen: boolean;
   onEditorClose: () => void;
   onPreviewClose: () => void;
-}) {
-  const { t } = useLocale();
-  const compact = isNativeMobileRuntime();
+};
+
+export function NativeWorkspaceFilePage(props: NativeWorkspaceFilePageProps) {
   const activeRequest = props.previewOpen
     ? props.previewRequest
     : props.editorOpen
       ? props.editorRequest
       : null;
   const activeMode: LoadedFile["mode"] = props.previewOpen ? "preview" : "editor";
-  const [loaded, setLoaded] = useState<LoadedFile | null>(null);
-  const [loading, setLoading] = useState(false);
+  if (!activeRequest) return null;
+  return (
+    <NativeWorkspaceFileSession
+      key={JSON.stringify([
+        activeMode,
+        activeRequest.id,
+        activeRequest.projectPathKey,
+        activeRequest.workdir,
+        activeRequest.path,
+      ])}
+      {...props}
+      activeRequest={activeRequest}
+      activeMode={activeMode}
+    />
+  );
+}
+
+function NativeWorkspaceFileSession(
+  props: NativeWorkspaceFilePageProps & {
+    activeRequest: WorkspaceCodeEditorOpenRequest | WorkspaceFilePreviewOpenRequest;
+    activeMode: LoadedFile["mode"];
+  },
+) {
+  const { t } = useLocale();
+  const compact = isNativeMobileRuntime();
+  const initialRequest = useRef({ ...props.activeRequest });
+  const activeRequest = initialRequest.current;
+  const activeMode = props.activeMode;
+  const locale = useRef(t);
+  locale.current = t;
+  const [loaded, setLoadedState] = useState<LoadedFile | null>(null);
+  const loadedRef = useRef<LoadedFile | null>(null);
+  const setLoaded = useCallback(
+    (next: LoadedFile | null | ((current: LoadedFile | null) => LoadedFile | null)) => {
+      const value = typeof next === "function" ? next(loadedRef.current) : next;
+      loadedRef.current = value;
+      setLoadedState(value);
+    },
+    [],
+  );
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const mounted = useRef(false);
+  const readGeneration = useRef(0);
   const [failure, setFailure] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<PendingConfirmation>(null);
 
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      readGeneration.current++;
+    };
+  }, []);
+
   const closeNow = useCallback(() => {
+    if (!mounted.current || savingRef.current) return;
     setConfirmation(null);
     if (activeMode === "preview") props.onPreviewClose();
     else props.onEditorClose();
@@ -111,14 +165,18 @@ export function NativeWorkspaceFilePage(props: {
       request: WorkspaceCodeEditorOpenRequest | WorkspaceFilePreviewOpenRequest,
       mode: LoadedFile["mode"],
     ) => {
+      const generation = ++readGeneration.current;
+      const current = () => mounted.current && generation === readGeneration.current;
       setLoading(true);
       setFailure(null);
+      setLoaded(null);
       try {
         if (mode === "editor" || isWorkspaceEditablePreviewPath(request.path)) {
           const response = await invokeFs<ReadEditableTextResponse>("fs_read_editable_text", {
             workdir: request.workdir,
             path: request.path,
           });
+          if (!current()) return;
           setLoaded({
             request,
             mode,
@@ -137,6 +195,7 @@ export function NativeWorkspaceFilePage(props: {
             workdir: request.workdir,
             path: request.path,
           });
+          if (!current()) return;
           setLoaded({
             request,
             mode,
@@ -152,29 +211,24 @@ export function NativeWorkspaceFilePage(props: {
         }
         setConfirmation(null);
       } catch (error) {
+        if (!current()) return;
         setLoaded(null);
         setFailure(
           message(
             error,
             mode === "preview"
-              ? t("workspaceFilePreview.openFailed")
-              : t("workspaceEditor.openFailed"),
+              ? locale.current("workspaceFilePreview.openFailed")
+              : locale.current("workspaceEditor.openFailed"),
           ),
         );
       } finally {
-        setLoading(false);
+        if (current()) setLoading(false);
       }
     },
-    [t],
+    [setLoaded],
   );
 
   useEffect(() => {
-    if (!activeRequest) {
-      setLoaded(null);
-      setFailure(null);
-      setConfirmation(null);
-      return;
-    }
     void load(activeRequest, activeMode);
   }, [activeMode, activeRequest, load]);
 
@@ -188,50 +242,53 @@ export function NativeWorkspaceFilePage(props: {
   const canEdit = loaded?.mode === "editor" || editablePreview;
 
   const save = useCallback(async () => {
-    if (!loaded || loaded.content === null || !dirty || saving) return true;
+    if (savingRef.current || !mounted.current) return false;
+    const snapshot = loadedRef.current;
+    if (!snapshot || snapshot.content === null || snapshot.content === snapshot.savedContent)
+      return true;
+    savingRef.current = true;
     setSaving(true);
     setFailure(null);
     try {
-      let response: WriteTextResponse | undefined;
+      let response: WriteTextResponse | WriteDocumentResponse;
       if (
-        loaded.mode === "preview" &&
-        getWorkspacePreviewKind(loaded.path) === "document" &&
-        workspacePathExtension(loaded.path) === "docx"
+        snapshot.mode === "preview" &&
+        getWorkspacePreviewKind(snapshot.path) === "document" &&
+        workspacePathExtension(snapshot.path) === "docx"
       ) {
-        await invokeFs("fs_write_docx_text", {
-          workdir: loaded.request.workdir,
-          path: loaded.path,
-          content: loaded.content,
-          expected_mtime_ms: loaded.mtimeMs,
-          expected_content_hash: loaded.contentHash,
+        response = await invokeFs<WriteDocumentResponse>("fs_write_docx_text", {
+          workdir: snapshot.request.workdir,
+          path: snapshot.path,
+          content: snapshot.content,
+          expected_mtime_ms: snapshot.mtimeMs,
+          expected_content_hash: snapshot.contentHash,
         });
       } else {
         response = await invokeFs<WriteTextResponse>("fs_write_text", {
-          workdir: loaded.request.workdir,
-          path: loaded.path,
-          content: loaded.content,
+          workdir: snapshot.request.workdir,
+          path: snapshot.path,
+          content: snapshot.content,
           mode: "rewrite",
-          expected_mtime_ms: loaded.mtimeMs,
-          expected_content_hash: loaded.contentHash,
+          expected_mtime_ms: snapshot.mtimeMs,
+          expected_content_hash: snapshot.contentHash,
         });
       }
-      if (response) {
-        setLoaded((current) =>
-          current
-            ? {
-                ...current,
-                savedContent: current.content,
-                mtimeMs: response.mtimeMs,
-                contentHash: response.contentHash,
-                totalLines: response.totalLines,
-              }
-            : current,
-        );
-      } else {
-        await load(loaded.request, loaded.mode);
-      }
-      return true;
+      if (!mounted.current) return false;
+      setLoaded((current) =>
+        current
+          ? {
+              ...current,
+              savedContent: snapshot.content,
+              mtimeMs: response.mtimeMs,
+              contentHash: response.contentHash,
+              totalLines: "totalLines" in response ? response.totalLines : current.totalLines,
+              sizeBytes: response.bytesWritten,
+            }
+          : current,
+      );
+      return loadedRef.current?.content === loadedRef.current?.savedContent;
     } catch (error) {
+      if (!mounted.current) return false;
       setFailure(
         isConflict(error)
           ? t("workspaceEditor.conflictMessage")
@@ -239,33 +296,38 @@ export function NativeWorkspaceFilePage(props: {
       );
       return false;
     } finally {
-      setSaving(false);
+      savingRef.current = false;
+      if (mounted.current) setSaving(false);
     }
-  }, [dirty, load, loaded, saving, t]);
+  }, [setLoaded, t]);
 
   const requestClose = () => {
+    if (savingRef.current) return;
     if (dirty) setConfirmation("close");
     else closeNow();
   };
   const requestReload = () => {
-    if (!loaded) return;
+    if (!loaded || savingRef.current || loading) return;
     if (dirty) setConfirmation("reload");
     else void load(loaded.request, loaded.mode);
   };
   const confirmSave = async () => {
     const pending = confirmation;
     if (!(await save())) return;
+    if (!mounted.current) return;
     setConfirmation(null);
     if (pending === "close") closeNow();
+    else if (pending === "reload" && loadedRef.current) {
+      await load(loadedRef.current.request, loadedRef.current.mode);
+    }
   };
   const confirmDiscard = () => {
+    if (savingRef.current) return;
     const pending = confirmation;
     setConfirmation(null);
     if (pending === "close") closeNow();
     else if (pending === "reload" && loaded) void load(loaded.request, loaded.mode);
   };
-
-  if (!activeRequest) return null;
 
   const handlers = new Map<string, PresentationHandler>();
   const bind = (
@@ -408,6 +470,7 @@ export function NativeWorkspaceFilePage(props: {
                 : t("workspaceEditor.close"),
               "xmark",
               requestClose,
+              !saving,
             ),
           ],
         },

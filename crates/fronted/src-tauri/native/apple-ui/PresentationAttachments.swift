@@ -1,4 +1,6 @@
 import SwiftUI
+import Foundation
+import ImageIO
 import PhotosUI
 import UniformTypeIdentifiers
 #if os(iOS)
@@ -99,17 +101,12 @@ struct XgentAttachmentPicker: View {
                     let urls = try result.get()
                     let files = try await Task.detached {
                         guard urls.count <= 9 else { throw AttachmentError.limit }
-                        return try urls.map { url -> [String: String] in
-                            let scoped = url.startAccessingSecurityScopedResource()
-                            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-                            guard size <= 20 * 1024 * 1024 else { throw AttachmentError.size }
-                            return try Self.payload(Data(contentsOf: url), name: url.lastPathComponent,
-                                type: UTType(filenameExtension: url.pathExtension) ?? .data)
-                        }
+                        return try urls.map { try XgentAttachmentPayload.file($0) }
                     }.value
                     try send(files)
-                } catch { model.error = error.localizedDescription }
+                } catch {
+                    if !XgentAttachmentPayload.isCancellation(error) { model.error = error.localizedDescription }
+                }
             }
         }
         .photosPicker(isPresented: $pickingPhotos, selection: $photos, maxSelectionCount: 9, matching: .images)
@@ -122,8 +119,10 @@ struct XgentAttachmentPicker: View {
                     var files: [[String: String]] = []
                     for item in selection {
                         guard let data = try await item.loadTransferable(type: Data.self) else { throw AttachmentError.unavailable }
-                        let type = item.supportedContentTypes.first ?? .image
-                        files.append(try Self.payload(data, name: "photo-\(UUID().uuidString).\(type.preferredFilenameExtension ?? "jpg")", type: type))
+                        let payload = try await Task.detached {
+                            try XgentAttachmentPayload.photo(data, name: "photo-\(UUID().uuidString)")
+                        }.value
+                        files.append(payload)
                     }
                     try send(files)
                 } catch { model.error = error.localizedDescription }
@@ -134,16 +133,11 @@ struct XgentAttachmentPicker: View {
             XgentCamera { data in
                 takingPhoto = false
                 guard let data else { return }
-                do { try send([Self.payload(data, name: "camera-\(UUID().uuidString).jpg", type: .jpeg)]) }
+                do { try send([XgentAttachmentPayload.photo(data, name: "camera-\(UUID().uuidString)")]) }
                 catch { model.error = error.localizedDescription }
             }.ignoresSafeArea()
         }
         #endif
-    }
-
-    nonisolated private static func payload(_ data: Data, name: String, type: UTType) throws -> [String: String] {
-        guard data.count <= 20 * 1024 * 1024 else { throw AttachmentError.size }
-        return ["fileName": name, "mimeType": type.preferredMIMEType ?? "application/octet-stream", "contentBase64": data.base64EncodedString()]
     }
 
     private func send(_ files: [[String: String]]) throws {
@@ -162,6 +156,63 @@ struct XgentAttachmentPicker: View {
         }
     }
     #endif
+}
+
+enum XgentAttachmentPayload {
+    static let maximumBytes = 20 * 1024 * 1024
+
+    nonisolated static func file(_ url: URL) throws -> [String: String] {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        var coordinationError: NSError?
+        var result: Result<[String: String], Error>?
+        NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
+            result = Result {
+                let values = try coordinatedURL.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey])
+                guard values.isDirectory != true else { throw AttachmentError.unavailable }
+                guard (values.fileSize ?? 0) <= maximumBytes else { throw AttachmentError.size }
+                let data = try Data(contentsOf: coordinatedURL)
+                let type = UTType(filenameExtension: url.pathExtension) ?? .data
+                if type.conforms(to: .image), type.preferredMIMEType != "image/svg+xml" {
+                    return try photo(data, name: url.lastPathComponent)
+                }
+                return try payload(data, name: url.lastPathComponent, type: type)
+            }
+        }
+        if let coordinationError { throw coordinationError }
+        guard let result else { throw AttachmentError.unavailable }
+        return try result.get()
+    }
+
+    nonisolated static func photo(_ data: Data, name: String) throws -> [String: String] {
+        guard data.count <= maximumBytes else { throw AttachmentError.size }
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let identifier = CGImageSourceGetType(source),
+              let type = UTType(identifier as String), type.conforms(to: .image),
+              CGImageSourceGetCount(source) > 0 else { throw AttachmentError.unavailable }
+        let base = (name as NSString).deletingPathExtension
+        let supported = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp", "image/x-icon"]
+        if let mime = type.preferredMIMEType, supported.contains(mime) {
+            return try payload(data, name: "\(base).\(type.preferredFilenameExtension ?? "jpg")", type: type)
+        }
+        let jpeg = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(jpeg as CFMutableData, UTType.jpeg.identifier as CFString, 1, nil) else {
+            throw AttachmentError.unavailable
+        }
+        CGImageDestinationAddImageFromSource(destination, source, 0,
+            [kCGImageDestinationLossyCompressionQuality: 0.9] as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else { throw AttachmentError.unavailable }
+        return try payload(jpeg as Data, name: "\(base).jpg", type: .jpeg)
+    }
+
+    nonisolated static func payload(_ data: Data, name: String, type: UTType) throws -> [String: String] {
+        guard data.count <= maximumBytes else { throw AttachmentError.size }
+        return ["fileName": name, "mimeType": type.preferredMIMEType ?? "application/octet-stream", "contentBase64": data.base64EncodedString()]
+    }
+
+    nonisolated static func isCancellation(_ error: Error) -> Bool {
+        error is CancellationError || (error as? CocoaError)?.code == .userCancelled
+    }
 }
 
 private enum AttachmentError: LocalizedError {
