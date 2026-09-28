@@ -201,6 +201,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private var activeCommand: ActiveCommand?
     private var scheduledRuns = Set<String>()
     private var cancelledRuns = Set<String>()
+    private var earlyCancelledRuns: [String] = []
     private var initialized = false
     private let sessionIdentifier = strdup("xgent-mobile-execution")!
     private let externalWorkspaces = IOSExternalWorkspaceStore()
@@ -411,6 +412,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         try validate(request)
         stateLock.lock()
         let inserted = scheduledRuns.insert(request.runId).inserted
+        if inserted { earlyCancelledRuns.removeAll { $0 == request.runId } }
         stateLock.unlock()
         guard inserted else {
             throw MobileExecutionError.invalidRequest("A mobile run with this runId already exists")
@@ -435,7 +437,15 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         let request = try invoke.parseArgs(CancelArgs.self)
         stateLock.lock()
         let scheduled = scheduledRuns.contains(request.runId)
-        if scheduled { cancelledRuns.insert(request.runId) }
+        let firstCancellation = cancelledRuns.insert(request.runId).inserted
+        if !scheduled && firstCancellation {
+            // Rust may still be checking the backend or a paired PC. Remember
+            // a bounded set of early cancellations until run registers.
+            earlyCancelledRuns.append(request.runId)
+            if earlyCancelledRuns.count > 256 {
+                cancelledRuns.remove(earlyCancelledRuns.removeFirst())
+            }
+        }
         if activeCommand?.runId == request.runId, var command = activeCommand {
             command.cancelled = true
             activeCommand = command

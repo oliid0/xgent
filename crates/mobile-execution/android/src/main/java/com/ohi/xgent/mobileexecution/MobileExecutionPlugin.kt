@@ -11,6 +11,7 @@ import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
 import java.io.File
+import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import org.json.JSONArray
@@ -65,6 +66,19 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
     private val activeProcesses = ConcurrentHashMap<String, Process>()
     private val scheduledRuns = ConcurrentHashMap.newKeySet<String>()
     private val cancelledRuns = ConcurrentHashMap.newKeySet<String>()
+    private val cancellationLock = Any()
+    private val earlyCancelledRuns = ArrayDeque<String>()
+
+    private fun reserveRun(runId: String): Boolean = synchronized(cancellationLock) {
+        val inserted = scheduledRuns.add(runId)
+        if (inserted) earlyCancelledRuns.remove(runId)
+        inserted
+    }
+
+    private fun finishRun(runId: String) = synchronized(cancellationLock) {
+        scheduledRuns.remove(runId)
+        cancelledRuns.remove(runId)
+    }
 
     private val backendDir = File(activity.filesDir, "mobile-execution")
     private val rootfsDir = File(backendDir, "rootfs")
@@ -154,7 +168,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
             invoke.reject("Install the bundled Alpine rootfs before adding toolchains")
             return
         }
-        if (!scheduledRuns.add(runId)) {
+        if (!reserveRun(runId)) {
             invoke.reject("A mobile run with this runId already exists")
             return
         }
@@ -184,8 +198,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                 invoke.reject("Toolchain installation failed: ${error.message}")
             } finally {
                 activeProcesses.remove(runId)
-                scheduledRuns.remove(runId)
-                cancelledRuns.remove(runId)
+                finishRun(runId)
             }
         }
     }
@@ -257,7 +270,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                 return
             }
 
-        if (!scheduledRuns.add(request.runId)) {
+        if (!reserveRun(request.runId)) {
             invoke.reject("A mobile run with this runId already exists")
             return
         }
@@ -279,8 +292,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                 invoke.reject("Mobile command failed: ${error.message}")
             } finally {
                 activeProcesses.remove(request.runId)
-                scheduledRuns.remove(request.runId)
-                cancelledRuns.remove(request.runId)
+                finishRun(request.runId)
             }
         }
     }
@@ -297,9 +309,19 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                 invoke.reject(error.message ?: "Invalid runId")
                 return
             }
-        val scheduled = scheduledRuns.contains(runId)
+        val scheduled = synchronized(cancellationLock) {
+            val active = scheduledRuns.contains(runId)
+            val firstCancellation = cancelledRuns.add(runId)
+            if (!active && firstCancellation) {
+                // shell_cancel can arrive before run reaches this plugin.
+                earlyCancelledRuns.addLast(runId)
+                if (earlyCancelledRuns.size > MAX_EARLY_CANCELLATIONS) {
+                    cancelledRuns.remove(earlyCancelledRuns.removeFirst())
+                }
+            }
+            active
+        }
         if (scheduled) {
-            cancelledRuns.add(runId)
             activeProcesses[runId]?.let { process ->
                 process.destroy()
                 if (process.isAlive) process.destroyForcibly()
@@ -554,6 +576,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
         private const val MAX_TOOLCHAIN_INSTALL_TIMEOUT_MS = 1_800_000L
         private const val MAX_STDIN_BYTES = 1024 * 1024
         private const val MAX_COMMAND_CHARS = 256 * 1024
+        private const val MAX_EARLY_CANCELLATIONS = 256
         private const val READINESS_MARKER = ".xgent-runtime-ready"
         private const val READINESS_VERSION = "android-proot-alpine-v2"
         private const val READINESS_TOKEN = "xgent-android-shell-ready"
