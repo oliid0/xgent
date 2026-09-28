@@ -6,6 +6,8 @@ import { createReactHookHarness } from "../helpers/react-hook-harness.mjs";
 function harness(options = {}) {
   const hooks = createReactHookHarness();
   const calls = [];
+  const listeners = new Set();
+  const subscriptions = [];
   let response = { exitCode: 0, stdout: "ok", stderr: "", cancelled: false };
   let closes = 0;
   const props = { open: true, workdir: "/project", mode: "terminal", onClose() { closes++; },
@@ -19,12 +21,21 @@ function harness(options = {}) {
     ...mocks,
     "@astryxdesign/core/CodeBlock": { Code: "Code", CodeBlock: "CodeBlock" },
     react: hooks.react,
-    "@xgent/runtime": { async invoke(command, args) {
-      calls.push({ command, args });
-      if (options.invoke) return options.invoke(command, args);
-      if (command === "shell_cancel") return { cancelled: true };
-      return response;
-    } },
+    "@xgent/runtime": {
+      isTauriRuntime: () => options.native === true,
+      async listenNativePlugin(plugin, event, handler) {
+        subscriptions.push({ plugin, event });
+        if (options.listen) await options.listen(plugin, event, handler);
+        listeners.add(handler);
+        return async () => { listeners.delete(handler); };
+      },
+      async invoke(command, args) {
+        calls.push({ command, args });
+        if (options.invoke) return options.invoke(command, args);
+        if (command === "shell_cancel") return { cancelled: true };
+        return response;
+      },
+    },
     "../../../i18n": { useLocale: () => ({ t: (key) => key }) },
     "../../../components/icons": {},
     "../../../presentation/NativeSurface": { NativeSurface: "NativeSurface" },
@@ -45,6 +56,8 @@ function harness(options = {}) {
   }
   return { run, calls, render, find, props, unmount: () => hooks.unmount(),
     replayEffects: () => hooks.replayEffects(), get closes() { return closes; },
+    get listenerCount() { return listeners.size; }, subscriptions,
+    emitOutput: (event) => { for (const listener of listeners) listener(event); },
     setResponse: (value) => { response = value; } };
 }
 
@@ -89,6 +102,78 @@ function deferred() {
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
+
+const tick = () => new Promise(resolve => setImmediate(resolve));
+const outputEvent = (runId, stream, bytes) => ({
+  runId, stream, data: Buffer.from(bytes).toString("base64"),
+});
+
+test("native terminal streams UTF-8 stdout and stderr, then replaces them with the final result", async () => {
+  const pending = deferred();
+  const h = harness({ native: true, invoke: command =>
+    command === "shell_cancel" ? Promise.resolve({ cancelled: true }) : pending.promise });
+  h.render().handlers.get("command").run("echo streamed");
+  const running = h.render().handlers.get("run").run(null);
+  await tick();
+  const runId = h.calls.find(call => call.command === "shell_run").args.run_id;
+  assert.deepEqual(h.subscriptions, [{ plugin: "mobile-execution", event: "output" }]);
+  assert.equal(h.listenerCount, 1);
+  const chinese = Buffer.from("中文");
+  h.emitOutput(outputEvent(runId, "stdout", chinese.subarray(0, 2)));
+  h.emitOutput(outputEvent(runId, "stdout", chinese.subarray(2)));
+  h.emitOutput(outputEvent(runId, "stderr", Buffer.from("warning")));
+  h.emitOutput(outputEvent("another-run", "stdout", Buffer.from("wrong run")));
+  h.emitOutput(outputEvent(runId, "other", Buffer.from("wrong stream")));
+  const live = JSON.stringify(h.render().document);
+  assert.ok(live.includes("中文"));
+  assert.ok(live.includes("warning"));
+  assert.equal(live.includes("wrong run"), false);
+  assert.equal(live.includes("wrong stream"), false);
+  pending.resolve({ exitCode: 0, stdout: "final", stderr: "", cancelled: false });
+  await running;
+  assert.equal(h.listenerCount, 0);
+  const final = JSON.stringify(h.render().document);
+  assert.ok(final.includes("final"));
+  assert.equal(final.includes("warning"), false);
+  assert.equal(final.includes("中文"), false);
+});
+
+test("Android terminal shows live output and ignores late output from the previous workspace", async () => {
+  const old = deferred(), next = deferred();
+  const h = harness({ apple: false, native: true, invoke: (command, args) =>
+    command === "shell_cancel" ? Promise.resolve({ cancelled: true })
+      : args.workdir === "/project" ? old.promise : next.promise });
+  h.find("TextInput").props.onChange("echo old");
+  h.find("HStack", value => value.as === "form").props.onSubmit({ preventDefault() {} });
+  await tick();
+  const oldId = h.calls.find(call => call.command === "shell_run").args.run_id;
+  h.emitOutput(outputEvent(oldId, "stdout", Buffer.from("live old")));
+  assert.equal(h.find("CodeBlock", value => value.title === "stdout")?.props.code, "live old");
+  h.props.workdir = "/other";
+  h.render();
+  h.emitOutput(outputEvent(oldId, "stdout", Buffer.from(" obsolete")));
+  h.find("TextInput").props.onChange("echo new");
+  h.find("HStack", value => value.as === "form").props.onSubmit({ preventDefault() {} });
+  await tick();
+  const newId = h.calls.filter(call => call.command === "shell_run").at(-1).args.run_id;
+  h.emitOutput(outputEvent(newId, "stdout", Buffer.from("live new")));
+  assert.equal(h.find("CodeBlock", value => value.title === "stdout")?.props.code, "live new");
+  old.resolve({ exitCode: 0, stdout: "obsolete", stderr: "", cancelled: false });
+  await tick();
+  assert.equal(h.listenerCount, 1);
+  assert.equal(JSON.stringify(h.find("MobileFullscreenPanel")).includes("obsolete"), false);
+  next.resolve({ exitCode: 0, stdout: "done", stderr: "", cancelled: false });
+  await tick();
+  assert.equal(h.listenerCount, 0);
+});
+
+test("native output listener failure still executes and displays the command result", async () => {
+  const h = harness({ native: true, listen: async () => { throw new Error("unavailable"); } });
+  await h.run("pwd");
+  assert.equal(h.calls.filter(call => call.command === "shell_run").length, 1);
+  assert.equal(h.listenerCount, 0);
+  assert.ok(JSON.stringify(h.render().document).includes("ok"));
+});
 
 test("old terminal results and errors cannot overwrite a new workspace run", async () => {
   for (const fail of [false, true]) {

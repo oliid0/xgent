@@ -8,7 +8,7 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
-import { invoke } from "@xgent/runtime";
+import { invoke, isTauriRuntime, listenNativePlugin } from "@xgent/runtime";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GitBranch, Key, Send, Square, Terminal, Trash2, X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
@@ -38,6 +38,8 @@ type TerminalEntry = {
   command: string;
   response?: ShellRunResponse;
   error?: string;
+  liveStdout?: string;
+  liveStderr?: string;
 };
 
 export type MobileShellPanelMode = "terminal" | "git" | "ssh";
@@ -255,7 +257,39 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
       setCommand("");
       setActiveRunId(id);
       setEntries((current) => [...current.slice(-19), { id, command: nextCommand }]);
+      let removeOutputListener: (() => Promise<void>) | undefined;
       try {
+        if (isTauriRuntime()) {
+          try {
+            const decoders = { stdout: new TextDecoder(), stderr: new TextDecoder() };
+            let liveStdout = "";
+            let liveStderr = "";
+            removeOutputListener = await listenNativePlugin<{
+              runId: string;
+              stream: "stdout" | "stderr";
+              data: string;
+            }>("mobile-execution", "output", (event) => {
+              if (!isCurrentRun(id) || event.runId !== id) return;
+              if (event.stream !== "stdout" && event.stream !== "stderr") return;
+              try {
+                const bytes = Uint8Array.from(atob(event.data), (char) => char.charCodeAt(0));
+                const chunk = decoders[event.stream].decode(bytes, { stream: true });
+                if (event.stream === "stdout") liveStdout = (liveStdout + chunk).slice(-65_536);
+                else liveStderr = (liveStderr + chunk).slice(-65_536);
+                setEntries((current) =>
+                  current.map((entry) =>
+                    entry.id === id ? { ...entry, liveStdout, liveStderr } : entry,
+                  ),
+                );
+              } catch {
+                // The final Shell result remains available if one event is malformed.
+              }
+            });
+          } catch {
+            // Live observation is optional; a failed listener must not block Shell.
+          }
+        }
+        if (!isCurrentRun(id)) return;
         const response = await invoke<ShellRunResponse>("shell_run", {
           workdir,
           command: cdTarget === null ? nextCommand : "pwd",
@@ -283,6 +317,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           current.map((entry) => (entry.id === id ? { ...entry, error } : entry)),
         );
       } finally {
+        if (removeOutputListener) void removeOutputListener().catch(() => undefined);
         if (isCurrentRun(id)) {
           runScope.runId = "";
           setActiveRunId("");
@@ -382,9 +417,14 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
             {
               id: `${entry.id}:output`,
               kind: "Text",
-              text:
-                entry.error ??
-                [entry.response?.stdout, entry.response?.stderr].filter(Boolean).join("\n"),
+              text: entry.error
+                ? [entry.liveStdout, entry.liveStderr, entry.error].filter(Boolean).join("\n")
+                : [
+                    entry.response?.stdout ?? entry.liveStdout,
+                    entry.response?.stderr ?? entry.liveStderr,
+                  ]
+                    .filter(Boolean)
+                    .join("\n"),
             },
             ...(entry.response
               ? [
@@ -531,6 +571,8 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
               {entries.map((entry) => {
                 const response = entry.response;
                 const exitCode = response?.exitCode ?? response?.exit_code;
+                const stdout = response?.stdout ?? entry.liveStdout;
+                const stderr = response?.stderr ?? entry.liveStderr;
                 return (
                   <Card key={entry.id} padding={3} width="100%">
                     <VStack gap={3}>
@@ -545,9 +587,9 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
                           </Text>
                         </HStack>
                       ) : null}
-                      {response?.stdout ? (
+                      {stdout ? (
                         <CodeBlock
-                          code={response.stdout}
+                          code={stdout}
                           language="plaintext"
                           title="stdout"
                           size="sm"
@@ -557,9 +599,9 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
                           container="section"
                         />
                       ) : null}
-                      {response?.stderr ? (
+                      {stderr ? (
                         <CodeBlock
-                          code={response.stderr}
+                          code={stderr}
                           language="plaintext"
                           title="stderr"
                           size="sm"
