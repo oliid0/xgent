@@ -1,6 +1,7 @@
 import SwiftUI
 import Foundation
 import ImageIO
+import Nuke
 import PhotosUI
 import UniformTypeIdentifiers
 #if os(iOS)
@@ -195,14 +196,19 @@ enum XgentAttachmentPayload {
         if let mime = type.preferredMIMEType, supported.contains(mime) {
             return try payload(data, name: "\(base).\(type.preferredFilenameExtension ?? "jpg")", type: type)
         }
-        let jpeg = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(jpeg as CFMutableData, UTType.jpeg.identifier as CFString, 1, nil) else {
-            throw AttachmentError.unavailable
+        var pixels: Float = 2048
+        while pixels >= 1 {
+            try Task.checkCancellation()
+            guard let image = ImageRequest.ThumbnailOptions(maxPixelSize: pixels).makeThumbnail(with: data),
+                  let jpeg = ImageEncoders.ImageIO(type: .jpeg, compressionRatio: 0.9).encode(image) else {
+                throw AttachmentError.unavailable
+            }
+            if jpeg.count <= 5 * 1024 * 1024 {
+                return try payload(jpeg, name: "\(base).jpg", type: .jpeg)
+            }
+            pixels /= 2
         }
-        CGImageDestinationAddImageFromSource(destination, source, 0,
-            [kCGImageDestinationLossyCompressionQuality: 0.9] as CFDictionary)
-        guard CGImageDestinationFinalize(destination) else { throw AttachmentError.unavailable }
-        return try payload(jpeg as Data, name: "\(base).jpg", type: .jpeg)
+        throw AttachmentError.size
     }
 
     nonisolated static func payload(_ data: Data, name: String, type: UTType) throws -> [String: String] {

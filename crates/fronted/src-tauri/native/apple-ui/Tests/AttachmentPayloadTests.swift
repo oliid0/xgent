@@ -48,6 +48,19 @@ final class AttachmentPayloadTests: XCTestCase {
         XCTAssertThrowsError(try XgentAttachmentPayload.file(directory))
     }
 
+    func testLargeUnsupportedPhotosUseABoundedOrientedJPEG() throws {
+        let tiff = try nativeImageFixture(width: 4096, height: 1024, type: .tiff, orientation: 6)
+        XCTAssertLessThanOrEqual(tiff.count, XgentAttachmentPayload.maximumBytes)
+        let payload = try XgentAttachmentPayload.photo(tiff, name: "rotated.tiff")
+        let jpeg = try XCTUnwrap(Data(base64Encoded: try XCTUnwrap(payload["contentBase64"])))
+        let size = try nativeImageDimensions(jpeg)
+        XCTAssertEqual(size.0, 512)
+        XCTAssertEqual(size.1, 2048)
+        XCTAssertLessThanOrEqual(jpeg.count, 5 * 1024 * 1024)
+        XCTAssertEqual(payload["mimeType"], "image/jpeg")
+        XCTAssertEqual(payload["fileName"], "rotated.jpg")
+    }
+
     func testInvalidOversizedAndCancelledSelectionsHaveDistinctOutcomes() throws {
         XCTAssertThrowsError(try XgentAttachmentPayload.photo(Data("invalid".utf8), name: "photo"))
         XCTAssertThrowsError(try XgentAttachmentPayload.payload(

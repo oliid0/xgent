@@ -71,6 +71,46 @@ final class MobileRenderingTests: XCTestCase {
     }
 
     @MainActor
+    func testImagePreviewAndThumbnailsAtNarrowWideAndAccessibleSizes() async throws {
+        let image = try nativeImageFixture().base64EncodedString()
+        for (name, width, typeSize) in [
+            ("images-narrow", CGFloat(320), DynamicTypeSize.large),
+            ("images-wide", CGFloat(768), DynamicTypeSize.large),
+            ("images-accessible", CGFloat(390), DynamicTypeSize.accessibility2),
+        ] {
+            let page = try document(mode: "page", appearance: "light", nodes: [
+                node("file", "BrowserLayout", ["fill": true, "children": [
+                    node("title", "Heading", ["text": "Workspace image"]),
+                    node("activity", "HStack", ["children": [
+                        node("thumbnail", "ActivityPreview", ["label": "Screenshot", "value": image, "action": "preview"]),
+                        node("missing", "ActivityPreview", ["label": "Running tool", "value": "", "status": "running", "action": "tool"]),
+                    ]]),
+                    node("image", "MediaPreview", ["label": "photo.png", "language": "image/png", "value": image, "fill": true]),
+                ]]),
+            ], title: "Image")
+            let model = XgentPresentationModel()
+            model.update(page)
+            try await capture(XgentIOSPagePresentation(document: page, sidebar: nil, model: model).dynamicTypeSize(typeSize),
+                              name: name, width: width)
+        }
+        let page = try document(mode: "page", appearance: "dark", nodes: [
+            node("broken", "MediaPreview", ["label": "broken.png", "language": "image/png", "value": "invalid-image", "fill": true]),
+        ], title: "Image")
+        let model = XgentPresentationModel()
+        model.update(page)
+        try await capture(XgentIOSPagePresentation(document: page, sidebar: nil, model: model),
+                          name: "image-error-narrow", width: 320)
+        let html = Data("<html><body><h1>Workspace document</h1><p>Native document preview</p></body></html>".utf8)
+        let office = try document(mode: "page", appearance: "light", nodes: [
+            node("document", "MediaPreview", ["label": "report.doc", "language": "text/html", "value": html.base64EncodedString(), "fill": true]),
+        ], title: "Document")
+        let officeModel = XgentPresentationModel()
+        officeModel.update(office)
+        try await capture(XgentIOSPagePresentation(document: office, sidebar: nil, model: officeModel),
+                          name: "office-preview-narrow", width: 320)
+    }
+
+    @MainActor
     private func firstResponder(in view: UIView) -> UIView? {
         if view.isFirstResponder { return view }
         return view.subviews.lazy.compactMap { firstResponder(in: $0) }.first

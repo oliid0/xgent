@@ -869,9 +869,8 @@ struct XgentIOSNode: View {
     private var activityPreview: some View {
         Button { model.send(node, in: document) } label: {
             ZStack {
-                if let data = mediaData, let image = UIImage(data: data) {
-                    Image(uiImage: image).resizable().scaledToFill()
-                } else {
+                XgentDataImage(encoded: model.value(node, in: document).text, maximumPixelSize: 300,
+                               contentMode: .fill, label: node.label ?? "Activity") {
                     Color(xgentHex: palette.surface).opacity(0.78)
                     VStack(spacing: 5) {
                         Image(systemName: node.icon ?? "hammer").font(.system(size: 19, weight: .medium))
@@ -965,19 +964,19 @@ struct XgentIOSNode: View {
     }
 
     @ViewBuilder private var mediaPreview: some View {
-        if let data = mediaData, let mimeType = node.language,
-           mimeType.hasPrefix("audio/") || mimeType.hasPrefix("video/") {
+        if let mimeType = node.language,
+           mimeType.hasPrefix("audio/") || mimeType.hasPrefix("video/"), let data = mediaData {
             XgentIOSAVPreview(data: data, mimeType: mimeType, label: node.label ?? "Media preview")
-        } else if let data = mediaData, node.language == "application/pdf" {
+        } else if node.language == "application/pdf", let data = mediaData {
             XgentIOSPDFPreview(data: data)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityLabel(node.label ?? "PDF document")
-        } else if let data = mediaData, let image = UIImage(data: data) {
-            ScrollView([.horizontal, .vertical]) {
-                Image(uiImage: image).resizable().scaledToFit()
-                    .accessibilityLabel(node.label ?? "Image preview")
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let mimeType = node.language,
+                  !mimeType.hasPrefix("image/"), let data = mediaData {
+            XgentQuickLookPreview(data: data, mimeType: mimeType, label: node.label ?? "Document")
+        } else if !model.value(node, in: document).text.isEmpty {
+            XgentImagePreview(encoded: model.value(node, in: document).text,
+                              label: node.label ?? "Image preview")
         } else {
             Label(node.label ?? "No preview", systemImage: "doc.questionmark")
                 .foregroundStyle(Color(xgentHex: palette.secondaryText))

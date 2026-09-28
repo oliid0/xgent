@@ -114,7 +114,7 @@ private struct XgentQuickLookController: UIViewControllerRepresentable {
     }
 }
 
-private struct XgentQuickLookPreview: View {
+struct XgentQuickLookPreview: View {
     let data: Data
     let mimeType: String
     let label: String
@@ -143,11 +143,29 @@ private struct XgentQuickLookPreview: View {
         .task(id: data) {
             if let temporaryURL { try? FileManager.default.removeItem(at: temporaryURL) }
             temporaryURL = nil
-            do {
+            failure = nil
+            let suffix = fileExtension
+            let bytes = data
+            let write = Task.detached(priority: .userInitiated) {
                 let url = FileManager.default.temporaryDirectory
                     .appendingPathComponent(UUID().uuidString)
-                    .appendingPathExtension(fileExtension)
-                try data.write(to: url, options: .atomic)
+                    .appendingPathExtension(suffix)
+                do {
+                    try Task.checkCancellation()
+                    try bytes.write(to: url, options: .atomic)
+                    try Task.checkCancellation()
+                    return url
+                } catch {
+                    try? FileManager.default.removeItem(at: url)
+                    throw error
+                }
+            }
+            do {
+                let url = try await withTaskCancellationHandler(operation: { try await write.value }, onCancel: { write.cancel() })
+                guard !Task.isCancelled else {
+                    try? FileManager.default.removeItem(at: url)
+                    return
+                }
                 guard QLPreviewController.canPreview(url as NSURL) else {
                     try? FileManager.default.removeItem(at: url)
                     failure = "This file type cannot be previewed."
@@ -156,7 +174,7 @@ private struct XgentQuickLookPreview: View {
                 temporaryURL = url
                 failure = nil
             } catch {
-                failure = error.localizedDescription
+                if !Task.isCancelled { failure = error.localizedDescription }
             }
         }
         .onDisappear {
@@ -439,21 +457,8 @@ extension XgentNodeView {
     var nativeActivityPreview: some View {
         Button { model.send(node, in: document) } label: {
             ZStack {
-                if let data = mediaData {
-                    #if os(iOS)
-                    if let image = UIImage(data: data) {
-                        Image(uiImage: image).resizable().scaledToFill()
-                    } else {
-                        activityFallback
-                    }
-                    #else
-                    if let image = NSImage(data: data) {
-                        Image(nsImage: image).resizable().scaledToFill()
-                    } else {
-                        activityFallback
-                    }
-                    #endif
-                } else {
+                XgentDataImage(encoded: model.value(node, in: document).text, maximumPixelSize: 300,
+                               contentMode: .fill, label: node.label ?? "Activity") {
                     activityFallback
                 }
                 if node.status == "running" {
@@ -568,39 +573,25 @@ extension XgentNodeView {
     }
 
     @ViewBuilder var nativeMediaPreview: some View {
-        if let data = mediaData, let mimeType = node.language,
-           mimeType.hasPrefix("audio/") || mimeType.hasPrefix("video/") {
+        if let mimeType = node.language,
+           mimeType.hasPrefix("audio/") || mimeType.hasPrefix("video/"), let data = mediaData {
             XgentAVPreview(data: data, mimeType: mimeType, label: node.label ?? "Media preview")
-        } else if let data = mediaData, node.language == "application/pdf" {
+        } else if node.language == "application/pdf", let data = mediaData {
             XgentPDFPreview(data: data)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityLabel(node.label ?? "PDF document")
-        } else if let data = mediaData {
+        } else if !model.value(node, in: document).text.isEmpty {
             #if os(iOS)
             if let mimeType = node.language,
-               mimeType == "text/html" || mimeType.hasPrefix("application/vnd.") {
+               !mimeType.hasPrefix("image/"), let data = mediaData {
                 XgentQuickLookPreview(data: data, mimeType: mimeType, label: node.label ?? "Document")
             } else {
-                ScrollView([.horizontal, .vertical]) {
-                    if let image = UIImage(data: data) {
-                        Image(uiImage: image).resizable().scaledToFit()
-                            .accessibilityLabel(node.label ?? "Image preview")
-                    } else {
-                        Label(node.label ?? "Unable to preview image", systemImage: "exclamationmark.triangle")
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                XgentImagePreview(encoded: model.value(node, in: document).text,
+                                  label: node.label ?? "Image preview")
             }
             #else
-            ScrollView([.horizontal, .vertical]) {
-                if let image = NSImage(data: data) {
-                    Image(nsImage: image).resizable().scaledToFit()
-                        .accessibilityLabel(node.label ?? "Image preview")
-                } else {
-                    Label(node.label ?? "Unable to preview image", systemImage: "exclamationmark.triangle")
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            XgentImagePreview(encoded: model.value(node, in: document).text,
+                              label: node.label ?? "Image preview")
             #endif
         } else {
             Label(node.label ?? "No preview", systemImage: "doc.questionmark")
