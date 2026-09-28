@@ -26,6 +26,7 @@ export type ConfirmDialogOptions = {
 };
 
 type PendingConfirmDialog = ConfirmDialogOptions & {
+  requestId: number;
   resolve: (confirmed: boolean) => void;
 };
 
@@ -129,9 +130,11 @@ function NativeConfirmDialog(props: {
 export function useConfirmDialog() {
   const [pending, setPending] = useState<PendingConfirmDialog | null>(null);
   const pendingRef = useRef<PendingConfirmDialog | null>(null);
+  const requestIdRef = useRef(0);
 
-  const close = useCallback((confirmed: boolean) => {
+  const close = useCallback((confirmed: boolean, expected?: PendingConfirmDialog) => {
     const current = pendingRef.current;
+    if (expected && current !== expected) return;
     pendingRef.current = null;
     setPending(null);
     current?.resolve(confirmed);
@@ -140,7 +143,7 @@ export function useConfirmDialog() {
   const confirm = useCallback((options: ConfirmDialogOptions) => {
     return new Promise<boolean>((resolve) => {
       pendingRef.current?.resolve(false);
-      const next = { ...options, resolve };
+      const next = { ...options, resolve, requestId: ++requestIdRef.current };
       pendingRef.current = next;
       setPending(next);
     });
@@ -155,6 +158,7 @@ export function useConfirmDialog() {
 
   const dialog = pending ? (
     <ConfirmDialog
+      key={pending.requestId}
       title={pending.title}
       subtitle={pending.subtitle}
       description={pending.description}
@@ -163,10 +167,11 @@ export function useConfirmDialog() {
       cancelLabel={pending.cancelLabel}
       closeLabel={pending.closeLabel}
       tone={pending.tone}
-      onCancel={() => close(false)}
-      onConfirm={() => close(true)}
+      onCancel={() => close(false, pending)}
+      onConfirm={() => close(true, pending)}
     />
   ) : null;
 
-  return { confirm, dialog };
+  const cancel = useCallback(() => close(false), [close]);
+  return { confirm, cancel, dialog };
 }

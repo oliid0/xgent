@@ -15,6 +15,7 @@ import {
   removeExpandedPath,
   removeExpandedSubtree,
 } from "../../../components/project-tools/file-tree/model";
+import { useFileTreeActionScope } from "../../../components/project-tools/file-tree/useFileTreeActionScope";
 import { useFileTreeData } from "../../../components/project-tools/file-tree/useFileTreeData";
 import {
   WorkspaceToolsContext,
@@ -395,10 +396,21 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
   const [pendingDirectory, setPendingDirectory] = useState(ROOT_PATH);
   const [draftName, setDraftName] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
-  const [busyAction, setBusyAction] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const projectReady = Boolean(props.projectPathKey.trim() && props.cwd.trim());
+  const {
+    busy: busyAction,
+    revision: actionRevision,
+    isActive,
+    begin: beginAction,
+    isCurrent: isCurrentAction,
+    finish: finishScopedAction,
+  } = useFileTreeActionScope(props.projectPathKey, props.cwd, props.open && projectReady);
   const expandedPaths = props.fileTreeState.expandedPaths;
+  const expandedRef = useRef(expandedPaths);
+  useEffect(() => {
+    expandedRef.current = expandedPaths;
+  }, [expandedPaths]);
   const expandedSet = useMemo(() => new Set(expandedPaths), [expandedPaths]);
   const { nodes, loadChildren, refreshVisible, createEntry, renameEntry, deleteEntry, search } =
     useFileTreeData({
@@ -428,14 +440,17 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
     setDraftName("");
     setDeleteTarget(null);
     setActionError(null);
-  }, [props.projectPathKey]);
+  }, [actionRevision]);
 
   const selectedNode =
     nodes[props.fileTreeState.selectedPath] ??
     search.results.find((entry) => entry.path === props.fileTreeState.selectedPath) ??
     nodes[ROOT_PATH];
   const selectedPath = selectedNode?.path ?? ROOT_PATH;
-  const emitExpanded = (next: string[]) => props.onFileTreeStateChange({ expandedPaths: next });
+  const emitExpanded = (next: string[]) => {
+    expandedRef.current = next;
+    props.onFileTreeStateChange({ expandedPaths: next });
+  };
   const selectPath = (path: string) => props.onFileTreeStateChange({ selectedPath: path });
   const toggleDirectory = (path: string) => {
     if (expandedSet.has(path)) {
@@ -455,7 +470,7 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
   };
   const openFile = (path: string) => props.onOpenFile?.(path, siblingImages(path));
   const startAction = (action: Exclude<PendingAction, null>) => {
-    if (!projectReady || busyAction) return;
+    if (!projectReady || busyAction || !isActive()) return;
     if (action === "rename" && !selectedPath) return;
     setPendingAction(action);
     setPendingTargetPath(selectedPath);
@@ -465,62 +480,71 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
     setActionError(null);
   };
   const finishAction = async () => {
-    if (!pendingAction || busyAction) return;
+    if (!pendingAction || busyAction || !isActive()) return;
     const name = draftName.trim();
     if (!name) {
       setActionError(t("projectTools.fileTree.nameRequired"));
       return;
     }
-    setBusyAction(true);
+    const owner = beginAction();
+    if (!owner) return;
     setActionError(null);
     try {
       const targetPath = pendingTargetPath ?? selectedPath;
       const targetDir = pendingDirectory;
       if (pendingAction === "file") {
         const next = await createEntry("file", targetDir, name);
-        emitExpanded(addExpandedPaths(expandedPaths, [targetDir]));
+        if (!isCurrentAction(owner)) return;
+        emitExpanded(addExpandedPaths(expandedRef.current, [targetDir]));
         selectPath(next);
       } else if (pendingAction === "folder") {
         const next = await createEntry("dir", targetDir, name);
-        emitExpanded(addExpandedPaths(expandedPaths, [targetDir, next]));
+        if (!isCurrentAction(owner)) return;
+        emitExpanded(addExpandedPaths(expandedRef.current, [targetDir, next]));
         selectPath(next);
       } else if (targetPath) {
         const next = await renameEntry(targetPath, name);
-        emitExpanded(remapExpandedPathsForRename(expandedPaths, targetPath, next));
+        if (!isCurrentAction(owner)) return;
+        emitExpanded(remapExpandedPathsForRename(expandedRef.current, targetPath, next));
         selectPath(next);
       }
       setPendingAction(null);
       setPendingTargetPath(null);
       setDraftName("");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : String(error));
+      if (isCurrentAction(owner))
+        setActionError(error instanceof Error ? error.message : String(error));
     } finally {
-      setBusyAction(false);
+      finishScopedAction(owner);
     }
   };
   const confirmDelete = async () => {
     if (!deleteTarget || busyAction) return;
-    setBusyAction(true);
+    const owner = beginAction();
+    if (!owner) return;
     setActionError(null);
     try {
       await deleteEntry(deleteTarget);
-      emitExpanded(removeExpandedSubtree(expandedPaths, deleteTarget));
+      if (!isCurrentAction(owner)) return;
+      emitExpanded(removeExpandedSubtree(expandedRef.current, deleteTarget));
       selectPath(dirname(deleteTarget));
       setDeleteTarget(null);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : String(error));
+      if (isCurrentAction(owner))
+        setActionError(error instanceof Error ? error.message : String(error));
     } finally {
-      setBusyAction(false);
+      finishScopedAction(owner);
     }
   };
 
   const importFiles = async (payload: string) => {
     if (!projectReady || busyAction) return;
-    const revision = importContext.revision;
-    const isCurrent = () => importContext.active && importContext.revision === revision;
+    if (importContext.revision !== importGeneration) return;
+    const owner = beginAction();
+    if (!owner) return;
+    const isCurrent = () => isCurrentAction(owner) && importContext.revision === importGeneration;
     const targetDir = selectedNode?.kind === "dir" ? selectedPath : dirname(selectedPath);
     let lastPath = "";
-    setBusyAction(true);
     setActionError(null);
     try {
       await importDeviceFiles(
@@ -542,11 +566,11 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
       if (lastPath && isCurrent()) {
         props.onFileTreeStateChange({
           selectedPath: lastPath,
-          expandedPaths: addExpandedPaths(expandedPaths, [targetDir]),
+          expandedPaths: addExpandedPaths(expandedRef.current, [targetDir]),
         });
         refreshVisible();
       }
-      setBusyAction(false);
+      finishScopedAction(owner);
     }
   };
 
@@ -554,19 +578,13 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
   const importContext = useRef({
     key: JSON.stringify([props.projectPathKey, props.cwd, importDirectory]),
     revision: 0,
-    active: true,
   }).current;
   const importKey = JSON.stringify([props.projectPathKey, props.cwd, importDirectory]);
   if (importContext.key !== importKey) {
     importContext.key = importKey;
     importContext.revision += 1;
   }
-  useEffect(() => {
-    importContext.active = true;
-    return () => {
-      importContext.active = false;
-    };
-  }, [importContext]);
+  const importGeneration = importContext.revision;
 
   const handlers = new Map<string, PresentationHandler>();
   const bind = (
@@ -834,11 +852,13 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
                     kind: "TextInput" as const,
                     label: actionPlaceholder,
                     value: draftName,
+                    disabled: busyAction,
                     fill: true,
                     action: bind(
                       "files-name",
                       (value) => setDraftName(value as string),
                       (value) => typeof value === "string",
+                      !busyAction,
                     ),
                   },
                   button(
@@ -848,11 +868,17 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
                     finishAction,
                     !busyAction,
                   ),
-                  button("files-cancel-action", t("settings.cancel"), "xmark", () => {
-                    setPendingAction(null);
-                    setPendingTargetPath(null);
-                    setActionError(null);
-                  }),
+                  button(
+                    "files-cancel-action",
+                    t("settings.cancel"),
+                    "xmark",
+                    () => {
+                      setPendingAction(null);
+                      setPendingTargetPath(null);
+                      setActionError(null);
+                    },
+                    !busyAction,
+                  ),
                 ],
               },
             ]
@@ -874,8 +900,12 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
                     !busyAction,
                     true,
                   ),
-                  button("files-cancel-delete", t("settings.cancel"), "xmark", () =>
-                    setDeleteTarget(null),
+                  button(
+                    "files-cancel-delete",
+                    t("settings.cancel"),
+                    "xmark",
+                    () => setDeleteTarget(null),
+                    !busyAction,
                   ),
                 ],
               },

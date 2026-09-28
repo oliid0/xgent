@@ -48,6 +48,7 @@ import {
   removeExpandedPath,
   removeExpandedSubtree,
 } from "./model";
+import { useFileTreeActionScope } from "./useFileTreeActionScope";
 import { useFileTreeData } from "./useFileTreeData";
 
 const FILE_TREE_QUERY_SYNC_DEBOUNCE_MS = 180;
@@ -81,13 +82,25 @@ export function FileTreePanel(props: {
   const [query, setQuery] = useState(syncState.query);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [pendingTargetPath, setPendingTargetPath] = useState<string | null>(null);
+  const [pendingDirectory, setPendingDirectory] = useState(ROOT_PATH);
   const [draftName, setDraftName] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
-  const [busyAction, setBusyAction] = useState(false);
+  const {
+    busy: busyAction,
+    revision: actionRevision,
+    isActive,
+    begin: beginAction,
+    isCurrent: isCurrentAction,
+    finish: finishScopedAction,
+  } = useFileTreeActionScope(projectPathKey, cwd, active && initialized);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [revealTarget, setRevealTarget] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const { confirm: requestConfirmDialog, dialog: confirmDialog } = useConfirmDialog();
+  const {
+    confirm: requestConfirmDialog,
+    cancel: cancelConfirmDialog,
+    dialog: confirmDialog,
+  } = useConfirmDialog();
 
   const {
     nodes,
@@ -186,14 +199,14 @@ export function FileTreePanel(props: {
 
   // Transient UI state never leaks across project switches.
   useEffect(() => {
-    void projectPathKey;
+    cancelConfirmDialog();
     setContextMenu(null);
     setPendingAction(null);
     setPendingTargetPath(null);
     setDraftName("");
     setActionError(null);
     setRevealTarget(null);
-  }, [projectPathKey]);
+  }, [actionRevision, cancelConfirmDialog]);
 
   // Reveal: expand + load the ancestor chain, then scroll the row into view.
   // The expansion merge reads `expandedRef` *after* the awaits so manual
@@ -204,11 +217,12 @@ export function FileTreePanel(props: {
       const dirs =
         kind === "dir" && path ? [...ancestorDirsOfPath(path), path] : ancestorDirsOfPath(path);
       await ensureDirsLoaded(dirs);
+      if (!isActive()) return;
       setExpanded(addExpandedPaths(expandedRef.current, dirs));
       selectPath(path);
       setRevealTarget(path);
     },
-    [ensureDirsLoaded, selectPath, setExpanded],
+    [ensureDirsLoaded, isActive, selectPath, setExpanded],
   );
 
   // External reveal requests arrive as a bump of the persisted revision
@@ -309,44 +323,49 @@ export function FileTreePanel(props: {
 
   const startAction = useCallback(
     (action: Exclude<PendingAction, null>, targetPath: string) => {
+      if (!isActive() || busyAction) return;
       const currentNodes = nodesRef.current;
       const targetNode = currentNodes[targetPath] ?? currentNodes[ROOT_PATH];
       const normalizedTargetPath = targetNode?.path ?? ROOT_PATH;
       if (action === "rename" && !normalizedTargetPath) return;
       selectPath(normalizedTargetPath);
       setPendingTargetPath(normalizedTargetPath);
+      setPendingDirectory(
+        targetNode?.kind === "dir" ? normalizedTargetPath : dirname(normalizedTargetPath),
+      );
       setPendingAction(action);
       setActionError(null);
       setDraftName(action === "rename" ? basename(normalizedTargetPath) : "");
     },
-    [selectPath],
+    [busyAction, isActive, selectPath],
   );
 
   const finishAction = useCallback(async () => {
-    if (!pendingAction || busyAction) return;
+    if (!pendingAction || busyAction || !isActive()) return;
     const name = draftName.trim();
     if (!name) {
       setActionError(t("projectTools.fileTree.nameRequired"));
       return;
     }
-    setBusyAction(true);
+    const owner = beginAction();
+    if (!owner) return;
     setActionError(null);
     try {
-      const currentNodes = nodesRef.current;
       const targetPath = pendingTargetPath ?? selectedPath;
-      const targetNode = currentNodes[targetPath] ?? currentNodes[ROOT_PATH];
-      const targetDir =
-        targetNode?.kind === "dir" ? targetNode.path : dirname(targetNode?.path ?? targetPath);
+      const targetDir = pendingDirectory;
       if (pendingAction === "file") {
         const nextPath = await createEntry("file", targetDir, name);
+        if (!isCurrentAction(owner)) return;
         setExpanded(addExpandedPaths(expandedRef.current, [targetDir]));
         selectPath(nextPath);
       } else if (pendingAction === "folder") {
         const nextPath = await createEntry("dir", targetDir, name);
+        if (!isCurrentAction(owner)) return;
         setExpanded(addExpandedPaths(expandedRef.current, [targetDir, nextPath]));
         selectPath(nextPath);
       } else if (pendingAction === "rename" && targetPath) {
         const nextPath = await renameEntry(targetPath, name);
+        if (!isCurrentAction(owner)) return;
         setExpanded(remapExpandedPathsForRename(expandedRef.current, targetPath, nextPath));
         selectPath(nextPath);
       }
@@ -354,77 +373,96 @@ export function FileTreePanel(props: {
       setPendingTargetPath(null);
       setDraftName("");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : String(error));
+      if (isCurrentAction(owner))
+        setActionError(error instanceof Error ? error.message : String(error));
     } finally {
-      setBusyAction(false);
+      finishScopedAction(owner);
     }
   }, [
     busyAction,
+    beginAction,
     createEntry,
     draftName,
     pendingAction,
+    pendingDirectory,
     pendingTargetPath,
     renameEntry,
     selectPath,
     selectedPath,
     setExpanded,
+    isActive,
+    isCurrentAction,
+    finishScopedAction,
     t,
   ]);
 
   const deletePath = useCallback(
     async (targetPath: string) => {
       if (!targetPath || busyAction) return;
-      const confirmed = await requestConfirmDialog({
-        title: t("projectTools.fileTree.deleteConfirm").replace("{path}", targetPath),
-        subtitle: t("projectTools.fileTree.deleteConfirmDescription"),
-        description: (
-          <VStack gap={2}>
-            <HStack gap={2} vAlign="center">
-              <Trash2 />
-              <Text type="label">{basename(targetPath)}</Text>
-            </HStack>
-            <Code>{targetPath}</Code>
-          </VStack>
-        ),
-        confirmLabel: t("projectTools.fileTree.delete"),
-        cancelLabel: t("settings.cancel"),
-        closeLabel: t("projectTools.fileTree.deleteConfirmClose"),
-        tone: "destructive",
-      });
-      if (!confirmed) return;
-      setBusyAction(true);
-      setActionError(null);
+      const owner = beginAction();
+      if (!owner) return;
       try {
+        const confirmed = await requestConfirmDialog({
+          title: t("projectTools.fileTree.deleteConfirm").replace("{path}", targetPath),
+          subtitle: t("projectTools.fileTree.deleteConfirmDescription"),
+          description: (
+            <VStack gap={2}>
+              <HStack gap={2} vAlign="center">
+                <Trash2 />
+                <Text type="label">{basename(targetPath)}</Text>
+              </HStack>
+              <Code>{targetPath}</Code>
+            </VStack>
+          ),
+          confirmLabel: t("projectTools.fileTree.delete"),
+          cancelLabel: t("settings.cancel"),
+          closeLabel: t("projectTools.fileTree.deleteConfirmClose"),
+          tone: "destructive",
+        });
+        if (!confirmed || !isCurrentAction(owner)) return;
+        setActionError(null);
         await deleteEntry(targetPath);
+        if (!isCurrentAction(owner)) return;
         setExpanded(removeExpandedSubtree(expandedRef.current, targetPath));
         selectPath(dirname(targetPath));
       } catch (error) {
-        setActionError(error instanceof Error ? error.message : String(error));
+        if (isCurrentAction(owner))
+          setActionError(error instanceof Error ? error.message : String(error));
       } finally {
-        setBusyAction(false);
+        finishScopedAction(owner);
       }
     },
-    [busyAction, deleteEntry, requestConfirmDialog, selectPath, setExpanded, t],
+    [
+      busyAction,
+      beginAction,
+      deleteEntry,
+      requestConfirmDialog,
+      selectPath,
+      setExpanded,
+      isCurrentAction,
+      finishScopedAction,
+      t,
+    ],
   );
 
   const handleOpenExternal = useCallback(
     (path: string) => {
       setActionError(null);
       void openWorkspacePath(path, "choose").catch((error: unknown) => {
-        setActionError(error instanceof Error ? error.message : String(error));
+        if (isActive()) setActionError(error instanceof Error ? error.message : String(error));
       });
     },
-    [openWorkspacePath],
+    [isActive, openWorkspacePath],
   );
 
   const handleOpenContainingDirectory = useCallback(
     (path: string) => {
       setActionError(null);
       void openWorkspacePath(path, "reveal").catch((error: unknown) => {
-        setActionError(error instanceof Error ? error.message : String(error));
+        if (isActive()) setActionError(error instanceof Error ? error.message : String(error));
       });
     },
-    [openWorkspacePath],
+    [isActive, openWorkspacePath],
   );
 
   const handleMenuRefresh = useCallback(
@@ -644,11 +682,13 @@ export function FileTreePanel(props: {
                 label={actionPlaceholder}
                 isLabelHidden
                 hasAutoFocus
+                isDisabled={busyAction}
                 value={draftName}
                 onChange={setDraftName}
                 onEnter={() => void finishAction()}
                 onKeyDown={(event) => {
                   if (event.key === "Escape") {
+                    if (busyAction) return;
                     event.preventDefault();
                     setPendingAction(null);
                     setPendingTargetPath(null);
@@ -674,6 +714,7 @@ export function FileTreePanel(props: {
               variant="ghost"
               size="sm"
               icon={<X />}
+              isDisabled={busyAction}
               onClick={() => {
                 setPendingAction(null);
                 setPendingTargetPath(null);
@@ -751,7 +792,7 @@ export function FileTreePanel(props: {
         <FileTreeContextMenu
           path={contextNode?.path ?? ROOT_PATH}
           kind={contextNode?.kind ?? "dir"}
-          canMutate={canMutate}
+          canMutate={canMutate && !busyAction}
           canOpenFile={Boolean(fileTree.onOpenFile)}
           canInsertMention={Boolean(fileTree.onInsertFileMention)}
           showHidden={syncState.showHidden}
