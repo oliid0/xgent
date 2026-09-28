@@ -33,11 +33,19 @@ final class MarkdownTests: XCTestCase {
     }
 
     func testSwiftHighlightingPreservesWhitespaceAndUnicode() {
-        let code = "  let text = \"\u{4F60}\u{597D} \u{1F44B}\"\n\t// comment\n"
-        for dark in [false, true] {
-            let result = XgentSwiftHighlighter(dark: dark).attributedCode(code, language: "SWIFT")
-            XCTAssertEqual(result.string, code)
-            XCTAssertNotNil(result.attribute(.foregroundColor, at: 2, effectiveRange: nil))
+        for prefix in ["", "  ", "\t", "\n\n\t  "] {
+            let code = prefix + "let text = \"\u{4F60}\u{597D} \u{1F44B}\"\n\t// comment\n"
+            for dark in [false, true] {
+                let result = XgentSwiftHighlighter(dark: dark).attributedCode(code, language: "SWIFT")
+                XCTAssertEqual(result.string, code)
+                XCTAssertNotNil(result.attribute(.foregroundColor, at: prefix.utf16.count, effectiveRange: nil))
+            }
+        }
+    }
+
+    func testEmptyAndWhitespaceOnlySwiftRemainVerbatim() {
+        for code in ["", "  ", "\n\t\r\n"] {
+            XCTAssertEqual(XgentSwiftHighlighter(dark: false).attributedCode(code, language: "swift").string, code)
         }
     }
 

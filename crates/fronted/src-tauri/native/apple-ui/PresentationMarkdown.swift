@@ -106,7 +106,15 @@ struct XgentSwiftHighlighter: CodeSyntaxHighlighter {
     func attributedCode(_ content: String, language: String?) -> NSAttributedString {
         // Splash is a Swift tokenizer. Other languages retain their original text.
         guard language?.lowercased() == "swift" else { return NSAttributedString(string: content) }
-        return highlighter.highlight(content)
+        // Splash 0.16 duplicates the first whitespace token. Keep the exact
+        // source prefix outside its tokenizer so indentation/copy stay intact.
+        let prefix = String(content.prefix(while: { $0.isWhitespace }))
+        let code = String(content.dropFirst(prefix.count))
+        let highlighted = highlighter.highlight(code)
+        guard highlighted.string == code else { return NSAttributedString(string: content) }
+        let result = NSMutableAttributedString(string: prefix)
+        result.append(highlighted)
+        return result
     }
 
     func highlightCode(_ content: String, language: String?) -> Text {
