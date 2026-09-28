@@ -325,6 +325,7 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
   const closeRequestIdRef = useRef<number | null>(null);
   const openAnimationFrameRef = useRef<number | null>(null);
   const closeAnimationTimeoutRef = useRef<number | null>(null);
+  const activeRunIdRef = useRef<string | null>(null);
   const initialThemeRef = useRef(theme);
   const [tabs, setTabs] = useState<EditorTab[]>([]);
   const [activeKey, setActiveKey] = useState("");
@@ -333,6 +334,7 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
   const [pendingDialog, setPendingDialog] = useState<PendingDialog | null>(null);
   const [isRunningFile, setIsRunningFile] = useState(false);
   const [runResult, setRunResult] = useState<EditorRunResult | null>(null);
+  const [runCancelError, setRunCancelError] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   const activeTab = useMemo(
@@ -476,8 +478,10 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
       phase: "running",
       output: "",
     });
+    setRunCancelError(null);
     try {
       const runId = `workspace-editor-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
+      activeRunIdRef.current = runId;
       const response = await invoke<ShellRunResponse>("shell_run", {
         workdir: tab.workdir,
         command: runnable.command,
@@ -509,9 +513,27 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
         error: toMessage(error, t("workspaceEditor.runFailed")),
       });
     } finally {
+      activeRunIdRef.current = null;
       setIsRunningFile(false);
     }
   }, [activeTab, isRunningFile, saveTab, t]);
+
+  const stopActiveFile = useCallback(() => {
+    const runId = activeRunIdRef.current;
+    if (!runId) return;
+    setRunCancelError(null);
+    void invoke<{ cancelled: boolean }>("shell_cancel", { run_id: runId })
+      .then((response) => {
+        if (activeRunIdRef.current === runId && !response.cancelled) {
+          setRunCancelError(t("workspaceEditor.stopRunFailed"));
+        }
+      })
+      .catch((error) => {
+        if (activeRunIdRef.current === runId) {
+          setRunCancelError(toMessage(error, t("workspaceEditor.stopRunFailed")));
+        }
+      });
+  }, [t]);
 
   const readTab = useCallback(
     async (request: WorkspaceCodeEditorOpenRequest) => {
@@ -1254,16 +1276,29 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
           touchPresentation="bottom-sheet"
           footer={
             <Button
-              label={t("workspaceEditor.closeRunOutput")}
+              label={
+                isRunningFile ? t("workspaceEditor.stopRun") : t("workspaceEditor.closeRunOutput")
+              }
               variant="secondary"
-              isDisabled={isRunningFile}
-              onClick={() => setRunResult(null)}
+              onClick={() => {
+                if (isRunningFile) stopActiveFile();
+                else setRunResult(null);
+              }}
             />
           }
         >
           <VStack gap={3}>
             {runResult.phase === "running" ? (
-              <Spinner size="lg" label={t("workspaceEditor.running")} />
+              <>
+                <Spinner size="lg" label={t("workspaceEditor.running")} />
+                {runCancelError ? (
+                  <Banner
+                    status="error"
+                    title={t("workspaceEditor.stopRunFailed")}
+                    description={runCancelError}
+                  />
+                ) : null}
+              </>
             ) : (
               <Banner
                 status={
