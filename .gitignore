@@ -22,8 +22,3 @@ cc/
 
 crates/fronted/src-tauri/native/apple-ui/.build/
 crates/fronted/src-tauri/native/apple-ui/.swiftpm/
-
-# Sources consumed by the Android/iOS release resource-preparation script.
-!crates/mobile-execution/THIRD_PARTY_NOTICES.md
-!crates/mobile-execution/PROOT_SOURCE.md
-!crates/mobile-execution/LICENSES/*.txt
