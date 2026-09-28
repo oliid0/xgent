@@ -58,6 +58,19 @@ struct XgentAttachmentOwner {
     }
 }
 
+private struct XgentAttachmentBatch: Sendable {
+    var files: [[String: String]] = []
+    var failures: [String] = []
+
+    mutating func append(_ label: String, _ operation: () throws -> [String: String]) throws {
+        do { files.append(try operation()) }
+        catch {
+            if XgentAttachmentPayload.isCancellation(error) { throw error }
+            failures.append("\(label): \(error.localizedDescription)")
+        }
+    }
+}
+
 // System pickers feed the same attachment import action as all other renderers.
 struct XgentAttachmentPicker: View {
     let node: XgentNode
@@ -140,14 +153,17 @@ struct XgentAttachmentPicker: View {
                 let urls = try result.get()
                 return try await XgentAttachmentPayload.prepare {
                     guard urls.count <= 9 else { throw AttachmentError.limit }
-                    return try urls.map {
+                    var batch = XgentAttachmentBatch()
+                    for url in urls {
                         try Task.checkCancellation()
-                        return try XgentAttachmentPayload.file($0)
+                        try batch.append(url.lastPathComponent) { try XgentAttachmentPayload.file(url) }
                     }
+                    return batch
                 }
             }
         }, onCancellation: { fileOwner = nil })
-        .photosPicker(isPresented: $pickingPhotos, selection: $photos, maxSelectionCount: 9, matching: .images)
+        .photosPicker(isPresented: $pickingPhotos, selection: $photos, maxSelectionCount: 9,
+                      matching: .images, preferredItemEncoding: .current)
         .onChange(of: photos) { _, selection in
             guard !selection.isEmpty else { return }
             let owner = photoOwner
@@ -155,16 +171,21 @@ struct XgentAttachmentPicker: View {
             photos = []
             guard let owner else { return }
             startImport(owner) {
-                var files: [[String: String]] = []
-                for item in selection {
+                var batch = XgentAttachmentBatch()
+                for (index, item) in selection.enumerated() {
                     try Task.checkCancellation()
-                    guard let data = try await item.loadTransferable(type: Data.self) else { throw AttachmentError.unavailable }
-                    let payload = try await XgentAttachmentPayload.prepare {
-                        try XgentAttachmentPayload.photo(data, name: "photo-\(UUID().uuidString)")
+                    do {
+                        guard let data = try await item.loadTransferable(type: Data.self) else { throw AttachmentError.unavailable }
+                        let payload = try await XgentAttachmentPayload.prepare {
+                            try XgentAttachmentPayload.photo(data, name: "photo-\(UUID().uuidString)")
+                        }
+                        batch.files.append(payload)
+                    } catch {
+                        if XgentAttachmentPayload.isCancellation(error) { throw error }
+                        batch.failures.append("Photo \(index + 1): \(error.localizedDescription)")
                     }
-                    files.append(payload)
                 }
-                return files
+                return batch
             }
         }
         .onChange(of: node.action) { _, _ in cancelSelection() }
@@ -177,9 +198,10 @@ struct XgentAttachmentPicker: View {
                 cameraOwner = nil
                 guard let data, let owner else { return }
                 startImport(owner) {
-                    try await XgentAttachmentPayload.prepare {
-                        [try XgentAttachmentPayload.photo(data, name: "camera-\(UUID().uuidString)")]
+                    let payload = try await XgentAttachmentPayload.prepare {
+                        try XgentAttachmentPayload.photo(data, name: "camera-\(UUID().uuidString)")
                     }
+                    return XgentAttachmentBatch(files: [payload])
                 }
             }.ignoresSafeArea()
         }
@@ -199,7 +221,7 @@ struct XgentAttachmentPicker: View {
     }
 
     private func startImport(_ owner: XgentAttachmentOwner,
-                             operation: @escaping @MainActor () async throws -> [[String: String]]) {
+                             operation: @escaping @MainActor () async throws -> XgentAttachmentBatch) {
         guard !importing, owner.isCurrent(in: model) else { return }
         importing = true
         importID = owner.id
@@ -213,10 +235,11 @@ struct XgentAttachmentPicker: View {
             }
             do {
                 try Task.checkCancellation()
-                let files = try await operation()
+                let batch = try await operation()
                 try Task.checkCancellation()
                 guard importID == owner.id else { return }
-                try owner.send(files, in: model)
+                try owner.send(batch.files, in: model)
+                if !batch.failures.isEmpty { model.error = batch.failures.joined(separator: "\n") }
             } catch {
                 if importID == owner.id, owner.isCurrent(in: model),
                    !XgentAttachmentPayload.isCancellation(error) { model.error = error.localizedDescription }
