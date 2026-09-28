@@ -102,17 +102,29 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
     answer: (value: { answer?: string; trustHostKey?: boolean }) => void;
   } | null>(null);
   const [promptAnswer, setPromptAnswer] = useState("");
-  useEffect(() => {
-    if (!open) desktopRun.current?.abort();
-    return () => {
-      desktopRun.current?.abort();
-    };
-  }, [open]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedHost = useMemo(
     () => hosts.find((host) => host.id === selectedHostId) ?? null,
     [hosts, selectedHostId],
   );
+  const scopeKey = JSON.stringify([open, workdir, projectPathKey, selectedHost?.id ?? ""]);
+  const runScope = useRef({
+    key: scopeKey,
+    revision: 0,
+    active: true,
+    runId: "",
+    pendingCancelIds: [] as string[],
+  }).current;
+  if (runScope.key !== scopeKey) {
+    if (runScope.runId) runScope.pendingCancelIds.push(runScope.runId);
+    runScope.key = scopeKey;
+    runScope.revision += 1;
+    runScope.runId = "";
+  }
+  const runRevision = runScope.revision;
+  const isCurrentScope = () =>
+    open && runScope.active && runScope.key === scopeKey && runScope.revision === runRevision;
+  const isCurrentRun = (id: string) => isCurrentScope() && runScope.runId === id;
   const associatedSet = useMemo(
     () => new Set(associatedHostIds.filter((id) => hosts.some((host) => host.id === id))),
     [associatedHostIds, hosts],
@@ -133,6 +145,29 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
   }, [hosts, open]);
 
   useEffect(() => {
+    runScope.active = true;
+    for (const runId of runScope.pendingCancelIds.splice(0)) {
+      void invoke("shell_cancel", { run_id: runId }).catch(() => undefined);
+    }
+    return () => {
+      runScope.active = false;
+      desktopRun.current?.abort();
+      const runId = runScope.runId;
+      runScope.runId = "";
+      if (runId) void invoke("shell_cancel", { run_id: runId }).catch(() => undefined);
+    };
+  }, [runScope, scopeKey]);
+
+  useEffect(() => {
+    setCommand("");
+    setKeyboardResponse("");
+    setEntries([]);
+    setActiveRunId("");
+    setSshPrompt(null);
+    setPromptAnswer("");
+  }, [scopeKey]);
+
+  useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [activeRunId, entries]);
 
@@ -142,12 +177,14 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
     if (
       !selectedHost ||
       !remoteCommand ||
-      activeRunId ||
+      !isCurrentScope() ||
+      runScope.runId ||
       !workdir.trim() ||
       (mobile && selectedHost.authType === "keyboardInteractive" && !keyboardResponse.trim())
     )
       return;
     const id = createRunId();
+    runScope.runId = id;
     setCommand("");
     setActiveRunId(id);
     setEntries((current) => [...current, { id, command: remoteCommand }]);
@@ -180,46 +217,63 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
                   return;
                 }
                 controller.signal.addEventListener("abort", abort, { once: true });
+                if (!isCurrentRun(id)) {
+                  abort();
+                  return;
+                }
                 setPromptAnswer("");
                 setSshPrompt({
                   prompt,
                   answer: (value) => {
                     controller.signal.removeEventListener("abort", abort);
+                    if (!isCurrentRun(id) || controller.signal.aborted) {
+                      abort();
+                      return;
+                    }
                     setSshPrompt(null);
                     resolve(value);
                   },
                 });
               }),
           });
+      if (!isCurrentRun(id)) return;
       setEntries((current) =>
         current.map((entry) => (entry.id === id ? { ...entry, response } : entry)),
       );
     } catch (cause) {
+      if (!isCurrentRun(id)) return;
       const error = cause instanceof Error ? cause.message : String(cause);
       setEntries((current) =>
         current.map((entry) => (entry.id === id ? { ...entry, error } : entry)),
       );
     } finally {
-      desktopRun.current = null;
-      setSshPrompt(null);
-      setActiveRunId("");
+      if (desktopRun.current === controller) desktopRun.current = null;
+      if (isCurrentRun(id)) {
+        runScope.runId = "";
+        setSshPrompt(null);
+        setActiveRunId("");
+      }
     }
   };
 
   const cancel = async () => {
-    if (!activeRunId) return;
+    const runId = runScope.runId;
+    if (!runId || !isCurrentRun(runId)) return;
     desktopRun.current?.abort();
-    await invoke("shell_cancel", { run_id: activeRunId }).catch(() => undefined);
+    await invoke("shell_cancel", { run_id: runId }).catch(() => undefined);
   };
 
   const close = () => {
+    if (!isCurrentScope()) return;
     desktopRun.current?.abort();
-    if (activeRunId) void invoke("shell_cancel", { run_id: activeRunId }).catch(() => undefined);
+    const runId = runScope.runId;
+    runScope.runId = "";
+    if (runId) void invoke("shell_cancel", { run_id: runId }).catch(() => undefined);
     onClose();
   };
 
   const toggleHostAssociation = (hostId: string) => {
-    if (!projectPathKey) return;
+    if (!projectPathKey || !isCurrentScope()) return;
     const current = associatedHostIds.filter((id) => hosts.some((host) => host.id === id));
     onAssociatedHostIdsChange(
       associatedSet.has(hostId) ? current.filter((id) => id !== hostId) : [...current, hostId],
@@ -238,6 +292,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
               "back",
               t("chat.mobileSsh.back"),
               () => {
+                if (!isCurrentScope()) return;
                 setSelectedHostId("");
                 setEntries([]);
                 setKeyboardResponse("");
@@ -253,7 +308,9 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
                   "challenge",
                   t("settings.sshAuthKeyboardInteractive"),
                   keyboardResponse,
-                  setKeyboardResponse,
+                  (value) => {
+                    if (isCurrentScope()) setKeyboardResponse(value);
+                  },
                   true,
                 ),
               ]
@@ -278,7 +335,9 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
                 : []),
             ]),
           ),
-          c.input("command", "Command", command, setCommand),
+          c.input("command", "Command", command, (value) => {
+            if (isCurrentScope()) setCommand(value);
+          }),
           c.action(
             "run",
             t("chat.send"),
@@ -293,11 +352,15 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
           c.action("cancel", t("chat.stopGeneration"), cancel, !!activeRunId),
         ]
       : [
-          c.action("settings", t("settings.sshAdd"), onOpenSettings),
+          c.action("settings", t("settings.sshAdd"), () => {
+            if (isCurrentScope()) onOpenSettings();
+          }),
           ...orderedHosts.map((host) =>
             c.group(host.id, host.name, [
               {
-                ...c.action(`${host.id}:connect`, endpoint(host), () => setSelectedHostId(host.id)),
+                ...c.action(`${host.id}:connect`, endpoint(host), () => {
+                  if (isCurrentScope()) setSelectedHostId(host.id);
+                }),
                 kind: "NavigationRow",
                 icon: "server.rack",
               },
@@ -332,15 +395,18 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
                 "ssh-answer",
                 t("settings.sshAuthMethod"),
                 promptAnswer,
-                setPromptAnswer,
+                (value) => {
+                  if (isCurrentScope()) setPromptAnswer(value);
+                },
                 !sshPrompt.prompt.answerEcho,
               ),
             ]),
-        c.action("ssh-confirm", t("settings.confirm"), () =>
+        c.action("ssh-confirm", t("settings.confirm"), () => {
+          if (!isCurrentScope()) return;
           sshPrompt.answer(
             sshPrompt.prompt.kind === "hostKey" ? { trustHostKey: true } : { answer: promptAnswer },
-          ),
-        ),
+          );
+        }),
         c.action("ssh-cancel", t("settings.cancel"), cancel),
       );
     }
@@ -356,12 +422,13 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
           dismissAction: "close",
         }}
         handlers={c.handlers}
-        onError={(error) =>
-          setEntries((current) => [
-            ...current,
-            { id: createRunId(), command: "", error: String(error) },
-          ])
-        }
+        onError={(error) => {
+          if (isCurrentScope())
+            setEntries((current) => [
+              ...current,
+              { id: createRunId(), command: "", error: String(error) },
+            ]);
+        }}
       />
     );
   }
