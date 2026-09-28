@@ -16,6 +16,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { Thumbnail } from "@astryxdesign/core/Thumbnail";
 import { Token } from "@astryxdesign/core/Token";
 import {
+  type DragEvent,
   memo,
   type ReactNode,
   type RefObject,
@@ -54,6 +55,19 @@ import {
 import { useLocale } from "../../../i18n";
 import { canManualCompact, contextUsageRatio } from "../../../lib/chat/contextUsage";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
+import {
+  clearActiveWorkspacePathDrag,
+  getActiveWorkspacePathDrag,
+  hasWorkspacePathDragPayload,
+  readNativeWorkspacePathDragOver,
+  readNativeWorkspacePathDrop,
+  readWorkspacePathDragPayload,
+  WORKSPACE_PATH_NATIVE_DRAG_LEAVE_EVENT,
+  WORKSPACE_PATH_NATIVE_DRAG_OVER_EVENT,
+  WORKSPACE_PATH_NATIVE_DROP_EVENT,
+  type WorkspacePathDragPayload,
+  workspacePathDragMatchesProject,
+} from "../../../lib/chat/workspacePathDrag";
 import type { GitClient } from "../../../lib/git/types";
 import {
   checkMobileAssistantPermissions,
@@ -399,6 +413,72 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const [showComposerExpandControl, setShowComposerExpandControl] = useState(false);
   const isComposerExpandedRef = useRef(false);
   const glassCardRef = useRef<HTMLDivElement | null>(null);
+  const [workspaceDropState, setWorkspaceDropState] = useState<"accept" | "blocked" | null>(null);
+
+  const acceptsWorkspacePath = useCallback(
+    (payload: WorkspacePathDragPayload | null) =>
+      payload !== null && !isInputDisabled && workspacePathDragMatchesProject(payload, workdir),
+    [isInputDisabled, workdir],
+  );
+  const insertWorkspacePath = useCallback(
+    (payload: WorkspacePathDragPayload | null) => {
+      setWorkspaceDropState(null);
+      if (!payload || !acceptsWorkspacePath(payload) || !composerRef.current) return false;
+      composerRef.current.insertFileMention(payload.relativePath, payload.entryKind);
+      composerRef.current.focus();
+      return true;
+    },
+    [acceptsWorkspacePath, composerRef],
+  );
+  const handleWorkspaceDragOver = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!hasWorkspacePathDragPayload(event.dataTransfer)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const accepted = acceptsWorkspacePath(getActiveWorkspacePathDrag());
+      event.dataTransfer.dropEffect = accepted ? "copy" : "none";
+      setWorkspaceDropState(accepted ? "accept" : "blocked");
+    },
+    [acceptsWorkspacePath],
+  );
+  const handleWorkspaceDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!hasWorkspacePathDragPayload(event.dataTransfer)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const payload = readWorkspacePathDragPayload(event.dataTransfer);
+      clearActiveWorkspacePathDrag();
+      insertWorkspacePath(payload);
+    },
+    [insertWorkspacePath],
+  );
+  useEffect(() => {
+    const target = glassCardRef.current;
+    if (!target) return;
+    const hover = (event: Event) => {
+      const payload = readNativeWorkspacePathDragOver(event);
+      if (!payload) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setWorkspaceDropState(acceptsWorkspacePath(payload) ? "accept" : "blocked");
+    };
+    const leave = () => setWorkspaceDropState(null);
+    const drop = (event: Event) => {
+      const payload = readNativeWorkspacePathDrop(event);
+      if (!payload) return;
+      event.preventDefault();
+      event.stopPropagation();
+      insertWorkspacePath(payload);
+    };
+    target.addEventListener(WORKSPACE_PATH_NATIVE_DRAG_OVER_EVENT, hover);
+    target.addEventListener(WORKSPACE_PATH_NATIVE_DRAG_LEAVE_EVENT, leave);
+    target.addEventListener(WORKSPACE_PATH_NATIVE_DROP_EVENT, drop);
+    return () => {
+      target.removeEventListener(WORKSPACE_PATH_NATIVE_DRAG_OVER_EVENT, hover);
+      target.removeEventListener(WORKSPACE_PATH_NATIVE_DRAG_LEAVE_EVENT, leave);
+      target.removeEventListener(WORKSPACE_PATH_NATIVE_DROP_EVENT, drop);
+    };
+  }, [acceptsWorkspacePath, insertWorkspacePath]);
 
   const expandFromHeightRef = useRef<number | null>(null);
   const expandAnimationRef = useRef<Animation | null>(null);
@@ -889,6 +969,15 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
               : undefined
           }
           className="xgent-chat-composer"
+          data-workspace-path-drop-zone=""
+          data-workspace-drop={workspaceDropState ?? undefined}
+          onDragOver={handleWorkspaceDragOver}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setWorkspaceDropState(null);
+            }
+          }}
+          onDrop={handleWorkspaceDrop}
           data-expanded={isComposerExpanded ? "true" : "false"}
           style={isComposerExpanded ? { minHeight: 0, flex: 1 } : undefined}
           drawer={

@@ -3,7 +3,9 @@ param(
   [string]$ExecutablePath,
 
   [ValidateRange(1, 60)]
-  [int]$StartupWaitSeconds = 8
+  [int]$StartupWaitSeconds = 8,
+
+  [switch]$TestWindowPersistence
 )
 
 $ErrorActionPreference = "Stop"
@@ -76,6 +78,10 @@ try {
   }
 
   $window = Wait-XgentWindow $process
+  if (-not $TestWindowPersistence) {
+    Write-Output "PASS: process stayed alive and the main window became ready"
+    return
+  }
   $outer = New-Object XgentWindowSmoke+Rect
   [void][XgentWindowSmoke]::GetWindowRect($window, [ref]$outer)
   if (-not [XgentWindowSmoke]::MoveWindow($window, $outer.Left, $outer.Top, 960, 680, $true)) {

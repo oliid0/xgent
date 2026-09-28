@@ -145,6 +145,13 @@ import {
 import type { AgentRunnerFailoverParams } from "../lib/chat/runner/agentRunner";
 import { skillMentionInjection } from "../lib/chat/skills/mentionInjection";
 import { OPEN_TOOL_ACTIVITY, toolActivitySelection } from "../lib/chat/toolActivityNavigation";
+import {
+  clearActiveWorkspacePathDrag,
+  clearActiveWorkspacePathNativeHover,
+  dispatchActiveWorkspacePathDrop,
+  dispatchActiveWorkspacePathNativeHover,
+  getActiveWorkspacePathDrag,
+} from "../lib/chat/workspacePathDrag";
 import type { ScrollFollowHandle } from "../lib/chat-scroll/useScrollFollow";
 import { createStreamDebugLogger } from "../lib/debug/agentDebug";
 import { tauriGitClient } from "../lib/git/tauriGitClient";
@@ -5962,6 +5969,13 @@ export function ChatPage(props: ChatPageProps) {
           window.devicePixelRatio,
         );
         setIsFileDropActive(isNativeDropInsideUploadZone(event.position, { scaleFactor }));
+        if (getActiveWorkspacePathDrag()) {
+          dispatchActiveWorkspacePathNativeHover({
+            x: event.position.x / scaleFactor,
+            y: event.position.y / scaleFactor,
+          });
+          setIsFileDropActive(false);
+        }
         return;
       }
 
@@ -5972,11 +5986,21 @@ export function ChatPage(props: ChatPageProps) {
           window.devicePixelRatio,
         );
         if (isNativeDropInsideUploadZone(event.position, { scaleFactor })) {
+          if (event.paths.length === 0 && getActiveWorkspacePathDrag()) {
+            dispatchActiveWorkspacePathDrop({
+              x: event.position.x / scaleFactor,
+              y: event.position.y / scaleFactor,
+            });
+            return;
+          }
+          clearActiveWorkspacePathDrag();
           void importDroppedPaths(event.paths);
         }
+        clearActiveWorkspacePathDrag();
         return;
       }
 
+      clearActiveWorkspacePathNativeHover();
       setIsFileDropActive(false);
     })
       .then((nextUnlisten) => {
@@ -5995,6 +6019,7 @@ export function ChatPage(props: ChatPageProps) {
       if (unlisten) {
         unlisten();
       }
+      clearActiveWorkspacePathDrag();
     };
   }, [importDroppedPaths]);
 

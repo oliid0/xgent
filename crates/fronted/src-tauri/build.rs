@@ -94,21 +94,30 @@ fn link_native_ui(manifest_dir: &std::path::Path) {
     } else {
         format!("{arch}-apple-macosx15.0")
     };
-    let mut files: Vec<_> = std::fs::read_dir(&sources).expect("native SwiftUI sources")
-        .map(|entry| entry.expect("SwiftUI source").path())
-        .filter(|path| path.extension().is_some_and(|ext| ext == "swift")).collect();
-    files.sort();
-    let status = Command::new("xcrun").args(["swiftc", "-swift-version", "5", "-O", "-emit-library", "-static",
-        "-module-name", "XgentNativeUI", "-target", &swift_target, "-sdk", sdk.trim()])
-        .args(files).arg("-o").arg(output.join("libXgentNativeUI.a"))
+    // SwiftPM's static product includes the UI and its package dependencies.
+    // A target-specific scratch path keeps device/simulator objects isolated.
+    let scratch = output.join("native-ui");
+    let swift_args = ["swift", "build", "--configuration", "release",
+        "--product", "XgentNativeUI", "--triple", &swift_target, "--sdk", sdk.trim()];
+    let status = Command::new("xcrun").args(swift_args)
+        .arg("--package-path").arg(&sources)
+        .arg("--scratch-path").arg(&scratch)
         .status().expect("compile native SwiftUI presentation");
     assert!(status.success(), "native SwiftUI presentation compilation failed");
-    println!("cargo:rustc-link-search=native={}", output.display());
+    let binary_path = Command::new("xcrun").args(swift_args)
+        .arg("--package-path").arg(&sources)
+        .arg("--scratch-path").arg(&scratch).arg("--show-bin-path")
+        .output().expect("locate native SwiftUI static product");
+    assert!(binary_path.status.success(), "locate native SwiftUI static product failed");
+    let binary_path = String::from_utf8(binary_path.stdout).expect("SwiftPM binary path");
+    assert!(std::path::Path::new(binary_path.trim()).join("libXgentNativeUI.a").is_file(),
+        "SwiftPM did not produce the native UI static archive");
+    println!("cargo:rustc-link-search=native={}", binary_path.trim());
     println!("cargo:rustc-link-search=native={}/usr/lib/swift", sdk.trim());
     println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/lib/swift");
     println!("cargo:rustc-link-lib=static=XgentNativeUI");
     let platform_ui = if ios { "UIKit" } else { "AppKit" };
-    for framework in ["SwiftUI", platform_ui, "WebKit", "Foundation", "PhotosUI", "Photos", "UniformTypeIdentifiers", "AVFoundation"] {
+    for framework in ["SwiftUI", platform_ui, "WebKit", "Foundation", "PhotosUI", "Photos", "UniformTypeIdentifiers", "AVFoundation", "AVKit", "PDFKit", "QuickLook"] {
         println!("cargo:rustc-link-lib=framework={framework}");
     }
 }

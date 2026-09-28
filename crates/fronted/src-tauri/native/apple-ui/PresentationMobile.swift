@@ -1,4 +1,5 @@
 #if os(iOS)
+import Flow
 import SwiftUI
 
 // The complete compact application surface is handwritten. Wire nodes provide
@@ -315,7 +316,7 @@ private struct XgentIOSComposer: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let activity {
-                HStack(spacing: 8) {
+                HFlow(itemSpacing: 8, rowSpacing: 8) {
                     XgentIOSNodes(nodes: activity.children ?? [], document: document, model: model)
                 }
             }
@@ -620,6 +621,7 @@ struct XgentIOSSheetPresentation: View {
                     }
                 }
                 .formStyle(.grouped)
+                .scrollContentBackground(.hidden)
                 .id(document.id)
                 .scrollDismissesKeyboard(.interactively)
             } else {

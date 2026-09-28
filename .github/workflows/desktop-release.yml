@@ -340,11 +340,15 @@ jobs:
           rm -rf dist/portable
           test "$(find dist -type f | wc -l)" -gt 0
 
+      - name: Smoke launch Windows portable app
+        shell: powershell
+        run: ./scripts/release/smoke-launch-windows.ps1 -ExecutablePath target/x86_64-pc-windows-msvc/release/xgent.exe
+
       - name: Optional Windows interaction diagnostics
         if: inputs.smoke == true
         continue-on-error: true
         shell: powershell
-        run: ./scripts/release/smoke-launch-windows.ps1 -ExecutablePath target/x86_64-pc-windows-msvc/release/xgent.exe
+        run: ./scripts/release/smoke-launch-windows.ps1 -ExecutablePath target/x86_64-pc-windows-msvc/release/xgent.exe -TestWindowPersistence
 
       - uses: actions/upload-artifact@v7
         with:

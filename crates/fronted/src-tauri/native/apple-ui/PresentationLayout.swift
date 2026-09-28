@@ -254,11 +254,7 @@ extension XgentNodeView {
     }
 
     var nativeMarkdown: some View {
-        Text(attributedText)
-            .font(.system(size: CGFloat(presentationTheme.typography.body * presentationTheme.fontScale)))
-            .foregroundStyle(Color(xgentHex: palette.text))
-            .textSelection(.enabled)
-            .fixedSize(horizontal: false, vertical: true)
+        XgentMarkdown(text: node.text ?? "")
     }
 
     var nativeCodeBlock: some View {

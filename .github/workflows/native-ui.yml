@@ -1,0 +1,96 @@
+name: Native Apple UI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - crates/fronted/src-tauri/native/apple-ui/**
+      - crates/fronted/src-tauri/build.rs
+      - .github/workflows/native-ui.yml
+  pull_request:
+    paths:
+      - crates/fronted/src-tauri/native/apple-ui/**
+      - crates/fronted/src-tauri/build.rs
+      - .github/workflows/native-ui.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-ui-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-ui:
+    name: Swift packages and native rendering
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    defaults:
+      run:
+        working-directory: crates/fronted/src-tauri/native/apple-ui
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Test macOS package
+        run: |
+          set -o pipefail
+          xcodebuild test -scheme XgentNativeUI -destination 'platform=macOS' \
+            -resultBundlePath "$RUNNER_TEMP/native-macos.xcresult" \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/native-macos.log"
+
+      - name: Select iPhone simulator
+        run: |
+          simulator_id="$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          iphones = [d for runtime, items in devices.items() if "iOS-26" in runtime for d in items if d["name"].startswith("iPhone")]
+          if not iphones:
+              sys.exit("No available iOS 26 iPhone simulator")
+          print(iphones[0]["udid"])
+          ')"
+          echo "NATIVE_SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
+
+      - name: Test iOS package and capture native layouts
+        run: |
+          set -o pipefail
+          xcodebuild test -scheme XgentNativeUI \
+            -destination "platform=iOS Simulator,id=$NATIVE_SIMULATOR_ID" \
+            -resultBundlePath "$RUNNER_TEMP/native-ios.xcresult" \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/native-ios.log"
+
+      - name: Compile device static archive through the production SwiftPM command
+        run: |
+          xcrun swift build --package-path . --scratch-path "$RUNNER_TEMP/native-device" \
+            --configuration release --product XgentNativeUI \
+            --triple arm64-apple-ios26.0 --sdk "$(xcrun --sdk iphoneos --show-sdk-path)"
+          binary_path="$(xcrun swift build --package-path . --scratch-path "$RUNNER_TEMP/native-device" \
+            --configuration release --product XgentNativeUI \
+            --triple arm64-apple-ios26.0 --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" --show-bin-path)"
+          test -s "$binary_path/libXgentNativeUI.a"
+          xcrun nm -g "$binary_path/libXgentNativeUI.a" > "$RUNNER_TEMP/native-symbols.txt"
+          grep -q 'xgent_native_ui_reset' "$RUNNER_TEMP/native-symbols.txt"
+
+      - name: Export native screenshots
+        if: ${{ always() }}
+        run: |
+          if [ -d "$RUNNER_TEMP/native-ios.xcresult" ]; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/native-ios.xcresult" \
+              --output-path "$RUNNER_TEMP/native-screenshots"
+          fi
+
+      - name: Upload native verification and dependency lock
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-ui-verification
+          path: |
+            crates/fronted/src-tauri/native/apple-ui/Package.resolved
+            ${{ runner.temp }}/native-*.log
+            ${{ runner.temp }}/native-symbols.txt
+            ${{ runner.temp }}/native-screenshots
+          retention-days: 3
+          if-no-files-found: error

@@ -26,6 +26,10 @@ import {
   useState,
 } from "react";
 import { useLocale } from "../../../i18n";
+import {
+  finishWorkspacePathDrag,
+  writeWorkspacePathDragPayload,
+} from "../../../lib/chat/workspacePathDrag";
 import type { WorkspaceFileTreeStatePatch } from "../../../lib/settings";
 import { useConfirmDialog } from "../../astryx/useConfirmDialog";
 import { getFileTypeIcon } from "../../chat/fileTypeIcons";
@@ -470,7 +474,28 @@ export function FileTreePanel(props: {
 
       return {
         id: node.path,
-        label: node.name,
+        label: (
+          // biome-ignore lint/a11y/noStaticElementInteractions: The enclosing tree control owns keyboard interaction; its context menu offers the same insert-reference action.
+          <span
+            draggable={!touchActions && node.path !== ROOT_PATH}
+            onDragStart={(event) => {
+              if (
+                touchActions ||
+                !writeWorkspacePathDragPayload(event.dataTransfer, {
+                  projectPathKey,
+                  cwd,
+                  relativePath: node.path,
+                  entryKind: node.kind,
+                  label: node.name,
+                })
+              )
+                event.preventDefault();
+            }}
+            onDragEnd={finishWorkspacePathDrag}
+          >
+            {node.name}
+          </span>
+        ),
         description: node.error,
         startContent: <TypeIcon />,
         endContent: node.loading ? (
@@ -492,7 +517,18 @@ export function FileTreePanel(props: {
 
     const root = buildItem(ROOT_PATH);
     return root ? [root] : [];
-  }, [expandedSet, handleOpenFile, nodes, selectPath, selectedPath, t, toggleDirectory]);
+  }, [
+    cwd,
+    expandedSet,
+    handleOpenFile,
+    nodes,
+    projectPathKey,
+    selectPath,
+    selectedPath,
+    t,
+    toggleDirectory,
+    touchActions,
+  ]);
 
   if (!initialized) {
     return (

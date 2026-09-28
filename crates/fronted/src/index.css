@@ -3444,6 +3444,16 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   max-width: 100%;
 }
 
+.xgent-chat-composer[data-workspace-drop="accept"] {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.xgent-chat-composer[data-workspace-drop="blocked"] {
+  outline: 2px solid var(--color-error);
+  outline-offset: 2px;
+}
+
 .xgent-composer-model-controls {
   min-width: 0;
   flex: 1 1 auto;

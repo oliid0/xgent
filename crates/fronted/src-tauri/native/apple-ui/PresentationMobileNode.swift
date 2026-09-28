@@ -332,11 +332,7 @@ struct XgentIOSNode: View {
                 Text(node.label ?? "").font(.subheadline.weight(.medium))
             }
         case .markdown:
-            Text(attributedText)
-                .font(.system(size: CGFloat(theme.typography.body * theme.fontScale)))
-                .foregroundStyle(Color(xgentHex: palette.text))
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
+            XgentMarkdown(text: node.text ?? "")
         case .codeBlock:
             codeBlock
         case .list:
