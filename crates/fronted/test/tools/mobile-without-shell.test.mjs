@@ -17,6 +17,7 @@ function harness() {
       if (command === "mcp_list_tools") return [{ serverId: "remote", serverLabel: "Remote", name: "lookup", description: "Lookup", inputSchema: { type: "object" } }];
       if (command === "mcp_call_tool") return { content: [{ type: "text", text: "remote result" }], isError: false, details: {} };
       if (command === "fs_list") return { entries: [{ kind: "file", path: "notes.txt" }], offset: 0, total: 1, hasMore: false };
+      if (command === "fs_path_status") return { exists: true, kind: "file", path: args.path };
       throw new Error(`Unexpected IPC: ${command}`);
     } },
     "@tauri-apps/api/path": { homeDir: async () => "/sandbox" },
@@ -35,6 +36,39 @@ function harness() {
 }
 
 const ready = { available: true, installed: true, capabilities: { shell: true } };
+
+test("Android Shell paths reach native file tools and preview in the owning workspace", async () => {
+  const h = harness();
+  const registry = await h.build({ runtimePlatform: "android", skillsEnabled: false });
+  const list = await registry.executeToolCall({ id: "guest-files", name: "List", arguments: { path: "/workspace" } });
+  assert.equal(list.isError, false);
+  assert.equal(h.requests.find(({ command }) => command === "fs_list").args.workdir, "/sandbox/workspace");
+  const originalWindow = globalThis.window;
+  const originalEvent = globalThis.CustomEvent;
+  const events = [];
+  globalThis.window = { dispatchEvent: (event) => events.push(event) };
+  globalThis.CustomEvent ??= class { constructor(type, init) { this.type = type; this.detail = init.detail; } };
+  try {
+    const preview = await registry.executeToolCall({ id: "guest-preview", name: "PreviewFile", arguments: { path: "/workspace/notes.txt" } });
+    assert.equal(preview.isError, false, JSON.stringify(preview));
+    assert.deepEqual(h.requests.find(({ command }) => command === "fs_path_status").args, { workdir: "/sandbox/workspace", path: "notes.txt" });
+    assert.equal(events[0].detail.path, "notes.txt");
+    assert.equal(events[0].detail.workdir, "/sandbox/workspace");
+    const outside = await registry.executeToolCall({ id: "bad-preview", name: "PreviewFile", arguments: { path: "/workspace/../secret" } });
+    assert.equal(outside.isError, true);
+    assert.equal(events.length, 1);
+  } finally {
+    if (originalWindow === undefined) delete globalThis.window;
+    else globalThis.window = originalWindow;
+    if (originalEvent === undefined) delete globalThis.CustomEvent;
+    else globalThis.CustomEvent = originalEvent;
+  }
+  for (const overrides of [{ runtimePlatform: "ios" }, { runtimePlatform: "android", lanPcCommandHostReady: true }]) {
+    const other = await h.build({ ...overrides, skillsEnabled: false });
+    const result = await other.executeToolCall({ id: "unmapped", name: "PreviewFile", arguments: { path: "/workspace/notes.txt" } });
+    assert.equal(result.isError, true);
+  }
+});
 
 test("a pending Shell probe does not block native file and network MCP tool execution", async () => {
   const h = harness();
@@ -106,8 +140,12 @@ test("mobile Shell instructions follow the actual command host", () => {
   assert.match(ios, /Inspect MobileEnvironment/);
   assert.doesNotMatch(ios, /Use ManagedProcess instead of Bash/);
   assert.doesNotMatch(ios, /npm\/pnpm installs/);
+  const android = buildToolsSuffix("/phone/workspace", tools, "android");
+  assert.match(android, /current project is mounted at \/workspace/);
+  assert.doesNotMatch(ios, /current project is mounted at \/workspace/);
   const paired = buildToolsSuffix("C:\\Users\\owner\\workspace", tools, "windows");
   assert.match(paired, /native PowerShell/);
   assert.match(paired, /npm\/pnpm installs/);
   assert.doesNotMatch(paired, /Inspect MobileEnvironment before the first mobile Bash call/);
+  assert.doesNotMatch(paired, /current project is mounted at \/workspace/);
 });

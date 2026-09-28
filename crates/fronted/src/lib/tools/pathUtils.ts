@@ -62,6 +62,7 @@ type ResolveOptions = {
 
 type ResolverOptions = {
   workdir: string;
+  shellWorkspaceRoot?: string;
   homeDir?: string;
   resolveHomeDir?: () => Promise<string>;
   skillsRootEnabled?: boolean;
@@ -247,6 +248,7 @@ export function formatResolvedTarget(path: Pick<ResolvedPath, "displayPath"> | u
 
 export class ToolPathResolver {
   private readonly workdir: string;
+  private readonly shellWorkspaceRoot?: string;
   private readonly resolveHomeDirFn?: () => Promise<string>;
   private readonly skillsRootEnabled: boolean;
   private readonly skillAccessPolicy?: SkillAccessPolicy;
@@ -258,6 +260,7 @@ export class ToolPathResolver {
 
   constructor(options: ResolverOptions) {
     this.workdir = normalizeRootPath(options.workdir);
+    this.shellWorkspaceRoot = options.shellWorkspaceRoot;
     this.homeDir =
       typeof options.homeDir === "string" ? normalizeComparablePath(options.homeDir) : "";
     this.homeDirResolved = this.homeDir.length > 0;
@@ -499,7 +502,18 @@ export class ToolPathResolver {
   }
 
   private async resolveAbsolutePath(value: string, options: ResolveOptions): Promise<ResolvedPath> {
-    const absolutePath = normalizeComparablePath(value);
+    let absolutePath = normalizeComparablePath(value);
+    // PRoot's /workspace is a per-run bind, not a path in Android's filesystem.
+    // Translate before matching roots so nested read-only policies still apply.
+    const shellRelative = this.shellWorkspaceRoot
+      ? relativePathFromAbsolute(absolutePath, this.shellWorkspaceRoot)
+      : null;
+    if (shellRelative !== null) {
+      absolutePath = joinNormalizedPath(
+        this.workdir,
+        sanitizeRelativePath(shellRelative, options.label, false),
+      );
+    }
     const workspaceRel = relativePathFromAbsolute(absolutePath, this.workdir);
     const skillsRootDir = await this.getSkillsRootDir();
     const skillRel = skillsRootDir ? relativePathFromAbsolute(absolutePath, skillsRootDir) : null;

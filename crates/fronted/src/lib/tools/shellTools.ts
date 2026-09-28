@@ -515,6 +515,7 @@ export type ShellSandboxSettings = {
 export function createShellTools(params: {
   conversationId?: string;
   workdir: string;
+  shellWorkspaceRoot?: string;
   providerId: ProviderId;
   runtimePlatform?: RuntimePlatform;
   skillsRootEnabled?: boolean;
@@ -580,6 +581,7 @@ export function createShellTools(params: {
 
   const pathResolver = new ToolPathResolver({
     workdir,
+    shellWorkspaceRoot: params.shellWorkspaceRoot,
     resolveHomeDir: params.resolveHomeDir,
     skillsRootEnabled: allowSkillsRoot,
     skillsRootDir: cachedSkillsRootDir,

@@ -289,6 +289,7 @@ async function invokeFsToolCommand<T>(params: {
 
 export function createFsTools(params: {
   workdir: string;
+  shellWorkspaceRoot?: string;
   fileState: FileToolState;
   resolveHomeDir?: () => Promise<string>;
   skillsRootEnabled?: boolean;
@@ -321,6 +322,7 @@ export function createFsTools(params: {
 
   const pathResolver = new ToolPathResolver({
     workdir,
+    shellWorkspaceRoot: params.shellWorkspaceRoot,
     resolveHomeDir: params.resolveHomeDir,
     skillsRootEnabled: allowSkillsRoot,
     skillsRootDir: cachedSkillsRootDir,

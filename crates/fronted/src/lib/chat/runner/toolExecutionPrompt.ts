@@ -244,7 +244,7 @@ export function buildToolsSuffix(
             runtimePlatform === "macos"
               ? "- macOS prefers zsh, then Bash, then sh. Use POSIX/zsh-compatible commands."
               : runtimePlatform === "android"
-                ? "- Android runs commands in the installed Alpine PRoot environment. Use POSIX syntax and inspect MobileEnvironment before assuming a package manager or toolchain is available."
+                ? "- Android runs commands in the installed Alpine PRoot environment. Inside shell commands, the current project is mounted at /workspace; use relative paths or /workspace rather than the Android host storage path. File tools and PreviewFile accept these /workspace paths for the current project. Use POSIX syntax and inspect MobileEnvironment before assuming a package manager or toolchain is available."
                 : runtimePlatform === "ios"
                   ? "- iOS/iPadOS uses a restricted a-Shell-compatible native command set. Do not assume Linux process APIs, Node.js/npm, arbitrary native packages, or unrestricted WASI execution."
                   : "- Linux prefers Bash, then zsh, then sh. Use POSIX/bash-compatible commands.",

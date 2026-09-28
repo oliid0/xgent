@@ -9,6 +9,33 @@ const systemTools = loader.loadModule("src/lib/tools/customSystemTools.ts");
 const systemToolOptions = loader.loadModule("src/lib/tools/systemToolOptions.ts");
 const skillBuiltinHelpers = loader.loadModule("src/lib/skills/builtin.ts");
 
+test("Android Shell workspace paths resolve to the owning workspace and keep root permissions", async () => {
+  const resolver = new pathUtils.ToolPathResolver({
+    workdir: "/data/user/0/com.ohi.xgent/files/project-a",
+    shellWorkspaceRoot: "/workspace",
+  });
+  for (const input of ["/workspace/report.md", "file:///workspace/report.md"]) {
+    const resolved = await resolver.resolvePath(input, { label: "Read.path", intent: "read" });
+    assert.equal(resolved.scope, "workspace");
+    assert.equal(resolved.root, "/data/user/0/com.ohi.xgent/files/project-a");
+    assert.equal(resolved.relativePath, "report.md");
+  }
+  const cwd = await resolver.resolvePath("/workspace", { label: "Bash.cwd", intent: "cwd" });
+  assert.equal(cwd.absolutePath, "/data/user/0/com.ohi.xgent/files/project-a");
+  for (const input of ["/workspace/../secret", "/workspace-other/report.md"]) {
+    await assert.rejects(() => resolver.resolvePath(input, { label: "Read.path", intent: "read" }));
+  }
+  const desktop = new pathUtils.ToolPathResolver({ workdir: "/home/owner/project" });
+  await assert.rejects(() => desktop.resolvePath("/workspace/report.md", { label: "Read.path", intent: "read" }));
+  const secondProject = new pathUtils.ToolPathResolver({ workdir: "/phone/project-b", shellWorkspaceRoot: "/workspace" });
+  assert.equal((await secondProject.resolvePath("/workspace/report.md", { label: "Read.path", intent: "read" })).absolutePath, "/phone/project-b/report.md");
+  const restricted = new pathUtils.ToolPathResolver({
+    workdir: "/phone/project", shellWorkspaceRoot: "/workspace",
+    additionalRoots: [{ id: "reference", alias: "reference", path: "/phone/project/reference", access: "read" }],
+  });
+  await assert.rejects(() => restricted.resolvePath("/workspace/reference/guide.md", { label: "Write.path", intent: "write" }), /read-only/);
+});
+
 test("ToolPathResolver accepts broad workspace path inputs", async () => {
   const resolver = new pathUtils.ToolPathResolver({ workdir: "/workspace/project" });
 

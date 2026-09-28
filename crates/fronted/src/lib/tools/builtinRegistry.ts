@@ -201,9 +201,14 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
   );
   const capabilities = resolveRuntimeToolCapabilities(runtimeToolHost);
   const shellAvailable = runtimeToolHost !== "native-mobile" || isMobileShellAvailable();
+  const shellWorkspaceRoot =
+    runtimeToolHost === "native-mobile" && params.runtimePlatform === "android"
+      ? "/workspace"
+      : undefined;
   const baseBundles: BuiltinToolBundle[] = [
     createFsTools({
       workdir: params.workdir,
+      shellWorkspaceRoot,
       additionalRoots: params.additionalRoots,
       checkpoint: params.checkpoint,
       fileState: params.fileState,
@@ -217,6 +222,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
           createShellTools({
             conversationId: params.checkpoint?.conversationId,
             workdir: params.workdir,
+            shellWorkspaceRoot,
             providerId: params.providerId,
             runtimePlatform: params.runtimePlatform,
             skillsRootEnabled: params.skillsEnabled,
@@ -286,6 +292,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       ? [
           createMobilePreviewTools({
             workdir: params.workdir,
+            shellWorkspaceRoot,
             projectPathKey: params.projectPathKey,
           }),
         ]

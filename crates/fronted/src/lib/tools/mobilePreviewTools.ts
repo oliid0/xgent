@@ -2,6 +2,7 @@ import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
 import { invokeFs } from "./fsBackend";
+import { ToolPathResolver } from "./pathUtils";
 
 export const MOBILE_PREVIEW_REQUEST_EVENT = "xgent:mobile-preview-request";
 
@@ -57,8 +58,10 @@ export function subscribeMobilePreviewRequests(listener: (request: MobilePreview
 
 export function createMobilePreviewTools(params: {
   workdir: string;
+  shellWorkspaceRoot?: string;
   projectPathKey?: string;
 }): BuiltinToolBundle {
+  const pathResolver = new ToolPathResolver(params);
   async function executeToolCall(toolCall: ToolCall, signal?: AbortSignal) {
     if (toolCall.name !== "PreviewFile") {
       return toolResult(toolCall, `Unknown tool: ${toolCall.name}`, {}, true);
@@ -72,9 +75,17 @@ export function createMobilePreviewTools(params: {
     }
 
     try {
+      const resolved = await pathResolver.resolvePath(path, {
+        label: "PreviewFile.path",
+        intent: "read",
+        required: true,
+      });
+      if (resolved.scope !== "workspace") {
+        throw new Error("PreviewFile requires a file in the current workspace.");
+      }
       const status = await invokeFs<PathStatusResponse>("fs_path_status", {
         workdir: params.workdir,
-        path,
+        path: resolved.relativePath ?? ".",
       });
       if (!status.exists) {
         return toolResult(toolCall, `PreviewFile could not find ${path}.`, { path }, true);
