@@ -287,9 +287,7 @@ enum XgentAttachmentPayload {
                 guard (values.fileSize ?? 0) <= maximumBytes else { throw AttachmentError.size }
                 let data = try Data(contentsOf: coordinatedURL)
                 let type = UTType(filenameExtension: url.pathExtension) ?? .data
-                if type.conforms(to: .image), type.preferredMIMEType != "image/svg+xml" {
-                    return try photo(data, name: url.lastPathComponent)
-                }
+                // Files retain their original encoding; chat normalizes images after decoding this payload.
                 return try payload(data, name: url.lastPathComponent, type: type)
             }
         }

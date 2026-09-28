@@ -28,7 +28,7 @@ final class AttachmentPayloadTests: XCTestCase {
         XCTAssertEqual(CGImageSourceGetType(encoded) as String?, UTType.jpeg.identifier)
     }
 
-    func testCoordinatedFilesKeepDocumentBytesAndReadableImageMetadata() throws {
+    func testCoordinatedFilesKeepOriginalNamesTypesAndBytes() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -39,8 +39,16 @@ final class AttachmentPayloadTests: XCTestCase {
         let photo = directory.appendingPathComponent("photo.heic")
         try png.write(to: photo)
         let payload = try XgentAttachmentPayload.file(photo)
-        XCTAssertEqual(payload["fileName"], "photo.png")
-        XCTAssertEqual(payload["mimeType"], "image/png")
+        XCTAssertEqual(payload["fileName"], "photo.heic")
+        XCTAssertEqual(payload["mimeType"], "image/heic")
+        XCTAssertEqual(payload["contentBase64"], png.base64EncodedString())
+        let tiff = try nativeImageFixture(width: 160, height: 80, type: .tiff, orientation: 6)
+        let original = directory.appendingPathComponent("original.tiff")
+        try tiff.write(to: original)
+        let originalPayload = try XgentAttachmentPayload.file(original)
+        XCTAssertEqual(originalPayload["fileName"], "original.tiff")
+        XCTAssertEqual(originalPayload["mimeType"], "image/tiff")
+        XCTAssertEqual(originalPayload["contentBase64"], tiff.base64EncodedString())
         let svg = directory.appendingPathComponent("icon.svg")
         let svgBytes = Data("<svg xmlns=\"http://www.w3.org/2000/svg\"/>".utf8)
         try svgBytes.write(to: svg)

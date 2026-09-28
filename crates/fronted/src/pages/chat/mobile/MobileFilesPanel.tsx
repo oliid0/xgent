@@ -60,19 +60,29 @@ type MobileFilesPanelProps = {
 
 type PendingAction = "file" | "folder" | "rename" | null;
 
+type DeviceImportTarget = {
+  workdir: string;
+  directory: string;
+  revision: number;
+  selectionTaken: boolean;
+};
+
 async function importDeviceFiles(
   workdir: string,
   directory: string,
   files: File[],
   messages: { tooMany: string; tooLarge: string },
   onImported: (path: string) => void,
+  isCurrent: () => boolean,
 ) {
   if (files.length > 9) throw new Error(messages.tooMany);
   for (const file of files) {
+    if (!isCurrent()) return;
     if (file.size > 20 * 1024 * 1024) {
       throw new Error(messages.tooLarge.replace("{file}", file.name));
     }
     const bytes = new Uint8Array(await file.arrayBuffer());
+    if (!isCurrent()) return;
     let binary = "";
     for (let offset = 0; offset < bytes.length; offset += 0x8000) {
       binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
@@ -83,6 +93,7 @@ async function importDeviceFiles(
       file_name: file.name,
       content_base64: window.btoa(binary),
     });
+    if (!isCurrent()) return;
     onImported(imported.path);
   }
 }
@@ -119,21 +130,61 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
   const { t } = useLocale();
   const projectReady = Boolean(projectPathKey.trim() && cwd.trim());
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const importDirectoryRef = useRef(ROOT_PATH);
+  const importTargetRef = useRef<DeviceImportTarget | null>(null);
+  const importKey = JSON.stringify([projectPathKey, cwd, open]);
+  const importContext = useRef({ key: importKey, revision: 0, active: true }).current;
+  if (importContext.key !== importKey) {
+    importContext.key = importKey;
+    importContext.revision += 1;
+  }
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importRevision, setImportRevision] = useState(0);
+  const importGeneration = importContext.revision;
+
+  useEffect(() => {
+    if (importTargetRef.current?.revision !== importContext.revision) {
+      importTargetRef.current = null;
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setImportBusy(false);
+    }
+    setImportError(null);
+  }, [importKey, importContext]);
+  useEffect(() => {
+    importContext.active = true;
+    return () => {
+      importContext.active = false;
+      importTargetRef.current = null;
+    };
+  }, [importContext]);
+  useEffect(() => {
+    const input = fileInputRef.current;
+    if (!input) return;
+    const cancel = () => {
+      const target = importTargetRef.current;
+      if (!target || target.revision !== importGeneration || target.selectionTaken) return;
+      importTargetRef.current = null;
+      setImportBusy(false);
+    };
+    input.addEventListener("cancel", cancel);
+    return () => input.removeEventListener("cancel", cancel);
+  }, [importGeneration, open]);
 
   const handleDeviceFiles = async (files: File[]) => {
-    if (!files.length || !projectReady || importBusy) return;
-    const directory = importDirectoryRef.current;
+    const target = importTargetRef.current;
+    if (!target || target.revision !== importGeneration || target.selectionTaken) return;
+    const isCurrent = () =>
+      importContext.active &&
+      importTargetRef.current === target &&
+      importContext.revision === target.revision;
+    if (!isCurrent()) return;
+    target.selectionTaken = true;
     let lastPath = "";
-    setImportBusy(true);
-    setImportError(null);
     try {
+      if (!files.length) return;
       await importDeviceFiles(
-        cwd,
-        directory,
+        target.workdir,
+        target.directory,
         files,
         {
           tooMany: t("chat.upload.maxFiles").replace("{max}", "9"),
@@ -142,19 +193,23 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
         (path) => {
           lastPath = path;
         },
+        isCurrent,
       );
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : String(error));
+      if (isCurrent()) setImportError(error instanceof Error ? error.message : String(error));
     } finally {
-      if (lastPath) {
-        onFileTreeStateChange({
-          selectedPath: lastPath,
-          expandedPaths: addExpandedPaths(fileTreeState.expandedPaths, [directory]),
-          bumpRevision: true,
-        });
-        setImportRevision((revision) => revision + 1);
+      if (isCurrent()) {
+        if (lastPath) {
+          onFileTreeStateChange({
+            selectedPath: lastPath,
+            expandedPaths: addExpandedPaths(fileTreeState.expandedPaths, [target.directory]),
+            bumpRevision: true,
+          });
+          setImportRevision((revision) => revision + 1);
+        }
+        importTargetRef.current = null;
+        setImportBusy(false);
       }
-      setImportBusy(false);
     }
   };
 
@@ -260,6 +315,7 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
         />
 
         <input
+          key={importGeneration}
           ref={fileInputRef}
           type="file"
           multiple
@@ -280,8 +336,34 @@ export function MobileFilesPanel(props: MobileFilesPanelProps) {
             importBusy={importBusy}
             importRevision={importRevision}
             onImportFiles={(directory) => {
-              importDirectoryRef.current = directory;
-              fileInputRef.current?.click();
+              const input = fileInputRef.current;
+              if (
+                !projectReady ||
+                !input ||
+                !importContext.active ||
+                importTargetRef.current ||
+                importGeneration !== importContext.revision
+              ) {
+                return;
+              }
+              const target = {
+                workdir: cwd,
+                directory,
+                revision: importGeneration,
+                selectionTaken: false,
+              };
+              importTargetRef.current = target;
+              setImportBusy(true);
+              setImportError(null);
+              try {
+                input.click();
+              } catch (error) {
+                if (importTargetRef.current === target) {
+                  importTargetRef.current = null;
+                  setImportBusy(false);
+                  setImportError(error instanceof Error ? error.message : String(error));
+                }
+              }
             }}
           />
         </StackItem>
@@ -434,6 +516,8 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
 
   const importFiles = async (payload: string) => {
     if (!projectReady || busyAction) return;
+    const revision = importContext.revision;
+    const isCurrent = () => importContext.active && importContext.revision === revision;
     const targetDir = selectedNode?.kind === "dir" ? selectedPath : dirname(selectedPath);
     let lastPath = "";
     setBusyAction(true);
@@ -450,11 +534,12 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
         (path) => {
           lastPath = path;
         },
+        isCurrent,
       );
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : String(error));
+      if (isCurrent()) setActionError(error instanceof Error ? error.message : String(error));
     } finally {
-      if (lastPath) {
+      if (lastPath && isCurrent()) {
         props.onFileTreeStateChange({
           selectedPath: lastPath,
           expandedPaths: addExpandedPaths(expandedPaths, [targetDir]),
@@ -469,12 +554,19 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
   const importContext = useRef({
     key: JSON.stringify([props.projectPathKey, props.cwd, importDirectory]),
     revision: 0,
+    active: true,
   }).current;
   const importKey = JSON.stringify([props.projectPathKey, props.cwd, importDirectory]);
   if (importContext.key !== importKey) {
     importContext.key = importKey;
     importContext.revision += 1;
   }
+  useEffect(() => {
+    importContext.active = true;
+    return () => {
+      importContext.active = false;
+    };
+  }, [importContext]);
 
   const handlers = new Map<string, PresentationHandler>();
   const bind = (

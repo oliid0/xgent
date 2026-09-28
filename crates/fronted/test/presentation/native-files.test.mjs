@@ -2,17 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
-function harness() {
+function harness(options = {}) {
   const states = [];
   const calls = [];
   let cursor = 0;
+  let refreshes = 0;
   const data = {
     nodes: { "": { path: "", name: "project", kind: "dir", children: [], loaded: true } },
     search: { results: [
       { path: "nested/report.md", kind: "file", hidden: false },
       { path: "nested/reports", kind: "dir", hidden: false },
     ] },
-    loadChildren: async () => {}, refreshVisible() {},
+    loadChildren: async () => {}, refreshVisible() { refreshes++; },
     async createEntry(kind, directory, name) { calls.push(["create", kind, directory, name]); return `${directory}/${name}`; },
     async renameEntry(path, name) { calls.push(["rename", path, name]); return `nested/${name}`; },
     async deleteEntry(path) { calls.push(["delete", path]); },
@@ -44,6 +45,7 @@ function harness() {
     "@tauri-apps/api/core": { async invoke(command, args) {
       assert.equal(command, "fs_import_file");
       calls.push([command, args]);
+      if (options.import) return options.import(args);
       return { path: [args.directory, args.file_name].filter(Boolean).join("/") };
     } },
   } });
@@ -71,7 +73,7 @@ function harness() {
     registry.register(surface.document.surface, surface.handlers);
     return registry.dispatch({ surface: surface.document.surface, action, value, requestId: String(++request) });
   };
-  return { data, props, calls, dispatch, render, dispatchNative };
+  return { data, props, calls, dispatch, render, dispatchNative, get refreshes() { return refreshes; } };
 }
 
 test("native Files renames and deletes a search result without loading its parent tree", async () => {
@@ -85,6 +87,24 @@ test("native Files renames and deletes a search result without loading its paren
   await h.dispatch("files-delete");
   await h.dispatch("files-confirm-delete");
   assert.deepEqual(h.calls.at(-1), ["delete", "nested/report.md"]);
+});
+
+test("native Files ignores late import results and stops the batch after its workspace changes", async t => {
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", { configurable: true, writable: true, value: { btoa } });
+  t.after(() => previousWindow ? Object.defineProperty(globalThis, "window", previousWindow) : delete globalThis.window);
+  let release;
+  const h = harness({ import: () => new Promise(resolve => { release = resolve; }) });
+  const payload = JSON.stringify(["first.txt", "second.txt"].map(fileName => ({ fileName,
+    mimeType: "text/plain", contentBase64: "aGk=" })));
+  const pending = h.dispatch("files-import:0", payload);
+  await new Promise(resolve => setImmediate(resolve));
+  h.props.cwd = "/b"; h.props.projectPathKey = "/b"; h.render();
+  release({ path: "first.txt" });
+  await pending;
+  assert.equal(h.calls.filter(([command]) => command === "fs_import_file").length, 1);
+  assert.equal(h.props.fileTreeState.selectedPath, "");
+  assert.equal(h.refreshes, 0);
 });
 
 test("native Files creates inside the selected search directory and freezes its target", async () => {
