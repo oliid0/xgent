@@ -69,6 +69,19 @@ final class AttachmentPayloadTests: XCTestCase {
         XCTAssertEqual(payload["fileName"], "rotated.jpg")
     }
 
+    func testPhotoOriginalAboveTransportLimitIsDownsampledBeforeSending() throws {
+        let original = try nativeImageFixture(width: 4096, height: 2048, type: .tiff, orientation: 6)
+        XCTAssertGreaterThan(original.count, XgentAttachmentPayload.maximumBytes)
+        XCTAssertLessThan(original.count, XgentAttachmentPayload.maximumPhotoSourceBytes)
+        let payload = try XgentAttachmentPayload.photo(original, name: "large.tiff")
+        let jpeg = try XCTUnwrap(Data(base64Encoded: try XCTUnwrap(payload["contentBase64"])))
+        let dimensions = try nativeImageDimensions(jpeg)
+        XCTAssertLessThanOrEqual(max(dimensions.0, dimensions.1), 2048)
+        XCTAssertLessThanOrEqual(jpeg.count, 5 * 1024 * 1024)
+        XCTAssertEqual(payload["mimeType"], "image/jpeg")
+        XCTAssertEqual(payload["fileName"], "large.jpg")
+    }
+
     @MainActor
     func testCancelledPreparationDoesNotStartDetachedFileWork() async {
         let task = Task {

@@ -261,6 +261,7 @@ struct XgentAttachmentPicker: View {
 
 enum XgentAttachmentPayload {
     static let maximumBytes = 20 * 1024 * 1024
+    static let maximumPhotoSourceBytes = 100 * 1024 * 1024
 
     nonisolated static func prepare<T: Sendable>(_ operation: @escaping @Sendable () throws -> T) async throws -> T {
         try Task.checkCancellation()
@@ -297,14 +298,17 @@ enum XgentAttachmentPayload {
     }
 
     nonisolated static func photo(_ data: Data, name: String) throws -> [String: String] {
-        guard data.count <= maximumBytes else { throw AttachmentError.size }
+        // PhotosUI may return a large original. Bound source memory, then
+        // downsample before enforcing the smaller transport payload limit.
+        guard data.count <= maximumPhotoSourceBytes else { throw AttachmentError.photoSourceSize }
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let identifier = CGImageSourceGetType(source),
               let type = UTType(identifier as String), type.conforms(to: .image),
               CGImageSourceGetCount(source) > 0 else { throw AttachmentError.unavailable }
         let base = (name as NSString).deletingPathExtension
         let supported = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp", "image/x-icon"]
-        if let mime = type.preferredMIMEType, supported.contains(mime) {
+        if data.count <= maximumBytes,
+           let mime = type.preferredMIMEType, supported.contains(mime) {
             return try payload(data, name: "\(base).\(type.preferredFilenameExtension ?? "jpg")", type: type)
         }
         var pixels: Float = 2048
@@ -333,11 +337,12 @@ enum XgentAttachmentPayload {
 }
 
 private enum AttachmentError: LocalizedError {
-    case limit, size, unavailable, destination
+    case limit, size, photoSourceSize, unavailable, destination
     var errorDescription: String? {
         switch self {
         case .limit: return "Select up to 9 files."
         case .size: return "Each attachment must be 20 MB or smaller."
+        case .photoSourceSize: return "The selected photo is too large to process (100 MB maximum)."
         case .unavailable: return "The selected photo could not be loaded."
         case .destination: return "The attachment destination changed. Select the files again."
         }
