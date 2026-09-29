@@ -24,17 +24,28 @@ def matches(node, labels):
     return any(node.get(key, "").strip() in labels for key in ("text", "content-desc"))
 
 
-def tap(labels, timeout=30):
+def tap(labels, timeout=30, scroll=False):
     deadline = time.monotonic() + timeout
+    swipes = 0
+    size = adb("shell", "wm", "size").decode()
+    width, height = map(int, re.findall(r"(\d+)x(\d+)", size)[-1])
     while time.monotonic() < deadline:
         for node in snapshot().iter("node"):
             if node.get("enabled") != "true" or not matches(node, labels):
                 continue
-            bounds = list(map(int, re.findall(r"\d+", node.get("bounds", ""))))
-            if len(bounds) == 4 and bounds[2] > bounds[0] and bounds[3] > bounds[1]:
-                adb("shell", "input", "tap", str((bounds[0] + bounds[2]) // 2), str((bounds[1] + bounds[3]) // 2))
+            bounds = list(map(int, re.findall(r"-?\d+", node.get("bounds", ""))))
+            if len(bounds) != 4:
+                continue
+            left, top = max(0, bounds[0]), max(0, bounds[1])
+            right, bottom = min(width, bounds[2]), min(height, bounds[3])
+            if right > left and bottom > top:
+                adb("shell", "input", "tap", str((left + right) // 2), str((top + bottom) // 2))
                 time.sleep(1)
                 return
+        if scroll and swipes < 6:
+            adb("shell", "input", "swipe", str(width // 2), str(height * 3 // 4),
+                str(width // 2), str(height // 3), "400")
+            swipes += 1
         time.sleep(1)
     raise AssertionError(f"No enabled visible control: {labels}")
 
@@ -86,7 +97,13 @@ if any(matches(node, {"安装基础环境", "Install base environment"}) for nod
         time.sleep(2)
     else:
         raise AssertionError("The bundled Shell environment did not become ready")
-tap({"返回设置", "Back to Settings"})
+# Wait for the install/refresh action to finish, then install actual packages
+# through the Android settings controls. A ready rootfs only contains BusyBox.
+tap({"刷新状态", "Refresh status"}, timeout=300)
+tap({"Linux essentials"}, scroll=True)
+tap({"Python and pip"}, scroll=True)
+tap({"安装所选能力包", "Install selected packs"}, scroll=True)
+tap({"返回设置", "Back to Settings"}, timeout=300)
 tap({"返回对话", "Back to Chat"})
 tap({"工作工具", "Workspace tools"})
 tap({"打开终端", "Open terminal"})
@@ -136,4 +153,8 @@ run_terminal("pwd", "/etc")
 capture("rootfs-navigation")
 run_terminal("cd /workspace", "/workspace")
 run_terminal("pwd", "/workspace")
-print("PASS: settings, bundled environment, native stdout, rootfs ls/cd and retained cwd after failed cd")
+run_terminal("bash --version", "GNU bash", exact=False)
+run_terminal("python3 --version", "Python 3.", exact=False)
+run_terminal("python3 -m pip --version", "pip ", exact=False)
+capture("python-pack")
+print("PASS: settings, bundled environment, native stdout, rootfs ls/cd, retained cwd, Bash and installed Python/pip pack")

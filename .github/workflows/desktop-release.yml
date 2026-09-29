@@ -297,6 +297,25 @@ jobs:
         working-directory: crates/fronted
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      # libsodium-sys-stable 1.24.0 verifies these archives with its bundled
+      # minisign key; SODIUM_DIST_DIR avoids its download without retries.
+      - name: Download signed libsodium distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          sodium_dist_dir="$RUNNER_TEMP/xgent-libsodium-dist"
+          mkdir -p "$sodium_dist_dir"
+          for filename in \
+            LATEST.tar.gz LATEST.tar.gz.minisig \
+            libsodium-1.0.22-stable-msvc.zip libsodium-1.0.22-stable-msvc.zip.minisig; do
+            curl --fail --location --proto '=https' --tlsv1.2 \
+              --retry 4 --retry-all-errors --retry-max-time 300 --connect-timeout 20 --max-time 120 \
+              "https://download.libsodium.org/libsodium/releases/$filename" \
+              --output "$sodium_dist_dir/$filename"
+            test -s "$sodium_dist_dir/$filename"
+          done
+          printf 'SODIUM_DIST_DIR=%s\n' "$(cygpath -w "$sodium_dist_dir")" >> "$GITHUB_ENV"
+
       - name: Build Windows bundles
         if: env.SIGNED_RELEASE == 'true'
         working-directory: crates/fronted
