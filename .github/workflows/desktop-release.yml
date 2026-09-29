@@ -846,12 +846,17 @@ jobs:
         run: |
           set -euo pipefail
           export HOMEBREW_NO_AUTO_UPDATE=1
-          for formula in xcodegen libimobiledevice cocoapods; do
+          # The Intel image supplies CocoaPods as a Ruby gem. Installing the
+          # Homebrew formula collides with its existing /usr/local/bin/pod.
+          for formula in xcodegen libimobiledevice; do
             if ! brew list --versions "$formula" >/dev/null 2>&1; then
               brew install "$formula"
             fi
           done
-          for formula in xcodegen libimobiledevice cocoapods; do
+          if ! command -v pod >/dev/null 2>&1; then
+            brew install cocoapods
+          fi
+          for formula in xcodegen libimobiledevice; do
             if [ ! -L "$(brew --prefix)/var/homebrew/linked/$formula" ]; then
               brew link "$formula"
             fi

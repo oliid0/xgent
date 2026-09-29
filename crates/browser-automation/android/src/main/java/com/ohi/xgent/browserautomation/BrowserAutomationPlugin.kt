@@ -1,6 +1,7 @@
 package com.ohi.xgent.browserautomation
 
 import android.app.Activity
+import android.Manifest
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
@@ -11,12 +12,14 @@ import android.util.Base64
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
+import android.webkit.PermissionRequest
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceError
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.ValueCallback
 import android.widget.FrameLayout
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
@@ -121,6 +124,7 @@ private data class BrowserSession(
     var documentReady: Boolean = false,
     var visible: Boolean = false,
     var pendingNavigation: PendingBrowserNavigation? = null,
+    var pendingMedia: PermissionRequest? = null,
 )
 
 private data class PendingBrowserNavigation(
@@ -265,6 +269,10 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
             }
             session.pendingNavigation?.gate?.reject("Browser tab was closed during navigation")
             session.pendingNavigation = null
+            (activity as? BrowserInteractionHost)?.cancelBrowserFileChooser(sessionId)
+            (activity as? BrowserInteractionHost)?.cancelBrowserMedia(sessionId)
+            session.pendingMedia?.deny()
+            session.pendingMedia = null
             val payload = summary(session)
             (session.webView.parent as? ViewGroup)?.removeView(session.webView)
             session.webView.stopLoading()
@@ -325,8 +333,8 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
             javaScriptEnabled = true
             domStorageEnabled = true
             databaseEnabled = true
-            allowFileAccess = true
-            allowContentAccess = false
+            allowFileAccess = false
+            allowContentAccess = true
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             mediaPlaybackRequiresUserGesture = true
             setSupportMultipleWindows(false)
@@ -336,6 +344,73 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
         webView.webChromeClient = object : WebChromeClient() {
             override fun onReceivedTitle(view: WebView?, title: String?) {
                 session.title = title
+            }
+
+            override fun onShowFileChooser(
+                view: WebView?,
+                callback: ValueCallback<Array<Uri>>?,
+                params: FileChooserParams?,
+            ): Boolean {
+                if (callback == null) return false
+                val host = activity as? BrowserInteractionHost
+                val currentView = view
+                if (host == null || params == null || currentView == null || currentView !== session.webView || !session.visible) {
+                    callback.onReceiveValue(null)
+                    return true
+                }
+                val origin = currentView.url
+                if (origin == null || Uri.parse(origin).scheme !in listOf("http", "https")) {
+                    callback.onReceiveValue(null)
+                    return true
+                }
+                host.openBrowserFileChooser(
+                    session.sessionId,
+                    params,
+                    ValueCallback { uris ->
+                        callback.onReceiveValue(
+                            if (session.webView === currentView && session.visible && sameOrigin(origin, currentView.url)) uris else null,
+                        )
+                    },
+                )
+                return true
+            }
+
+            override fun onPermissionRequest(request: PermissionRequest) {
+                val host = activity as? BrowserInteractionHost
+                val resources = request.resources
+                val origin = request.origin.toString()
+                val pageUrl = session.webView.url
+                if (host == null || !session.visible || pageUrl == null ||
+                    Uri.parse(origin).scheme !in listOf("http", "https") ||
+                    Uri.parse(pageUrl).scheme !in listOf("http", "https") || resources.isEmpty() ||
+                    resources.any { it != PermissionRequest.RESOURCE_AUDIO_CAPTURE && it != PermissionRequest.RESOURCE_VIDEO_CAPTURE }
+                ) {
+                    request.deny()
+                    return
+                }
+                host.cancelBrowserMedia(session.sessionId)
+                session.pendingMedia?.deny()
+                session.pendingMedia = request
+                val permissions = resources.map {
+                    if (it == PermissionRequest.RESOURCE_AUDIO_CAPTURE) Manifest.permission.RECORD_AUDIO
+                    else Manifest.permission.CAMERA
+                }.distinct().toTypedArray()
+                host.requestBrowserMedia(session.sessionId, origin, permissions) { granted ->
+                    if (session.pendingMedia !== request) return@requestBrowserMedia
+                    session.pendingMedia = null
+                    if (granted && session.visible && sameOrigin(pageUrl, session.webView.url)) {
+                        request.grant(resources)
+                    } else {
+                        request.deny()
+                    }
+                }
+            }
+
+            override fun onPermissionRequestCanceled(request: PermissionRequest) {
+                if (session.pendingMedia === request) {
+                    session.pendingMedia = null
+                    (activity as? BrowserInteractionHost)?.cancelBrowserMedia(session.sessionId)
+                }
             }
         }
         webView.webViewClient = object : WebViewClient() {
@@ -439,6 +514,10 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
             },
         )
         val root = contentRoot()
+        (activity as? BrowserInteractionHost)?.cancelBrowserFileChooser(session.sessionId)
+        (activity as? BrowserInteractionHost)?.cancelBrowserMedia(session.sessionId)
+        session.pendingMedia?.deny()
+        session.pendingMedia = null
         root.removeView(failedView)
         failedView.destroy()
 
@@ -776,6 +855,14 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
     private fun contentRoot(): ViewGroup =
         activity.findViewById<ViewGroup>(android.R.id.content)
             ?: throw IllegalStateException("Android content root is unavailable")
+
+    private fun sameOrigin(expected: String, current: String?): Boolean {
+        if (current == null) return false
+        val left = Uri.parse(expected)
+        val right = Uri.parse(current)
+        return left.scheme in listOf("http", "https") && left.scheme == right.scheme &&
+            left.host != null && left.host.equals(right.host, ignoreCase = true) && left.port == right.port
+    }
 
     private fun <T> parse(invoke: Invoke, type: Class<T>): T? =
         runCatching { invoke.parseArgs(type) }.getOrElse { error ->
