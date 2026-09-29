@@ -7,6 +7,7 @@ import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { Section } from "@astryxdesign/core/Section";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
@@ -21,7 +22,10 @@ import {
   installMobileEnvironment,
   installMobileToolchains,
   listExternalMobileWorkspaces,
+  listenMobileEnvironmentInstallProgress,
+  type MobileEnvironmentInstallProgress,
   type MobileExecutionStatus,
+  mobileEnvironmentInstallLabel,
   mobileExecutionStatus,
   pickExternalMobileWorkspace,
   removeExternalMobileWorkspace,
@@ -56,6 +60,9 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
   const [busy, setBusy] = useState<"status" | "environment" | "toolchains" | "cancel" | "">("");
   const [activeRunId, setActiveRunId] = useState("");
   const [error, setError] = useState("");
+  const [installProgress, setInstallProgress] = useState<MobileEnvironmentInstallProgress | null>(
+    null,
+  );
 
   const isNativeMobile = !browser && (platform === "android" || platform === "ios");
 
@@ -115,13 +122,20 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
   async function installEnvironment() {
     setBusy("environment");
     setError("");
+    setInstallProgress({ phase: "preparing" });
+    const stopProgress = await listenMobileEnvironmentInstallProgress(setInstallProgress).catch(
+      () => undefined,
+    );
     try {
-      await installMobileEnvironment();
+      const result = await installMobileEnvironment();
+      if (!result.installed) throw new Error(result.detail || t("settings.mobileNotInstalled"));
       await refresh();
     } catch (cause) {
       await refresh();
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
+      stopProgress?.();
+      setInstallProgress(null);
       setBusy("");
     }
   }
@@ -261,7 +275,7 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
                 isDisabled={busy !== ""}
                 onClick={() => void refresh()}
               />
-              {status && !status.installed ? (
+              {!status?.installed ? (
                 <Button
                   type="button"
                   label={
@@ -271,11 +285,20 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
                   }
                   variant="primary"
                   isLoading={busy === "environment"}
-                  isDisabled={!status.available || busy !== ""}
+                  isDisabled={busy !== ""}
                   onClick={() => void installEnvironment()}
                 />
               ) : null}
             </HStack>
+
+            {busy === "environment" ? (
+              <ProgressBar
+                label={mobileEnvironmentInstallLabel(installProgress, t)}
+                value={installProgress?.percent ?? 0}
+                isIndeterminate={typeof installProgress?.percent !== "number"}
+                hasValueLabel={typeof installProgress?.percent === "number"}
+              />
+            ) : null}
 
             {status?.installed && status.toolchains.length > 0 ? (
               <VStack gap={3}>

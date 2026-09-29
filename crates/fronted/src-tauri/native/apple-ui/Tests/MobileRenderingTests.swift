@@ -143,7 +143,7 @@ final class MobileRenderingTests: XCTestCase {
     @MainActor
     private func firstResponder(in view: UIView) -> UIView? {
         if view.isFirstResponder { return view }
-        return view.subviews.lazy.compactMap { firstResponder(in: $0) }.first
+        return view.subviews.lazy.compactMap { self.firstResponder(in: $0) }.first
     }
 
     @MainActor

@@ -175,6 +175,24 @@ test("native output listener failure still executes and displays the command res
   assert.ok(JSON.stringify(h.render().document).includes("ok"));
 });
 
+test("mobile terminal presents ANSI output and CR progress as readable text on both surfaces", async () => {
+  const raw = "\x1b[31mred\x1b[0m\nloading 1%\rloading 100%\n" +
+    "\x1b]8;;https://example.com\x07link\x1b]8;;\x07\x00";
+  const readable = "red\nloading 100%\nlink";
+  const apple = harness();
+  apple.setResponse({ exitCode: 0, stdout: raw, stderr: "", cancelled: false });
+  await apple.run("printf output");
+  const nativeOutput = apple.render().document.nodes.flatMap(node => node.children ?? [])
+    .find(node => node.id?.endsWith(":output"));
+  assert.equal(nativeOutput?.text, readable);
+
+  const android = harness({ apple: false });
+  android.setResponse({ exitCode: 0, stdout: raw, stderr: "", cancelled: false });
+  android.find("TextInput").props.onChange("printf output");
+  await android.find("HStack", value => value.as === "form").props.onSubmit({ preventDefault() {} });
+  assert.equal(android.find("CodeBlock", value => value.title === "stdout")?.props.code, readable);
+});
+
 test("old terminal results and errors cannot overwrite a new workspace run", async () => {
   for (const fail of [false, true]) {
     const old = deferred(), next = deferred();

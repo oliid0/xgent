@@ -201,6 +201,84 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(rendered.type, "MobileMcpPage");
 });
 
+test("native Shell install responds to touch, reports progress, and exposes installation errors", async () => {
+  const states = [];
+  const effects = [];
+  let cursor = 0;
+  let installCalls = 0;
+  let onProgress;
+  let installFailure;
+  const locale = { SUPPORTED_LOCALES: ["en-US"], useLocale: () => ({ t: (key) => key }) };
+  const shellStatus = {
+    backend: "ios-a-shell", available: false, installed: false,
+    detail: "Bundle assets missing", toolchains: [], capabilities: { shell: false },
+  };
+  const loader = createTsModuleLoader({ mocks: {
+    react: {
+      useEffect(effect) { effects.push(effect); },
+      useState(initial) {
+        const index = cursor++;
+        if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
+        return [states[index], (next) => { states[index] = typeof next === "function" ? next(states[index]) : next; }];
+      },
+    },
+    "../i18n": locale,
+    "../../i18n": locale,
+    "./NativeSurface": { NativeSurface: "NativeSurface" },
+    "./nativeTheme": { createNativePresentationTheme: () => ({ marker: "theme" }) },
+    "../pages/settings/CronSection": { CronSection: "CronSection" },
+    "../pages/settings/SshSettingsSection": { SshSettingsSection: "SshSettingsSection" },
+    "../pages/settings/ComputerUseSection": { ComputerUseSection: "ComputerUseSection" },
+    "../pages/settings/GlobalShortcutsSection": { GlobalShortcutsSection: "GlobalShortcutsSection" },
+    "../pages/settings/HooksSection": { HooksSection: "HooksSection" },
+    "../pages/settings/SoulSection": { SoulSection: "SoulSection" },
+    "../pages/chat/mobile/MobileSkillsPage": { MobileSkillsPage: "MobileSkillsPage" },
+    "../pages/chat/mobile/MobileMcpPage": { MobileMcpPage: "MobileMcpPage" },
+    "../lib/mobileExecution": {
+      mobileExecutionStatus: async () => shellStatus,
+      listExternalMobileWorkspaces: async () => [],
+      installMobileEnvironment: () => {
+        installCalls++;
+        return new Promise((_resolve, reject) => { installFailure = reject; });
+      },
+      listenMobileEnvironmentInstallProgress: async (handler) => {
+        onProgress = handler;
+        return () => { onProgress = undefined; };
+      },
+      mobileEnvironmentInstallLabel: (progress) => progress?.phase ?? "Installing",
+    },
+  } });
+  const { NativeSettingsPage } = loader.loadModule("src/presentation/NativeSettingsPage.tsx");
+  const { getDefaultSettings } = loader.loadModule("src/lib/settings/index.ts");
+  const { createPresentationActionRegistry } = loader.loadModule("src/presentation/actionRegistry.ts");
+  const registry = createPresentationActionRegistry();
+  let document;
+  const render = () => {
+    cursor = 0;
+    const view = NativeSettingsPage({ settings: getDefaultSettings(), setSettings() {},
+      nativeMobile: true, initialSection: "mobileExecution", saveState: { status: "saved" }, onBack() {}, appUpdate: {} });
+    document = view.props.document;
+    registry.register("settings-install", view.props.handlers);
+  };
+  render();
+  for (const effect of effects.splice(0)) {
+    if (String(effect).includes("refreshShell")) effect();
+  }
+  await new Promise((resolve) => setImmediate(resolve));
+  render();
+  const pending = registry.dispatch({ surface: "settings-install", action: "install-shell", value: null, requestId: "1" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(installCalls, 1, "an unavailable status still permits a diagnostic install attempt");
+  onProgress({ phase: "copying", percent: 40 });
+  render();
+  assert.equal(document.nodes.find((node) => node.id === "busy")?.label, "copying");
+  installFailure(new Error("Missing bundled a-Shell resources"));
+  assert.equal((await pending).ok, false);
+  render();
+  assert.match(document.nodes.find((node) => node.id === "error")?.label ?? "", /Missing bundled/);
+  assert.equal(onProgress, undefined, "listener is removed after a failed install");
+});
+
 test("system picker payload rejects malformed files and preserves bytes and MIME type", () => {
   const loader = createTsModuleLoader();
   const { decodeNativeFiles } = loader.loadModule("src/presentation/nativeFiles.ts");

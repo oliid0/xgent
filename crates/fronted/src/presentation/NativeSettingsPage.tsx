@@ -28,7 +28,10 @@ import {
   installMobileEnvironment,
   installMobileToolchains,
   listExternalMobileWorkspaces,
+  listenMobileEnvironmentInstallProgress,
+  type MobileEnvironmentInstallProgress,
   type MobileExecutionStatus,
+  mobileEnvironmentInstallLabel,
   mobileExecutionStatus,
   pickExternalMobileWorkspace,
   removeExternalMobileWorkspace,
@@ -133,6 +136,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [shellToolchains, setShellToolchains] = useState<string[]>([]);
   const [shellRunId, setShellRunId] = useState("");
   const [shellInstallStage, setShellInstallStage] = useState<"rootfs" | "essentials" | "">("");
+  const [shellInstallProgress, setShellInstallProgress] =
+    useState<MobileEnvironmentInstallProgress | null>(null);
   const [shellWorkspaces, setShellWorkspaces] = useState<ExternalMobileWorkspace[]>([]);
   const [busyScope, setBusyScope] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -219,6 +224,10 @@ export function NativeSettingsPage(props: SettingsPageProps) {
 
   async function installShellEnvironment() {
     setShellInstallStage("rootfs");
+    setShellInstallProgress({ phase: "preparing" });
+    const stopProgress = await listenMobileEnvironmentInstallProgress(
+      setShellInstallProgress,
+    ).catch(() => undefined);
     try {
       const installed = await installMobileEnvironment();
       if (!installed.installed)
@@ -239,6 +248,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       await refreshShell().catch(() => undefined);
       throw cause;
     } finally {
+      stopProgress?.();
+      setShellInstallProgress(null);
       setShellInstallStage("");
     }
   }
@@ -512,7 +523,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       kind: "Progress",
       label:
         shellInstallStage === "rootfs"
-          ? t("settings.native.shellInstalling")
+          ? mobileEnvironmentInstallLabel(shellInstallProgress, t)
           : shellInstallStage === "essentials"
             ? t("settings.native.shellInstallingEssentials")
             : t("app.loading"),
@@ -1224,7 +1235,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           "install-shell",
           busy ? t("settings.mobileInstalling") : t("settings.mobileInstallEnvironment"),
           () => work(installShellEnvironment),
-          !busy && shell?.available === true && !shell.installed,
+          !busy && shell?.installed !== true,
         ),
         c.action("refresh-shell", t("settings.mobileRefresh"), () => work(refreshShell), !busy),
       ]),

@@ -62,6 +62,7 @@
     <key>wc</key><array><string>text.framework/text</string><string>wc_main</string><string>dhiflM:N:nsuw</string><string>file</string></array>
     <key>xargs</key><array><string>shell.framework/shell</string><string>xargs_main</string><string>0E:I:J:L:n:oP:pR:s:tx</string><string>no</string></array>
     <key>whoami</key><array><string>shell.framework/shell</string><string>id_main</string><string></string><string>no</string></array>
+    <key>wasm</key><array><string>shell.framework/shell</string><string>wasm3</string><string></string><string>file</string></array>
     <key>wasm3</key><array><string>shell.framework/shell</string><string>wasm3</string><string></string><string>file</string></array>
     <key>vim</key><array><string>vim.framework/vim</string><string>main</string><string></string><string>file</string></array>
     <key>lg2</key><array><string>lg2.framework/lg2</string><string>main</string><string></string><string>directory</string></array>

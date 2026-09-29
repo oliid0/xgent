@@ -151,7 +151,7 @@ private func iosToolchains(
             installed: available && resources.packageManager,
             installable: false,
             version: "a-Shell wasm3",
-            detail: "WASM commands installed with pkg run through a-Shell; direct untrusted WASI invocation stays disabled"
+            detail: "Compatible .wasm and .wasm3 packages run through the linked wasm3 interpreter; direct WASI invocation stays disabled"
         ),
         IOSToolchain(
             id: "python",
@@ -262,7 +262,12 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 guard missing.isEmpty else {
                     throw MobileExecutionError.io("Missing bundled a-Shell resources: \(missing.joined(separator: ", "))")
                 }
-                try self.installBundledEnvironmentResources {
+                try self.installBundledEnvironmentResources(onProgress: { phase, percent in
+                    self.trigger("install-progress", data: [
+                        "phase": phase,
+                        "percent": percent.map { $0 as Any } ?? NSNull(),
+                    ])
+                }) {
                     try self.initializeBackendIfNeeded()
                     let workspace = try self.installationProbeWorkspace()
                     try self.runInstallationProbes(workspace: workspace)
@@ -645,7 +650,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         // addCommandList returns nil even when the upstream bootstrap dictionary
         // was absent and its merge was a no-op. Verify the actual registry.
         let commands = Set(commandsAsArray() as? [String] ?? [])
-        let requiredCommands = ["dash", "cat", "python3", "jsc", "ffmpeg"]
+        let requiredCommands = ["dash", "cat", "python3", "jsc", "ffmpeg", "wasm", "wasm3"]
         let missingCommands = requiredCommands.filter { !commands.contains($0) }
         guard missingCommands.isEmpty else {
             throw MobileExecutionError.io("The bundled command registry is incomplete: \(missingCommands.joined(separator: ", "))")
@@ -731,10 +736,14 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     }
 
     private func installBundledEnvironmentResources(
+        onProgress: (String, Int?) -> Void,
         verifyActivated: () throws -> Void
     ) throws {
+        onProgress("preparing", nil)
         if installedEnvironmentResourcesAreValid() {
+            onProgress("verifying", nil)
             try verifyActivated()
+            onProgress("ready", 100)
             return
         }
         guard let supportRoot = mobileExecutionSupportRoot(create: true) else {
@@ -762,6 +771,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         }
         do {
             try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
+            onProgress("copying", nil)
             for item in ["bin", "vim", "terminfo", "cacert.pem"] {
                 let source = bundledResources.appendingPathComponent(item)
                 guard fileManager.fileExists(atPath: source.path) else {
@@ -809,13 +819,16 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                     withIntermediateDirectories: true
                 )
             }
+            onProgress("finalizing", nil)
             if fileManager.fileExists(atPath: destination.path) {
                 try fileManager.moveItem(at: destination, to: backup)
             }
             do {
                 try fileManager.moveItem(at: staging, to: destination)
+                onProgress("verifying", nil)
                 try verifyActivated()
                 try? fileManager.removeItem(at: backup)
+                onProgress("ready", 100)
             } catch {
                 if fileManager.fileExists(atPath: destination.path) {
                     try? fileManager.removeItem(at: destination)
@@ -884,7 +897,9 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 token
             ),
             ("ffmpeg", "ffmpeg -version", "ffmpeg version"),
+            ("WebAssembly interpreter", "wasm3 2>&1; [ \"$?\" -eq 1 ]", "Usage: wasm3 command arguments"),
             ("package manager", "pkg", "Usage: pkg"),
+            ("package registry", "pkg list >/dev/null && printf '\(token)'", token),
         ]
         defer {
             try? FileManager.default.removeItem(

@@ -1,4 +1,4 @@
-import { invoke } from "@xgent/runtime";
+import { invoke, listenNativePlugin } from "@xgent/runtime";
 
 export type MobileExecutionBackend = "android-proot" | "ios-a-shell" | "unavailable";
 
@@ -42,6 +42,36 @@ export type MobileToolchainInstallResult = {
   timedOut: boolean;
   cancelled: boolean;
 };
+
+export type MobileEnvironmentInstallProgress = {
+  phase: "preparing" | "copying" | "extracting" | "finalizing" | "verifying" | "ready";
+  percent?: number | null;
+};
+
+export function listenMobileEnvironmentInstallProgress(
+  handler: (progress: MobileEnvironmentInstallProgress) => void,
+) {
+  return listenNativePlugin<MobileEnvironmentInstallProgress>(
+    "mobile-execution",
+    "install-progress",
+    handler,
+  );
+}
+
+export function mobileEnvironmentInstallLabel(
+  progress: MobileEnvironmentInstallProgress | null,
+  t: (key: string) => string,
+) {
+  if (!progress) return t("settings.native.shellInstalling");
+  const phase = ["preparing", "copying", "extracting", "finalizing", "verifying", "ready"].includes(
+    progress.phase,
+  )
+    ? progress.phase
+    : "preparing";
+  const key = `settings.native.shellInstall.${phase}`;
+  const percent = progress.percent;
+  return `${t(key)}${typeof percent === "number" && percent >= 0 && percent <= 100 ? ` ${Math.round(percent)}%` : ""}`;
+}
 
 export type ExternalMobileWorkspace = {
   id: string;

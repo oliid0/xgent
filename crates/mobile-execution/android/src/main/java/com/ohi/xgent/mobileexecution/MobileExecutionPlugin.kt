@@ -92,7 +92,10 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
             rootfsDir = rootfsDir,
             tempDir = File(activity.cacheDir, "xgent-proot"),
             allowedHostRoots = {
-                listOf(activity.filesDir) + externalWorkspaces.allowedRoots()
+                // Tauri stores the default project under the app-owned
+                // .xgent/data tree, alongside rather than inside filesDir.
+                listOf(activity.filesDir, File(activity.dataDir, ".xgent/data")) +
+                    externalWorkspaces.allowedRoots()
             },
             activeProcesses = activeProcesses,
             cancelledRuns = cancelledRuns,
@@ -119,7 +122,14 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
         }
         worker.execute {
             runCatching {
-                val rootfs = installer.install {
+                val rootfs = installer.install(onProgress = { phase, percent ->
+                    runCatching {
+                        trigger("install-progress", JSObject().apply {
+                            put("phase", phase)
+                            put("percent", percent)
+                        })
+                    }.onFailure { error -> Log.w("MobileExecution", "Install progress unavailable", error) }
+                }) {
                     verifyInstalledEnvironment()
                     readinessMarker().writeText("$READINESS_VERSION\n")
                 }

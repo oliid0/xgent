@@ -23,7 +23,8 @@ internal class RootfsInstaller(
 ) {
     fun bundledRootfsStatus(): Result<BundledRootfs> = runCatching { loadBundledRootfs() }
 
-    fun install(verifyActivated: () -> Unit): BundledRootfs {
+    fun install(onProgress: (String, Int?) -> Unit, verifyActivated: () -> Unit): BundledRootfs {
+        onProgress("preparing", null)
         val bundled = loadBundledRootfs()
 
         backendDir.mkdirs()
@@ -33,17 +34,23 @@ internal class RootfsInstaller(
         val backup = File(backendDir, "rootfs-$operationId.backup")
         try {
             staging.mkdirs()
-            copyVerifiedAsset(bundled, archive)
+            copyVerifiedAsset(bundled, archive, onProgress)
+            onProgress("extracting", null)
             extract(archive, staging)
             require(File(staging, "bin/sh").isFile) {
                 "archive does not contain a usable rootfs (bin/sh is missing)"
             }
+            onProgress("finalizing", null)
             RootfsEnvironment.prepare(staging, context, bundled.repositoryBranch)
             File(staging, XGENT_VERSION_FILE).apply {
                 parentFile?.mkdirs()
                 writeText("${bundled.distribution} ${bundled.version}\n")
             }
-            replaceAtomically(staging, backup, verifyActivated)
+            replaceAtomically(staging, backup) {
+                onProgress("verifying", null)
+                verifyActivated()
+            }
+            onProgress("ready", 100)
             return bundled
         } finally {
             archive.delete()
@@ -77,8 +84,16 @@ internal class RootfsInstaller(
         )
     }
 
-    private fun copyVerifiedAsset(bundled: BundledRootfs, target: File) {
+    private fun copyVerifiedAsset(
+        bundled: BundledRootfs,
+        target: File,
+        onProgress: (String, Int?) -> Unit,
+    ) {
         val digest = MessageDigest.getInstance("SHA-256")
+        val assetBytes = runCatching { assets.openFd(bundled.assetPath).use { it.length } }
+            .getOrNull()?.takeIf { it > 0 }
+        var lastPercent = -1
+        onProgress("copying", if (assetBytes == null) null else 0)
         var total = 0L
         assets.open(bundled.assetPath, AssetManager.ACCESS_STREAMING).use { raw ->
             BufferedInputStream(raw).use { input ->
@@ -93,6 +108,13 @@ internal class RootfsInstaller(
                         }
                         digest.update(buffer, 0, count)
                         output.write(buffer, 0, count)
+                        if (assetBytes != null) {
+                            val percent = ((total * 100) / assetBytes).coerceIn(0, 100).toInt()
+                            if (percent >= lastPercent + 5 || percent == 100 && lastPercent != 100) {
+                                lastPercent = percent
+                                onProgress("copying", percent)
+                            }
+                        }
                     }
                 }
             }

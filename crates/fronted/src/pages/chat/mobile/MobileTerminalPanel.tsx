@@ -141,6 +141,36 @@ function shellQuote(value: string) {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
+// Text-only command results cannot interpret terminal controls. Fold progress
+// overwrites and remove ANSI escapes before presenting them as prose or code.
+const terminalEscape = String.fromCharCode(27);
+const terminalBell = String.fromCharCode(7);
+const terminalOsc = new RegExp(
+  `${terminalEscape}\\][^${terminalBell}${terminalEscape}]*(?:${terminalBell}|${terminalEscape}\\\\)`,
+  "g",
+);
+const terminalCsi = new RegExp(`${terminalEscape}\\[[0-?]*[ -/]*[@-~]`, "g");
+const terminalCharset = new RegExp(`${terminalEscape}[()][0-2AB]`, "g");
+const terminalSingle = new RegExp(`${terminalEscape}[@-_]`, "g");
+
+function displayTerminalOutput(raw: string) {
+  return raw
+    .replace(terminalOsc, "")
+    .replace(terminalCsi, "")
+    .replace(terminalCharset, "")
+    .replace(terminalSingle, "")
+    .split("\n")
+    .map((line) =>
+      Array.from(line.split("\r").filter(Boolean).at(-1) ?? "")
+        .filter((character) => {
+          const code = character.charCodeAt(0);
+          return code === 9 || (code >= 32 && code !== 127);
+        })
+        .join(""),
+    )
+    .join("\n");
+}
+
 export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   const {
     open,
@@ -423,13 +453,17 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
               id: `${entry.id}:output`,
               kind: "Text",
               text: entry.error
-                ? [entry.liveStdout, entry.liveStderr, entry.error].filter(Boolean).join("\n")
-                : [
-                    entry.response?.stdout ?? entry.liveStdout,
-                    entry.response?.stderr ?? entry.liveStderr,
-                  ]
-                    .filter(Boolean)
-                    .join("\n"),
+                ? displayTerminalOutput(
+                    [entry.liveStdout, entry.liveStderr, entry.error].filter(Boolean).join("\n"),
+                  )
+                : displayTerminalOutput(
+                    [
+                      entry.response?.stdout ?? entry.liveStdout,
+                      entry.response?.stderr ?? entry.liveStderr,
+                    ]
+                      .filter(Boolean)
+                      .join("\n"),
+                  ),
             },
             ...(entry.response
               ? [
@@ -576,8 +610,8 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
               {entries.map((entry) => {
                 const response = entry.response;
                 const exitCode = response?.exitCode ?? response?.exit_code;
-                const stdout = response?.stdout ?? entry.liveStdout;
-                const stderr = response?.stderr ?? entry.liveStderr;
+                const stdout = displayTerminalOutput(response?.stdout ?? entry.liveStdout ?? "");
+                const stderr = displayTerminalOutput(response?.stderr ?? entry.liveStderr ?? "");
                 return (
                   <Card key={entry.id} padding={3} width="100%">
                     <VStack gap={3}>
