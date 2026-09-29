@@ -172,6 +172,9 @@ internal class ProotRunner(
             "HOME=/root",
             "PATH=$WORKSPACE_PATH/node_modules/.bin:$WORKSPACE_PATH/.xgent/npm/bin:$WORKSPACE_PATH/.xgent/python/bin:/usr/lib/jvm/java-21-openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "PYTHONUNBUFFERED=1",
+            // PRoot package handling: uv must not re-link the
+            // .l2s.* files produced by --link2symlink when creating environments.
+            "UV_LINK_MODE=symlink",
             "PIP_USER=false",
             "npm_config_prefix=$WORKSPACE_PATH/.xgent/npm",
             "npm_config_cache=$WORKSPACE_PATH/.xgent/npm-cache",

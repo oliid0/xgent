@@ -57,7 +57,9 @@ fetch_verified_archive() {
   local url="$1"
   local sha256="$2"
   local output="$3"
-  curl --fail --location --proto '=https' --tlsv1.2 "$url" --output "$output"
+  curl --fail --location --proto '=https' --tlsv1.2 \
+    --retry 4 --retry-max-time 300 --connect-timeout 20 --max-time 120 \
+    "$url" --output "$output"
   echo "$sha256  $output" | sha256sum --check --status || {
     echo "Source archive SHA-256 mismatch: $url" >&2
     exit 1

@@ -26,8 +26,10 @@ prepare_arch() {
   local base_url="${ALPINE_RELEASES}/${alpine_arch}"
 
   curl --fail --location --proto '=https' --tlsv1.2 \
+    --retry 4 --retry-max-time 300 --connect-timeout 20 --max-time 120 \
     "${base_url}/${filename}" --output "${temp_dir}/${filename}"
   curl --fail --location --proto '=https' --tlsv1.2 \
+    --retry 4 --retry-max-time 300 --connect-timeout 20 --max-time 120 \
     "${base_url}/${filename}.sha256" --output "${temp_dir}/${filename}.sha256"
 
   (
