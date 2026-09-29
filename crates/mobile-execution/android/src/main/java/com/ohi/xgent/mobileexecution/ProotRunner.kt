@@ -212,10 +212,13 @@ internal class ProotRunner(
         }
         if (value.startsWith('/')) {
             val target = File(value).canonicalFile
-            require(target.isDirectory) { "cwd must be an existing directory" }
-            require(isAllowedHostPath(target)) {
-                "absolute cwd must be inside Xgent storage or a mounted external workspace"
+            // yy uses guest paths for the Linux shell. Only authorized host
+            // directories become binds; other absolute paths stay inside -r.
+            // The guest cd below verifies existence, including Linux symlinks.
+            if (!isAllowedHostPath(target)) {
+                return ResolvedCwd(guestPath = value, externalBind = null)
             }
+            require(target.isDirectory) { "cwd must be an existing directory" }
             if (target.isWithin(workdir)) {
                 val relative = workdir.toPath().relativize(target.toPath()).toString()
                     .replace(File.separatorChar, '/')

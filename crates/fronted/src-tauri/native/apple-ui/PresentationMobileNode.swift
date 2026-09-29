@@ -237,8 +237,21 @@ struct XgentIOSNode: View {
         return Data(base64Encoded: payload, options: .ignoreUnknownCharacters)
     }
 
+    @ViewBuilder private var identified: some View {
+        switch node.kind {
+        case .vStack, .hStack, .scrollView, .card, .section, .list,
+             .settingsGroup, .settingsLayout, .composer, .chatLayout,
+             .browserLayout, .chatMessage:
+            // Container identifiers propagate to descendants in SwiftUI.
+            // Keep each actionable child addressable in the live AX hierarchy.
+            rendered.accessibilityElement(children: .contain)
+        default:
+            rendered.accessibilityIdentifier(node.id)
+        }
+    }
+
     var body: some View {
-        AnyView(rendered)
+        AnyView(identified)
             .padding(CGFloat(node.padding ?? 0))
             .padding(.leading, CGFloat(node.indent ?? 0))
             .modifier(XgentIOSNodeFrame(node: node, alignment: alignment, parentAxis: parentAxis))
@@ -246,7 +259,6 @@ struct XgentIOSNode: View {
             .fixedSize(horizontal: node.wrap == false, vertical: false)
             .disabled(node.disabled == true || model.isBusy(node, in: document))
             .opacity(node.disabled == true ? 0.48 : 1)
-            .accessibilityIdentifier(node.id)
             .modifier(XgentIOSAccessibility(node: node))
     }
 

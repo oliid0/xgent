@@ -6427,6 +6427,9 @@ export function ChatPage(props: ChatPageProps) {
           open={mobileTerminalOpen}
           workdir={mobileWorkspacePath}
           mode={mobileTerminalDestination?.mode ?? "terminal"}
+          preferLanPcExecution={
+            settings.access.preferLanPcExecution && Boolean(settings.access.lanControlUrl.trim())
+          }
           sshHosts={settings.ssh.hosts}
           onClose={() => setMobileWorkspaceDestination(null)}
         />
@@ -7285,6 +7288,9 @@ export function ChatPage(props: ChatPageProps) {
           open={mobileTerminalOpen}
           workdir={mobileWorkspacePath}
           mode={mobileTerminalDestination?.mode ?? "terminal"}
+          preferLanPcExecution={
+            settings.access.preferLanPcExecution && Boolean(settings.access.lanControlUrl.trim())
+          }
           sshHosts={settings.ssh.hosts}
           initialCommand={mobileTerminalDestination?.initialCommand ?? ""}
           autoRunInitialCommand={mobileTerminalDestination?.autoRun ?? false}

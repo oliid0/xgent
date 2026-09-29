@@ -45,7 +45,6 @@ struct XgentIOSRootPresentation: View {
                     .clipShape(RoundedRectangle(cornerRadius: sidebar == nil ? 0 : 26,
                                                 style: .continuous))
                     .offset(x: sidebar == nil ? 0 : drawerWidth)
-                    .accessibilityIdentifier("xgent-native-root")
                     .accessibilityHidden(sidebar != nil)
                     .allowsHitTesting(sidebar == nil)
                     .zIndex(0)
@@ -118,7 +117,6 @@ struct XgentIOSWorkspacePresentation: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background { XgentThemeBackground().ignoresSafeArea() }
-        .accessibilityIdentifier("xgent-native-root")
     }
 }
 
@@ -195,7 +193,6 @@ struct XgentIOSPagePresentation: View {
             .clipped()
         }
         .background { XgentThemeBackground().ignoresSafeArea() }
-        .accessibilityIdentifier("xgent-native-root")
     }
 }
 
@@ -586,6 +583,7 @@ struct XgentIOSSheetPresentation: View {
                 .buttonStyle(.plain)
                 .modifier(XgentIOSNavigationControl())
                 .accessibilityLabel(back.label ?? "Back")
+                .accessibilityIdentifier(back.id)
             } else {
                 Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
             }

@@ -37,6 +37,7 @@ function harness(options = {}) {
       },
     },
     "../../../i18n": { useLocale: () => ({ t: (key) => key }) },
+    "../../../lib/runtimePlatform": { inferRuntimePlatform: () => options.platform ?? "ios" },
     "../../../components/icons": {},
     "../../../presentation/NativeSurface": { NativeSurface: "NativeSurface" },
     "../../../runtime/applePresentation": { isApplePresentationRuntime: () => options.apple !== false },
@@ -95,6 +96,41 @@ test("failed cd does not change the next command cwd and traversal never invokes
   const before = h.calls.length;
   await h.run("cd ../../outside");
   assert.equal(h.calls.length, before);
+});
+
+test("Android PRoot terminal navigates the guest rootfs and retains the directory across commands", async () => {
+  const h = harness({ native: true, platform: "android" });
+  assert.equal((await h.run("cd /etc")).cwd, "/etc");
+  assert.equal((await h.run("ls apk")).cwd, "/etc");
+  assert.equal(h.render().document.nodes.find(node => node.id === "cwd").text, "/etc");
+  assert.equal((await h.run("cd ../root")).cwd, "/root");
+  assert.equal((await h.run("cd -")).cwd, "/etc");
+  assert.equal((await h.run("cd ../../..")).cwd, "/");
+  assert.equal((await h.run("cd")).cwd, "/root");
+  assert.equal((await h.run("cd /project/source")).cwd, "/workspace/source");
+  assert.equal((await h.run("cd /workspace")).cwd, "/workspace");
+  h.setResponse({ exitCode: 1, stdout: "", stderr: "missing", cancelled: false });
+  await h.run("cd /missing");
+  h.setResponse({ exitCode: 0, stdout: "/workspace", stderr: "", cancelled: false });
+  assert.equal((await h.run("pwd")).cwd, "/workspace");
+});
+
+test("an Android browser connected to a PC keeps the host workspace boundary", async () => {
+  const h = harness({ native: false, platform: "android" });
+  h.render().handlers.get("command").run("cd /etc");
+  await h.render().handlers.get("run").run(null);
+  assert.equal(h.calls.length, 0);
+  assert.ok(JSON.stringify(h.render().document).includes("current workspace"));
+});
+
+test("native Android PC delegation retains host cwd and resets it when switching to local PRoot", async () => {
+  const h = harness({ native: true, platform: "android" });
+  h.props.preferLanPcExecution = true;
+  assert.equal((await h.run("cd source")).cwd, "source");
+  assert.equal((await h.run("pwd")).cwd, "source");
+  h.props.preferLanPcExecution = false;
+  assert.equal((await h.run("pwd")).cwd, null);
+  assert.equal((await h.run("cd /etc")).cwd, "/etc");
 });
 
 function deferred() {

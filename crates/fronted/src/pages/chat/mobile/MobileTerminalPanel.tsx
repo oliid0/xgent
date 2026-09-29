@@ -12,6 +12,7 @@ import { invoke, isTauriRuntime, listenNativePlugin } from "@xgent/runtime";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GitBranch, Key, Send, Square, Terminal, Trash2, X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
+import { inferRuntimePlatform } from "../../../lib/runtimePlatform";
 import type { SshHostConfig } from "../../../lib/settings";
 import { presentationControls } from "../../../presentation/controls";
 import { NativeSurface } from "../../../presentation/NativeSurface";
@@ -47,6 +48,7 @@ export type MobileShellPanelMode = "terminal" | "git" | "ssh";
 type MobileTerminalPanelProps = {
   open: boolean;
   workdir: string;
+  preferLanPcExecution?: boolean;
   mode?: MobileShellPanelMode;
   sshHosts?: SshHostConfig[];
   initialCommand?: string;
@@ -77,13 +79,30 @@ function unwrapShellPath(raw: string) {
   return value;
 }
 
-function normalizedRelativeCwd(
+function normalizedSessionCwd(
   current: string,
   requestedInput: string,
   workdir: string,
   previous: string,
+  guestFilesystem: boolean,
 ) {
   let requested = unwrapShellPath(requestedInput).replaceAll("\\", "/").trim();
+  if (guestFilesystem) {
+    if (requested === "-") return previous || "/workspace";
+    if (!requested || requested === "~") return "/root";
+    const workspace = workdir.replaceAll("\\", "/").replace(/\/+$/, "");
+    if (requested === workspace || requested.startsWith(`${workspace}/`)) {
+      requested = `/workspace${requested.slice(workspace.length)}`;
+    }
+    const path = requested.startsWith("/") ? requested : `${current || "/workspace"}/${requested}`;
+    const segments: string[] = [];
+    for (const segment of path.split("/")) {
+      if (!segment || segment === ".") continue;
+      if (segment === "..") segments.pop();
+      else segments.push(segment);
+    }
+    return `/${segments.join("/")}`;
+  }
   if (requested === "-") return previous;
   if (!requested || requested === "~" || requested === "/workspace") return "";
 
@@ -175,6 +194,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   const {
     open,
     workdir,
+    preferLanPcExecution = false,
     mode = "terminal",
     sshHosts = [],
     initialCommand = "",
@@ -182,6 +202,8 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
     onClose,
   } = props;
   const { t } = useLocale();
+  const guestFilesystem =
+    !preferLanPcExecution && isTauriRuntime() && inferRuntimePlatform() === "android";
   const [command, setCommand] = useState(initialCommand);
   const [entries, setEntries] = useState<TerminalEntry[]>([]);
   const [activeRunId, setActiveRunId] = useState("");
@@ -189,7 +211,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   const [previousSessionCwd, setPreviousSessionCwd] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoRunKeyRef = useRef("");
-  const runScopeKey = JSON.stringify([open, mode, workdir]);
+  const runScopeKey = JSON.stringify([open, mode, workdir, preferLanPcExecution]);
   const runScope = useRef({
     key: runScopeKey,
     revision: 0,
@@ -263,6 +285,13 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
       : t("chat.mobileTerminal.placeholder")
     : t("chat.mobileTerminal.noWorkspace");
   const PanelIcon = mode === "git" ? GitBranch : mode === "ssh" ? Key : Terminal;
+  const cwdLabel = sessionCwd.startsWith("/")
+    ? sessionCwd
+    : sessionCwd
+      ? `${workdir.replace(/[\\/]+$/, "")}/${sessionCwd}`
+      : guestFilesystem
+        ? "/workspace"
+        : workdir;
 
   const runCommand = useCallback(
     async (rawCommand: string) => {
@@ -273,7 +302,13 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
       let nextCwd = sessionCwd;
       if (cdTarget !== null) {
         try {
-          nextCwd = normalizedRelativeCwd(sessionCwd, cdTarget, workdir, previousSessionCwd);
+          nextCwd = normalizedSessionCwd(
+            sessionCwd,
+            cdTarget,
+            workdir,
+            previousSessionCwd,
+            guestFilesystem,
+          );
         } catch (cause) {
           if (isCurrentScope()) {
             setEntries((current) => [
@@ -359,7 +394,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
         }
       }
     },
-    [previousSessionCwd, sessionCwd, workdir, runRevision, runScopeKey],
+    [previousSessionCwd, sessionCwd, workdir, runRevision, runScopeKey, guestFilesystem],
   );
 
   useEffect(() => {
@@ -430,7 +465,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
       {
         id: "cwd",
         kind: "Text",
-        text: sessionCwd ? `${workdir}/${sessionCwd}` : workdir,
+        text: cwdLabel,
         secondary: true,
       },
       ...presets.map((preset) =>
@@ -536,7 +571,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
               {panelTitle}
             </Heading>
             <Text type="supporting" color="secondary" maxLines={1}>
-              {sessionCwd ? `${workdir.replace(/[\\/]+$/, "")}/${sessionCwd}` : workdir}
+              {cwdLabel}
             </Text>
           </VStack>
         </StackItem>

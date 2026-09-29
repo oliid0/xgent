@@ -90,18 +90,50 @@ tap({"返回设置", "Back to Settings"})
 tap({"返回对话", "Back to Chat"})
 tap({"工作工具", "Workspace tools"})
 tap({"打开终端", "Open terminal"})
-tap_terminal_input()
-adb("shell", "input", "text", "printf%sxgent-shell-ok")
-tap({"运行命令", "Run command"})
-deadline = time.monotonic() + 45
-while time.monotonic() < deadline:
-    nodes = list(snapshot().iter("node"))
-    if any(matches(node, {"退出码：0", "Exit code: 0"}) for node in nodes):
-        assert any(matches(node, {"stdout:\nxgent-shell-ok"}) for node in nodes), \
-            "The native Shell must expose actual stdout, not just echo the command"
-        break
-    time.sleep(1)
-else:
-    raise AssertionError("The native Shell did not return exit code zero")
+
+
+def run_terminal(command, expected_output=None, expected_exit=0, clear=True, exact=True):
+    if clear:
+        tap({"清空终端记录", "Clear terminal history"})
+    tap_terminal_input()
+    adb("shell", "input", "text", command.replace(" ", "%s"))
+    tap({"运行命令", "Run command"})
+    deadline = time.monotonic() + 45
+    while time.monotonic() < deadline:
+        nodes = list(snapshot().iter("node"))
+        exit_codes = [
+            int(match.group(1))
+            for node in nodes for key in ("text", "content-desc")
+            if (match := re.fullmatch(r"(?:退出码：|Exit code: )(-?\d+)", node.get(key, "").strip()))
+        ]
+        returned = any(code != 0 for code in exit_codes) if expected_exit is None else expected_exit in exit_codes
+        if returned:
+            if expected_output is not None:
+                outputs = [
+                    node.get(key, "")[len("stdout:\n"):].strip()
+                    for node in nodes for key in ("text", "content-desc")
+                    if node.get(key, "").startswith("stdout:\n")
+                ]
+                assert any(
+                    output == expected_output if exact else expected_output in output
+                    for output in outputs
+                ), f"The native Shell must expose actual stdout for {command!r}"
+            return
+        time.sleep(1)
+    capture("shell-failure")
+    raise AssertionError(f"The native Shell did not return exit code {expected_exit}: {command!r}")
+
+
+run_terminal("printf xgent-shell-ok", "xgent-shell-ok", clear=False)
 capture("shell-result")
-print("PASS: sidebar, settings, Shell management, bundled environment, native command execution")
+run_terminal("cd /etc", "/etc")
+run_terminal("ls apk", "repositories", exact=False)
+run_terminal("cd ..", "/")
+run_terminal("pwd", "/")
+run_terminal("cd -", "/etc")
+run_terminal("cd /xgent-definitely-missing", expected_exit=None)
+run_terminal("pwd", "/etc")
+capture("rootfs-navigation")
+run_terminal("cd /workspace", "/workspace")
+run_terminal("pwd", "/workspace")
+print("PASS: settings, bundled environment, native stdout, rootfs ls/cd and retained cwd after failed cd")

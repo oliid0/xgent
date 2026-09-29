@@ -32,12 +32,11 @@ final class ShellInstallationTests: XCTestCase {
         XCTAssertTrue(version.exists, "Installation failed: \(error.exists ? error.label : app.debugDescription)")
         XCTAssertTrue(version.label.contains("a-Shell"))
 
-        let back = app.buttons.matching(NSPredicate(format: "label IN %@", ["Back", "返回"])).firstMatch
-        tap(back, in: app)
+        tap(app.buttons["back"], in: app)
         tap(app.buttons["Close"], in: app)
         tap(app.buttons["tools"], in: app)
         tap(app.buttons["tool:terminal"], in: app)
-        let command = app.textFields["Command"]
+        let command = app.textFields["command"]
         tap(command, in: app)
         command.typeText("printf xgent-ios-shell-ok")
         tap(app.buttons["run"], in: app)
