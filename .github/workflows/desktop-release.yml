@@ -785,7 +785,10 @@ jobs:
 
   ios:
     name: iOS arm64 unsigned IPA
-    runs-on: macos-26
+    # Auxiliary a-Shell dash/FFmpeg assets contain arm64 device and x86_64
+    # simulator slices. Run the complete shell smoke on the supported simulator;
+    # ci.yml separately renders the native SwiftUI package on Apple Silicon.
+    runs-on: macos-15-intel
     needs:
       - release-metadata
       - release-preflight
@@ -980,7 +983,7 @@ jobs:
         run: |
           set -o pipefail
           log="$RUNNER_TEMP/ios-simulator-build.log"
-          if ! pnpm tauri ios build --ci --no-sign --target aarch64-sim --build-number "${{ github.run_number }}" --config "$XGENT_TAURI_VERSION_CONFIG" 2>&1 | tee "$log"; then
+          if ! pnpm tauri ios build --ci --no-sign --target x86_64 --build-number "${{ github.run_number }}" --config "$XGENT_TAURI_VERSION_CONFIG" 2>&1 | tee "$log"; then
             message="$(tail -n 160 "$log")"
             message="${message//'%'/'%25'}"
             message="${message//$'\r'/'%0D'}"

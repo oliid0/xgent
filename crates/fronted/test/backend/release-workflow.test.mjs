@@ -209,7 +209,7 @@ test("iOS release prepares host tools and every target before Tauri initializati
   assert.match(workflow, /DEVELOPER_DIR: \/Applications\/Xcode_26\.3\.app\/Contents\/Developer/);
   assert.match(macos, /runner: macos-26-intel/);
   assert.match(macos, /runner: macos-26/);
-  assert.match(ios, /runs-on: macos-26/);
+  assert.match(ios, /runs-on: macos-15-intel/);
   assert.match(
     ios,
     /targets: aarch64-apple-ios,x86_64-apple-ios,aarch64-apple-ios-sim/,
@@ -343,7 +343,8 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(androidInteractions, /Install base environment/);
   assert.match(androidInteractions, /Run command/);
   assert.match(android, /xgent-android-launch-evidence/);
-  assert.match(ios, /--target aarch64-sim/);
+  assert.match(ios, /runs-on: macos-15-intel/);
+  assert.match(ios, /--target x86_64/);
   for (const [name, next] of [
     ["Build iOS simulator smoke target", "Smoke launch iOS simulator app"],
     ["Smoke launch iOS simulator app", "Upload iOS launch evidence"],

@@ -4,6 +4,7 @@ set -euo pipefail
 readonly PROOT_SOURCE_REPOSITORY="https://github.com/termux/proot.git"
 readonly TALLOC_VERSION="2.4.4"
 readonly TALLOC_ARCHIVE_URL="https://www.samba.org/ftp/talloc/talloc-${TALLOC_VERSION}.tar.gz"
+readonly TALLOC_ARCHIVE_MIRROR="https://distfiles.macports.org/talloc/talloc-${TALLOC_VERSION}.tar.gz"
 readonly TALLOC_ARCHIVE_SHA256="55e47994018c13743485544e7206780ffbb3c8495e704a99636503e6e77abf59"
 readonly SHMEM_VERSION="0.7"
 readonly SHMEM_ARCHIVE_URL="https://github.com/termux/libandroid-shmem/archive/refs/tags/v${SHMEM_VERSION}.tar.gz"
@@ -57,13 +58,22 @@ fetch_verified_archive() {
   local url="$1"
   local sha256="$2"
   local output="$3"
-  curl --fail --location --proto '=https' --tlsv1.2 \
-    --retry 4 --retry-all-errors --retry-max-time 300 --connect-timeout 20 --max-time 120 \
-    "$url" --output "$output"
-  echo "$sha256  $output" | sha256sum --check --status || {
-    echo "Source archive SHA-256 mismatch: $url" >&2
-    exit 1
-  }
+  local mirror="${4:-}"
+  local source
+  for source in "$url" ${mirror:+"$mirror"}; do
+    echo "Downloading verified source archive: $source" >&2
+    if curl --fail --location --proto '=https' --tlsv1.2 \
+      --retry 2 --retry-all-errors --retry-max-time 120 --connect-timeout 20 --max-time 60 \
+      "$source" --output "$output"; then
+      echo "$sha256  $output" | sha256sum --check --status || {
+        echo "Source archive SHA-256 mismatch: $source" >&2
+        exit 1
+      }
+      return
+    fi
+  done
+  echo "Source archive download failed: $url" >&2
+  return 1
 }
 
 fetch_proot_source() {
@@ -84,7 +94,7 @@ fetch_proot_source() {
 prepare_dependency_sources() {
   local talloc_archive="$TEMP_ROOT/talloc.tar.gz"
   local shmem_archive="$TEMP_ROOT/libandroid-shmem.tar.gz"
-  fetch_verified_archive "$TALLOC_ARCHIVE_URL" "$TALLOC_ARCHIVE_SHA256" "$talloc_archive"
+  fetch_verified_archive "$TALLOC_ARCHIVE_URL" "$TALLOC_ARCHIVE_SHA256" "$talloc_archive" "$TALLOC_ARCHIVE_MIRROR"
   fetch_verified_archive "$SHMEM_ARCHIVE_URL" "$SHMEM_ARCHIVE_SHA256" "$shmem_archive"
   mkdir -p "$TEMP_ROOT/dependencies"
   tar -xzf "$talloc_archive" -C "$TEMP_ROOT/dependencies"

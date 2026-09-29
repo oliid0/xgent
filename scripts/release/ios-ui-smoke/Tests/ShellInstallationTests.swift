@@ -1,11 +1,10 @@
 import XCTest
 
 final class ShellInstallationTests: XCTestCase {
-    func testInstallAndExecuteBundledShell() throws {
-        continueAfterFailure = false
-        let app = XCUIApplication(bundleIdentifier: "com.ohi.xgent")
-        app.launch()
-        defer {
+    private var testedApp: XCUIApplication?
+
+    override func tearDownWithError() throws {
+        if let app = testedApp {
             let screenshot = XCTAttachment(screenshot: app.screenshot())
             screenshot.name = "ios-shell-result"
             screenshot.lifetime = .keepAlways
@@ -15,7 +14,16 @@ final class ShellInstallationTests: XCTestCase {
             hierarchy.lifetime = .keepAlways
             add(hierarchy)
             app.terminate()
+            testedApp = nil
         }
+        try super.tearDownWithError()
+    }
+
+    func testInstallAndExecuteBundledShell() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(bundleIdentifier: "com.ohi.xgent")
+        testedApp = app
+        app.launch()
 
         tap(app.buttons["tools"], in: app)
         tap(app.buttons["tool:shell"], in: app)
@@ -29,7 +37,7 @@ final class ShellInstallationTests: XCTestCase {
         )
         XCTAssertEqual(XCTWaiter.wait(for: [installed], timeout: 180), .completed,
                        "The bundled a-Shell installation must finish")
-        XCTAssertTrue(version.exists, "Installation failed: \(error.exists ? error.label : app.debugDescription)")
+        XCTAssertTrue(version.exists, "Installation failed: \(app.debugDescription)")
         XCTAssertTrue(version.label.contains("a-Shell"))
 
         tap(app.buttons["back"], in: app)
