@@ -112,7 +112,7 @@ final class CodeEditorInteractionTests: XCTestCase {
     @MainActor
     private func editor(in view: UIView) -> UITextView? {
         if let textView = view as? UITextView, textView.isEditable { return textView }
-        return view.subviews.lazy.compactMap { editor(in: $0) }.first
+        return view.subviews.lazy.compactMap { self.editor(in: $0) }.first
     }
 
     private func settle() async throws { try await Task.sleep(nanoseconds: 500_000_000) }

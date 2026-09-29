@@ -102,11 +102,15 @@ fn link_native_ui(manifest_dir: &std::path::Path) {
     let status = Command::new("xcrun").args(swift_args)
         .arg("--package-path").arg(&sources)
         .arg("--scratch-path").arg(&scratch)
+        // Xcode exports the product SDKROOT to script phases. SwiftPM needs
+        // the host macOS SDK for Package.swift; --sdk selects the iOS target.
+        .env_remove("SDKROOT")
         .status().expect("compile native SwiftUI presentation");
     assert!(status.success(), "native SwiftUI presentation compilation failed");
     let binary_path = Command::new("xcrun").args(swift_args)
         .arg("--package-path").arg(&sources)
         .arg("--scratch-path").arg(&scratch).arg("--show-bin-path")
+        .env_remove("SDKROOT")
         .output().expect("locate native SwiftUI static product");
     assert!(binary_path.status.success(), "locate native SwiftUI static product failed");
     let binary_path = String::from_utf8(binary_path.stdout).expect("SwiftPM binary path");

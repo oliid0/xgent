@@ -39,6 +39,29 @@ def tap(labels, timeout=30):
     raise AssertionError(f"No enabled visible control: {labels}")
 
 
+def tap_terminal_input(timeout=30):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for panel in snapshot().iter("node"):
+            if panel.get("class") != "android.view.View" or not matches(
+                panel, {"移动终端", "Mobile terminal"}
+            ):
+                continue
+            for node in panel.iter("node"):
+                if node.get("class") != "android.widget.EditText" or node.get("enabled") != "true":
+                    continue
+                bounds = list(map(int, re.findall(r"\d+", node.get("bounds", ""))))
+                if len(bounds) == 4 and bounds[2] > bounds[0] and bounds[3] > bounds[1]:
+                    adb(
+                        "shell", "input", "tap",
+                        str((bounds[0] + bounds[2]) // 2),
+                        str((bounds[1] + bounds[3]) // 2),
+                    )
+                    return
+        time.sleep(1)
+    raise AssertionError("No enabled visible terminal command input")
+
+
 def capture(name):
     (evidence / f"xgent-android-{name}.png").write_bytes(adb("exec-out", "screencap", "-p"))
 
@@ -67,7 +90,7 @@ tap({"返回设置", "Back to Settings"})
 tap({"返回对话", "Back to Chat"})
 tap({"工作工具", "Workspace tools"})
 tap({"打开终端", "Open terminal"})
-tap({"输入命令", "Enter a command"})
+tap_terminal_input()
 adb("shell", "input", "text", "printf%sxgent-shell-ok")
 tap({"运行命令", "Run command"})
 deadline = time.monotonic() + 45

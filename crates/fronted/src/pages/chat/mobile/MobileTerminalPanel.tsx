@@ -227,6 +227,11 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
       : mode === "ssh"
         ? t("chat.mobileSsh.title")
         : t("chat.mobileTerminal.title");
+  const commandLabel = workdir
+    ? mode === "ssh"
+      ? t("chat.mobileSsh.placeholder")
+      : t("chat.mobileTerminal.placeholder")
+    : t("chat.mobileTerminal.noWorkspace");
   const PanelIcon = mode === "git" ? GitBranch : mode === "ssh" ? Key : Terminal;
 
   const runCommand = useCallback(
@@ -652,25 +657,14 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
       >
         <StackItem size="fill">
           <TextInput
-            label={
-              workdir
-                ? mode === "ssh"
-                  ? t("chat.mobileSsh.placeholder")
-                  : t("chat.mobileTerminal.placeholder")
-                : t("chat.mobileTerminal.noWorkspace")
-            }
+            label={commandLabel}
+            aria-label={commandLabel}
             isLabelHidden
             value={command}
             onChange={setCommand}
             isDisabled={Boolean(activeRunId) || !workdir}
             disabledMessage={!workdir ? t("chat.mobileTerminal.noWorkspace") : undefined}
-            placeholder={
-              workdir
-                ? mode === "ssh"
-                  ? t("chat.mobileSsh.placeholder")
-                  : t("chat.mobileTerminal.placeholder")
-                : t("chat.mobileTerminal.noWorkspace")
-            }
+            placeholder={commandLabel}
             size="lg"
             width="100%"
           />
