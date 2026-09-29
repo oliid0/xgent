@@ -1,0 +1,23 @@
+name: XgentIOSSmoke
+options:
+  deploymentTarget:
+    iOS: "26.0"
+targets:
+  XgentIOSSmoke:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Tests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.ohi.xgent.ios-smoke
+        SWIFT_VERSION: "5.0"
+schemes:
+  XgentIOSSmoke:
+    build:
+      targets:
+        XgentIOSSmoke: [test]
+    test:
+      targets:
+        - name: XgentIOSSmoke
+          parallelizable: false

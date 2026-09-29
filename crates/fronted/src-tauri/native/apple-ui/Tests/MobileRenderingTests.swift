@@ -1,4 +1,5 @@
 #if os(iOS)
+import SnapshotTesting
 import SwiftUI
 import UIKit
 import XCTest
@@ -323,11 +324,16 @@ final class MobileRenderingTests: XCTestCase {
         controller.view.layoutIfNeeded()
         defer { window.isHidden = true; window.rootViewController = nil }
         try await Task.sleep(nanoseconds: 500_000_000)
-        let image = UIGraphicsImageRenderer(size: size).image { _ in
-            XCTAssertTrue(window.drawHierarchy(in: window.bounds, afterScreenUpdates: true))
+        // SwiftPM tests have no application key window. SnapshotTesting renders
+        // the hosting view's layers and captures WKWebView children separately.
+        let strategy = Snapshotting<UIViewController, UIImage>.image(size: size)
+        let image = await withCheckedContinuation { continuation in
+            strategy.snapshot(controller).run { continuation.resume(returning: $0) }
         }
         XCTAssertEqual(image.size, size)
         XCTAssertGreaterThan(try XCTUnwrap(image.pngData()).count, 10_000)
+        let pixels = try XCTUnwrap(image.cgImage?.dataProvider?.data) as Data
+        XCTAssertGreaterThan(Set(pixels).count, 8, "\(name) must contain rendered content, not a blank image")
         let attachment = XCTAttachment(image: image)
         attachment.name = name
         attachment.lifetime = .keepAlways

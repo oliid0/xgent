@@ -263,10 +263,9 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                     throw MobileExecutionError.io("Missing bundled a-Shell resources: \(missing.joined(separator: ", "))")
                 }
                 try self.installBundledEnvironmentResources(onProgress: { phase, percent in
-                    self.trigger("install-progress", data: [
-                        "phase": phase,
-                        "percent": percent.map { $0 as Any } ?? NSNull(),
-                    ])
+                    var progress: JSObject = ["phase": phase]
+                    if let percent { progress["percent"] = percent }
+                    self.trigger("install-progress", data: progress)
                 }) {
                     try self.initializeBackendIfNeeded()
                     let workspace = try self.installationProbeWorkspace()

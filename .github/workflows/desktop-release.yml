@@ -1060,7 +1060,27 @@ jobs:
           xcrun simctl ui "$simulator_udid" content_size accessibility-extra-extra-extra-large
           sleep 2
           xcrun simctl io "$simulator_udid" screenshot "$RUNNER_TEMP/xgent-ios-dark-large-smoke.png"
+          xcrun simctl ui "$simulator_udid" appearance light
+          xcrun simctl ui "$simulator_udid" content_size large
           xcrun simctl terminate "$simulator_udid" "$bundle_id"
+
+          smoke_project="$RUNNER_TEMP/xgent-ios-ui-smoke"
+          mkdir -p "$smoke_project"
+          cp -R scripts/release/ios-ui-smoke/. "$smoke_project/"
+          xcodegen generate --spec "$smoke_project/project.yml" --project "$smoke_project"
+          xcodebuild test -project "$smoke_project/XgentIOSSmoke.xcodeproj" \
+            -scheme XgentIOSSmoke -destination "platform=iOS Simulator,id=$simulator_udid" \
+            -resultBundlePath "$RUNNER_TEMP/xgent-ios-interactions.xcresult" \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/xgent-ios-interactions.log"
+
+      - name: Export iOS interaction evidence
+        if: always() && (github.event_name == 'push' || inputs.publish == true || inputs.smoke == true)
+        shell: bash
+        run: |
+          if [ -d "$RUNNER_TEMP/xgent-ios-interactions.xcresult" ]; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/xgent-ios-interactions.xcresult" \
+              --output-path "$RUNNER_TEMP/xgent-ios-interactions"
+          fi
 
       - name: Upload iOS launch evidence
         if: always() && (github.event_name == 'push' || inputs.publish == true || inputs.smoke == true)
@@ -1072,6 +1092,7 @@ jobs:
             ${{ runner.temp }}/xgent-ios*-smoke.png
             ${{ runner.temp }}/xgent-ios-*.log
             ${{ runner.temp }}/xgent-ios-crashes
+            ${{ runner.temp }}/xgent-ios-interactions
           if-no-files-found: warn
           retention-days: 7
 
