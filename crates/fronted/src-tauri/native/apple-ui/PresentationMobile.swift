@@ -545,6 +545,7 @@ private struct XgentIOSPageHeader: View {
 struct XgentIOSSheetPresentation: View {
     let initialDocument: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var document: XgentDocument {
         // A sheet's route updates retain its surface ID. Resolve only that
         // surface so an unrelated sheet cannot replace this sheet's content.
@@ -571,46 +572,83 @@ struct XgentIOSSheetPresentation: View {
         list == nil ? [.large] : [.fraction(0.62), .large]
     }
 
-    private var header: some View {
-        HStack(spacing: 8) {
-            if let back {
-                Button { model.send(back, in: document) } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .modifier(XgentIOSNavigationControl())
-                .accessibilityLabel(back.label ?? "Back")
-                .accessibilityIdentifier(back.id)
-            } else {
-                Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+    @ViewBuilder private var leadingNavigation: some View {
+        if let back {
+            Button { model.send(back, in: document) } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
-            Text(document.title)
-                .font(.headline)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .accessibilityAddTraits(.isHeader)
-            if let saveStatus, back != nil {
-                Text(saveStatus.text ?? "")
-                    .font(.subheadline)
-                    .foregroundStyle(saveStatus.secondary == true ? Color.secondary : Color.red)
-                    .lineLimit(2)
-                    .frame(minWidth: 44, maxWidth: 96)
-            } else if document.dismissAction != nil {
-                Button { model.dismiss(document) } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .contentShape(Circle())
+            .buttonStyle(.plain)
+            .modifier(XgentIOSNavigationControl())
+            .accessibilityLabel(back.label ?? "Back")
+            .accessibilityIdentifier(back.id)
+        } else {
+            Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+        }
+    }
+
+    @ViewBuilder private var trailingNavigation: some View {
+        if document.dismissAction != nil && (saveStatus == nil || back == nil) {
+            Button { model.dismiss(document) } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .modifier(XgentIOSNavigationControl())
+            .accessibilityLabel(Text("Close"))
+        } else {
+            Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+        }
+    }
+
+    private var title: some View {
+        Text(document.title)
+            .font(.headline)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func statusText(_ node: XgentNode) -> some View {
+        Text(node.text ?? "")
+            .font(.subheadline)
+            .foregroundStyle(node.secondary == true ? Color.secondary : Color.red)
+            .accessibilityIdentifier(node.id)
+    }
+
+    private var header: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 8) {
+                    HStack {
+                        leadingNavigation
+                        Spacer(minLength: 0)
+                        trailingNavigation
+                    }
+                    title.fixedSize(horizontal: false, vertical: true)
+                    if let saveStatus, back != nil {
+                        statusText(saveStatus)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                .buttonStyle(.plain)
-                .modifier(XgentIOSNavigationControl())
-                .accessibilityLabel(Text("Close"))
             } else {
-                Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+                HStack(spacing: 8) {
+                    leadingNavigation
+                    title.lineLimit(2)
+                    if let saveStatus, back != nil {
+                        statusText(saveStatus)
+                            .lineLimit(2)
+                            .frame(minWidth: 44, maxWidth: 96)
+                    } else {
+                        trailingNavigation
+                    }
+                }
             }
         }
         .frame(minHeight: 68)

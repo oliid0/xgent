@@ -24,7 +24,7 @@ def matches(node, labels):
     return any(node.get(key, "").strip() in labels for key in ("text", "content-desc"))
 
 
-def tap(labels, timeout=30, scroll=False):
+def tap(labels, timeout=30, scroll=False, scroll_direction="down"):
     deadline = time.monotonic() + timeout
     swipes = 0
     size = adb("shell", "wm", "size").decode()
@@ -42,9 +42,14 @@ def tap(labels, timeout=30, scroll=False):
                 adb("shell", "input", "tap", str((left + right) // 2), str((top + bottom) // 2))
                 time.sleep(1)
                 return
-        if scroll and swipes < 6:
-            adb("shell", "input", "swipe", str(width // 2), str(height * 3 // 4),
-                str(width // 2), str(height // 3), "400")
+        if scroll and swipes < 12:
+            start_y, end_y = (
+                (height // 3, height * 3 // 4)
+                if scroll_direction == "up"
+                else (height * 3 // 4, height // 3)
+            )
+            adb("shell", "input", "swipe", str(width // 2), str(start_y),
+                str(width // 2), str(end_y), "400")
             swipes += 1
         time.sleep(1)
     raise AssertionError(f"No enabled visible control: {labels}")
@@ -102,7 +107,7 @@ if any(matches(node, {"安装基础环境", "Install base environment"}) for nod
 tap({"刷新状态", "Refresh status"}, timeout=300)
 tap({"Linux essentials"}, scroll=True)
 tap({"Python and pip"}, scroll=True)
-tap({"安装所选能力包", "Install selected packs"}, scroll=True)
+tap({"安装所选能力包", "Install selected packs"}, scroll=True, scroll_direction="up")
 tap({"返回设置", "Back to Settings"}, timeout=300)
 tap({"返回对话", "Back to Chat"})
 tap({"工作工具", "Workspace tools"})

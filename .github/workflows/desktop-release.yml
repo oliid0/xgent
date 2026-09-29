@@ -904,10 +904,15 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          export SDKROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
-          export CPP="$(xcrun --sdk iphoneos --find clang) -E"
+          SDKROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
+          export SDKROOT
           log="$RUNNER_TEMP/xgent-ios-build.log"
           if ! pnpm tauri ios build --ci --no-sign --target aarch64 --build-number "${{ github.run_number }}" --config "$XGENT_TAURI_VERSION_CONFIG" 2>&1 | tee "$log"; then
+            config_log="$(find "$GITHUB_WORKSPACE/target/aarch64-apple-ios" -path '*/libsodium-stable/config.log' -print -quit 2>/dev/null || true)"
+            if [ -n "$config_log" ]; then
+              grep -n -B25 -A55 'C preprocessor' "$config_log" | tail -n 150 > "$RUNNER_TEMP/xgent-ios-libsodium-preprocessor.log" || true
+              cat "$RUNNER_TEMP/xgent-ios-libsodium-preprocessor.log"
+            fi
             message="$(tail -n 240 "$log")"
             message="${message//'%'/'%25'}"
             message="${message//$'\r'/'%0D'}"

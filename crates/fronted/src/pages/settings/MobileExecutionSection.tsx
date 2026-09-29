@@ -303,30 +303,8 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
             {status?.installed && status.toolchains.length > 0 ? (
               <VStack gap={3}>
                 <Heading level={4}>{t("settings.mobileCapabilityPacks")}</Heading>
-                <Grid columns={{ minWidth: 240, max: 2, repeat: "fit" }} gap={2} width="100%">
-                  {status.toolchains.map((toolchain) => {
-                    const checked = toolchain.installed || selected.includes(toolchain.id);
-                    return (
-                      <CheckboxInput
-                        key={toolchain.id}
-                        label={toolchain.label}
-                        description={toolchain.detail || undefined}
-                        value={checked}
-                        isDisabled={toolchain.installed || !toolchain.installable || busy !== ""}
-                        onChange={() =>
-                          setSelected((current) =>
-                            current.includes(toolchain.id)
-                              ? current.filter((id) => id !== toolchain.id)
-                              : [...current, toolchain.id],
-                          )
-                        }
-                        size="sm"
-                      />
-                    );
-                  })}
-                </Grid>
                 {pendingToolchains.length > 0 ? (
-                  <HStack gap={2} wrap="wrap">
+                  <HStack gap={2} wrap="wrap" className="mobile-execution-install-bar">
                     <Button
                       type="button"
                       label={
@@ -351,6 +329,28 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
                     ) : null}
                   </HStack>
                 ) : null}
+                <Grid columns={{ minWidth: 240, max: 2, repeat: "fit" }} gap={2} width="100%">
+                  {status.toolchains.map((toolchain) => {
+                    const checked = toolchain.installed || selected.includes(toolchain.id);
+                    return (
+                      <CheckboxInput
+                        key={toolchain.id}
+                        label={toolchain.label}
+                        description={toolchain.detail || undefined}
+                        value={checked}
+                        isDisabled={toolchain.installed || !toolchain.installable || busy !== ""}
+                        onChange={() =>
+                          setSelected((current) =>
+                            current.includes(toolchain.id)
+                              ? current.filter((id) => id !== toolchain.id)
+                              : [...current, toolchain.id],
+                          )
+                        }
+                        size="sm"
+                      />
+                    );
+                  })}
+                </Grid>
               </VStack>
             ) : null}
 
