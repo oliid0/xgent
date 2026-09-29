@@ -73,7 +73,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
       group.children.map((node) => node.id),
     ]),
     [
-      ["mobile-theme", "settings.native.theme", ["theme", "appearance-preset"]],
+      ["mobile-theme", "settings.native.theme", ["theme", "appearance-preset", "appearance-customized"]],
       ["mobile-appearance", "settings.mobile.appearanceGroup", ["nav:system", "nav:providers"]],
       ["mobile-personal", "settings.mobile.personalGroup", ["nav:soul", "nav:memory", "nav:skills"]],
       ["mobile-capabilities", "settings.mobile.capabilitiesGroup", [
@@ -90,6 +90,18 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(settings.theme, "light");
   assert.equal((await dispatch("appearance-preset", "stone")).ok, true);
   assert.equal(settings.customSettings.appearance.preset, "stone");
+  assert.equal((await dispatch("appearance-customized", true)).ok, true);
+  assert.deepEqual(
+    document.nodes.find((node) => node.id === "mobile-theme").children.slice(-2).map((node) => node.id),
+    ["accent-light", "accent-dark"],
+  );
+  assert.equal((await dispatch("accent-light", "#ABCDEF")).ok, true);
+  assert.equal((await dispatch("accent-dark", "#123456")).ok, true);
+  assert.equal(settings.customSettings.appearance.accentLight, "#abcdef");
+  assert.equal(settings.customSettings.appearance.accentDark, "#123456");
+  assert.equal((await dispatch("appearance-preset", "matcha")).ok, true);
+  assert.equal(settings.customSettings.appearance.customized, false);
+  assert.ok(!document.nodes.find((node) => node.id === "mobile-theme").children.some((node) => node.id === "accent-light"));
   await dispatch("nav:system");
   assert.ok(document.nodes.some((node) => node.id === "save-status"));
   assert.equal((await dispatch("language", "zh-CN")).ok, true);

@@ -531,6 +531,13 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const visible = (id: SectionId) => !props.hiddenSections?.includes(id);
 
   if (!page && nativeMobile) {
+    const appearance = settings.customSettings.appearance;
+    const updateAppearance = (patch: Partial<typeof appearance>) =>
+      setSettings((previous) =>
+        updateCustomSettings(previous, {
+          appearance: { ...previous.customSettings.appearance, ...patch },
+        }),
+      );
     nodes.push(
       c.group("mobile-theme", t("settings.native.theme"), [
         c.select(
@@ -548,7 +555,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         c.select(
           "appearance-preset",
           t("settings.ui.preset"),
-          settings.customSettings.appearance.preset,
+          appearance.preset,
           UI_THEME_PRESETS.map((value) => ({
             value,
             label:
@@ -559,16 +566,33 @@ export function NativeSettingsPage(props: SettingsPageProps) {
                   : "Matcha",
           })),
           (preset) =>
-            setSettings((previous) =>
-              updateCustomSettings(previous, {
-                appearance: {
-                  ...previous.customSettings.appearance,
-                  preset: preset as typeof previous.customSettings.appearance.preset,
-                  customized: false,
-                },
-              }),
-            ),
+            updateAppearance({
+              preset: preset as typeof appearance.preset,
+              customized: false,
+            }),
         ),
+        c.toggle(
+          "appearance-customized",
+          t("settings.ui.customize"),
+          appearance.customized,
+          (customized) => updateAppearance({ customized }),
+        ),
+        ...(appearance.customized
+          ? [
+              c.color(
+                "accent-light",
+                t("settings.ui.accentLight"),
+                appearance.accentLight,
+                (accentLight) => updateAppearance({ accentLight }),
+              ),
+              c.color(
+                "accent-dark",
+                t("settings.ui.accentDark"),
+                appearance.accentDark,
+                (accentDark) => updateAppearance({ accentDark }),
+              ),
+            ]
+          : []),
       ]),
       c.group("mobile-appearance", t("settings.mobile.appearanceGroup"), [
         ...(visible("system")
@@ -1184,13 +1208,13 @@ export function NativeSettingsPage(props: SettingsPageProps) {
               },
             ]
           : []),
-        ...(!shell?.available && shell?.detail
+        ...(!shell?.installed && shell?.detail
           ? [
               {
                 id: "shell-detail",
                 kind: "Banner" as const,
                 label: shell.detail,
-                status: "error" as const,
+                status: shell.available ? ("paused" as const) : ("error" as const),
               },
             ]
           : []),
