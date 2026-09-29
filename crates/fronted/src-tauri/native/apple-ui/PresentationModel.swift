@@ -289,7 +289,7 @@ final class XgentPresentationModel: ObservableObject {
     @Published private(set) var busy: Set<String> = []
     @Published var error: String?
     weak var webview: WKWebView?
-    var actionSink: ((XgentAction) -> Void)?
+    var actionSink: (@MainActor (XgentAction) -> Void)?
     private var revisions: [String: Int] = [:]
     private var pending: [String: (surface: String, node: String, revision: Int)] = [:]
     private var editRequests: [String: String] = [:]
