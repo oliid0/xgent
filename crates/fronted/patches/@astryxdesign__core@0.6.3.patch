@@ -106,3 +106,23 @@ index 789ed303b34cfaf817f75a48d701911b8e960db3..c09d2280e17e837e1c41b46e487376fe
      presentation = 'popover',
      isDefaultOpen = false,
      'data-testid': testId,
+diff --git a/dist/CodeBlock/CodeBlock.js b/dist/CodeBlock/CodeBlock.js
+--- a/dist/CodeBlock/CodeBlock.js
++++ b/dist/CodeBlock/CodeBlock.js
+@@ -444,6 +444,7 @@ export function CodeBlock({
+   className,
+   style,
+   ref,
++  'aria-label': ariaLabel,
+   ...props
+ }) {
+   const t = useTranslator();
+@@ -574,7 +575,7 @@ export function CodeBlock({
+     ,
+     tabIndex: 0,
+     role: "group",
+-    "aria-label": languageLabel ?? t('@astryx.codeBlock.code'),
++    "aria-label": ariaLabel ?? languageLabel ?? t('@astryx.codeBlock.code'),
+     ...mergeProps({
+       className: "xw2csxc x1odjw0f"
+     }, {

@@ -97,6 +97,8 @@ deadline = time.monotonic() + 45
 while time.monotonic() < deadline:
     nodes = list(snapshot().iter("node"))
     if any(matches(node, {"退出码：0", "Exit code: 0"}) for node in nodes):
+        assert any(matches(node, {"stdout:\nxgent-shell-ok"}) for node in nodes), \
+            "The native Shell must expose actual stdout, not just echo the command"
         break
     time.sleep(1)
 else:

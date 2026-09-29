@@ -191,6 +191,8 @@ test("mobile terminal presents ANSI output and CR progress as readable text on b
   android.find("TextInput").props.onChange("printf output");
   await android.find("HStack", value => value.as === "form").props.onSubmit({ preventDefault() {} });
   assert.equal(android.find("CodeBlock", value => value.title === "stdout")?.props.code, readable);
+  assert.equal(android.find("CodeBlock", value => value.title === "stdout")?.props["aria-label"],
+    `stdout:\n${readable}`);
 });
 
 test("old terminal results and errors cannot overwrite a new workspace run", async () => {

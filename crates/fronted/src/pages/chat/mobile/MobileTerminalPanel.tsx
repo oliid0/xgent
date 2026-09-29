@@ -629,6 +629,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
                       {stdout ? (
                         <CodeBlock
                           code={stdout}
+                          aria-label={`stdout:\n${stdout}`}
                           language="plaintext"
                           title="stdout"
                           size="sm"
@@ -641,6 +642,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
                       {stderr ? (
                         <CodeBlock
                           code={stderr}
+                          aria-label={`stderr:\n${stderr}`}
                           language="plaintext"
                           title="stderr"
                           size="sm"
@@ -653,6 +655,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
                       {entry.error ? (
                         <CodeBlock
                           code={entry.error}
+                          aria-label={`error:\n${entry.error}`}
                           language="plaintext"
                           title="error"
                           size="sm"
