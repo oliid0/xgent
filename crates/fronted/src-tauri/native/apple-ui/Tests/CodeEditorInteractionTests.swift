@@ -2,29 +2,21 @@
 import Foundation
 import SwiftUI
 import UIKit
-import WebKit
 import XCTest
 @testable import XgentNativeUI
 
 @MainActor
-private final class CodeActionWebView: WKWebView {
-    var actions: [[String: Any]] = []
-    override func callAsyncJavaScript(
-        _ functionBody: String, arguments: [String: Any], in frame: WKFrameInfo?,
-        in contentWorld: WKContentWorld,
-        completionHandler: (@MainActor @Sendable (Result<Any, any Error>) -> Void)? = nil
-    ) {
-        if let action = arguments["action"] as? [String: Any] { actions.append(action) }
-        completionHandler?(.success(true))
-    }
+private final class CodeActionRecorder {
+    var actions: [XgentAction] = []
+    func record(_ action: XgentAction) { actions.append(action) }
 }
 
 final class CodeEditorInteractionTests: XCTestCase {
     @MainActor
     func testNativeTypingUsesTheRealEditBridgeAndAcknowledgementsKeepTheCaret() async throws {
         let model = XgentPresentationModel()
-        let bridge = CodeActionWebView()
-        model.webview = bridge
+        let bridge = CodeActionRecorder()
+        model.actionSink = bridge.record
         let initial = try document(content: "let message = \"Hello\"")
         model.update(initial)
         let (window, _) = mounted(model)
@@ -42,11 +34,11 @@ final class CodeEditorInteractionTests: XCTestCase {
         try await settle()
         let expected = "let message = \"Hello\"" + suffix
         let action = try XCTUnwrap(bridge.actions.last)
-        XCTAssertEqual(action["action"] as? String, "edit")
-        XCTAssertEqual(action["surface"] as? String, "editor")
-        XCTAssertEqual(action["value"] as? String, expected)
+        XCTAssertEqual(action.action, "edit")
+        XCTAssertEqual(action.surface, "editor")
+        XCTAssertEqual(action.value, .string(expected))
         let cursor = input.selectedRange
-        model.complete(XgentActionResult(surface: "editor", requestId: try XCTUnwrap(action["requestId"] as? String),
+        model.complete(XgentActionResult(surface: "editor", requestId: action.requestId,
                                          ok: true, error: nil, acceptedValue: .string(expected)))
         model.update(try document(revision: 2, content: expected))
         try await settle()
@@ -59,8 +51,8 @@ final class CodeEditorInteractionTests: XCTestCase {
     @MainActor
     func testDisabledCodeEditorRemovesTheEditableViewAndRejectsItsLateCallback() async throws {
         let model = XgentPresentationModel()
-        let bridge = CodeActionWebView()
-        model.webview = bridge
+        let bridge = CodeActionRecorder()
+        model.actionSink = bridge.record
         model.update(try document(content: "let count = 1"))
         let (window, _) = mounted(model)
         defer { window.isHidden = true; window.rootViewController = nil }
@@ -83,8 +75,8 @@ final class CodeEditorInteractionTests: XCTestCase {
     @MainActor
     func testFileSurfaceChangeResetsSelectionAndScalesTheCodeFont() async throws {
         let model = XgentPresentationModel()
-        let bridge = CodeActionWebView()
-        model.webview = bridge
+        let bridge = CodeActionRecorder()
+        model.actionSink = bridge.record
         model.update(try document(content: "let longName = 12345"))
         let (window, controller) = mounted(model)
         defer { window.isHidden = true; window.rootViewController = nil }
