@@ -127,9 +127,9 @@ def run_terminal(command, expected_output=None, expected_exit=0, clear=True, exa
         if returned:
             if expected_output is not None:
                 outputs = [
-                    node.get(key, "")[len("stdout:\n"):].strip()
+                    match.group(1).strip()
                     for node in nodes for key in ("text", "content-desc")
-                    if node.get(key, "").startswith("stdout:\n")
+                    if (match := re.fullmatch(r"stdout:\s*(.*)", node.get(key, "").strip(), re.DOTALL))
                 ]
                 assert any(
                     output == expected_output if exact else expected_output in output

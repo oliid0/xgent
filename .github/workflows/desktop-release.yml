@@ -870,9 +870,19 @@ jobs:
           command -v pod
           xcodegen --version
           pod --version
+          # Tauri invokes Xcode build scripts that resolve the SDK through the
+          # system selection. The Intel image otherwise supplies iOS 18.5 from
+          # its default Xcode even when DEVELOPER_DIR points at Xcode 26.3.
+          sudo xcode-select --switch "$DEVELOPER_DIR"
           xcode-select -p
           xcodebuild -version
           xcrun swift --version
+          ios_sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
+          case "$ios_sdk" in
+            "$DEVELOPER_DIR"/*) ;;
+            *) echo "Wrong iOS SDK: $ios_sdk" >&2; exit 1 ;;
+          esac
+          test -d "$ios_sdk"
 
       - name: Initialize Tauri iOS project
         working-directory: crates/fronted
@@ -894,6 +904,8 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          export SDKROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
+          export CPP="$(xcrun --sdk iphoneos --find clang) -E"
           log="$RUNNER_TEMP/xgent-ios-build.log"
           if ! pnpm tauri ios build --ci --no-sign --target aarch64 --build-number "${{ github.run_number }}" --config "$XGENT_TAURI_VERSION_CONFIG" 2>&1 | tee "$log"; then
             message="$(tail -n 240 "$log")"
