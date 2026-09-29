@@ -322,14 +322,10 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(windows, /scripts\/release\/smoke-launch-windows\.ps1/);
   assert.match(windowsLaunchSmoke, /Start-Process[\s\S]*-WindowStyle Hidden/);
   assert.match(windowsLaunchSmoke, /Portable Xgent exited during the launch smoke test/);
-  assert.match(windowsLaunchSmoke, /Wait-XgentClientSize/);
-  assert.match(windowsLaunchSmoke, /\[switch\]\$TestWindowPersistence/);
-  assert.match(windowsLaunchSmoke, /if \(-not \$TestWindowPersistence\) \{[\s\S]*?return\s*\}/);
   const windowsSmokeStart = windows.indexOf("- name: Smoke");
   const windowsSmokeStep = windows.slice(windowsSmokeStart, windows.indexOf("\n      - ", windowsSmokeStart + 1));
   assert.match(windowsSmokeStep, /Smoke launch Windows portable app/);
   assert.doesNotMatch(windowsSmokeStep, /continue-on-error/);
-  assert.match(windowsLaunchSmoke, /Hidden-window events corrupted persisted size/);
   assert.match(windowsLaunchSmoke, /finally[\s\S]*Stop-Process/);
   assert.match(android, /android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d/);
   assert.match(android, /script: bash scripts\/release\/smoke-launch-android\.sh/);

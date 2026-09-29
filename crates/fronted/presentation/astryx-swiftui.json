@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "astryxVersion": "0.6.0",
+  "astryxVersion": "0.6.3",
   "rendering": {
     "applicationUI": "SwiftUI",
     "webContent": "WebKitOnly",

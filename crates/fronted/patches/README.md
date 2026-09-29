@@ -1,7 +1,7 @@
-# Astryx 0.6.0 layer compatibility
+# Astryx 0.6.3 layer compatibility
 
 The unified Astryx frontend runs inside each non-Apple device's system WebView.
-Astryx 0.6.0 requires the Popover API and CSS `position-area` with logical self alignment.
+Astryx 0.6.3 requires the Popover API and CSS `position-area` with logical self alignment.
 On older engines, closed menus/tooltips can enter normal layout and obscure
 controls. Chromium 124 has Popover support but lacks the required positioning.
 
@@ -17,15 +17,15 @@ The CSS Anchor Positioning polyfill is not an equivalent drop-in replacement:
 its documented limitations include dynamically added/removed anchors and targets,
 and unsupported anchor properties assigned through React inline styles.
 
-Astryx 0.6.0 improves its no-Popover fallback, but its built-in context layers
+Astryx 0.6.3 retains its no-Popover fallback, but its built-in context layers
 still use inline `positionArea`/`positionTryFallbacks` and do not provide an
 application-wide geometry fallback. The exact-version patch is therefore still
 required for the project's older supported Chromium/WebView engines.
 
-Sources checked on 2026-09-12:
+Sources checked on 2026-09-28:
 
-- Astryx MCP `get("useLayer")`, the 0.6.0 npm package, and
-  `dist/Layer/useLayer.js` from both 0.5.4 and 0.6.0.
+- Astryx MCP `get("Selector")` and `get("BottomSheet")`, the 0.6.3 npm package,
+  and `dist/Layer/useLayer.js` from 0.6.0 and 0.6.3.
 - https://github.com/oddbird/css-anchor-positioning#limitations
 - https://github.com/oddbird/popover-polyfill
 - https://floating-ui.com/docs/autoUpdate

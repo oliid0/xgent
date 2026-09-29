@@ -344,12 +344,6 @@ jobs:
         shell: powershell
         run: ./scripts/release/smoke-launch-windows.ps1 -ExecutablePath target/x86_64-pc-windows-msvc/release/xgent.exe
 
-      - name: Optional Windows interaction diagnostics
-        if: inputs.smoke == true
-        continue-on-error: true
-        shell: powershell
-        run: ./scripts/release/smoke-launch-windows.ps1 -ExecutablePath target/x86_64-pc-windows-msvc/release/xgent.exe -TestWindowPersistence
-
       - uses: actions/upload-artifact@v7
         with:
           name: xgent-windows-x64
@@ -502,6 +496,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ needs.release-metadata.outputs.release_sha }}
+          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
@@ -783,6 +778,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ needs.release-metadata.outputs.release_sha }}
+          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:

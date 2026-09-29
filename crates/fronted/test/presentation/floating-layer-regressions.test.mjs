@@ -6,7 +6,7 @@ const readSource = (relativePath) =>
   readFileSync(new URL(`../../${relativePath}`, import.meta.url), "utf8");
 
 const compatibilitySource = readSource("src/lib/system/layerCompatibility.ts");
-const packagePatch = readSource("patches/@astryxdesign__core@0.6.0.patch");
+const packagePatch = readSource("patches/@astryxdesign__core@0.6.3.patch");
 const stylesSource = readSource("src/index.css");
 const themeSource = readSource("src/theme/xgentTheme.ts");
 const glassThemeSource = readSource("src/theme/glassTheme.ts");

@@ -1,20 +1,11 @@
 import Foundation
-import WebKit
 import XCTest
 @testable import XgentNativeUI
 
 @MainActor
-private final class ActionWebView: WKWebView {
-    var actions: [[String: Any]] = []
-
-    override func callAsyncJavaScript(
-        _ functionBody: String, arguments: [String: Any], in frame: WKFrameInfo?,
-        in contentWorld: WKContentWorld,
-        completionHandler: (@MainActor @Sendable (Result<Any, any Error>) -> Void)? = nil
-    ) {
-        if let action = arguments["action"] as? [String: Any] { actions.append(action) }
-        completionHandler?(.success(true))
-    }
+private final class ActionRecorder {
+    var actions: [XgentAction] = []
+    func record(_ action: XgentAction) { actions.append(action) }
 }
 
 final class PresentationModelTests: XCTestCase {
@@ -24,8 +15,8 @@ final class PresentationModelTests: XCTestCase {
                         try document(2, value: "Current", focusRequest: 0),
                         try document(2, value: "Current", action: "replacement")] {
             let model = XgentPresentationModel()
-            let webview = ActionWebView()
-            model.webview = webview
+            let webview = ActionRecorder()
+            model.actionSink = webview.record
             let initial = try document(1, value: "Initial")
             model.update(initial)
             model.update(current)
@@ -38,8 +29,8 @@ final class PresentationModelTests: XCTestCase {
     @MainActor
     func testNormalizedAcknowledgementBeforeDocumentDoesNotObscureLaterClear() throws {
         let model = XgentPresentationModel()
-        let webview = ActionWebView()
-        model.webview = webview
+        let webview = ActionRecorder()
+        model.actionSink = webview.record
         let initial = try document(1, value: "")
         let input = try XCTUnwrap(initial.node(id: "input"))
         model.update(initial)
@@ -55,8 +46,8 @@ final class PresentationModelTests: XCTestCase {
     @MainActor
     func testNormalizedDocumentBeforeAcknowledgementReconcilesAndRestoresDraft() throws {
         let model = XgentPresentationModel()
-        let webview = ActionWebView()
-        model.webview = webview
+        let webview = ActionRecorder()
+        model.actionSink = webview.record
         let initial = try document(1, value: "")
         let input = try XCTUnwrap(initial.node(id: "input"))
         model.update(initial)
@@ -72,8 +63,8 @@ final class PresentationModelTests: XCTestCase {
     @MainActor
     func testOlderAcknowledgementCannotReplaceNewerTyping() throws {
         let model = XgentPresentationModel()
-        let webview = ActionWebView()
-        model.webview = webview
+        let webview = ActionRecorder()
+        model.actionSink = webview.record
         let initial = try document(1, value: "")
         let input = try XCTUnwrap(initial.node(id: "input"))
         model.update(initial)
@@ -91,8 +82,8 @@ final class PresentationModelTests: XCTestCase {
     @MainActor
     func testRemovedSurfaceDropsEditsAndIgnoresDelayedAcknowledgement() throws {
         let model = XgentPresentationModel()
-        let webview = ActionWebView()
-        model.webview = webview
+        let webview = ActionRecorder()
+        model.actionSink = webview.record
         let initial = try document(1, value: "")
         model.update(initial)
         model.send(try XCTUnwrap(initial.node(id: "input")), in: initial,
@@ -157,8 +148,8 @@ final class PresentationModelTests: XCTestCase {
     @MainActor
     func testAttachmentOwnerSurvivesOrdinaryDocumentUpdatesAndEmitsTheCapturedAction() throws {
         let model = XgentPresentationModel()
-        let webview = ActionWebView()
-        model.webview = webview
+        let webview = ActionRecorder()
+        model.actionSink = webview.record
         let initial = try attachmentDocument(1, action: "attach:conversation:0")
         model.update(initial)
         let owner = XgentAttachmentOwner(node: try XCTUnwrap(initial.node(id: "attach")), document: initial, option: "files")
@@ -167,16 +158,19 @@ final class PresentationModelTests: XCTestCase {
         let files = [["fileName": "note.txt", "mimeType": "text/plain", "contentBase64": "aGk="]]
         try owner.send(files, in: model)
         XCTAssertEqual(webview.actions.count, 1)
-        XCTAssertEqual(webview.actions[0]["action"] as? String, "attach:conversation:0")
-        let value = try XCTUnwrap(webview.actions[0]["value"] as? String)
+        XCTAssertEqual(webview.actions[0].action, "attach:conversation:0")
+        guard case .string(let value) = webview.actions[0].value else {
+            XCTFail("Expected serialized attachment payload")
+            return
+        }
         XCTAssertEqual(try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [[String: String]], files)
     }
 
     @MainActor
     func testAttachmentOwnerRejectsChangedAndReturnedTargets() throws {
         let model = XgentPresentationModel()
-        let webview = ActionWebView()
-        model.webview = webview
+        let webview = ActionRecorder()
+        model.actionSink = webview.record
         let initial = try attachmentDocument(1, action: "attach:conversation:0")
         model.update(initial)
         let owner = XgentAttachmentOwner(node: try XCTUnwrap(initial.node(id: "attach")), document: initial, option: "files")
@@ -237,8 +231,8 @@ final class PresentationModelTests: XCTestCase {
     }
 
     @MainActor
-    private func acknowledgement(_ webview: ActionWebView, index: Int, value: String) throws -> XgentActionResult {
-        let request = try XCTUnwrap(webview.actions[index]["requestId"] as? String)
+    private func acknowledgement(_ webview: ActionRecorder, index: Int, value: String) throws -> XgentActionResult {
+        let request = webview.actions[index].requestId
         return XgentActionResult(surface: "test", requestId: request, ok: true, error: nil,
                                  acceptedValue: .string(value))
     }

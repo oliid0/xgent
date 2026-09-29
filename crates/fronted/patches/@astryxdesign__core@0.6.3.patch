@@ -1,4 +1,18 @@
+diff --git a/dist/BottomSheet/BottomSheet.js b/dist/BottomSheet/BottomSheet.js
+index d3206e18f02d1c45b68166b37943ba59659e428b..6cb3b392c82e0d99265dc8d970bd2a80ca3dcca1 100644
+--- a/dist/BottomSheet/BottomSheet.js
++++ b/dist/BottomSheet/BottomSheet.js
+@@ -177,7 +177,7 @@ function StandaloneBottomSheet({
+     dismissOnEscape();
+   }, [dismissOnEscape]);
+   const handleKeyDown = useCallback(event => {
+-    if (event.key !== 'Escape') {
++    if (event.key !== 'Escape' || event.defaultPrevented) {
+       return;
+     }
+     // Claim the key before reading it: an unclaimed Escape lets the browser
 diff --git a/dist/Layer/useLayer.js b/dist/Layer/useLayer.js
+index 58fb9f5c7f19bb4a75c07f8dc7f75518a8a41fbc..8a7e8d2e6eadbdb84c5316d33ad6589e7e0adf50 100644
 --- a/dist/Layer/useLayer.js
 +++ b/dist/Layer/useLayer.js
 @@ -13,6 +13,7 @@
@@ -34,7 +48,7 @@ diff --git a/dist/Layer/useLayer.js b/dist/Layer/useLayer.js
      const mount = {
        portalTarget,
        portalStyle: portalTarget ? readPortalWritingContext(sentinel, portalTarget) : {}
-@@ -482,6 +485,12 @@ function useLayerImplementation(options) {
+@@ -483,6 +486,12 @@ function useLayerImplementation(options) {
      }
    }, []);
    const popoverRefCallback = useCallback(el => {
@@ -55,7 +69,8 @@ diff --git a/dist/Layer/useLayer.js b/dist/Layer/useLayer.js
      // Keep the marker mounted after resolving the layer. Apart from giving
      // us the real JSX parent on first show, this lets its ref report when a
      // persistent hook's render call moves to a different host.
-@@ -536,6 +547,5 @@ function useLayerImplementation(options) {
+@@ -535,7 +546,6 @@ function useLayerImplementation(options) {
+     const {
        placement = 'above',
        alignment = 'center',
 -      positioning = 'anchor',
@@ -73,9 +88,10 @@ diff --git a/dist/Layer/useLayer.js b/dist/Layer/useLayer.js
        style: {
          ...stylexResult.style,
 diff --git a/dist/Selector/Selector.js b/dist/Selector/Selector.js
+index 789ed303b34cfaf817f75a48d701911b8e960db3..c09d2280e17e837e1c41b46e487376fee3ee5f55 100644
 --- a/dist/Selector/Selector.js
 +++ b/dist/Selector/Selector.js
-@@ -321,12 +321,12 @@ export function Selector(props) {
+@@ -324,12 +324,12 @@ export function Selector(props) {
      htmlName,
      renderOption,
      renderValue,
@@ -90,14 +106,3 @@ diff --git a/dist/Selector/Selector.js b/dist/Selector/Selector.js
      presentation = 'popover',
      isDefaultOpen = false,
      'data-testid': testId,
-diff --git a/dist/BottomSheet/BottomSheet.js b/dist/BottomSheet/BottomSheet.js
---- a/dist/BottomSheet/BottomSheet.js
-+++ b/dist/BottomSheet/BottomSheet.js
-@@ -178,6 +178,6 @@
-   }, [dismissOnEscape]);
-   const handleKeyDown = useCallback(event => {
--    if (event.key !== 'Escape') {
-+    if (event.key !== 'Escape' || event.defaultPrevented) {
-       return;
-     }
-     // Claim the key before reading it: an unclaimed Escape lets the browser

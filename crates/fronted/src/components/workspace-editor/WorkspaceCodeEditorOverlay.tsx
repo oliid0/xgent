@@ -522,17 +522,13 @@ export function WorkspaceCodeEditorOverlay(props: WorkspaceCodeEditorOverlayProp
     const runId = activeRunIdRef.current;
     if (!runId) return;
     setRunCancelError(null);
-    void invoke<{ cancelled: boolean }>("shell_cancel", { run_id: runId })
-      .then((response) => {
-        if (activeRunIdRef.current === runId && !response.cancelled) {
-          setRunCancelError(t("workspaceEditor.stopRunFailed"));
-        }
-      })
-      .catch((error) => {
-        if (activeRunIdRef.current === runId) {
-          setRunCancelError(toMessage(error, t("workspaceEditor.stopRunFailed")));
-        }
-      });
+    // `cancelled: false` also means the run has not registered yet; the backend
+    // remembers this request until registration, so only an IPC error is a failure.
+    void invoke("shell_cancel", { run_id: runId }).catch((error) => {
+      if (activeRunIdRef.current === runId) {
+        setRunCancelError(toMessage(error, t("workspaceEditor.stopRunFailed")));
+      }
+    });
   }, [t]);
 
   const readTab = useCallback(

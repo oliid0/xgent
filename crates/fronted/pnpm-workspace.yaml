@@ -5,4 +5,4 @@ allowBuilds:
   esbuild: true
   protobufjs: true
 patchedDependencies:
-  '@astryxdesign/core@0.6.0': patches/@astryxdesign__core@0.6.0.patch
+  '@astryxdesign/core@0.6.3': patches/@astryxdesign__core@0.6.3.patch

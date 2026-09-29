@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf};
@@ -23,6 +23,7 @@ const MAX_STDOUT_BYTES: usize = 400 * 1024; // 400KB
 const MAX_STDERR_BYTES: usize = 400 * 1024; // 400KB
 const TERMINATION_GRACE_MS: u64 = 300;
 const STREAM_EOF_GRACE_MS: u64 = 300;
+const MAX_EARLY_SHELL_CANCELLATIONS: usize = 256;
 
 /// Cancellation flag shared between the (possibly blocking) run body and the
 /// async cancel watchers. Blocking code polls `is_cancelled`; async code
@@ -62,17 +63,28 @@ pub(crate) type ShellCancelToken = Arc<ShellCancelFlag>;
 
 #[derive(Default)]
 pub(crate) struct ShellRunRegistry {
-    runs: Mutex<HashMap<String, ShellCancelToken>>,
+    state: Mutex<ShellRunRegistryState>,
+}
+
+#[derive(Default)]
+struct ShellRunRegistryState {
+    runs: HashMap<String, ShellCancelToken>,
+    early_cancellations: VecDeque<String>,
 }
 
 impl ShellRunRegistry {
     pub(crate) fn register(&self, run_id: &str) -> ShellCancelToken {
         let token = Arc::new(ShellCancelFlag::default());
-        let previous = self
-            .runs
-            .lock()
-            .expect("shell run registry poisoned")
-            .insert(run_id.to_string(), Arc::clone(&token));
+        let mut state = self.state.lock().expect("shell run registry poisoned");
+        if let Some(index) = state
+            .early_cancellations
+            .iter()
+            .position(|pending| pending == run_id)
+        {
+            state.early_cancellations.remove(index);
+            token.cancel();
+        }
+        let previous = state.runs.insert(run_id.to_string(), Arc::clone(&token));
         if let Some(previous) = previous {
             previous.cancel();
         }
@@ -80,26 +92,32 @@ impl ShellRunRegistry {
     }
 
     pub(crate) fn cancel(&self, run_id: &str) -> bool {
-        let Some(token) = self
-            .runs
-            .lock()
-            .expect("shell run registry poisoned")
-            .get(run_id)
-            .cloned()
-        else {
-            return false;
-        };
-        token.cancel();
-        true
+        let mut state = self.state.lock().expect("shell run registry poisoned");
+        if let Some(token) = state.runs.get(run_id) {
+            token.cancel();
+            return true;
+        }
+        // Independent Tauri/LAN invokes can arrive out of order. Keep a bounded
+        // tombstone so a command registered just after its cancellation starts
+        // with an already-cancelled token. The return value still means that an
+        // active command existed at this instant.
+        if !run_id.is_empty() && !state.early_cancellations.iter().any(|id| id == run_id) {
+            state.early_cancellations.push_back(run_id.to_string());
+            if state.early_cancellations.len() > MAX_EARLY_SHELL_CANCELLATIONS {
+                state.early_cancellations.pop_front();
+            }
+        }
+        false
     }
 
     pub(crate) fn unregister(&self, run_id: &str, token: &ShellCancelToken) {
-        let mut runs = self.runs.lock().expect("shell run registry poisoned");
-        let owns_registration = runs
+        let mut state = self.state.lock().expect("shell run registry poisoned");
+        let owns_registration = state
+            .runs
             .get(run_id)
             .is_some_and(|registered| Arc::ptr_eq(registered, token));
         if owns_registration {
-            runs.remove(run_id);
+            state.runs.remove(run_id);
         }
     }
 }
@@ -642,7 +660,6 @@ fn platform_shell_candidates(cmd: &str) -> Vec<ShellCandidate> {
     }
 }
 
-#[cfg(test)]
 fn default_platform_shell_profile() -> ShellExecutionProfile {
     platform_shell_candidates("")
         .into_iter()
@@ -1030,7 +1047,29 @@ pub(crate) fn run_shell_script_with_envs(
     let timeout = Duration::from_millis(effective_timeout_ms);
     let start = Instant::now();
 
-
+    // A LAN/WebView cancel may arrive before registration. Do not spawn a
+    // short-lived command that could complete its side effect before the
+    // cancellation check in the child polling loop.
+    if is_cancelled(cancel_token.as_ref()) {
+        let profile = default_platform_shell_profile();
+        return Ok(ShellRunResponse {
+            exit_code: -1,
+            shell: shell_basename(profile.display_shell),
+            platform: profile.platform.to_string(),
+            profile: profile.profile.to_string(),
+            shell_family: profile.shell_family.to_string(),
+            sandbox: None,
+            stdout: String::new(),
+            stderr: String::new(),
+            stdout_truncated: false,
+            stderr_truncated: false,
+            timed_out: false,
+            cancelled: true,
+            stdio_open_after_exit: false,
+            effective_timeout_ms,
+            duration_ms: start.elapsed().as_millis(),
+        });
+    }
 
     let sandbox_spec = match sandbox_options {
         Some(options) => {
@@ -1152,7 +1191,8 @@ mod tests {
         default_platform_shell_profile, is_loader_failure_exit, normalize_timeout_ms,
         run_shell_script, run_shell_script_with_envs, sandbox_probe_verdict,
         sanitize_rel_path_core, ShellRunRegistry,
-        DEFAULT_SHELL_TIMEOUT_MS, MAX_SHELL_TIMEOUT_MS, MIN_SHELL_TIMEOUT_MS,
+        DEFAULT_SHELL_TIMEOUT_MS, MAX_EARLY_SHELL_CANCELLATIONS, MAX_SHELL_TIMEOUT_MS,
+        MIN_SHELL_TIMEOUT_MS,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -1339,6 +1379,53 @@ mod tests {
         assert!(token.is_cancelled());
         registry.unregister("run-1", &token);
         assert!(!registry.cancel("run-1"));
+    }
+
+    #[test]
+    fn shell_registry_remembers_cancellation_before_lan_run_registration() {
+        let registry = ShellRunRegistry::default();
+        assert!(!registry.cancel("remote-run"));
+        assert!(!registry.cancel("remote-run"));
+        let token = registry.register("remote-run");
+        assert!(token.is_cancelled());
+        registry.unregister("remote-run", &token);
+
+        let fresh = registry.register("remote-run");
+        assert!(!fresh.is_cancelled(), "early cancellation is consumed once");
+        registry.unregister("remote-run", &fresh);
+    }
+
+    #[test]
+    fn shell_run_cancelled_before_registration_never_spawns() {
+        let registry = ShellRunRegistry::default();
+        assert!(!registry.cancel("early-run"));
+        let token = registry.register("early-run");
+        let workdir = tempfile::tempdir().expect("workdir");
+        let marker = workdir.path().join("cancellation-marker.txt");
+        let response = run_shell_script(
+            workdir.path().display().to_string(),
+            "echo touched > cancellation-marker.txt".to_string(),
+            None,
+            Some(10_000),
+            None,
+            None,
+            Some(token),
+        )
+        .expect("cancelled result");
+        assert!(response.cancelled);
+        assert!(!marker.exists(), "pre-cancelled commands must not run");
+    }
+
+    #[test]
+    fn shell_registry_bounds_early_cancellations() {
+        let registry = ShellRunRegistry::default();
+        for index in 0..=MAX_EARLY_SHELL_CANCELLATIONS {
+            assert!(!registry.cancel(&format!("run-{index}")));
+        }
+        let evicted = registry.register("run-0");
+        assert!(!evicted.is_cancelled());
+        let recent = registry.register(&format!("run-{MAX_EARLY_SHELL_CANCELLATIONS}"));
+        assert!(recent.is_cancelled());
     }
 
     #[test]

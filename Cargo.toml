@@ -13,4 +13,4 @@ members = [
 # which does not pass an iOS destination triple to SwiftPM. The adapter
 # keeps swift-rs' public crate identity while forwarding to the audited
 # XCFramework-aware implementation.
-swift-rs = { path = "crates/swift-rs-xcframework" }
+swift-rs = { path = "crates/mobile-execution/swift-rs-xcframework" }

@@ -289,6 +289,7 @@ final class XgentPresentationModel: ObservableObject {
     @Published private(set) var busy: Set<String> = []
     @Published var error: String?
     weak var webview: WKWebView?
+    var actionSink: ((XgentAction) -> Void)?
     private var revisions: [String: Int] = [:]
     private var pending: [String: (surface: String, node: String, revision: Int)] = [:]
     private var editRequests: [String: String] = [:]
@@ -299,6 +300,7 @@ final class XgentPresentationModel: ObservableObject {
     func invalidate() {
         active = false
         webview = nil
+        actionSink = nil
         pending.removeAll()
         editRequests.removeAll()
         acknowledgedEdits.removeAll()
@@ -411,6 +413,10 @@ final class XgentPresentationModel: ObservableObject {
     }
 
     private func emit(_ action: XgentAction) {
+        if let actionSink {
+            actionSink(action)
+            return
+        }
         guard let webview else {
             complete(XgentActionResult(surface: action.surface, requestId: action.requestId,
                                        ok: false, error: "The application connection is unavailable."))

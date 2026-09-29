@@ -114,6 +114,19 @@ fn link_native_ui(manifest_dir: &std::path::Path) {
         "SwiftPM did not produce the native UI static archive");
     println!("cargo:rustc-link-search=native={}", binary_path.trim());
     println!("cargo:rustc-link-search=native={}/usr/lib/swift", sdk.trim());
+    // Rust/cc performs the final link, so SwiftPM cannot add the toolchain's
+    // compatibility archives for us. They live alongside swiftc, not in the SDK.
+    let swiftc = Command::new("xcrun").args(["--find", "swiftc"])
+        .output().expect("locate Swift compiler");
+    assert!(swiftc.status.success(), "locate Swift compiler failed");
+    let swiftc = String::from_utf8(swiftc.stdout).expect("Swift compiler path");
+    let swift_usr = std::path::Path::new(swiftc.trim())
+        .parent().and_then(std::path::Path::parent)
+        .expect("Swift compiler is inside a toolchain usr/bin directory");
+    let swift_platform = if simulator { "iphonesimulator" } else if ios { "iphoneos" } else { "macosx" };
+    let compatibility_libraries = swift_usr.join("lib/swift").join(swift_platform);
+    assert!(compatibility_libraries.is_dir(), "Swift compatibility libraries missing: {}", compatibility_libraries.display());
+    println!("cargo:rustc-link-search=native={}", compatibility_libraries.display());
     println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/lib/swift");
     println!("cargo:rustc-link-lib=static=XgentNativeUI");
     let platform_ui = if ios { "UIKit" } else { "AppKit" };
