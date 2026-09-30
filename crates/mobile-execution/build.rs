@@ -1,5 +1,6 @@
 const COMMANDS: &[&str] = &[
     "status",
+    "set_alpine_mirror",
     "install",
     "install_toolchains",
     "list_external_workspaces",

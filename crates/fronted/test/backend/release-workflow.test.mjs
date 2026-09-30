@@ -92,6 +92,20 @@ function jobSource(name, nextName) {
   return workflow.slice(start, end);
 }
 
+test("mobile execution default permissions have generated command entries", () => {
+  const pluginBuild = readFileSync(path.join(repoRoot, "crates/mobile-execution/build.rs"), "utf8");
+  const defaults = readFileSync(
+    path.join(repoRoot, "crates/mobile-execution/permissions/default.toml"),
+    "utf8",
+  );
+  const commands = new Set(
+    [...pluginBuild.matchAll(/^\s*"([a-z_]+)",$/gm)].map((match) => match[1]),
+  );
+  for (const [, permission] of defaults.matchAll(/"allow-([a-z-]+)"/g)) {
+    assert.ok(commands.has(permission.replaceAll("-", "_")), `missing ${permission} command`);
+  }
+});
+
 test("desktop starts 15 percent smaller and migrates only the legacy default geometry", () => {
   for (const { name, config } of desktopWindowConfigs) {
     const mainWindow = config.app.windows[0];
