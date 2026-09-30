@@ -38,8 +38,21 @@ const DEFAULT_RECONCILE_INTERVAL_MS = 60_000;
 const DEFAULT_WORKDIRS_FALLBACK_MS = 300_000;
 const DEFAULT_WORKDIRS_DEBOUNCE_MS = 2_000;
 const DEFAULT_POSITION_LOCK_MS = 1_200;
+export const WORKSPACE_HISTORY_PAGE_SIZE = 10;
+
+export type SidebarHistoryState = {
+  cwd?: string;
+  limit: number;
+  totalCount: number;
+  hasMore: boolean;
+  loading: boolean;
+  loaded: boolean;
+  error: string | null;
+};
 
 export type SidebarSnapshot = {
+  workspaceHistory: ReadonlyMap<string, SidebarHistoryState>;
+  recentHistory: SidebarHistoryState;
   revision: number;
   scopeKey: string;
   conversations: readonly SidebarConversation[];
@@ -74,6 +87,8 @@ export type SidebarStore = {
   setScope(scope: SidebarScope): void;
   refresh(options?: { reason?: SidebarRefreshReason }): Promise<void>;
   loadMore(): Promise<void>;
+  loadWorkspaceHistory(cwd: string, more?: boolean): Promise<void>;
+  loadRecentHistory(more?: boolean): Promise<void>;
   refreshWorkdirs(reason: SidebarWorkdirsRefreshReason): Promise<void>;
   rename(id: string, title: string): Promise<boolean>;
   setPinned(id: string, isPinned: boolean): Promise<boolean>;
@@ -126,6 +141,15 @@ export function createSidebarStore(
   let running = new Map<string, { workdir: string | null; updatedAt: number }>();
   const positionLocks = new Map<string, number>();
   let snapshot: SidebarSnapshot = {
+    workspaceHistory: new Map(),
+    recentHistory: {
+      limit: pageSize,
+      totalCount: 0,
+      hasMore: false,
+      loading: false,
+      loaded: false,
+      error: null,
+    },
     revision: 0,
     scopeKey: sidebarScopeKey(scope),
     conversations: [],
@@ -170,6 +194,101 @@ export function createSidebarStore(
     snapshot = { ...snapshot, ...patch, revision: snapshot.revision + 1 };
     for (const listener of listeners) {
       listener();
+    }
+  };
+
+  // Each lane reads a prefix of its own scope. A fresh prefix avoids offset
+  // skips when another device pins or deletes a conversation between pages.
+  let historyGeneration = 0;
+  const loadHistory = async (historyScope: SidebarScope, more = false) => {
+    const key = historyScope.kind === "workdir" ? workspaceProjectPathKey(historyScope.cwd) : "";
+    if (historyScope.kind === "workdir" && !key) return;
+    const previous = key ? snapshot.workspaceHistory.get(key) : snapshot.recentHistory;
+    if (previous?.loading) return;
+    const limit =
+      (previous?.limit ?? WORKSPACE_HISTORY_PAGE_SIZE) +
+      (more && previous?.loaded ? WORKSPACE_HISTORY_PAGE_SIZE : 0);
+    const loading: SidebarHistoryState = {
+      cwd: historyScope.kind === "workdir" ? historyScope.cwd : undefined,
+      limit,
+      totalCount: previous?.totalCount ?? 0,
+      hasMore: previous?.hasMore ?? false,
+      loading: startCount > 0,
+      loaded: previous?.loaded ?? false,
+      error: null,
+    };
+    const save = (state: SidebarHistoryState, extra?: Partial<SidebarSnapshot>) => {
+      commit(
+        key
+          ? { ...extra, workspaceHistory: new Map(snapshot.workspaceHistory).set(key, state) }
+          : { ...extra, recentHistory: state },
+      );
+    };
+    save(loading);
+    if (startCount === 0) return;
+    const generation = historyGeneration;
+    const before = byId;
+    const matchesHistory = (item: SidebarConversation) =>
+      key ? workspaceProjectPathKey(item.cwd ?? "") === key : !item.cwd?.trim();
+    try {
+      const batchSize = Math.min(limit, 200);
+      const page = await backend.listConversations(1, batchSize, historyScope);
+      let pageNumber = 1;
+      while (page.items.length > 0 && page.items.length < Math.min(limit, page.totalCount)) {
+        if (generation !== historyGeneration || startCount === 0) return;
+        const next = await backend.listConversations(++pageNumber, batchSize, historyScope);
+        page.totalCount = next.totalCount;
+        if (next.items.length === 0) break;
+        page.items.push(...next.items);
+      }
+      if (generation !== historyGeneration || startCount === 0) return;
+      byId = new Map(byId);
+      const received = new Set<string>();
+      for (const item of page.items.filter(matchesHistory)) {
+        received.add(item.id);
+        if (byId.get(item.id) !== before.get(item.id) || snapshot.mutations.has(item.id)) continue;
+        byId.set(item.id, mergeSidebarConversation(byId.get(item.id), item));
+      }
+      if (page.items.length >= page.totalCount) {
+        for (const [id, item] of before) {
+          if (
+            matchesHistory(item) &&
+            !received.has(id) &&
+            byId.get(id) === item &&
+            !item.isPending &&
+            !snapshot.mutations.has(id)
+          ) {
+            byId.delete(id);
+          }
+        }
+      }
+      save(
+        {
+          limit,
+          totalCount: page.totalCount,
+          hasMore: page.items.length < page.totalCount,
+          loading: false,
+          loaded: true,
+          error: null,
+        },
+        { byId },
+      );
+    } catch (error) {
+      if (generation !== historyGeneration || startCount === 0) return;
+      save({
+        ...loading,
+        loading: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+  const loadWorkspaceHistory = (cwd: string, more = false) =>
+    loadHistory({ kind: "workdir", cwd }, more);
+  const loadRecentHistory = (more = false) => loadHistory({ kind: "unscoped" }, more);
+  const refreshHistory = () => {
+    void loadRecentHistory();
+    for (const state of snapshot.workspaceHistory.values()) {
+      if (state.cwd) void loadWorkspaceHistory(state.cwd);
     }
   };
 
@@ -671,16 +790,19 @@ export function createSidebarStore(
             wasDisconnected = false;
             void fetchFirstPage(false);
             void refreshWorkdirs("reconnect");
+            refreshHistory();
           }
         }) ?? null;
       reconcileTimer = setInterval(() => {
         void fetchFirstPage(false);
+        refreshHistory();
       }, reconcileIntervalMs);
       workdirsFallbackTimer = setInterval(() => {
         void refreshWorkdirs("fallback");
       }, workdirsFallbackMs);
       void refreshWorkdirs("initial");
       void fetchFirstPage(true);
+      refreshHistory();
     },
 
     stop: () => {
@@ -693,6 +815,7 @@ export function createSidebarStore(
       }
       requestSeq += 1;
       listGeneration += 1;
+      historyGeneration += 1;
       unsubscribeEvents?.();
       unsubscribeEvents = null;
       unsubscribeConnection?.();
@@ -744,6 +867,8 @@ export function createSidebarStore(
 
     refresh,
     loadMore,
+    loadWorkspaceHistory,
+    loadRecentHistory,
     refreshWorkdirs,
 
     rename: (id, title) =>

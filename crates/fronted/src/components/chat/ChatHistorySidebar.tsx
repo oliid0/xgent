@@ -31,6 +31,8 @@ import {
   workspaceProjectPathKey,
 } from "../../lib/settings";
 import { cn } from "../../lib/shared/utils";
+import { sortSidebarConversations } from "../../lib/sidebar/reconcile";
+import { type SidebarHistoryState, WORKSPACE_HISTORY_PAGE_SIZE } from "../../lib/sidebar/store";
 import type {
   SidebarConversation,
   SidebarListStatus,
@@ -74,6 +76,9 @@ import { ExecutionModeMenu } from "./ExecutionModeMenu";
 
 type ChatHistorySidebarProps = {
   items: readonly SidebarConversation[];
+  workspaceItems?: readonly SidebarConversation[];
+  workspaceHistory?: ReadonlyMap<string, SidebarHistoryState>;
+  onLoadWorkspaceHistory?: (cwd: string, more?: boolean) => Promise<void>;
   currentConversationId: string;
   runningConversationIds: ReadonlySet<string>;
   // Rows with an in-flight mutation: only that row's controls are disabled.
@@ -653,6 +658,8 @@ const ProjectRow = memo(function ProjectRow(props: {
   isRunning: boolean;
   isRenaming: boolean;
   isPendingRemove: boolean;
+  expanded?: boolean;
+  onToggleExpanded?: (project: WorkspaceProject) => void;
   renameDraft: string;
   onSelectProject: (project: WorkspaceProject) => void;
   onOpenWorkspaceSettings?: (project: WorkspaceProject) => void;
@@ -684,6 +691,8 @@ const ProjectRow = memo(function ProjectRow(props: {
     isRunning,
     isRenaming,
     isPendingRemove,
+    expanded = false,
+    onToggleExpanded,
     renameDraft,
     onSelectProject,
     onOpenWorkspaceSettings,
@@ -711,7 +720,7 @@ const ProjectRow = memo(function ProjectRow(props: {
   const [menuOpen, setMenuOpen] = useState(false);
   const isDefaultProject = project.id === DEFAULT_WORKSPACE_PROJECT_ID;
   const isPinned = project.isPinned === true;
-  const ProjectFolderIcon = isActive ? FolderOpen : FolderClosed;
+  const ProjectFolderIcon = expanded ? FolderOpen : FolderClosed;
 
   useEffect(() => {
     if (!isRenaming) return;
@@ -860,28 +869,47 @@ const ProjectRow = memo(function ProjectRow(props: {
           />
         </AstryxStack>
       ) : (
-        <SideNavItem
-          label={project.name}
-          icon={ProjectFolderIcon}
-          size="sm"
-          isSelected={isActive}
-          isDisabled={isArchived}
-          className={cn(
-            "min-w-0",
-            isMissing
-              ? "hover:text-destructive focus-visible:bg-destructive/10"
-              : isArchived
-                ? "cursor-default"
-                : "hover:text-foreground",
-          )}
-          onClick={() => {
-            // Archived workspaces cannot be selected, so no new
-            // conversations can start in them.
-            if (!isArchived) {
-              onSelectProject(project);
-            }
-          }}
-        />
+        <AstryxStack direction="horizontal" className="min-w-0 items-center">
+          {!isArchived && onToggleExpanded ? (
+            <AstryxButton
+              variant="ghost"
+              label={project.name}
+              type="button"
+              aria-label={project.name}
+              aria-expanded={expanded}
+              onClick={() => onToggleExpanded(project)}
+              className="flex h-7 w-5 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+            >
+              <ChevronRight
+                className={cn(
+                  "h-3 w-3 transition-transform motion-reduce:transition-none",
+                  expanded && "rotate-90",
+                )}
+              />
+            </AstryxButton>
+          ) : null}
+          <SideNavItem
+            label={project.name}
+            icon={ProjectFolderIcon}
+            size="sm"
+            isSelected={isActive}
+            isDisabled={isArchived}
+            className={cn(
+              "min-w-0 flex-1",
+              isMissing
+                ? "hover:text-destructive focus-visible:bg-destructive/10"
+                : isArchived
+                  ? "cursor-default"
+                  : "hover:text-foreground",
+            )}
+            onClick={() => {
+              if (!isArchived) {
+                onSelectProject(project);
+                if (!expanded) onToggleExpanded?.(project);
+              }
+            }}
+          />
+        </AstryxStack>
       )}
       {!isRenaming ? (
         <AstryxStack
@@ -1193,6 +1221,9 @@ function SidebarStateCard(props: {
 export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHistorySidebarProps) {
   const {
     items,
+    workspaceItems = [],
+    workspaceHistory,
+    onLoadWorkspaceHistory,
     currentConversationId,
     runningConversationIds,
     busyConversationIds,
@@ -1269,7 +1300,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   } = props;
   const { t } = useLocale();
   const soul = useSoul();
-  const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false);
+  const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(true);
   const projectsCollapsed = !workspaceManagerOpen;
   const projectsDisclosure = useCollapsible({
     isCollapsible: {
@@ -1277,9 +1308,47 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
       onOpenChange: setWorkspaceManagerOpen,
     },
   });
-  // Recent conversations always belong to the selected workspace. Keeping
-  // this lane visible avoids the former unrelated second disclosure state.
+  // Ordinary chats stay below the workspace tree for quick mode switching.
   const recentCollapsed = false;
+  const [expandedProjectIds, setExpandedProjectIds] = useState<ReadonlySet<string>>(
+    () => new Set(activeProjectId ? [activeProjectId] : []),
+  );
+  useEffect(() => {
+    if (!activeProjectId) return;
+    setExpandedProjectIds((current) =>
+      current.has(activeProjectId) ? current : new Set(current).add(activeProjectId),
+    );
+  }, [activeProjectId]);
+  useEffect(() => {
+    if (!showProjects || !isOpen) return;
+    for (const project of projects) {
+      if (
+        expandedProjectIds.has(project.id) &&
+        !workspaceHistory?.has(workspaceProjectPathKey(project.path))
+      ) {
+        void onLoadWorkspaceHistory?.(project.path);
+      }
+    }
+  }, [
+    expandedProjectIds,
+    isOpen,
+    onLoadWorkspaceHistory,
+    projects,
+    showProjects,
+    workspaceHistory,
+  ]);
+  const projectConversations = useMemo(() => {
+    const groups = new Map<string, SidebarConversation[]>();
+    for (const item of workspaceItems) {
+      const key = workspaceProjectPathKey(item.cwd ?? "");
+      if (!key) continue;
+      const group = groups.get(key) ?? [];
+      group.push(item);
+      groups.set(key, group);
+    }
+    for (const [key, group] of groups) groups.set(key, sortSidebarConversations(group));
+    return groups;
+  }, [workspaceItems]);
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [selectedConversationIds, setSelectedConversationIds] = useState<ReadonlySet<string>>(
@@ -1787,39 +1856,56 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   const renderActiveProjectRow = (project: WorkspaceProject) => {
     const pathKey = workspaceProjectPathKey(project.path);
     return (
-      <ProjectRow
-        key={project.id}
-        project={project}
-        isActive={activeProjectId === project.id}
-        isMissing={missingProjectPathKeys.has(pathKey)}
-        isRunning={runningProjectPathKeys.has(pathKey)}
-        isRenaming={projectRenamingId === project.id}
-        isPendingRemove={pendingProjectRemoveId === project.id}
-        renameDraft={projectRenameDraft}
-        onSelectProject={handleSelectProject}
-        onOpenWorkspaceSettings={onOpenWorkspaceSettings ? handleOpenWorkspaceSettings : undefined}
-        onBrowseProjectInFileTree={
-          onBrowseProjectInFileTree ? handleBrowseProjectInFileTree : undefined
-        }
-        onBrowseProjectInSystemFileManager={
-          onBrowseProjectInSystemFileManager ? handleBrowseProjectInSystemFileManager : undefined
-        }
-        onStartRenamingProject={handleStartRenamingProject}
-        onProjectRenameDraftChange={handleProjectRenameDraftChange}
-        onCommitProjectRename={handleCommitProjectRename}
-        onCancelProjectRename={handleCancelProjectRename}
-        onSetProjectPinned={handleSetProjectPinned}
-        onRemoveProject={handleRemoveProject}
-        workspaceProjectGroups={workspaceProjectGroups}
-        currentGroupId={activeProjectGroupIds.get(pathKey) ?? null}
-        onMoveProjectToGroup={onMoveProjectToGroup ? handleMoveProjectToGroup : undefined}
-        isArchived={false}
-        canArchive={canArchiveProjects}
-        onArchiveProject={handleArchiveProject}
-        onUnarchiveProject={handleUnarchiveProject}
-        onSetPendingRemove={setPendingProjectRemoveId}
-        touchActions={mobileExperience}
-      />
+      <AstryxStack direction="vertical" key={project.id} className="min-w-0">
+        <ProjectRow
+          project={project}
+          isActive={
+            activeProjectId === project.id &&
+            !items.some((item) => item.id === currentConversationId) &&
+            !workspaceItems.some((item) => item.id === currentConversationId)
+          }
+          isMissing={missingProjectPathKeys.has(pathKey)}
+          isRunning={runningProjectPathKeys.has(pathKey)}
+          isRenaming={projectRenamingId === project.id}
+          isPendingRemove={pendingProjectRemoveId === project.id}
+          expanded={expandedProjectIds.has(project.id)}
+          onToggleExpanded={(target) =>
+            setExpandedProjectIds((current) => {
+              const next = new Set(current);
+              if (next.has(target.id)) next.delete(target.id);
+              else next.add(target.id);
+              return next;
+            })
+          }
+          renameDraft={projectRenameDraft}
+          onSelectProject={handleSelectProject}
+          onOpenWorkspaceSettings={
+            onOpenWorkspaceSettings ? handleOpenWorkspaceSettings : undefined
+          }
+          onBrowseProjectInFileTree={
+            onBrowseProjectInFileTree ? handleBrowseProjectInFileTree : undefined
+          }
+          onBrowseProjectInSystemFileManager={
+            onBrowseProjectInSystemFileManager ? handleBrowseProjectInSystemFileManager : undefined
+          }
+          onStartRenamingProject={handleStartRenamingProject}
+          onProjectRenameDraftChange={handleProjectRenameDraftChange}
+          onCommitProjectRename={handleCommitProjectRename}
+          onCancelProjectRename={handleCancelProjectRename}
+          onSetProjectPinned={handleSetProjectPinned}
+          onRemoveProject={handleRemoveProject}
+          workspaceProjectGroups={workspaceProjectGroups}
+          currentGroupId={activeProjectGroupIds.get(pathKey) ?? null}
+          onMoveProjectToGroup={onMoveProjectToGroup ? handleMoveProjectToGroup : undefined}
+          isArchived={false}
+          canArchive={canArchiveProjects}
+          onArchiveProject={handleArchiveProject}
+          onUnarchiveProject={handleUnarchiveProject}
+          onSetPendingRemove={setPendingProjectRemoveId}
+          touchActions={mobileExperience}
+        />
+        {renderWorkspaceConversations(project)}
+      </AstryxStack>
     );
   };
 
@@ -1878,6 +1964,66 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
       onOpenConversationInSplit,
     ],
   );
+
+  const renderWorkspaceConversations = (project: WorkspaceProject) => {
+    if (!expandedProjectIds.has(project.id)) return null;
+    const key = workspaceProjectPathKey(project.path);
+    const state = workspaceHistory?.get(key);
+    const conversations = projectConversations.get(key) ?? [];
+    const visible = conversations.slice(0, state?.limit ?? WORKSPACE_HISTORY_PAGE_SIZE);
+    const canLoadMore = conversations.length > visible.length || state?.hasMore;
+    return (
+      <AstryxStack
+        direction="vertical"
+        className="mb-1 ml-5 min-w-0 space-y-0.5 border-l border-border/50 pl-2"
+        data-testid={`workspace-conversations-${project.id}`}
+      >
+        {visible.map(renderHistoryRow)}
+        {!state || (state.loading && visible.length === 0) ? (
+          <AstryxText
+            as="span"
+            type="inherit"
+            role="status"
+            className="px-2 py-1 text-xs text-muted-foreground"
+          >
+            {t("sidebar.readingHistory")}
+          </AstryxText>
+        ) : visible.length === 0 && !state.error ? (
+          <AstryxText as="span" type="inherit" className="px-2 py-1 text-xs text-muted-foreground">
+            {t("chat.emptyChatHistory")}
+          </AstryxText>
+        ) : null}
+        {state?.error ? (
+          <AstryxText
+            as="span"
+            type="inherit"
+            role="alert"
+            className="px-2 py-1 text-xs text-destructive"
+          >
+            {state.error}
+          </AstryxText>
+        ) : null}
+        {canLoadMore || state?.error ? (
+          <AstryxButton
+            variant="ghost"
+            type="button"
+            label={
+              state?.error ? t("chat.workspaceHistoryRetry") : t("sidebar.continueLoadingHistory")
+            }
+            isDisabled={state?.loading}
+            onClick={() => void onLoadWorkspaceHistory?.(project.path, !state?.error)}
+            className="justify-start px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            {state?.loading
+              ? t("sidebar.loadingMoreHistory")
+              : state?.error
+                ? t("chat.workspaceHistoryRetry")
+                : t("sidebar.continueLoadingHistory")}
+          </AstryxButton>
+        ) : null}
+      </AstryxStack>
+    );
+  };
 
   const sidebarModeControls = (
     <AstryxStack

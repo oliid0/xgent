@@ -13,8 +13,8 @@ import { useLocale } from "../../../i18n";
 import type { AppUpdateController } from "../../../lib/appUpdates";
 import { normalizeConversationTitle } from "../../../lib/chat/page/chatPageHelpers";
 import type { ExecutionMode, WorkspaceProject, WorkspaceProjectGroup } from "../../../lib/settings";
+import { sortSidebarConversations } from "../../../lib/sidebar/reconcile";
 import {
-  selectConversations,
   selectListState,
   selectProjectActivityInputs,
   selectRunningConversationIds,
@@ -103,9 +103,26 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
   const { store, projects, onConversationDeleted, onConversationCwdChanged } = props;
   const { t } = useLocale();
 
-  const items = useSidebarSelector(store, selectConversations);
+  const byId = useSidebarSelector(store, (snapshot) => snapshot.byId);
+  const workspaceHistory = useSidebarSelector(store, (snapshot) => snapshot.workspaceHistory);
+  const recentHistory = useSidebarSelector(store, (snapshot) => snapshot.recentHistory);
+  const recentItems = useMemo(
+    () =>
+      sortSidebarConversations(Array.from(byId.values()).filter((item) => !item.cwd?.trim())).slice(
+        0,
+        recentHistory.limit,
+      ),
+    [byId, recentHistory.limit],
+  );
+  const workspaceItems = useMemo(
+    () => sortSidebarConversations(Array.from(byId.values()).filter((item) => !!item.cwd?.trim())),
+    [byId],
+  );
+  const searchableItems = useMemo(
+    () => sortSidebarConversations(Array.from(byId.values())),
+    [byId],
+  );
   const listState = useSidebarSelector(store, selectListState, sidebarShallowEqual);
-  const scopeKey = useSidebarSelector(store, (snapshot) => snapshot.scopeKey);
   const runningConversationIds = useSidebarSelector(store, selectRunningConversationIds);
   const busyConversationIds = useSidebarSelector(store, selectMutations);
   const mutationErrors = useSidebarSelector(store, selectMutationErrors);
@@ -218,7 +235,7 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
   );
 
   const handleLoadMore = useCallback(() => {
-    void store.loadMore();
+    void store.loadRecentHistory(true);
   }, [store]);
 
   // A per-row mutation error is more actionable (and dismissable) than the
@@ -234,6 +251,9 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
   } else if (listState.error) {
     errorMessage = t(`chat.history.${listState.error}`);
     errorDetail = listState.errorDetail;
+  } else if (recentHistory.error) {
+    errorMessage = t("chat.history.listFailed");
+    errorDetail = recentHistory.error;
   }
 
   return (
@@ -253,7 +273,7 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
       <WorkspaceSearchPalette
         open={searchOpen}
         onOpenChange={setSearchOpen}
-        conversations={items}
+        conversations={searchableItems}
         workdir={props.searchWorkdir}
         onSelectConversation={props.onSelectConversation}
         onOpenFile={props.onOpenSearchFile}
@@ -262,15 +282,24 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         onCreateProject={props.onCreateProject}
       />
       <ChatHistorySidebar
-        items={items}
+        items={recentItems}
+        workspaceItems={workspaceItems}
+        workspaceHistory={workspaceHistory}
+        onLoadWorkspaceHistory={store.loadWorkspaceHistory}
         currentConversationId={props.currentConversationId}
         runningConversationIds={runningConversationIds}
         busyConversationIds={busyConversationIds}
-        listStatus={listState.status}
-        scopeKey={scopeKey}
-        totalItems={listState.totalCount}
-        hasMore={listState.hasMore}
-        isLoadingMore={listState.isLoadingMore}
+        listStatus={
+          recentHistory.error || recentHistory.loaded
+            ? "ready"
+            : recentHistory.loading
+              ? "loading"
+              : "initial"
+        }
+        scopeKey="recent-chat"
+        totalItems={recentHistory.totalCount}
+        hasMore={recentHistory.hasMore}
+        isLoadingMore={recentHistory.loading && recentItems.length > 0}
         errorMessage={errorMessage}
         errorDetail={errorDetail}
         onDismissError={handleDismissError}

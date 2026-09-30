@@ -361,11 +361,14 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(androidSmoke, /smoke-android-interactions\.py/);
   const androidInteractions = readFileSync(path.join(repoRoot, "scripts/release/smoke-android-interactions.py"), "utf8");
   assert.match(androidInteractions, /Install base environment/);
+  assert.match(androidInteractions, /"Refresh status"\}, scroll=True\)/);
+  assert.match(androidInteractions, /"Install base environment"\}, scroll=True\)/);
   assert.match(androidInteractions, /Run command/);
   assert.match(android, /xgent-android-launch-evidence/);
   assert.match(ios, /runs-on: macos-15-intel/);
   assert.match(ios, /xcodebuild build -project "\$project" -scheme xgent_iOS/);
   assert.match(ios, /pnpm tauri ios build --ci --no-sign --open[\s\S]*--target/);
+  assert.match(ios, /--config '\{"build":\{"beforeBuildCommand":null\}\}' --target/);
   assert.match(ios, /cli-options-server\.json/);
   assert.match(ios, /trap 'kill "\$tauri_cli_pid"/);
   assert.match(ios, /-configuration release -sdk iphonesimulator/);

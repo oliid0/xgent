@@ -882,10 +882,12 @@ export function ChatPage(props: ChatPageProps) {
   const activeWorkspaceProjectPath = activeWorkspaceProject?.path.trim() ?? "";
   const sidebarScope = useMemo<SidebarScope>(
     () =>
-      activeWorkspaceProjectPath
-        ? { kind: "workdir", cwd: activeWorkspaceProjectPath }
-        : { kind: "none" },
-    [activeWorkspaceProjectPath],
+      !isAgentMode
+        ? { kind: "unscoped" }
+        : activeWorkspaceProjectPath
+          ? { kind: "workdir", cwd: activeWorkspaceProjectPath }
+          : { kind: "none" },
+    [activeWorkspaceProjectPath, isAgentMode],
   );
   useEffect(() => {
     sidebarStore.setScope(sidebarScope);
@@ -1189,6 +1191,7 @@ export function ChatPage(props: ChatPageProps) {
       if (!(await checkWorkspaceProjectDirectory(project))) {
         return;
       }
+      setSettings((previous) => updateSystem(previous, { executionMode: "tools" }));
       activateWorkspaceProject(project);
       if (compactViewport) {
         setSidebarOpen(false);
@@ -1212,6 +1215,7 @@ export function ChatPage(props: ChatPageProps) {
       if (!(await checkWorkspaceProjectDirectory(project))) {
         return;
       }
+      setSettings((previous) => updateSystem(previous, { executionMode: "tools" }));
       setActiveView("chat");
       activateWorkspaceProject(project, { startConversation: true });
       if (compactViewport) {
@@ -5236,17 +5240,23 @@ export function ChatPage(props: ChatPageProps) {
     onCloseRight: handleCloseMobileActivity,
   });
 
-  const handleNewConversation = useCallback(() => {
-    setRightSidebarPresentation("side");
-    openController.cancel();
-    prepareComposerForConversationChange();
-    startNewConversationActionRef.current({
-      workdir: isAgentMode ? activeWorkspaceProjectPath || undefined : undefined,
-    });
-    if (compactViewport) {
-      setSidebarOpen(false);
-    }
-  }, [activeWorkspaceProjectPath, compactViewport, isAgentMode, openController]);
+  const handleNewConversation = useCallback(
+    (mode?: ExecutionMode) => {
+      if (mode) setSettings((previous) => updateSystem(previous, { executionMode: mode }));
+      setRightSidebarPresentation("side");
+      openController.cancel();
+      prepareComposerForConversationChange();
+      startNewConversationActionRef.current({
+        workdir: (mode ? isAgentExecutionMode(mode) : isAgentMode)
+          ? activeWorkspaceProjectPath || undefined
+          : undefined,
+      });
+      if (compactViewport) {
+        setSidebarOpen(false);
+      }
+    },
+    [activeWorkspaceProjectPath, compactViewport, isAgentMode, openController],
+  );
 
   const handleDesktopNavigationSelect = useCallback(
     (target: WorkspaceNavigationTarget, shell?: string) => {
@@ -5292,7 +5302,7 @@ export function ChatPage(props: ChatPageProps) {
     setWorkspaceToolsOpen(false);
     setDesktopNavigationTarget("conversations");
     setSidebarOpen(true);
-    handleNewConversation();
+    handleNewConversation("text");
   }, [handleNewConversation]);
 
   useEffect(() => {
@@ -5322,16 +5332,22 @@ export function ChatPage(props: ChatPageProps) {
       if (!targetConversationId) {
         return;
       }
+      const knownConversation = sidebarStore.peek(targetConversationId);
+      const workdir = knownConversation
+        ? knownConversation.cwd?.trim() || ""
+        : conversationRuntimeCacheRef.current.get(targetConversationId)?.workdir?.trim() || "";
+      if (knownConversation || workdir) {
+        setSettings((previous) =>
+          updateSystem(previous, {
+            executionMode: workdir ? "tools" : "text",
+          }),
+        );
+      }
       setRightSidebarPresentation("side");
       prepareComposerForConversationChange();
       openController.open(targetConversationId, {
         afterPaint: () => {
-          if (!isAgentMode) return;
-          const workdir =
-            conversationRuntimeCacheRef.current.get(targetConversationId)?.workdir?.trim() ||
-            sidebarStore.peek(targetConversationId)?.cwd?.trim() ||
-            "";
-          activateConversationWorkspace(workdir);
+          if (workdir) activateConversationWorkspace(workdir);
         },
       });
       restoreCachedComposerDraft(targetConversationId);
@@ -5343,7 +5359,6 @@ export function ChatPage(props: ChatPageProps) {
       activateConversationWorkspace,
       compactViewport,
       conversationRuntimeCacheRef,
-      isAgentMode,
       openController,
       sidebarStore,
     ],
@@ -6569,7 +6584,7 @@ export function ChatPage(props: ChatPageProps) {
           if (activeView !== "chat" && isDraftConversation) {
             return;
           }
-          handleNewConversation();
+          handleNewConversation("text");
         }}
         onSelectConversation={(id) => {
           setActiveView("chat");

@@ -1015,13 +1015,14 @@ jobs:
           (
             cd crates/fronted
             pnpm tauri ios build --ci --no-sign --open \
-              --config "$XGENT_TAURI_VERSION_CONFIG" --target
+              --config "$XGENT_TAURI_VERSION_CONFIG" \
+              --config '{"build":{"beforeBuildCommand":null}}' --target
           ) > "$options_log" 2>&1 &
           tauri_cli_pid=$!
           trap 'kill "$tauri_cli_pid" 2>/dev/null || true; wait "$tauri_cli_pid" 2>/dev/null || true' EXIT
-          # The CLI runs beforeBuildCommand again before writing its options
-          # file. The full frontend rebuild took longer than the old 3-minute
-          # wait on the macOS release runner.
+          # The IPA build already generated dist. The options server only
+          # prepares Xcode's build settings, so avoid rebuilding the frontend
+          # a second time before it writes the options file.
           for _ in $(seq 1 300); do
             if ! kill -0 "$tauri_cli_pid" 2>/dev/null; then
               cat "$options_log"

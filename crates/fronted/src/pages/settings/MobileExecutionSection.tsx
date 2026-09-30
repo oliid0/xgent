@@ -276,10 +276,46 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
           ) : null}
         </HStack>
 
+        {error ? <Banner status="error" title={error} collapsible={false} /> : null}
+
         {!isNativeMobile ? (
           <Banner status="info" title={t("settings.mobileNativeOnly")} collapsible={false} />
         ) : (
           <VStack gap={4}>
+            <HStack gap={2} wrap="wrap">
+              {!status?.installed ? (
+                <Button
+                  type="button"
+                  label={
+                    busy === "environment"
+                      ? t("settings.mobileInstalling")
+                      : t("settings.mobileInstallEnvironment")
+                  }
+                  variant="primary"
+                  isLoading={busy === "environment"}
+                  isDisabled={busy !== ""}
+                  onClick={() => void installEnvironment()}
+                />
+              ) : null}
+              <Button
+                type="button"
+                label={t("settings.mobileRefresh")}
+                variant="secondary"
+                isLoading={busy === "status"}
+                isDisabled={busy !== ""}
+                onClick={() => void refresh()}
+              />
+            </HStack>
+
+            {busy === "environment" ? (
+              <ProgressBar
+                label={mobileEnvironmentInstallLabel(installProgress, t)}
+                value={installProgress?.percent ?? 0}
+                isIndeterminate={typeof installProgress?.percent !== "number"}
+                hasValueLabel={typeof installProgress?.percent === "number"}
+              />
+            ) : null}
+
             <Text type="supporting" color="secondary" wordBreak="break-word">
               {t("settings.mobileWithoutShell")}
             </Text>
@@ -324,40 +360,6 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
                 isDisabled={busy !== ""}
                 presentation="adaptive"
                 width="100%"
-              />
-            ) : null}
-
-            <HStack gap={2} wrap="wrap">
-              <Button
-                type="button"
-                label={t("settings.mobileRefresh")}
-                variant="secondary"
-                isLoading={busy === "status"}
-                isDisabled={busy !== ""}
-                onClick={() => void refresh()}
-              />
-              {!status?.installed ? (
-                <Button
-                  type="button"
-                  label={
-                    busy === "environment"
-                      ? t("settings.mobileInstalling")
-                      : t("settings.mobileInstallEnvironment")
-                  }
-                  variant="primary"
-                  isLoading={busy === "environment"}
-                  isDisabled={busy !== ""}
-                  onClick={() => void installEnvironment()}
-                />
-              ) : null}
-            </HStack>
-
-            {busy === "environment" ? (
-              <ProgressBar
-                label={mobileEnvironmentInstallLabel(installProgress, t)}
-                value={installProgress?.percent ?? 0}
-                isIndeterminate={typeof installProgress?.percent !== "number"}
-                hasValueLabel={typeof installProgress?.percent === "number"}
               />
             ) : null}
 
@@ -528,8 +530,6 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
             ) : null}
           </VStack>
         )}
-
-        {error ? <Banner status="error" title={error} collapsible={false} /> : null}
       </VStack>
     </Section>
   );

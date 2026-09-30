@@ -190,7 +190,7 @@ test("scope switch paints the cached slice immediately without a wipe", async ()
   store.stop();
 });
 
-test("scope none resolves empty locally without a backend call", async () => {
+test("scope none stays empty while the separate recent-chat lane loads", async () => {
   const fake = createFakeBackend();
   const store = createSidebarStore(fake.backend);
   store.setScope({ kind: "none" });
@@ -199,7 +199,42 @@ test("scope none resolves empty locally without a backend call", async () => {
   const snapshot = store.getSnapshot();
   assert.equal(snapshot.listStatus, "ready");
   assert.equal(snapshot.conversations.length, 0);
-  assert.equal(fake.state.calls.list.length, 0);
+  assert.deepEqual(fake.state.calls.list.map(({ scope }) => scope.kind), ["unscoped"]);
+  store.stop();
+});
+
+test("workspace tree and ordinary chats load independently of the active scope", async () => {
+  const fake = createFakeBackend();
+  fake.state.pages.set("cwd:/tmp/a", [conversation("work-a", { cwd: "/tmp/a" })]);
+  fake.state.pages.set("cwd:/tmp/b", [conversation("work-b", { cwd: "/tmp/b" })]);
+  fake.state.pages.set("cwd-empty", [conversation("chat-1"), conversation("chat-2")]);
+  const store = createSidebarStore(fake.backend, { pageSize: 1 });
+  store.setScope(SCOPE_A);
+  store.start();
+  await tick();
+
+  assert.deepEqual(store.getSnapshot().conversations.map(({ id }) => id), ["work-a"]);
+  assert.equal(store.getSnapshot().recentHistory.hasMore, true);
+  assert.ok(store.peek("chat-1"));
+  await store.loadRecentHistory(true);
+  await store.loadWorkspaceHistory("/tmp/b");
+  assert.ok(store.peek("chat-2"));
+  assert.ok(store.peek("work-b"));
+  assert.equal(store.getSnapshot().workspaceHistory.get("/tmp/b")?.loaded, true);
+  assert.deepEqual(store.getSnapshot().conversations.map(({ id }) => id), ["work-a"]);
+  store.stop();
+});
+
+test("workspace expansion requested before sidebar start loads after transport startup", async () => {
+  const fake = createFakeBackend();
+  fake.state.pages.set("cwd:/tmp/b", [conversation("work-b", { cwd: "/tmp/b" })]);
+  const store = createSidebarStore(fake.backend);
+  await store.loadWorkspaceHistory("/tmp/b");
+  assert.equal(store.getSnapshot().workspaceHistory.get("/tmp/b")?.loaded, false);
+  store.start();
+  await tick();
+  assert.equal(store.getSnapshot().workspaceHistory.get("/tmp/b")?.loaded, true);
+  assert.ok(store.peek("work-b"));
   store.stop();
 });
 

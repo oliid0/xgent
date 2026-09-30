@@ -53,6 +53,8 @@ import type {
   SelectedModel,
   WorkspaceProject,
 } from "../lib/settings";
+import { workspaceProjectPathKey } from "../lib/settings";
+import { sortSidebarConversations } from "../lib/sidebar/reconcile";
 import type { SidebarStore } from "../lib/sidebar/store";
 import { type DesktopSttCapture, startDesktopSttCapture } from "../lib/stt/desktopAudioCapture";
 import type {
@@ -424,7 +426,31 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const [activityOpen, setActivityOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [sidebarSearchVisible, setSidebarSearchVisible] = useState(false);
-  const [sidebarProjectsOpen, setSidebarProjectsOpen] = useState(false);
+  const [sidebarProjectsOpen, setSidebarProjectsOpen] = useState(true);
+  const [expandedProjectIds, setExpandedProjectIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  useEffect(() => {
+    if (!sidebarOpen || !sidebarProjectsOpen) return;
+    for (const project of props.projects) {
+      if (
+        expandedProjectIds.has(project.id) &&
+        !sidebar.workspaceHistory.has(workspaceProjectPathKey(project.path))
+      ) {
+        void props.sidebarStore.loadWorkspaceHistory(project.path);
+      }
+    }
+  }, [
+    expandedProjectIds,
+    props.projects,
+    props.sidebarStore,
+    sidebar.workspaceHistory,
+    sidebarOpen,
+    sidebarProjectsOpen,
+  ]);
+  const recentChats = sortSidebarConversations(
+    Array.from(sidebar.byId.values()).filter((item) => !item.cwd?.trim()),
+  ).slice(0, sidebar.recentHistory.limit);
   const [voiceAvailable, setVoiceAvailable] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [voicePartial, setVoicePartial] = useState("");
@@ -1460,16 +1486,89 @@ export function NativeChatPage(props: NativeChatPageProps) {
                                   .toLocaleLowerCase()
                                   .includes(query.toLocaleLowerCase()),
                               )
-                              .map((project) =>
-                                sidebarButton(`project:${project.id}`, project.name, () => {
-                                  props.onSelectProject(project);
-                                  finishSidebarAction();
-                                }),
-                              ),
+                              .flatMap((project): PresentationNode[] => {
+                                const expanded = expandedProjectIds.has(project.id);
+                                const key = workspaceProjectPathKey(project.path);
+                                const state = sidebar.workspaceHistory.get(key);
+                                const conversations = sortSidebarConversations(
+                                  Array.from(sidebar.byId.values()).filter(
+                                    (item) => workspaceProjectPathKey(item.cwd ?? "") === key,
+                                  ),
+                                );
+                                const visible = conversations.slice(0, state?.limit ?? 10);
+                                return [
+                                  {
+                                    ...sidebarButton(`project:${project.id}`, project.name, () => {
+                                      setExpandedProjectIds((current) => {
+                                        const next = new Set(current);
+                                        if (next.has(project.id)) next.delete(project.id);
+                                        else next.add(project.id);
+                                        return next;
+                                      });
+                                      props.onSelectProject(project);
+                                    }),
+                                    icon: expanded ? "folder.fill" : "folder",
+                                    selected: expanded,
+                                  },
+                                  ...(expanded
+                                    ? visible.map((conversation) => ({
+                                        ...sidebarButton(
+                                          `workspace-conversation:${conversation.id}`,
+                                          conversation.title,
+                                          () => {
+                                            props.onSelectConversation(conversation.id);
+                                            finishSidebarAction();
+                                          },
+                                        ),
+                                        indent: 18,
+                                        icon: "bubble.left",
+                                        selected: props.conversationId === conversation.id,
+                                      }))
+                                    : []),
+                                  ...(expanded &&
+                                  (!state || (state.loading && visible.length === 0))
+                                    ? [
+                                        {
+                                          id: `workspace-loading:${project.id}`,
+                                          kind: "Text" as const,
+                                          text: t("sidebar.readingHistory"),
+                                          indent: 18,
+                                        },
+                                      ]
+                                    : []),
+                                  ...(expanded && state?.error
+                                    ? [
+                                        sidebarButton(
+                                          `workspace-retry:${project.id}`,
+                                          t("presentation.retry"),
+                                          () =>
+                                            props.sidebarStore.loadWorkspaceHistory(project.path),
+                                        ),
+                                      ]
+                                    : []),
+                                  ...(expanded &&
+                                  (state?.hasMore || conversations.length > visible.length)
+                                    ? [
+                                        {
+                                          ...sidebarButton(
+                                            `workspace-more:${project.id}`,
+                                            t("presentation.loadMore"),
+                                            () =>
+                                              props.sidebarStore.loadWorkspaceHistory(
+                                                project.path,
+                                                true,
+                                              ),
+                                          ),
+                                          indent: 18,
+                                        },
+                                      ]
+                                    : []),
+                                ];
+                              }),
                           ]
                         : []),
                       { id: "recents-label", kind: "Heading", text: t("chat.recentConversation") },
-                      ...sidebar.conversations
+                      ...recentChats
                         .filter((conversation) =>
                           conversation.title
                             .toLocaleLowerCase()
@@ -1485,22 +1584,24 @@ export function NativeChatPage(props: NativeChatPageProps) {
                             },
                           ),
                         ),
-                      ...(sidebar.hasMore
+                      ...(sidebar.recentHistory.hasMore
                         ? [
                             sidebarButton("more", t("presentation.loadMore"), () =>
-                              props.sidebarStore.loadMore(),
+                              props.sidebarStore.loadRecentHistory(true),
                             ),
                           ]
                         : []),
-                      ...(sidebar.listErrorDetail
+                      ...(sidebar.recentHistory.error || sidebar.listErrorDetail
                         ? [
                             {
                               id: "sidebar:error",
                               kind: "Text" as const,
-                              text: sidebar.listErrorDetail,
+                              text: sidebar.recentHistory.error ?? sidebar.listErrorDetail ?? "",
                             },
                             sidebarButton("retry", t("presentation.retry"), () =>
-                              props.sidebarStore.refresh({ reason: "manual" }),
+                              sidebar.recentHistory.error
+                                ? props.sidebarStore.loadRecentHistory()
+                                : props.sidebarStore.refresh({ reason: "manual" }),
                             ),
                           ]
                         : []),
