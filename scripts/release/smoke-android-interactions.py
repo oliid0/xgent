@@ -89,11 +89,11 @@ capture("settings")
 tap({"返回对话", "Back to Chat"})
 tap({"工作工具", "Workspace tools"})
 tap({"Shell 管理", "Shell management"})
-tap({"刷新状态", "Refresh status"})
+tap({"刷新状态", "Refresh status"}, scroll=True)
 capture("shell-settings")
 nodes = list(snapshot().iter("node"))
 if any(matches(node, {"安装基础环境", "Install base environment"}) for node in nodes):
-    tap({"安装基础环境", "Install base environment"})
+    tap({"安装基础环境", "Install base environment"}, scroll=True)
     deadline = time.monotonic() + 180
     while time.monotonic() < deadline:
         nodes = list(snapshot().iter("node"))
@@ -104,7 +104,7 @@ if any(matches(node, {"安装基础环境", "Install base environment"}) for nod
         raise AssertionError("The bundled Shell environment did not become ready")
 # Wait for the install/refresh action to finish, then install actual packages
 # through the Android settings controls. A ready rootfs only contains BusyBox.
-tap({"刷新状态", "Refresh status"}, timeout=300)
+tap({"刷新状态", "Refresh status"}, timeout=300, scroll=True)
 tap({"Linux essentials"}, scroll=True)
 tap({"Python and pip"}, scroll=True)
 tap({"安装所选能力包", "Install selected packs"}, scroll=True, scroll_direction="up")

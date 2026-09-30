@@ -2,6 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
+function sidebarSnapshot(conversations = []) {
+  return {
+    conversations,
+    byId: new Map(conversations.map((item) => [item.id, item])),
+    workspaceHistory: new Map(),
+    recentHistory: { limit: 80, hasMore: false, loading: false, loaded: true, error: null },
+    hasMore: false,
+  };
+}
+
 // Exercise the adapter and real action/composer stores without an Apple SDK.
 // Only React mounting and the native publication boundary are substituted.
 function harness(overrides = {}, options = {}) {
@@ -18,7 +28,9 @@ function harness(overrides = {}, options = {}) {
       useState(initial) {
         const index = cursor++;
         if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
-        return [states[index], (value) => { states[index] = value; }];
+        return [states[index], (value) => {
+          states[index] = typeof value === "function" ? value(states[index]) : value;
+        }];
       },
       useRef(initial) {
         const index = cursor++;
@@ -44,7 +56,7 @@ function harness(overrides = {}, options = {}) {
     uploadWorkdir: "/project",
     settings: { theme: "system", system: { executionMode: "text" }, customSettings: { appearance: { showThinking: true } } },
     composerRef: { current: null },
-    sidebarStore: { subscribe: () => () => {}, getSnapshot: () => ({ conversations: [], hasMore: false }) },
+    sidebarStore: { subscribe: () => () => {}, getSnapshot: () => sidebarSnapshot() },
     historyItems: [], liveTranscriptStore: createLiveTranscriptStore(),
     modelOptions: [{ value: "provider::model", providerId: "provider", providerName: "Provider", label: "Model" }],
     chatRuntimeControls: { thinkingEnabled: false, nativeWebSearchEnabled: false, planModeEnabled: false, reasoning: "low" },
@@ -103,7 +115,7 @@ test("native edits reach the shared composer used by send and conversation draft
   assert.equal(h.render().nodes[0].children.find(node => node.id === "composer")
     .children.find(node => node.id === "draft").value, "");
   h.props.onSelectConversation = () => h.props.composerRef.current.setText("Restored draft");
-  h.props.sidebarStore.getSnapshot = () => ({ conversations: [{ id: "next", title: "Next" }] });
+  h.props.sidebarStore.getSnapshot = () => sidebarSnapshot([{ id: "next", title: "Next" }]);
   assert.equal((await h.dispatch("sidebar")).ok, true);
   h.render();
   assert.equal((await h.dispatch("conversation:next", null, "sidebar")).ok, true);
@@ -378,14 +390,21 @@ test("native iPhone opens More as a sheet menu and keeps compact sidebar routes"
   h.render();
   sidebar = h.documents().find((item) => item.mode === "sidebar");
   assert.ok(sidebar.nodes[0].children.some((node) => node.id === "sidebar-search"));
-  assert.equal((await h.dispatch("sidebar-projects-toggle", null, "sidebar")).ok, true);
-  h.render();
-  sidebar = h.documents().find((item) => item.mode === "sidebar");
   assert.ok(
     sidebar.nodes[0].children
       .find((node) => node.id === "sidebar-list")
       .children.some((node) => node.id === "project:project"),
   );
+  assert.equal((await h.dispatch("sidebar-projects-toggle", null, "sidebar")).ok, true);
+  h.render();
+  sidebar = h.documents().find((item) => item.mode === "sidebar");
+  assert.equal(
+    sidebar.nodes[0].children
+      .find((node) => node.id === "sidebar-list")
+      .children.some((node) => node.id === "project:project"), false,
+  );
+  assert.equal((await h.dispatch("sidebar-projects-toggle", null, "sidebar")).ok, true);
+  h.render();
   for (const action of ["files", "skills", "scheduled", "remote", "mcp", "new-chat", "settings"]) {
     assert.equal((await h.dispatch(action, null, "sidebar")).ok, true);
   }
@@ -651,10 +670,7 @@ test("native sidebar routes skills, MCP, files, workspaces, recents, new chat an
     projects: [{ id: "project", name: "Workspace" }],
     sidebarStore: {
       subscribe: () => () => {},
-      getSnapshot: () => ({
-        conversations: [{ id: "recent", title: "Recent chat" }],
-        hasMore: false,
-      }),
+      getSnapshot: () => sidebarSnapshot([{ id: "recent", title: "Recent chat" }]),
     },
     onOpenSettings: (section) => opened.push(section ?? "settings"),
     onOpenSkillsHub: () => opened.push("skills"),
@@ -677,6 +693,35 @@ test("native sidebar routes skills, MCP, files, workspaces, recents, new chat an
   assert.deepEqual(opened, ["skills", "mcp", "files", "new-workspace", "new-chat", "settings"]);
   assert.deepEqual(selected, ["project", "recent"]);
   assert.deepEqual(modes, ["tools"]);
+  h.unmount();
+});
+
+test("native sidebar keeps workspace conversations nested above ordinary recent chats", async () => {
+  const selected = [];
+  const work = { id: "work", title: "Agent work", cwd: "/project", updatedAt: 2 };
+  const chat = { id: "chat", title: "Simple chat", updatedAt: 1 };
+  const snapshot = sidebarSnapshot([work, chat]);
+  snapshot.workspaceHistory.set("/project", {
+    cwd: "/project", limit: 10, totalCount: 1, hasMore: false,
+    loading: false, loaded: true, error: null,
+  });
+  const h = harness({
+    projects: [{ id: "project", name: "Workspace", path: "/project" }],
+    sidebarStore: { subscribe: () => () => {}, getSnapshot: () => snapshot },
+    onSelectProject: (project) => selected.push(project.id),
+    onSelectConversation: (id) => selected.push(id),
+  }, { mobile: true });
+  assert.equal((await h.dispatch("sidebar")).ok, true);
+  h.render();
+  assert.equal((await h.dispatch("project:project", null, "sidebar")).ok, true);
+  h.render();
+  const list = h.documents().find((item) => item.mode === "sidebar")
+    .nodes[0].children.find((node) => node.id === "sidebar-list").children;
+  assert.ok(list.some((node) => node.id === "workspace-conversation:work" && node.indent === 18));
+  assert.ok(list.some((node) => node.id === "conversation:chat"));
+  assert.ok(!list.some((node) => node.id === "conversation:work"));
+  assert.equal((await h.dispatch("workspace-conversation:work", null, "sidebar")).ok, true);
+  assert.deepEqual(selected, ["project", "work"]);
   h.unmount();
 });
 
