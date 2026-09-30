@@ -344,7 +344,7 @@ private struct XgentIOSComposer: View {
             }
         }
         .padding(12)
-        .modifier(XgentGlassSurface(radius: 26, floating: true))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }

@@ -23,6 +23,7 @@ import {
   installMobileToolchains,
   listExternalMobileWorkspaces,
   listenMobileEnvironmentInstallProgress,
+  listenMobileExecutionOutput,
   type MobileEnvironmentInstallProgress,
   type MobileExecutionStatus,
   mobileEnvironmentInstallLabel,
@@ -59,6 +60,7 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
   const [externalWorkspaces, setExternalWorkspaces] = useState<ExternalMobileWorkspace[]>([]);
   const [busy, setBusy] = useState<"status" | "environment" | "toolchains" | "cancel" | "">("");
   const [activeRunId, setActiveRunId] = useState("");
+  const [toolchainOutput, setToolchainOutput] = useState("");
   const [error, setError] = useState("");
   const [installProgress, setInstallProgress] = useState<MobileEnvironmentInstallProgress | null>(
     null,
@@ -146,6 +148,25 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
     setActiveRunId(runId);
     setBusy("toolchains");
     setError("");
+    setToolchainOutput("");
+    let stopOutput: (() => Promise<void>) | undefined;
+    try {
+      const decoder = { stdout: new TextDecoder(), stderr: new TextDecoder() };
+      stopOutput = await listenMobileExecutionOutput((event) => {
+        if (event.runId !== runId || (event.stream !== "stdout" && event.stream !== "stderr")) {
+          return;
+        }
+        try {
+          const bytes = Uint8Array.from(atob(event.data), (char) => char.charCodeAt(0));
+          const chunk = decoder[event.stream].decode(bytes, { stream: true });
+          setToolchainOutput((current) => (current + chunk).slice(-8_192));
+        } catch {
+          // The final install response remains authoritative if a chunk is malformed.
+        }
+      });
+    } catch {
+      // Live output is optional; package installation still reports its final result.
+    }
     try {
       const result = await installMobileToolchains(selected, runId);
       setStatus((current) => (current ? { ...current, toolchains: result.status } : current));
@@ -161,6 +182,7 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
+      await stopOutput?.().catch(() => undefined);
       setActiveRunId("");
       setBusy("");
     }
@@ -328,6 +350,22 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
                       />
                     ) : null}
                   </HStack>
+                ) : null}
+                {activeRunId ? (
+                  <VStack gap={2}>
+                    <ProgressBar label={t("settings.mobileInstalling")} isIndeterminate />
+                    {toolchainOutput ? (
+                      <Text
+                        type="code"
+                        color="secondary"
+                        wordBreak="break-word"
+                        className="mobile-execution-install-output"
+                        aria-live="off"
+                      >
+                        {toolchainOutput}
+                      </Text>
+                    ) : null}
+                  </VStack>
                 ) : null}
                 <Grid columns={{ minWidth: 240, max: 2, repeat: "fit" }} gap={2} width="100%">
                   {status.toolchains.map((toolchain) => {

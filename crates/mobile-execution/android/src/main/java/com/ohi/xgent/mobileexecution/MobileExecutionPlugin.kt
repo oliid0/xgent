@@ -199,7 +199,13 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                         timeoutMs = timeoutMs,
                         stdin = null,
                     ),
-                )
+                ) { stream, bytes ->
+                    trigger("output", JSObject().apply {
+                        put("runId", runId)
+                        put("stream", stream)
+                        put("data", Base64.encodeToString(bytes, Base64.NO_WRAP))
+                    })
+                }
                 if (result.exitCode == 0 && !result.timedOut && !result.cancelled) {
                     refreshInventoryBestEffort()
                 }

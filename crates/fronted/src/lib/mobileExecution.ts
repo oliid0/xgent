@@ -48,6 +48,16 @@ export type MobileEnvironmentInstallProgress = {
   percent?: number | null;
 };
 
+export type MobileExecutionOutput = {
+  runId: string;
+  stream: "stdout" | "stderr";
+  data: string;
+};
+
+export function listenMobileExecutionOutput(handler: (output: MobileExecutionOutput) => void) {
+  return listenNativePlugin<MobileExecutionOutput>("mobile-execution", "output", handler);
+}
+
 export function listenMobileEnvironmentInstallProgress(
   handler: (progress: MobileEnvironmentInstallProgress) => void,
 ) {

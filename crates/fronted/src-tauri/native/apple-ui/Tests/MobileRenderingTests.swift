@@ -334,6 +334,22 @@ final class MobileRenderingTests: XCTestCase {
         XCTAssertGreaterThan(try XCTUnwrap(image.pngData()).count, 10_000)
         let pixels = try XCTUnwrap(image.cgImage?.dataProvider?.data) as Data
         XCTAssertGreaterThan(Set(pixels).count, 8, "\(name) must contain rendered content, not a blank image")
+        if name == "chat-narrow" {
+            let bitmap = try XCTUnwrap(image.cgImage)
+            let bytesPerPixel = bitmap.bitsPerPixel / 8
+            XCTAssertGreaterThanOrEqual(bytesPerPixel, 3)
+            var foregroundPixels = 0
+            for y in (bitmap.height * 3 / 4)..<bitmap.height {
+                for x in (bitmap.width / 10)..<(bitmap.width * 9 / 10) {
+                    let offset = y * bitmap.bytesPerRow + x * bytesPerPixel
+                    if (0..<3).filter({ pixels[offset + $0] < 100 }).count >= 2 {
+                        foregroundPixels += 1
+                    }
+                }
+            }
+            XCTAssertGreaterThan(foregroundPixels, 50,
+                                 "The bottom composer must render visible input and controls")
+        }
         let attachment = XCTAttachment(image: image)
         attachment.name = name
         attachment.lifetime = .keepAlways
