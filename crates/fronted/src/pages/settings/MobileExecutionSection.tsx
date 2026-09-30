@@ -244,12 +244,17 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
             </VStack>
           </StackItem>
           {isNativeMobile ? (
-            <StatusDot
-              label={
-                status?.installed ? t("settings.mobileReady") : t("settings.mobileNotInstalled")
-              }
-              variant={status?.installed ? "success" : "neutral"}
-            />
+            <HStack gap={1} vAlign="center">
+              <StatusDot
+                label={
+                  status?.installed ? t("settings.mobileReady") : t("settings.mobileNotInstalled")
+                }
+                variant={status?.installed ? "success" : "neutral"}
+              />
+              <Text type="supporting" color="secondary" aria-hidden="true">
+                {status?.installed ? t("settings.mobileReady") : t("settings.mobileNotInstalled")}
+              </Text>
+            </HStack>
           ) : null}
         </HStack>
 
@@ -432,15 +437,22 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
                           </VStack>
                         }
                         endContent={
-                          <HStack gap={2} vAlign="center">
-                            <StatusDot
-                              label={
-                                workspace.active
+                          <HStack gap={2} vAlign="center" wrap="wrap">
+                            <HStack gap={1} vAlign="center">
+                              <StatusDot
+                                label={
+                                  workspace.active
+                                    ? t("settings.mobileReady")
+                                    : t("settings.native.unavailable")
+                                }
+                                variant={workspace.active ? "success" : "warning"}
+                              />
+                              <Text type="supporting" color="secondary" aria-hidden="true">
+                                {workspace.active
                                   ? t("settings.mobileReady")
-                                  : t("settings.mobileNotInstalled")
-                              }
-                              variant={workspace.active ? "success" : "warning"}
-                            />
+                                  : t("settings.native.unavailable")}
+                              </Text>
+                            </HStack>
                             <Token
                               label={
                                 workspace.writable
