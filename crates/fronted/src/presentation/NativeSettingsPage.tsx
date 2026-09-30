@@ -29,12 +29,14 @@ import {
   installMobileToolchains,
   listExternalMobileWorkspaces,
   listenMobileEnvironmentInstallProgress,
+  listenMobileExecutionOutput,
   type MobileEnvironmentInstallProgress,
   type MobileExecutionStatus,
   mobileEnvironmentInstallLabel,
   mobileExecutionStatus,
   pickExternalMobileWorkspace,
   removeExternalMobileWorkspace,
+  setMobileAlpineMirror,
 } from "../lib/mobileExecution";
 import {
   type AppSettings,
@@ -135,6 +137,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [shell, setShell] = useState<MobileExecutionStatus>();
   const [shellToolchains, setShellToolchains] = useState<string[]>([]);
   const [shellRunId, setShellRunId] = useState("");
+  const [shellInstallOutput, setShellInstallOutput] = useState("");
   const [shellInstallStage, setShellInstallStage] = useState<"rootfs" | "essentials" | "">("");
   const [shellInstallProgress, setShellInstallProgress] =
     useState<MobileEnvironmentInstallProgress | null>(null);
@@ -208,8 +211,24 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   async function installShellToolchains(toolchains = shellToolchains) {
     const runId = `mobile-install-${createUuid()}`;
     setShellRunId(runId);
+    setShellInstallOutput("");
+    let stopOutput: (() => Promise<void>) | undefined;
     try {
+      const decoder = { stdout: new TextDecoder(), stderr: new TextDecoder() };
+      stopOutput = await listenMobileExecutionOutput((event) => {
+        if (event.runId !== runId || (event.stream !== "stdout" && event.stream !== "stderr"))
+          return;
+        try {
+          const bytes = Uint8Array.from(atob(event.data), (char) => char.charCodeAt(0));
+          const chunk = decoder[event.stream].decode(bytes, { stream: true });
+          setShellInstallOutput((current) => (current + chunk).slice(-8_192));
+        } catch {
+          // The final plugin response still contains the authoritative output.
+        }
+      }).catch(() => undefined);
       const result = await installMobileToolchains(toolchains, runId);
+      const completedOutput = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
+      if (completedOutput) setShellInstallOutput(completedOutput.slice(-8_192));
       await refreshShell();
       if (!result.succeeded)
         throw new Error(
@@ -218,6 +237,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             : result.stderr.trim() || `Package installation exited with code ${result.exitCode}`,
         );
     } finally {
+      await stopOutput?.().catch(() => undefined);
       setShellRunId("");
     }
   }
@@ -1239,6 +1259,28 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         ),
         c.action("refresh-shell", t("settings.mobileRefresh"), () => work(refreshShell), !busy),
       ]),
+      ...(shell?.backend === "android-proot" && shell.alpineMirrors?.length
+        ? [
+            c.group("shell-mirror", t("settings.mobileAlpineMirror"), [
+              c.select(
+                "alpine-mirror",
+                t("settings.mobileAlpineMirror"),
+                shell.selectedAlpineMirror ?? "official",
+                shell.alpineMirrors.map((mirror) => ({ value: mirror.id, label: mirror.name })),
+                (id) =>
+                  work(async () => {
+                    setShell(await setMobileAlpineMirror(id));
+                  }),
+                !busy,
+              ),
+              {
+                id: "alpine-mirror-hint",
+                kind: "Text",
+                text: t("settings.mobileAlpineMirrorHint"),
+              },
+            ]),
+          ]
+        : []),
       c.group("shell-toolchains", t("settings.native.toolchains"), [
         ...(shell?.toolchains ?? []).map(
           (tool): PresentationNode =>
@@ -1281,6 +1323,16 @@ export function NativeSettingsPage(props: SettingsPageProps) {
                   setError(String(cause));
                 }
               }),
+            ]
+          : []),
+        ...(shellInstallOutput
+          ? [
+              {
+                id: "shell-install-output",
+                kind: "CodeBlock" as const,
+                label: t("settings.mobileInstallOutput"),
+                text: shellInstallOutput.split("\n").slice(-12).join("\n"),
+              },
             ]
           : []),
       ]),

@@ -41,6 +41,10 @@ pub struct MobileExecutionStatus {
     pub capabilities: MobileExecutionCapabilities,
     #[serde(default)]
     pub toolchains: Vec<MobileToolchainStatus>,
+    #[serde(default)]
+    pub alpine_mirrors: Vec<AlpineMirror>,
+    #[serde(default)]
+    pub selected_alpine_mirror: Option<String>,
     pub environment_version: Option<String>,
     pub disk_usage_bytes: Option<u64>,
 }
@@ -77,6 +81,19 @@ pub struct InstallToolchainsResponse {
     pub stderr: String,
     pub timed_out: bool,
     pub cancelled: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlpineMirror {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetAlpineMirrorRequest {
+    pub id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

@@ -30,6 +30,15 @@ impl<R: Runtime> MobileExecution<R> {
         self.0.run_mobile_plugin("status", ()).map_err(Into::into)
     }
 
+    pub fn set_alpine_mirror(
+        &self,
+        request: SetAlpineMirrorRequest,
+    ) -> crate::Result<MobileExecutionStatus> {
+        self.0
+            .run_mobile_plugin("setAlpineMirror", request)
+            .map_err(Into::into)
+    }
+
     pub fn install(&self, request: InstallRequest) -> crate::Result<InstallResponse> {
         self.0
             .run_mobile_plugin("install", request)

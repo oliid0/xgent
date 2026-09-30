@@ -21,12 +21,21 @@ impl<R: Runtime> MobileExecution<R> {
             detail: Some("desktop commands use the native Xgent runner".to_string()),
             capabilities: MobileExecutionCapabilities::default(),
             toolchains: Vec::new(),
+            alpine_mirrors: Vec::new(),
+            selected_alpine_mirror: None,
             environment_version: None,
             disk_usage_bytes: None,
         })
     }
 
     pub fn install(&self, _request: InstallRequest) -> crate::Result<InstallResponse> {
+        Err(crate::Error::Unavailable)
+    }
+
+    pub fn set_alpine_mirror(
+        &self,
+        _request: SetAlpineMirrorRequest,
+    ) -> crate::Result<MobileExecutionStatus> {
         Err(crate::Error::Unavailable)
     }
 
