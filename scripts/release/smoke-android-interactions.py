@@ -110,6 +110,25 @@ tap({"Python and pip"}, scroll=True)
 tap({"安装所选能力包", "Install selected packs"}, scroll=True, scroll_direction="up")
 time.sleep(3)
 capture("package-install-progress")
+deadline = time.monotonic() + 90
+while time.monotonic() < deadline:
+    output = [
+        node.get(key, "")
+        for node in snapshot().iter("node")
+        for key in ("text", "content-desc")
+    ]
+    if any(
+        "fetch https://" in value
+        or re.search(r"\(\d+/\d+\) Installing", value)
+        or "OK:" in value
+        for value in output
+    ):
+        capture("package-install-output")
+        break
+    time.sleep(2)
+else:
+    capture("package-install-output-missing")
+    raise AssertionError("The package installer did not expose live APK output")
 tap({"返回设置", "Back to Settings"}, timeout=300)
 tap({"返回对话", "Back to Chat"})
 tap({"工作工具", "Workspace tools"})
