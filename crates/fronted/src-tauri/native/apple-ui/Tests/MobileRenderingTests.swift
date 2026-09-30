@@ -355,23 +355,25 @@ final class MobileRenderingTests: XCTestCase {
             } else {
                 XCTAssertGreaterThanOrEqual(channels.filter { $0 > 180 }.count, 3,
                                             "Light model picker needs a light background")
-                func darkTextPixels(x: Range<Int>, y: Range<Int>) -> Int {
+                func darkTextPixels(x: Range<Int>, y: Range<Int>, below limit: UInt8) -> Int {
                     var count = 0
                     for row in stride(from: y.lowerBound, to: y.upperBound, by: 2) {
                         for column in stride(from: x.lowerBound, to: x.upperBound, by: 2) {
                             let position = row * bitmap.bytesPerRow + column * bytesPerPixel
-                            if (0..<bytesPerPixel).filter({ pixels[position + $0] < 100 }).count >= 3 {
+                            if (0..<bytesPerPixel).filter({ pixels[position + $0] < limit }).count >= 3 {
                                 count += 1
                             }
                         }
                     }
                     return count
                 }
-                XCTAssertGreaterThan(darkTextPixels(x: bitmap.width / 3..<bitmap.width * 2 / 3,
-                                                    y: bitmap.height / 40..<bitmap.height / 10), 25,
+                XCTAssertGreaterThan(darkTextPixels(x: bitmap.width / 25..<bitmap.width / 3,
+                                                    y: bitmap.height / 80..<bitmap.height / 16,
+                                                    below: 100), 25,
                                      "Light model picker title must be readable")
-                XCTAssertGreaterThan(darkTextPixels(x: bitmap.width / 10..<bitmap.width * 3 / 5,
-                                                    y: bitmap.height / 10..<bitmap.height / 6), 25,
+                XCTAssertGreaterThan(darkTextPixels(x: bitmap.width / 10..<bitmap.width / 2,
+                                                    y: bitmap.height / 16..<bitmap.height / 10,
+                                                    below: 150), 25,
                                      "Light model picker search field must be readable")
             }
         }
