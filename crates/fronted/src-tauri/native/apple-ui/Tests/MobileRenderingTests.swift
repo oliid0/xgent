@@ -222,6 +222,14 @@ final class MobileRenderingTests: XCTestCase {
         let modelNode = try XCTUnwrap(actions.children?.first { $0.id == "model" })
         try await capture(XgentIOSModelPicker(node: modelNode, document: chat, model: model),
                           name: "model-groups-narrow", width: 320)
+        let lightChat = try document(mode: "root", appearance: "light", nodes: chatNodes)
+        let lightModel = XgentPresentationModel()
+        lightModel.update(lightChat)
+        let lightComposer = try XCTUnwrap(lightChat.nodes.first?.children?.first { $0.id == "composer" })
+        let lightActions = try XCTUnwrap(lightComposer.children?.first { $0.id == "composer-actions" })
+        let lightModelNode = try XCTUnwrap(lightActions.children?.first { $0.id == "model" })
+        try await capture(XgentIOSModelPicker(node: lightModelNode, document: lightChat, model: lightModel),
+                          name: "model-groups-light-narrow", width: 320)
         let settings = try document(mode: "sheet", appearance: "light", nodes: [
             node("back", "Button", ["label": "Back", "action": "back"]),
             node("save-status", "Text", ["text": "Saving changes", "secondary": true]),
@@ -334,6 +342,21 @@ final class MobileRenderingTests: XCTestCase {
         XCTAssertGreaterThan(try XCTUnwrap(image.pngData()).count, 10_000)
         let pixels = try XCTUnwrap(image.cgImage?.dataProvider?.data) as Data
         XCTAssertGreaterThan(Set(pixels).count, 8, "\(name) must contain rendered content, not a blank image")
+        if name == "model-groups-narrow" || name == "model-groups-light-narrow" {
+            let bitmap = try XCTUnwrap(image.cgImage)
+            let bytesPerPixel = bitmap.bitsPerPixel / 8
+            XCTAssertGreaterThanOrEqual(bytesPerPixel, 3)
+            let offset = (bitmap.height * 3 / 4) * bitmap.bytesPerRow
+                + (bitmap.width / 2) * bytesPerPixel
+            let channels = (0..<bytesPerPixel).map { pixels[offset + $0] }
+            if name == "model-groups-narrow" {
+                XCTAssertGreaterThanOrEqual(channels.filter { $0 < 100 }.count, 3,
+                                            "Dark model picker needs a dark background")
+            } else {
+                XCTAssertGreaterThanOrEqual(channels.filter { $0 > 180 }.count, 3,
+                                            "Light model picker needs a light background")
+            }
+        }
         if name == "chat-narrow" {
             let bitmap = try XCTUnwrap(image.cgImage)
             let bytesPerPixel = bitmap.bitsPerPixel / 8

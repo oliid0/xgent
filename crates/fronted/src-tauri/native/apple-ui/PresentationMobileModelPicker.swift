@@ -71,6 +71,7 @@ struct XgentIOSModelPicker: View {
             }
         }
         .presentationDetents([.large])
+        .preferredColorScheme((currentDocument ?? document).colorScheme)
         .onChange(of: currentNode == nil || currentNode?.disabled == true) { _, unavailable in
             if unavailable { dismiss() }
         }
