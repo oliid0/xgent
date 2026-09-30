@@ -1006,9 +1006,32 @@ jobs:
           project="crates/fronted/src-tauri/gen/apple/xgent.xcodeproj"
           simulator_build="$RUNNER_TEMP/xgent-ios-simulator-derived"
           log="$RUNNER_TEMP/xgent-ios-simulator-build.log"
+          options_file="crates/fronted/src-tauri/gen/apple/.tauri/cli-options-server.json"
+          options_log="$RUNNER_TEMP/xgent-ios-simulator-options.log"
           # Tauri's ios build archives for iphoneos even with --target x86_64;
-          # Xcode then excludes that architecture and leaves ARCHS empty.
-          # Build the generated project for the simulator destination directly.
+          # Xcode then excludes that architecture and leaves ARCHS empty. Keep
+          # the CLI options server alive while building the simulator in Xcode.
+          rm -f "$options_file"
+          (
+            cd crates/fronted
+            pnpm tauri ios build --ci --no-sign --open \
+              --config "$XGENT_TAURI_VERSION_CONFIG" --target
+          ) > "$options_log" 2>&1 &
+          tauri_cli_pid=$!
+          trap 'kill "$tauri_cli_pid" 2>/dev/null || true; wait "$tauri_cli_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 90); do
+            if ! kill -0 "$tauri_cli_pid" 2>/dev/null; then
+              cat "$options_log"
+              exit 1
+            fi
+            if [ -s "$options_file" ]; then break; fi
+            sleep 2
+          done
+          if [ ! -s "$options_file" ]; then
+            cat "$options_log"
+            echo "Tauri iOS CLI options server did not start" >&2
+            exit 1
+          fi
           if ! xcodebuild build -project "$project" -scheme xgent_iOS \
             -configuration release -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \

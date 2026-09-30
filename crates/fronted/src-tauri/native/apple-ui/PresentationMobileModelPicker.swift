@@ -24,9 +24,51 @@ struct XgentIOSModelPicker: View {
         let theme = currentDocument?.theme ?? document.theme ?? .fallback
         return Color(xgentHex: theme.palette(for: displayedScheme).background)
     }
+    private var palette: XgentPalette {
+        (currentDocument?.theme ?? document.theme ?? .fallback).palette(for: displayedScheme)
+    }
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Text(currentNode?.label ?? node.label ?? "Model")
+                    .font(.headline)
+                    .foregroundStyle(Color(xgentHex: palette.text))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Button { dismiss() } label: { Image(systemName: "xmark") }
+                    .accessibilityLabel(Text("Close"))
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(Color(xgentHex: palette.secondaryText))
+                TextField(
+                    "Search models",
+                    text: $query,
+                    prompt: Text(currentNode?.text ?? node.text ?? node.label ?? "Model")
+                        .foregroundStyle(Color(xgentHex: palette.secondaryText))
+                )
+                .foregroundStyle(Color(xgentHex: palette.text))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .accessibilityIdentifier("model-search")
+                if !query.isEmpty {
+                    Button { query = "" } label: { Image(systemName: "xmark.circle.fill") }
+                        .accessibilityLabel(Text("Clear search"))
+                        .foregroundStyle(Color(xgentHex: palette.secondaryText))
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
+            .background(Color(xgentHex: palette.card), in: RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+
             List {
                 ForEach(groups) { group in
                     Section {
@@ -38,7 +80,7 @@ struct XgentIOSModelPicker: View {
                             } label: {
                                 HStack(spacing: 12) {
                                     Text(option.displayLabel)
-                                        .foregroundStyle(.primary)
+                                        .foregroundStyle(Color(xgentHex: palette.text))
                                         .fixedSize(horizontal: false, vertical: true)
                                     Spacer(minLength: 8)
                                     if let currentNode, option.value == model.value(currentNode, in: document).text {
@@ -48,6 +90,7 @@ struct XgentIOSModelPicker: View {
                                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                                 .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
                             .disabled(option.disabled == true || currentNode == nil || currentNode?.disabled == true)
                             .accessibilityIdentifier("model-option:\(option.value)")
                         }
@@ -58,7 +101,6 @@ struct XgentIOSModelPicker: View {
             }
             .scrollContentBackground(.hidden)
             .scrollDismissesKeyboard(.interactively)
-            .background { XgentThemeBackground().ignoresSafeArea() }
             .overlay {
                 if groups.isEmpty {
                     let empty = currentNode?.children?.first { $0.kind == .emptyState }
@@ -67,20 +109,8 @@ struct XgentIOSModelPicker: View {
                     }
                 }
             }
-            .navigationTitle(currentNode?.label ?? node.label ?? "Model")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(displayedBackground, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(displayedScheme, for: .navigationBar)
-            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always),
-                        prompt: Text(currentNode?.text ?? node.text ?? node.label ?? "Model"))
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: { Image(systemName: "xmark") }
-                        .accessibilityLabel(Text("Close"))
-                }
-            }
         }
+        .background(displayedBackground.ignoresSafeArea())
         .presentationDetents([.large])
         .preferredColorScheme((currentDocument ?? document).colorScheme)
         .onChange(of: currentNode == nil || currentNode?.disabled == true) { _, unavailable in
