@@ -963,6 +963,12 @@ jobs:
 
               required = [
                   "Frameworks/ios_system.framework/ios_system",
+                  "Frameworks/dash.framework/dash",
+                  "Frameworks/dashA.framework/dashA",
+                  "Frameworks/dashB.framework/dashB",
+                  "Frameworks/dashC.framework/dashC",
+                  "Frameworks/dashD.framework/dashD",
+                  "Frameworks/dashE.framework/dashE",
                   "Frameworks/openssl.framework/openssl",
                   "Frameworks/libssh2.framework/libssh2",
                   "Frameworks/ffmpeg.framework/ffmpeg",

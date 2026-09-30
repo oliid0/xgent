@@ -70,7 +70,8 @@ private let pythonFrameworks = [
 
 private let nativeTargetNames = [
     "ios_system", "awk", "curl_ios", "files", "shell", "tar", "text", "ssh_cmd",
-    "dash", "vim", "lg2", "ffmpeg", "ffprobe", "openssl", "libssh2", "freetype", "lua_ios",
+    "dash", "dashA", "dashB", "dashC", "dashD", "dashE",
+    "vim", "lg2", "ffmpeg", "ffprobe", "openssl", "libssh2", "freetype", "lua_ios",
     "harfbuzz", "libpng",
 ]
 
@@ -167,6 +168,33 @@ let package = Package(
             name: "dash",
             url: "https://github.com/holzschu/ios_system/releases/download/Auxiliary/dash.xcframework.zip",
             checksum: "9a30ac6b3780dd68d2268d10467902214e32333e980c59090faa6099f0d250fc"
+        ),
+        // dash loads these command slices with dlopen, so Mach-O dependency
+        // inspection cannot discover them from dash.framework alone.
+        .binaryTarget(
+            name: "dashA",
+            url: "https://github.com/holzschu/ios_system/releases/download/Auxiliary/dashA.xcframework.zip",
+            checksum: "a45eb647bf81caf0fd80dba704326842ce03668c60499488d387dce26cf30ee6"
+        ),
+        .binaryTarget(
+            name: "dashB",
+            url: "https://github.com/holzschu/ios_system/releases/download/Auxiliary/dashB.xcframework.zip",
+            checksum: "c0de9fdc7c9cc2386012a1dccdbb112cf4b15243699ffcf49c9dbc6d17163bce"
+        ),
+        .binaryTarget(
+            name: "dashC",
+            url: "https://github.com/holzschu/ios_system/releases/download/Auxiliary/dashC.xcframework.zip",
+            checksum: "553d98fa8c5705754a9cdd2f4d2f5d3cd5d1dc5f765921f5fb0f3422848e09bf"
+        ),
+        .binaryTarget(
+            name: "dashD",
+            url: "https://github.com/holzschu/ios_system/releases/download/Auxiliary/dashD.xcframework.zip",
+            checksum: "7aa457e359b3bb215fdd56df5b689b826863f2e96d72a87a3046a3116f2dd30c"
+        ),
+        .binaryTarget(
+            name: "dashE",
+            url: "https://github.com/holzschu/ios_system/releases/download/Auxiliary/dashE.xcframework.zip",
+            checksum: "9f79675fa3c797257931853ca746337a66f8218157d44736d1c14425030aff3e"
         ),
         .binaryTarget(
             name: "vim",

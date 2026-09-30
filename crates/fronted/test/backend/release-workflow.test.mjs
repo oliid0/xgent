@@ -25,6 +25,10 @@ const iosPackage = readFileSync(
   path.join(repoRoot, "crates/mobile-execution/ios/Package.swift"),
   "utf8",
 );
+const iosFrameworkPackage = readFileSync(
+  path.join(repoRoot, "crates/mobile-execution/ios-frameworks/Package.swift"),
+  "utf8",
+);
 const mobileAssistantIos = readFileSync(
   path.join(repoRoot, "crates/mobile-assistant/ios/Sources/MobileAssistantPlugin.swift"),
   "utf8",
@@ -279,6 +283,12 @@ test("release packaging preserves native runtime resources without ABI drift", (
       "ios_system requires a root-level Copy Bundle Resources entry, not just Tauri assets");
     assert.ok(workflow.includes(`"${dictionary}.plist",`), "IPA verification checks the bootstrap dictionary");
     assert.ok(readFileSync(path.resolve(repoRoot, "crates/fronted/src-tauri/gen/apple", source), "utf8").includes("<plist"));
+  }
+  for (const name of ["dash", "dashA", "dashB", "dashC", "dashD", "dashE"]) {
+    assert.ok(iosFrameworkPackage.includes(`"${name}"`), `${name} must be an app product target`);
+    assert.ok(iosFrameworkPackage.includes(`name: "${name}"`), `${name} must have a binary target`);
+    assert.ok(workflow.includes(`"Frameworks/${name}.framework/${name}"`),
+      `${name} is loaded at runtime and must be embedded in the IPA`);
   }
   assert.match(iosPlugin, /let commands = Set\(commandsAsArray\(\)/);
   assert.match(iosPlugin, /guard missingCommands\.isEmpty else/);

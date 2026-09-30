@@ -30,7 +30,17 @@ def tap(labels, timeout=30, scroll=False, scroll_direction="down"):
     size = adb("shell", "wm", "size").decode()
     width, height = map(int, re.findall(r"(\d+)x(\d+)", size)[-1])
     while time.monotonic() < deadline:
-        for node in snapshot().iter("node"):
+        nodes = list(snapshot().iter("node"))
+        # WebView reports controls underneath the fixed settings header as
+        # visible. Tapping their reported center instead hits the header.
+        header_bottom = max(
+            (int(bounds[3]) for node in nodes
+             if matches(node, {"返回设置", "Back to Settings"})
+             if len(bounds := list(map(int, re.findall(r"-?\d+", node.get("bounds", ""))))) == 4),
+            default=0,
+        )
+        obscured_above = False
+        for node in nodes:
             if node.get("enabled") != "true" or not matches(node, labels):
                 continue
             bounds = list(map(int, re.findall(r"-?\d+", node.get("bounds", ""))))
@@ -38,6 +48,10 @@ def tap(labels, timeout=30, scroll=False, scroll_direction="down"):
                 continue
             left, top = max(0, bounds[0]), max(0, bounds[1])
             right, bottom = min(width, bounds[2]), min(height, bounds[3])
+            if (header_bottom and top < header_bottom + 12
+                    and not matches(node, {"返回设置", "Back to Settings"})):
+                obscured_above = True
+                continue
             if right > left and bottom > top:
                 adb("shell", "input", "tap", str((left + right) // 2), str((top + bottom) // 2))
                 time.sleep(1)
@@ -45,7 +59,7 @@ def tap(labels, timeout=30, scroll=False, scroll_direction="down"):
         if scroll and swipes < 12:
             start_y, end_y = (
                 (height // 3, height * 3 // 4)
-                if scroll_direction == "up"
+                if obscured_above or scroll_direction == "up"
                 else (height * 3 // 4, height // 3)
             )
             adb("shell", "input", "swipe", str(width // 2), str(start_y),
@@ -101,6 +115,9 @@ if any(matches(node, {"安装基础环境", "Install base environment"}) for nod
             break
         time.sleep(2)
     else:
+        capture("install-not-ready")
+        visible = [node.get("text", "") for node in snapshot().iter("node") if node.get("text")]
+        print("Shell installation did not become ready; visible state:", visible[-30:])
         raise AssertionError("The bundled Shell environment did not become ready")
 # Wait for the install/refresh action to finish, then install actual packages
 # through the Android settings controls. A ready rootfs only contains BusyBox.

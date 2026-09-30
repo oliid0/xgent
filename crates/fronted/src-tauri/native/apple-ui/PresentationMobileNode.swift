@@ -889,16 +889,22 @@ struct XgentIOSNode: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(node.label ?? "Tool")
                         .font(.system(.subheadline, design: .monospaced).weight(.medium))
-                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(Color(xgentHex: palette.text))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .minimumScaleFactor(0.85)
                     if let text = node.text, !text.isEmpty {
-                        Text(text).font(.caption).foregroundStyle(.secondary)
+                        Text(text).font(.caption)
+                            .foregroundStyle(Color(xgentHex: palette.secondaryText))
                             .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                            .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .tint(Color(xgentHex: palette.secondaryText))
         .padding(10)
         .background(Color(xgentHex: palette.surface).opacity(0.72), in: RoundedRectangle(
             cornerRadius: CGFloat(theme.radius.element), style: .continuous
