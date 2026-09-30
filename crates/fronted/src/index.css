@@ -3738,6 +3738,13 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   padding-left: max(var(--spacing-4), env(safe-area-inset-left, 0px));
 }
 
+[data-native-mobile="true"] .settings-page-compact .mobile-execution-section {
+  min-width: 0;
+  padding-right: max(var(--spacing-4), env(safe-area-inset-right, 0px));
+  padding-left: max(var(--spacing-4), env(safe-area-inset-left, 0px));
+  overflow-wrap: anywhere;
+}
+
 [data-native-mobile="true"] .settings-page-compact .mobile-execution-install-bar {
   position: sticky;
   top: 0;

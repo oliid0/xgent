@@ -141,7 +141,12 @@ targets:
       {{~/each}}
 
       - script: |
-          export CPP="$(xcrun --find clang) -E -isysroot ${SDKROOT:?}"
+          case "${PLATFORM_NAME:?}" in
+            iphoneos) cpp_target="${ARCHS:?}-apple-ios" ;;
+            iphonesimulator) cpp_target="${ARCHS:?}-apple-ios-simulator" ;;
+            *) echo "Unsupported iOS build platform: ${PLATFORM_NAME}" >&2; exit 1 ;;
+          esac
+          export CPP="$(xcrun --find clang) -E -target ${cpp_target} -isysroot ${SDKROOT:?}"
           {{ tauri-binary }} {{ tauri-binary-args-str }} -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
         name: Build Rust Code
         basedOnDependencyAnalysis: false

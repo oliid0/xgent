@@ -465,11 +465,12 @@ struct XgentIOSNode: View {
                     .font(node.variant == "compact"
                         ? .caption.weight(.medium)
                         : .body.weight(node.prominent == true ? .semibold : .regular))
-                    .lineLimit(node.variant == "compact" ? 2 : 1)
+                    .lineLimit(document.mode == .sheet ? nil : (node.variant == "compact" ? 2 : 1))
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(minHeight: CGFloat(theme.control.medium))
-            .frame(maxWidth: node.variant == "compact" ? .infinity : nil)
+            .frame(maxWidth: document.mode == .sheet || node.variant == "compact" ? .infinity : nil)
             .padding(.horizontal, node.variant == "compact" ? 6 : 14)
             .foregroundStyle(buttonForeground)
             .background(buttonBackground, in: RoundedRectangle(
@@ -506,33 +507,21 @@ struct XgentIOSNode: View {
     }
 
     @ViewBuilder private var textInput: some View {
-        if document.mode == .sheet, !dynamicTypeSize.isAccessibilitySize {
-            HStack(spacing: 12) {
-                Text(node.label ?? "")
-                Spacer(minLength: 12)
-                textEntry
-                    .textFieldStyle(.plain)
-                    .multilineTextAlignment(.trailing)
-                    .frame(minWidth: 100, idealWidth: 180, maxWidth: 240)
+        VStack(alignment: .leading, spacing: 7) {
+            if let label = node.label, !label.isEmpty, document.mode == .sheet {
+                Text(label).font(.subheadline).foregroundStyle(.secondary)
             }
-            .frame(minHeight: 44)
-        } else {
-            VStack(alignment: .leading, spacing: 7) {
-                if let label = node.label, !label.isEmpty, document.mode == .sheet {
-                    Text(label).font(.subheadline).foregroundStyle(.secondary)
+            textEntry
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
+                .background(Color(xgentHex: palette.surface), in: RoundedRectangle(
+                    cornerRadius: CGFloat(theme.radius.element), style: .continuous
+                ))
+                .overlay {
+                    RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
+                        .stroke(Color(xgentHex: palette.border), lineWidth: 1)
                 }
-                textEntry
-                    .textFieldStyle(.plain)
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 42)
-                    .background(Color(xgentHex: palette.surface), in: RoundedRectangle(
-                        cornerRadius: CGFloat(theme.radius.element), style: .continuous
-                    ))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
-                            .stroke(Color(xgentHex: palette.border), lineWidth: 1)
-                    }
-            }
         }
     }
 
@@ -754,7 +743,8 @@ struct XgentIOSNode: View {
                     Text(node.label ?? "").foregroundStyle(Color(xgentHex: palette.text))
                     if let text = node.text, !text.isEmpty {
                         Text(text).font(.subheadline).foregroundStyle(Color(xgentHex: palette.secondaryText))
-                            .lineLimit(2)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 8)

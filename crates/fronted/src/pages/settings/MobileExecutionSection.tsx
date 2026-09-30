@@ -205,7 +205,7 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
   }
 
   return (
-    <Section padding={5} width="100%">
+    <Section padding={5} width="100%" className="mobile-execution-section">
       <VStack gap={4}>
         <HStack gap={3} hAlign="between" vAlign="start" wrap="wrap">
           <Terminal />

@@ -217,7 +217,9 @@ test("iOS release prepares host tools and every target before Tauri initializati
   assert.match(ios, /for formula in xcodegen libimobiledevice; do/);
   assert.match(ios, /sudo xcode-select --switch "\$DEVELOPER_DIR"/);
   assert.match(ios, /SDKROOT="\$\(xcrun --sdk iphoneos --show-sdk-path\)"\s+export SDKROOT/);
-  assert.match(iosProjectTemplate, /export CPP="\$\(xcrun --find clang\) -E -isysroot \$\{SDKROOT:\?\}"/);
+  assert.match(iosProjectTemplate, /iphoneos\) cpp_target="\$\{ARCHS:\?\}-apple-ios"/);
+  assert.match(iosProjectTemplate, /iphonesimulator\) cpp_target="\$\{ARCHS:\?\}-apple-ios-simulator"/);
+  assert.match(iosProjectTemplate, /export CPP="\$\(xcrun --find clang\) -E -target \$\{cpp_target\} -isysroot \$\{SDKROOT:\?\}"/);
   assert.match(ios, /xgent-ios-libsodium-preprocessor\.log/);
   assert.match(ios, /if ! command -v pod >\/dev\/null 2>&1; then\s+brew install cocoapods/);
   assert.match(ios, /if \[ ! -L .*homebrew\/linked\/\$formula.*\]; then\s+brew link "\$formula"/);
