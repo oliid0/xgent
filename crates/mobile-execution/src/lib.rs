@@ -35,6 +35,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("mobile-execution")
         .invoke_handler(tauri::generate_handler![
             commands::status,
+            commands::set_alpine_mirror,
             commands::install,
             commands::install_toolchains,
             commands::list_external_workspaces,

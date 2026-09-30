@@ -2554,6 +2554,8 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.mobileInstallEnvironment": "安装基础环境",
     "settings.mobileInstalling": "正在安装…",
     "settings.mobileInstallOutput": "安装输出",
+    "settings.mobileAlpineMirror": "Alpine 软件源",
+    "settings.mobileAlpineMirrorHint": "选择 APK 软件包下载镜像；安装基础环境前后均可更改。",
     "settings.mobileCapabilityPacks": "按需能力包",
     "settings.mobileInstallSelected": "安装所选能力包",
     "settings.mobileCancel": "取消安装",
@@ -5579,6 +5581,9 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.mobileInstallEnvironment": "Install base environment",
     "settings.mobileInstalling": "Installing…",
     "settings.mobileInstallOutput": "Installation output",
+    "settings.mobileAlpineMirror": "Alpine package mirror",
+    "settings.mobileAlpineMirrorHint":
+      "Choose the APK package download mirror. You can change it before or after installing Alpine.",
     "settings.mobileCapabilityPacks": "On-demand capability packs",
     "settings.mobileInstallSelected": "Install selected packs",
     "settings.mobileCancel": "Cancel installation",

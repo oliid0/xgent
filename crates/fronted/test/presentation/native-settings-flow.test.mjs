@@ -201,13 +201,18 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(rendered.type, "MobileMcpPage");
 });
 
-test("native Shell install responds to touch, reports progress, and exposes installation errors", async () => {
+test("native Shell install reports progress, errors, and live and final package output", async () => {
   const states = [];
   const effects = [];
   let cursor = 0;
   let installCalls = 0;
   let onProgress;
   let installFailure;
+  let onOutput;
+  let completeToolchains;
+  let toolchainRunId;
+  let outputUnsubscribed = false;
+  let selectedMirror;
   const locale = { SUPPORTED_LOCALES: ["en-US"], useLocale: () => ({ t: (key) => key }) };
   const shellStatus = {
     backend: "ios-a-shell", available: false, installed: false,
@@ -245,6 +250,19 @@ test("native Shell install responds to touch, reports progress, and exposes inst
         onProgress = handler;
         return () => { onProgress = undefined; };
       },
+      listenMobileExecutionOutput: async (handler) => {
+        onOutput = handler;
+        return async () => { onOutput = undefined; outputUnsubscribed = true; };
+      },
+      installMobileToolchains: (_toolchains, runId) => {
+        toolchainRunId = runId;
+        return new Promise((resolve) => { completeToolchains = resolve; });
+      },
+      setMobileAlpineMirror: async (id) => {
+        selectedMirror = id;
+        shellStatus.selectedAlpineMirror = id;
+        return shellStatus;
+      },
       mobileEnvironmentInstallLabel: (progress) => progress?.phase ?? "Installing",
     },
   } });
@@ -277,6 +295,44 @@ test("native Shell install responds to touch, reports progress, and exposes inst
   render();
   assert.match(document.nodes.find((node) => node.id === "error")?.label ?? "", /Missing bundled/);
   assert.equal(onProgress, undefined, "listener is removed after a failed install");
+
+  shellStatus.backend = "android-proot";
+  shellStatus.available = true;
+  shellStatus.installed = true;
+  shellStatus.toolchains = [{ id: "essentials", label: "Essentials", installed: false, installable: true }];
+  await registry.dispatch({ surface: "settings-install", action: "refresh-shell", value: null, requestId: "2" });
+  render();
+  await registry.dispatch({ surface: "settings-install", action: "shell-pack:essentials", value: true, requestId: "3" });
+  render();
+  const installing = registry.dispatch({ surface: "settings-install", action: "install-shell-packs", value: null, requestId: "4" });
+  await new Promise((resolve) => setImmediate(resolve));
+  onOutput({ runId: toolchainRunId, stream: "stdout",
+    data: Buffer.from("Downloading packages\n").toString("base64") });
+  render();
+  assert.match(document.nodes.find((node) => node.id === "shell-toolchains")?.children
+    .find((node) => node.id === "shell-install-output")?.text ?? "", /Downloading packages/);
+  completeToolchains({ succeeded: true, stdout: "Packages installed\n", stderr: "", status: [], exitCode: 0 });
+  assert.equal((await installing).ok, true);
+  render();
+  assert.match(document.nodes.find((node) => node.id === "shell-toolchains")?.children
+    .find((node) => node.id === "shell-install-output")?.text ?? "", /Packages installed/);
+  assert.equal(outputUnsubscribed, true);
+
+  shellStatus.alpineMirrors = [
+    { id: "official", name: "Official CDN" },
+    { id: "tuna", name: "Tsinghua TUNA" },
+  ];
+  shellStatus.selectedAlpineMirror = "official";
+  await registry.dispatch({ surface: "settings-install", action: "refresh-shell", value: null, requestId: "5" });
+  render();
+  assert.equal(document.nodes.find((node) => node.id === "shell-mirror")?.children
+    .find((node) => node.id === "alpine-mirror")?.value, "official");
+  assert.equal((await registry.dispatch({ surface: "settings-install", action: "alpine-mirror",
+    value: "tuna", requestId: "6" })).ok, true);
+  render();
+  assert.equal(selectedMirror, "tuna");
+  assert.equal(document.nodes.find((node) => node.id === "shell-mirror")?.children
+    .find((node) => node.id === "alpine-mirror")?.value, "tuna");
 });
 
 test("system picker payload rejects malformed files and preserves bytes and MIME type", () => {

@@ -27,6 +27,11 @@ class InstallToolchainsArgs {
 }
 
 @InvokeArg
+class SetAlpineMirrorArgs {
+    var id: String? = null
+}
+
+@InvokeArg
 class WasiArgs {
     var modulePath: String? = null
     var arguments: Array<String>? = null
@@ -110,6 +115,22 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                 .onFailure { error ->
                     invoke.reject("Could not inspect the Android shell environment: ${error.message}")
                 }
+        }
+    }
+
+    @Command
+    fun setAlpineMirror(invoke: Invoke) {
+        val args = runCatching { invoke.parseArgs(SetAlpineMirrorArgs::class.java) }
+            .getOrElse { error ->
+                invoke.reject("Invalid Alpine mirror request: ${error.message}")
+                return
+            }
+        worker.execute {
+            runCatching {
+                RootfsEnvironment.selectMirror(activity, rootfsDir, args.id.orEmpty())
+                statusPayload()
+            }.onSuccess(invoke::resolve)
+                .onFailure { error -> invoke.reject("Could not select Alpine mirror: ${error.message}") }
         }
     }
 
@@ -379,6 +400,15 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                 },
             )
             put("toolchains", toolchainStatusPayload())
+            put("selectedAlpineMirror", RootfsEnvironment.selectedMirror(activity).id)
+            put("alpineMirrors", JSONArray().apply {
+                RootfsEnvironment.alpineMirrors.forEach { mirror ->
+                    put(JSObject().apply {
+                        put("id", mirror.id)
+                        put("name", mirror.name)
+                    })
+                }
+            })
             put(
                 "environmentVersion",
                 File(rootfsDir, "etc/xgent-environment")

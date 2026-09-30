@@ -4,17 +4,59 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.system.Os
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 internal object RootfsEnvironment {
+    data class AlpineMirror(val id: String, val name: String, val baseUrl: String)
+
+    val alpineMirrors = listOf(
+        AlpineMirror("official", "Official CDN", "https://dl-cdn.alpinelinux.org/alpine"),
+        AlpineMirror("tuna", "Tsinghua TUNA", "https://mirrors.tuna.tsinghua.edu.cn/alpine"),
+        AlpineMirror("aliyun", "Alibaba", "https://mirrors.aliyun.com/alpine"),
+        AlpineMirror("ustc", "USTC", "https://mirrors.ustc.edu.cn/alpine"),
+        AlpineMirror("huawei", "Huawei", "https://repo.huaweicloud.com/alpine"),
+        AlpineMirror("tencent", "Tencent", "https://mirrors.cloud.tencent.com/alpine"),
+        AlpineMirror("leaseweb", "LEASEWEB UK", "https://mirror.leaseweb.com/alpine"),
+        AlpineMirror("rwth", "RWTH Germany", "https://ftp.halifax.rwth-aachen.de/alpine"),
+        AlpineMirror("jaist", "JAIST Japan", "https://ftp.jaist.ac.jp/pub/Linux/alpine"),
+        AlpineMirror("kakao", "Kakao Korea", "https://mirror.kakao.com/alpine"),
+    )
+
+    fun selectedMirror(context: Context): AlpineMirror {
+        val id = context.getSharedPreferences(MIRROR_PREFS, Context.MODE_PRIVATE)
+            .getString(MIRROR_KEY, "official")
+        return alpineMirrors.firstOrNull { it.id == id } ?: alpineMirrors.first()
+    }
+
+    fun selectMirror(context: Context, rootfs: File, id: String) {
+        val mirror = alpineMirrors.firstOrNull { it.id == id }
+            ?: throw IllegalArgumentException("Unknown Alpine mirror")
+        val previous = selectedMirror(context)
+        val repositories = File(rootfs, "etc/apk/repositories")
+            .takeIf { File(rootfs, "bin/sh").isFile }
+        val branch = repositories?.let { file ->
+            ALPINE_BRANCH.find(file.takeIf { it.isFile }?.readText().orEmpty())
+                ?.value ?: error("Installed Alpine repository branch is unavailable")
+        }
+        if (repositories != null && branch != null) {
+            writeRepositories(repositories, branch, mirror)
+        }
+        val saved = context.getSharedPreferences(MIRROR_PREFS, Context.MODE_PRIVATE)
+            .edit().putString(MIRROR_KEY, mirror.id).commit()
+        if (!saved) {
+            if (repositories != null && branch != null) {
+                runCatching { writeRepositories(repositories, branch, previous) }
+            }
+            error("Could not save the Alpine mirror selection")
+        }
+    }
+
     fun prepare(rootfs: File, context: Context, alpineBranch: String? = null) {
         val etc = File(rootfs, "etc").apply { mkdirs() }
         if (alpineBranch != null) {
             require(ALPINE_BRANCH.matches(alpineBranch)) { "invalid Alpine repository branch" }
-            File(etc, "apk").mkdirs()
-            File(etc, "apk/repositories").writeText(
-                "${ALPINE_REPOSITORY}/$alpineBranch/main\n" +
-                    "${ALPINE_REPOSITORY}/$alpineBranch/community\n",
-            )
+            writeRepositories(File(etc, "apk/repositories"), alpineBranch, selectedMirror(context))
         }
         File(etc, "resolv.conf").writeText(resolverConfig(context))
         File(etc, "hosts").apply {
@@ -31,6 +73,17 @@ internal object RootfsEnvironment {
         // 01777: world-writable with sticky bit, matching a normal Linux rootfs.
         runCatching { Os.chmod(File(rootfs, "tmp").absolutePath, 1023) }
         runCatching { Os.chmod(File(rootfs, "var/tmp").absolutePath, 1023) }
+    }
+
+    private fun writeRepositories(file: File, branch: String, mirror: AlpineMirror) {
+        file.parentFile?.mkdirs()
+        val staging = File.createTempFile("repositories-", ".tmp", file.parentFile)
+        try {
+            staging.writeText("${mirror.baseUrl}/$branch/main\n${mirror.baseUrl}/$branch/community\n")
+            Files.move(staging.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            staging.delete()
+        }
     }
 
     private fun resolverConfig(context: Context): String {
@@ -73,6 +126,7 @@ internal object RootfsEnvironment {
         )
     }
 
-    private const val ALPINE_REPOSITORY = "https://dl-cdn.alpinelinux.org/alpine"
+    private const val MIRROR_PREFS = "xgent-alpine-mirror"
+    private const val MIRROR_KEY = "selected-mirror"
     private val ALPINE_BRANCH = Regex("v[0-9]+\\.[0-9]+")
 }

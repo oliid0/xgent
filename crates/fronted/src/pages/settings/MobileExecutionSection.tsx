@@ -9,6 +9,7 @@ import { List, ListItem } from "@astryxdesign/core/List";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { Section } from "@astryxdesign/core/Section";
+import { Selector } from "@astryxdesign/core/Selector";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
@@ -30,6 +31,7 @@ import {
   mobileExecutionStatus,
   pickExternalMobileWorkspace,
   removeExternalMobileWorkspace,
+  setMobileAlpineMirror,
 } from "../../lib/mobileExecution";
 import { normalizeRuntimePlatform, type RuntimePlatform } from "../../lib/runtimePlatform";
 import type { SettingsSectionProps } from "./types";
@@ -58,7 +60,9 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
   const [status, setStatus] = useState<MobileExecutionStatus>();
   const [selected, setSelected] = useState<string[]>([]);
   const [externalWorkspaces, setExternalWorkspaces] = useState<ExternalMobileWorkspace[]>([]);
-  const [busy, setBusy] = useState<"status" | "environment" | "toolchains" | "cancel" | "">("");
+  const [busy, setBusy] = useState<
+    "status" | "environment" | "toolchains" | "cancel" | "mirror" | ""
+  >("");
   const [activeRunId, setActiveRunId] = useState("");
   const [toolchainOutput, setToolchainOutput] = useState("");
   const [error, setError] = useState("");
@@ -138,6 +142,18 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
     } finally {
       stopProgress?.();
       setInstallProgress(null);
+      setBusy("");
+    }
+  }
+
+  async function chooseAlpineMirror(id: string) {
+    setBusy("mirror");
+    setError("");
+    try {
+      setStatus(await setMobileAlpineMirror(id));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
       setBusy("");
     }
   }
@@ -293,6 +309,22 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
               <Text type="supporting" color="secondary">
                 {status.detail}
               </Text>
+            ) : null}
+
+            {platform === "android" && status?.alpineMirrors?.length ? (
+              <Selector
+                label={t("settings.mobileAlpineMirror")}
+                description={t("settings.mobileAlpineMirrorHint")}
+                options={status.alpineMirrors.map((mirror) => ({
+                  value: mirror.id,
+                  label: mirror.name,
+                }))}
+                value={status.selectedAlpineMirror ?? "official"}
+                onChange={(id) => void chooseAlpineMirror(id)}
+                isDisabled={busy !== ""}
+                presentation="adaptive"
+                width="100%"
+              />
             ) : null}
 
             <HStack gap={2} wrap="wrap">

@@ -20,6 +20,8 @@ export type MobileToolchainStatus = {
   detail?: string | null;
 };
 
+export type AlpineMirror = { id: string; name: string };
+
 export type MobileExecutionStatus = {
   backend: MobileExecutionBackend;
   available: boolean;
@@ -27,6 +29,8 @@ export type MobileExecutionStatus = {
   detail?: string | null;
   capabilities: MobileExecutionCapabilities;
   toolchains: MobileToolchainStatus[];
+  alpineMirrors?: AlpineMirror[];
+  selectedAlpineMirror?: string | null;
   environmentVersion?: string | null;
   diskUsageBytes?: number | null;
 };
@@ -126,6 +130,12 @@ export function installMobileEnvironment() {
     `${PLUGIN_COMMAND}install`,
     { request: {} },
   );
+}
+
+export function setMobileAlpineMirror(id: string) {
+  return invoke<MobileExecutionStatus>(`${PLUGIN_COMMAND}set_alpine_mirror`, {
+    request: { id },
+  });
 }
 
 export function installMobileToolchains(toolchains: string[], runId: string) {

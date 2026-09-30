@@ -20,6 +20,14 @@ pub(crate) async fn status<R: Runtime>(app: AppHandle<R>) -> Result<MobileExecut
 }
 
 #[command]
+pub(crate) async fn set_alpine_mirror<R: Runtime>(
+    app: AppHandle<R>,
+    request: SetAlpineMirrorRequest,
+) -> Result<MobileExecutionStatus> {
+    on_worker(move || app.mobile_execution().set_alpine_mirror(request)).await
+}
+
+#[command]
 pub(crate) async fn install<R: Runtime>(
     app: AppHandle<R>,
     request: InstallRequest,

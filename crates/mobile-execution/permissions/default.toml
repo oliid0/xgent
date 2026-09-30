@@ -4,6 +4,7 @@
 description = "Allows Xgent's bundled mobile execution environment to be inspected, installed, run, and cancelled."
 permissions = [
   "allow-status",
+  "allow-set-alpine-mirror",
   "allow-install",
   "allow-install-toolchains",
   "allow-list-external-workspaces",
