@@ -1000,52 +1000,38 @@ jobs:
 
       - name: Build iOS simulator smoke target
         if: github.event_name == 'push' || inputs.publish == true || inputs.smoke == true
-        working-directory: crates/fronted
         shell: bash
         run: |
-          set -o pipefail
-          log="$RUNNER_TEMP/ios-simulator-build.log"
-          if ! pnpm tauri ios build --ci --no-sign --target x86_64 --build-number "${{ github.run_number }}" --config "$XGENT_TAURI_VERSION_CONFIG" 2>&1 | tee "$log"; then
+          set -euo pipefail
+          project="crates/fronted/src-tauri/gen/apple/xgent.xcodeproj"
+          simulator_build="$RUNNER_TEMP/xgent-ios-simulator-derived"
+          log="$RUNNER_TEMP/xgent-ios-simulator-build.log"
+          # Tauri's ios build archives for iphoneos even with --target x86_64;
+          # Xcode then excludes that architecture and leaves ARCHS empty.
+          # Build the generated project for the simulator destination directly.
+          if ! xcodebuild build -project "$project" -scheme xgent_iOS \
+            -configuration release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$simulator_build" \
+            ARCHS=x86_64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "$log"; then
             message="$(tail -n 160 "$log")"
             message="${message//'%'/'%25'}"
             message="${message//$'\r'/'%0D'}"
             message="${message//$'\n'/'%0A'}"
-            echo "::error file=crates/fronted/src-tauri/tauri.ios.conf.json,line=1,title=iOS simulator build failed::$message"
+            echo "::error file=crates/fronted/src-tauri/ios.project.yml,line=1,title=iOS simulator build failed::$message"
             exit 1
           fi
+          test -s "$simulator_build/Build/Products/release-iphonesimulator/Xgent.app/Info.plist"
 
       - name: Smoke launch iOS simulator app
         if: github.event_name == 'push' || inputs.publish == true || inputs.smoke == true
         shell: bash
         run: |
           set -euo pipefail
-          sim_app="$(python3 - <<'PY'
-          import os
-          import plistlib
-
-          candidates = []
-          for root, directories, files in os.walk("crates/fronted/src-tauri"):
-              if root.endswith(".xcarchive"):
-                  directories.clear()
-                  continue
-              for directory in list(directories):
-                  if not directory.endswith(".app"):
-                      continue
-                  path = os.path.join(root, directory)
-                  info_path = os.path.join(path, "Info.plist")
-                  try:
-                      with open(info_path, "rb") as stream:
-                          info = plistlib.load(stream)
-                  except (FileNotFoundError, plistlib.InvalidFileException):
-                      continue
-                  platforms = info.get("CFBundleSupportedPlatforms", [])
-                  if "iPhoneSimulator" in platforms:
-                      candidates.append((os.path.getmtime(info_path), path))
-          if not candidates:
-              raise SystemExit("No iPhoneSimulator .app bundle was produced")
-          print(max(candidates)[1])
-          PY
-          )"
+          sim_app="$RUNNER_TEMP/xgent-ios-simulator-derived/Build/Products/release-iphonesimulator/Xgent.app"
+          test -d "$sim_app"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleSupportedPlatforms:0' "$sim_app/Info.plist" | grep -Fx iPhoneSimulator
           bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$sim_app/Info.plist")"
           executable="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$sim_app/Info.plist")"
           test -x "$sim_app/$executable"

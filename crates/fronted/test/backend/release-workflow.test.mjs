@@ -350,7 +350,11 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(androidInteractions, /Run command/);
   assert.match(android, /xgent-android-launch-evidence/);
   assert.match(ios, /runs-on: macos-15-intel/);
-  assert.match(ios, /--target x86_64/);
+  assert.match(ios, /xcodebuild build -project "\$project" -scheme xgent_iOS/);
+  assert.match(ios, /-configuration release -sdk iphonesimulator/);
+  assert.match(ios, /-destination 'generic\/platform=iOS Simulator'/);
+  assert.match(ios, /ARCHS=x86_64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO/);
+  assert.match(ios, /CFBundleSupportedPlatforms:0.*grep -Fx iPhoneSimulator/);
   for (const [name, next] of [
     ["Build iOS simulator smoke target", "Smoke launch iOS simulator app"],
     ["Smoke launch iOS simulator app", "Upload iOS launch evidence"],
