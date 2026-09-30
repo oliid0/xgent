@@ -6,6 +6,17 @@ import SwiftUI
 import SwiftUIIntrospect
 import UIKit
 
+private struct XgentIOSFormRowKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var xgentIOSFormRow: Bool {
+        get { self[XgentIOSFormRowKey.self] }
+        set { self[XgentIOSFormRowKey.self] = newValue }
+    }
+}
+
 // iOS has a deliberately handwritten presentation layer. The wire nodes below
 // carry state and actions only; no generated Astryx-to-SwiftUI renderer is used.
 struct XgentIOSNodes: View {
@@ -172,6 +183,10 @@ struct XgentIOSNode: View {
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.xgentIOSFormRow) private var isFormRow
+    @ScaledMetric(relativeTo: .body) private var bodyScale = 1.0
+    @ScaledMetric(relativeTo: .subheadline) private var supportingScale = 1.0
+    @ScaledMetric(relativeTo: .caption) private var captionScale = 1.0
     @State private var expanded = false
     @State private var pickingModel = false
 
@@ -281,7 +296,7 @@ struct XgentIOSNode: View {
             section
         case .text:
             Text(node.text ?? "")
-                .font(.system(size: CGFloat(theme.typography.body * theme.fontScale)))
+                .font(.system(size: CGFloat(theme.typography.body * theme.fontScale * bodyScale)))
                 .foregroundStyle(Color(xgentHex: node.secondary == true ? palette.secondaryText : palette.text))
                 .textSelection(.enabled)
         case .heading:
@@ -292,7 +307,7 @@ struct XgentIOSNode: View {
                 Text(node.text ?? node.label ?? "")
                     .lineLimit(node.maxLines)
             }
-            .font(.system(size: CGFloat(theme.typography.body * theme.fontScale), weight: .semibold))
+            .font(.system(size: CGFloat(theme.typography.body * theme.fontScale * bodyScale), weight: .semibold))
             .foregroundStyle(Color(xgentHex: palette.text))
             .accessibilityAddTraits(.isHeader)
         case .button:
@@ -309,8 +324,12 @@ struct XgentIOSNode: View {
         case .selector:
             selector
         case .segmentedControl:
-            Picker(node.label ?? "", selection: textBinding) { pickerOptions }
-                .pickerStyle(.segmented)
+            if dynamicTypeSize.isAccessibilitySize {
+                selector
+            } else {
+                Picker(node.label ?? "", selection: textBinding) { pickerOptions }
+                    .pickerStyle(.segmented)
+            }
         case .menu:
             nativeMenu
         case .divider:
@@ -321,7 +340,7 @@ struct XgentIOSNode: View {
             progressBar
         case .badge:
             Text(node.label ?? node.text ?? "")
-                .font(.system(size: CGFloat(theme.typography.caption * theme.fontScale), weight: .medium))
+                .font(.system(size: CGFloat(theme.typography.caption * theme.fontScale * captionScale), weight: .medium))
                 .foregroundStyle(statusColor)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -334,7 +353,7 @@ struct XgentIOSNode: View {
             HStack(spacing: 7) {
                 Circle().fill(statusColor).frame(width: 8, height: 8)
                 Text(node.label ?? node.text ?? "")
-                    .font(.system(size: CGFloat(theme.typography.supporting * theme.fontScale)))
+                    .font(.system(size: CGFloat(theme.typography.supporting * theme.fontScale * supportingScale)))
                     .foregroundStyle(Color(xgentHex: palette.secondaryText))
             }
         case .slider:
@@ -428,7 +447,7 @@ struct XgentIOSNode: View {
         VStack(alignment: .leading, spacing: 8) {
             if let label = node.label, !label.isEmpty {
                 Text(label)
-                    .font(.system(size: CGFloat(theme.typography.supporting * theme.fontScale),
+                    .font(.system(size: CGFloat(theme.typography.supporting * theme.fontScale * supportingScale),
                                   weight: .semibold))
                     .foregroundStyle(Color(xgentHex: palette.secondaryText))
                     .padding(.horizontal, 4)
@@ -513,14 +532,14 @@ struct XgentIOSNode: View {
             }
             textEntry
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 12)
-                .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
-                .background(Color(xgentHex: palette.surface), in: RoundedRectangle(
+                .padding(.horizontal, isFormRow ? 0 : 12)
+                .frame(maxWidth: .infinity, minHeight: isFormRow ? 32 : 42, alignment: .leading)
+                .background(isFormRow ? Color.clear : Color(xgentHex: palette.surface), in: RoundedRectangle(
                     cornerRadius: CGFloat(theme.radius.element), style: .continuous
                 ))
                 .overlay {
                     RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
-                        .stroke(Color(xgentHex: palette.border), lineWidth: 1)
+                        .stroke(isFormRow ? Color.clear : Color(xgentHex: palette.border), lineWidth: 1)
                 }
         }
     }
@@ -558,13 +577,13 @@ struct XgentIOSNode: View {
                         textView.keyboardDismissMode = .interactive
                     }
                     .frame(minHeight: 112)
-                    .padding(8)
-                    .background(Color(xgentHex: palette.surface), in: RoundedRectangle(
+                    .padding(isFormRow ? 0 : 8)
+                    .background(isFormRow ? Color.clear : Color(xgentHex: palette.surface), in: RoundedRectangle(
                         cornerRadius: CGFloat(theme.radius.element), style: .continuous
                     ))
                     .overlay {
                         RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
-                            .stroke(Color(xgentHex: palette.border), lineWidth: 1)
+                            .stroke(isFormRow ? Color.clear : Color(xgentHex: palette.border), lineWidth: 1)
                     }
             }
         }
@@ -617,6 +636,15 @@ struct XgentIOSNode: View {
                 .background(Color(xgentHex: palette.muted), in: Capsule())
             }
             .buttonStyle(.plain)
+        } else if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) {
+                nodeLabel.fixedSize(horizontal: false, vertical: true)
+                Picker(selection: textBinding) { pickerOptions } label: { nodeLabel }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         } else {
             Picker(selection: textBinding) { pickerOptions } label: { nodeLabel }
                 .pickerStyle(.menu)
@@ -755,9 +783,9 @@ struct XgentIOSNode: View {
                 }
             }
             .frame(maxWidth: .infinity,
-                   minHeight: node.variant == "sidebar" ? 44 : 56,
+                   minHeight: node.variant == "sidebar" || isFormRow ? 44 : 56,
                    alignment: .leading)
-            .padding(.horizontal, node.variant == "sidebar" ? 8 : 12)
+            .padding(.horizontal, isFormRow ? 0 : (node.variant == "sidebar" ? 8 : 12))
             .background(
                 node.selected == true ? Color(xgentHex: palette.muted) : Color.clear,
                 in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
@@ -837,7 +865,7 @@ struct XgentIOSNode: View {
     private var thinking: some View {
         DisclosureGroup(isExpanded: $expanded) {
             Text(attributedText)
-                .font(.system(size: CGFloat(theme.typography.supporting * theme.fontScale)))
+                .font(.system(size: CGFloat(theme.typography.supporting * theme.fontScale * supportingScale)))
                 .foregroundStyle(Color(xgentHex: palette.secondaryText))
                 .textSelection(.enabled)
                 .padding(.top, 6)
@@ -856,12 +884,19 @@ struct XgentIOSNode: View {
         DisclosureGroup(isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 8) { children }.padding(.top, 8)
         } label: {
-            HStack(spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
                 statusIcon
-                Text(node.label ?? "Tool").font(.system(.subheadline, design: .monospaced).weight(.medium))
-                if let text = node.text, !text.isEmpty {
-                    Text(text).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(node.label ?? "Tool")
+                        .font(.system(.subheadline, design: .monospaced).weight(.medium))
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let text = node.text, !text.isEmpty {
+                        Text(text).font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(10)

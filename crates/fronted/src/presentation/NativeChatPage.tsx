@@ -117,16 +117,28 @@ function toolResultPreviewNodes(result: unknown, prefix: string): PresentationNo
 function toolEvidenceNodes(
   result: ToolResultMessage | undefined,
   prefix: string,
-  pendingText: string,
+  argumentsText: string,
+  labels: { arguments: string; result: string },
   args?: Record<string, unknown>,
 ): PresentationNode[] {
-  const text = result ? toolResultMessageToText(result) : pendingText;
-  const nodes = toolResultPreviewNodes(result, prefix);
+  const text = result ? toolResultMessageToText(result) : "";
+  const nodes: PresentationNode[] = argumentsText
+    ? [
+        {
+          id: `${prefix}:arguments`,
+          kind: "CodeBlock",
+          label: labels.arguments,
+          language: "json",
+          text: argumentsText,
+        },
+      ]
+    : [];
+  nodes.push(...toolResultPreviewNodes(result, prefix));
   if (text) {
     nodes.push({
       id: `${prefix}:result`,
       kind: "CodeBlock",
-      label: result?.toolName,
+      label: labels.result,
       language: "text",
       text,
     });
@@ -293,7 +305,7 @@ function roundNodes(
   rounds: UiRound[],
   prefix: string,
   showThinking: boolean,
-  labels: { thinking: string; search: string },
+  labels: { thinking: string; search: string; arguments: string; result: string },
 ): PresentationNode[] {
   return rounds.flatMap((round) =>
     round.blocks.flatMap((block): PresentationNode[] => {
@@ -343,6 +355,7 @@ function roundNodes(
               block.item.toolResult,
               `${id}:tool:${block.item.toolCall.id}`,
               safeStringify(block.item.toolCall.arguments),
+              labels,
               block.item.toolCall.arguments,
             ),
           },
@@ -539,6 +552,8 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const contentLabels = {
     thinking: t("chat.thinking"),
     search: t("chat.search.webSearch"),
+    arguments: t("chat.toolDetails.arguments"),
+    result: t("chat.toolDetails.result"),
   };
   const messages: PresentationNode[] = props.historyItems.flatMap((item): PresentationNode[] => {
     if (item.kind === "assistant") {
@@ -1305,6 +1320,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
           item.toolResult,
           `activity:${item.toolCall.id}`,
           safeStringify(item.toolCall.arguments),
+          contentLabels,
           item.toolCall.arguments,
         ),
       }))

@@ -213,6 +213,46 @@ final class MobileRenderingTests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsFieldsAndWorkDetailsAtReadableSizes() async throws {
+        for (suffix, width, typeSize) in [
+            ("narrow", CGFloat(320), DynamicTypeSize.large),
+            ("wide", CGFloat(768), DynamicTypeSize.large),
+            ("accessible", CGFloat(390), DynamicTypeSize.accessibility2),
+        ] {
+            let model = XgentPresentationModel()
+            let settings = try document(mode: "sheet", appearance: "light", nodes: [
+                node("provider", "SettingsGroup", ["label": "Provider connection", "children": [
+                    node("name", "TextInput", ["label": "Name", "value": "Workspace provider", "action": "name"]),
+                    node("url", "TextInput", ["label": "Base URL", "value": "https://api.example.com/v1", "action": "url"]),
+                    node("key", "TextInput", ["label": "API Key", "value": "test-secret", "secure": true, "action": "key"]),
+                    node("format", "Selector", ["label": "Request format", "value": "chat", "action": "format", "options": [
+                        ["value": "chat", "label": "Chat Completions"], ["value": "responses", "label": "Responses API"],
+                    ]]),
+                ]]),
+                node("behavior", "SettingsGroup", ["label": "Execution", "children": [
+                    node("mode", "SegmentedControl", ["label": "Execution target", "value": "local", "action": "mode", "options": [
+                        ["value": "local", "label": "On device"], ["value": "remote", "label": "Paired computer"],
+                    ]]),
+                    node("permissions", "NavigationRow", ["label": "Tool permissions", "text": "Choose which actions need your approval.", "icon": "lock.shield", "action": "permissions"]),
+                ]]),
+            ], title: "Provider")
+            try await capture(XgentIOSSheetPresentation(initialDocument: settings, model: model)
+                .dynamicTypeSize(typeSize), name: "settings-fields-\(suffix)", width: width)
+
+            let work = try document(mode: "sheet", appearance: "dark", nodes: [
+                node("summary", "Text", ["text": "Reviewing the workspace and preparing the requested changes."]),
+                node("shell", "ToolCall", ["label": "RunShellCommand", "text": "python3 scripts/check_workspace.py --include src/settings", "status": "running", "children": [
+                    node("arguments", "CodeBlock", ["label": "Arguments", "language": "json", "text": "{\"command\": \"python3 scripts/check_workspace.py\"}"]),
+                ]]),
+                node("read", "ToolCall", ["label": "ReadWorkspaceFile", "text": "src/settings/ProviderConnection.swift", "status": "completed"]),
+                node("fetch", "ToolCall", ["label": "FetchRemoteDocumentation", "text": "The server could not be reached. Check the connection and retry.", "status": "error"]),
+            ], title: "Work activity")
+            try await capture(XgentIOSSheetPresentation(initialDocument: work, model: model)
+                .dynamicTypeSize(typeSize), name: "work-details-\(suffix)", width: width)
+        }
+    }
+
+    @MainActor
     func testModelGroupsAndLongSettingsHeader() async throws {
         let model = XgentPresentationModel()
         let chat = try document(mode: "root", appearance: "dark", nodes: chatNodes)

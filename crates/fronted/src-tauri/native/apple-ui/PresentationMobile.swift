@@ -681,6 +681,7 @@ struct XgentIOSSheetPresentation: View {
                     }
                 }
                 .formStyle(.grouped)
+                .environment(\.xgentIOSFormRow, true)
                 .scrollContentBackground(.hidden)
                 .id(document.id)
                 .scrollDismissesKeyboard(.interactively)

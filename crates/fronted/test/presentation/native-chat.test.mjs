@@ -465,6 +465,10 @@ test("native chat and activity preserve file edit evidence from tool results", a
   const transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
   const tool = transcript.children.find((node) => node.id === "answer").children[0];
   assert.equal(tool.kind, "ToolCall");
+  const argumentsNode = tool.children.find((node) => node.id.endsWith(":arguments"));
+  assert.equal(argumentsNode.label, "chat.toolDetails.arguments");
+  assert.deepEqual(JSON.parse(argumentsNode.text), { path: "report.md" });
+  assert.equal(tool.children.find((node) => node.id.endsWith(":result")).label, "chat.toolDetails.result");
   assert.equal(tool.children.find((node) => node.language === "text").text, "File edited successfully");
   const diff = tool.children.find((node) => node.language === "diff");
   assert.match(diff.text, /-old line/);
