@@ -1019,7 +1019,10 @@ jobs:
           ) > "$options_log" 2>&1 &
           tauri_cli_pid=$!
           trap 'kill "$tauri_cli_pid" 2>/dev/null || true; wait "$tauri_cli_pid" 2>/dev/null || true' EXIT
-          for _ in $(seq 1 90); do
+          # The CLI runs beforeBuildCommand again before writing its options
+          # file. The full frontend rebuild took longer than the old 3-minute
+          # wait on the macOS release runner.
+          for _ in $(seq 1 300); do
             if ! kill -0 "$tauri_cli_pid" 2>/dev/null; then
               cat "$options_log"
               exit 1
