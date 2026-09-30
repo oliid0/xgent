@@ -6,6 +6,7 @@ struct XgentIOSModelPicker: View {
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var systemScheme
     @State private var query = ""
 
     private var currentDocument: XgentDocument? {
@@ -15,6 +16,13 @@ struct XgentIOSModelPicker: View {
 
     private var groups: [XgentModelOptionGroup] {
         XgentModelOptions.groups(currentNode?.options ?? [], query: query)
+    }
+    private var displayedScheme: ColorScheme {
+        (currentDocument ?? document).colorScheme ?? systemScheme
+    }
+    private var displayedBackground: Color {
+        let theme = currentDocument?.theme ?? document.theme ?? .fallback
+        return Color(xgentHex: theme.palette(for: displayedScheme).background)
     }
 
     var body: some View {
@@ -61,6 +69,9 @@ struct XgentIOSModelPicker: View {
             }
             .navigationTitle(currentNode?.label ?? node.label ?? "Model")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(displayedBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(displayedScheme, for: .navigationBar)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always),
                         prompt: Text(currentNode?.text ?? node.text ?? node.label ?? "Model"))
             .toolbar {
