@@ -169,6 +169,8 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
     }
     try {
       const result = await installMobileToolchains(selected, runId);
+      const completedOutput = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
+      if (completedOutput) setToolchainOutput(completedOutput.slice(-8_192));
       setStatus((current) => (current ? { ...current, toolchains: result.status } : current));
       if (!result.succeeded) {
         throw new Error(
@@ -356,19 +358,26 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
                     ) : null}
                   </HStack>
                 ) : null}
-                {activeRunId ? (
+                {activeRunId || toolchainOutput ? (
                   <VStack gap={2}>
-                    <ProgressBar label={t("settings.mobileInstalling")} isIndeterminate />
+                    {activeRunId ? (
+                      <ProgressBar label={t("settings.mobileInstalling")} isIndeterminate />
+                    ) : null}
                     {toolchainOutput ? (
-                      <Text
-                        type="code"
-                        color="secondary"
-                        wordBreak="break-word"
-                        className="mobile-execution-install-output"
-                        aria-live="off"
-                      >
-                        {toolchainOutput}
-                      </Text>
+                      <VStack gap={1}>
+                        <Text type="supporting" color="secondary">
+                          {t("settings.mobileInstallOutput")}
+                        </Text>
+                        <Text
+                          type="code"
+                          color="secondary"
+                          wordBreak="break-word"
+                          className="mobile-execution-install-output"
+                          aria-live="off"
+                        >
+                          {toolchainOutput}
+                        </Text>
+                      </VStack>
                     ) : null}
                   </VStack>
                 ) : null}

@@ -128,7 +128,7 @@ while time.monotonic() < deadline:
     time.sleep(2)
 else:
     capture("package-install-output-missing")
-    raise AssertionError("The package installer did not expose live APK output")
+    raise AssertionError("The package installer did not expose APK output during or after installation")
 tap({"返回设置", "Back to Settings"}, timeout=300)
 tap({"返回对话", "Back to Chat"})
 tap({"工作工具", "Workspace tools"})
