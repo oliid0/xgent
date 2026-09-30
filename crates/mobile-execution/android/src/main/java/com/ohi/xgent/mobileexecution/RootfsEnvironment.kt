@@ -79,11 +79,16 @@ internal object RootfsEnvironment {
         file.parentFile?.mkdirs()
         val staging = File.createTempFile("repositories-", ".tmp", file.parentFile)
         try {
-            staging.writeText("${mirror.baseUrl}/$branch/main\n${mirror.baseUrl}/$branch/community\n")
+            staging.writeText(repositoryContents(branch, mirror))
             Files.move(staging.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
         } finally {
             staging.delete()
         }
+    }
+
+    fun repositoryContents(branch: String, mirror: AlpineMirror): String {
+        require(ALPINE_BRANCH.matches(branch)) { "invalid Alpine repository branch" }
+        return "${mirror.baseUrl}/$branch/main\n${mirror.baseUrl}/$branch/community\n"
     }
 
     private fun resolverConfig(context: Context): String {

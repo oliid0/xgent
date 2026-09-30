@@ -369,7 +369,7 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(ios, /xcodebuild build -project "\$project" -scheme xgent_iOS/);
   assert.match(ios, /pnpm tauri ios build --ci --no-sign --open[\s\S]*--target/);
   assert.match(ios, /--config '\{"build":\{"beforeBuildCommand":null\}\}' --target/);
-  assert.match(ios, /cli-options-server\.json/);
+  assert.match(ios, /join\(tmpdir\(\), `\$\{identifier\}-server-addr`\)/);
   assert.match(ios, /trap 'kill "\$tauri_cli_pid"/);
   assert.match(ios, /-configuration release -sdk iphonesimulator/);
   assert.match(ios, /-destination 'generic\/platform=iOS Simulator'/);

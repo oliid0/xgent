@@ -2205,17 +2205,32 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   ref={projectsHeaderRef}
                   className="group/workspace-header min-w-0 px-2 pb-1 pt-2"
                 >
-                  <SideNavSection title={t("chat.workspaceSection")}>
-                    <SideNavItem
-                      label={selectedWorkspaceProject?.name ?? t("chat.workspaceSection")}
-                      icon={FolderOpen}
-                      isSelected
-                      size="sm"
-                      onClick={projectsDisclosure.toggle}
-                      endContent={
+                  <SideNavSection
+                    title={t("chat.workspaceSection")}
+                    endContent={
+                      <>
+                        <IconButton
+                          label={
+                            projectsDisclosure.isOpen
+                              ? t("chat.workspaceCollapse")
+                              : t("chat.workspaceExpand")
+                          }
+                          icon={
+                            <ChevronRight
+                              className={cn(
+                                "h-4 w-4 transition-transform motion-reduce:transition-none",
+                                projectsDisclosure.isOpen && "rotate-90",
+                              )}
+                            />
+                          }
+                          variant="ghost"
+                          size={mobileExperience ? "lg" : "sm"}
+                          aria-expanded={projectsDisclosure.isOpen}
+                          onClick={projectsDisclosure.toggle}
+                        />
                         <MoreMenu
                           label={t("chat.workspaceMore")}
-                          size="sm"
+                          size={mobileExperience ? "lg" : "sm"}
                           placement="below"
                           alignment="end"
                           items={[
@@ -2273,8 +2288,10 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                             },
                           ]}
                         />
-                      }
-                    />
+                      </>
+                    }
+                  >
+                    {null}
                   </SideNavSection>
                 </AstryxStack>
                 <AstryxStack

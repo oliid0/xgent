@@ -1006,7 +1006,15 @@ jobs:
           project="crates/fronted/src-tauri/gen/apple/xgent.xcodeproj"
           simulator_build="$RUNNER_TEMP/xgent-ios-simulator-derived"
           log="$RUNNER_TEMP/xgent-ios-simulator-build.log"
-          options_file="crates/fronted/src-tauri/gen/apple/.tauri/cli-options-server.json"
+          # The locked Tauri CLI 2.11.4 writes <identifier>-server-addr in
+          # std::env::temp_dir(); the project-local JSON belongs to newer CLI code.
+          options_file="$(node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import { tmpdir } from "node:os";
+            import { join } from "node:path";
+            const { identifier } = JSON.parse(readFileSync("crates/fronted/src-tauri/tauri.conf.json", "utf8"));
+            process.stdout.write(join(tmpdir(), `${identifier}-server-addr`));
+          ')"
           options_log="$RUNNER_TEMP/xgent-ios-simulator-options.log"
           # Tauri's ios build archives for iphoneos even with --target x86_64;
           # Xcode then excludes that architecture and leaves ARCHS empty. Keep

@@ -150,8 +150,8 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                             put("percent", percent)
                         })
                     }.onFailure { error -> Log.w("MobileExecution", "Install progress unavailable", error) }
-                }) {
-                    verifyInstalledEnvironment()
+                }) { bundled ->
+                    verifyInstalledEnvironment(bundled)
                     readinessMarker().writeText("$READINESS_VERSION\n")
                 }
                 rootfs
@@ -506,8 +506,16 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
             readinessMarker().takeIf { it.isFile }?.readText()?.trim() == READINESS_VERSION
         }.getOrDefault(false)
 
-    private fun verifyInstalledEnvironment() {
+    private fun verifyInstalledEnvironment(bundled: BundledRootfs) {
         readinessMarker().delete()
+        val repositories = File(rootfsDir, "etc/apk/repositories")
+        val expectedRepositories = RootfsEnvironment.repositoryContents(
+            bundled.repositoryBranch,
+            RootfsEnvironment.selectedMirror(activity),
+        )
+        require(repositories.isFile && repositories.readText() == expectedRepositories) {
+            "Alpine repositories do not match the selected mirror and bundled release"
+        }
         val workspace = File(backendDir, "install-probe").apply { mkdirs() }
         require(workspace.isDirectory) { "could not create the PRoot verification workspace" }
         val probes = listOf(
@@ -522,9 +530,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                 "printf '$READINESS_TOKEN'",
             "package manager" to
                 "test -x /sbin/apk && apk --version >/dev/null && " +
-                "test -s /etc/apk/repositories && " +
-                "grep -Fq 'https://dl-cdn.alpinelinux.org/alpine/v3.22/main' " +
-                "/etc/apk/repositories && printf '$READINESS_TOKEN'",
+                "test -s /etc/apk/repositories && printf '$READINESS_TOKEN'",
             "network configuration" to
                 "test -s /etc/resolv.conf && " +
                 "test -s /etc/ssl/certs/ca-certificates.crt && " +

@@ -23,7 +23,7 @@ internal class RootfsInstaller(
 ) {
     fun bundledRootfsStatus(): Result<BundledRootfs> = runCatching { loadBundledRootfs() }
 
-    fun install(onProgress: (String, Int?) -> Unit, verifyActivated: () -> Unit): BundledRootfs {
+    fun install(onProgress: (String, Int?) -> Unit, verifyActivated: (BundledRootfs) -> Unit): BundledRootfs {
         onProgress("preparing", null)
         val bundled = loadBundledRootfs()
 
@@ -48,7 +48,7 @@ internal class RootfsInstaller(
             }
             replaceAtomically(staging, backup) {
                 onProgress("verifying", null)
-                verifyActivated()
+                verifyActivated(bundled)
             }
             onProgress("ready", 100)
             return bundled
