@@ -5,11 +5,13 @@ extension XgentPresentationTheme {
         light: XgentPalette(accent: "#0088ff", accentText: "#006edc", background: "#f5f5f7",
                             surface: "#ffffff", card: "#ffffff", popover: "#ffffff", muted: "#eeeeef",
                             text: "#0d0d0d", secondaryText: "#6e6e73", disabledText: "#8e8e93",
-                            border: "#0000001a", emphasizedBorder: "#d9d9d9", shadow: "#000000"),
+                            border: "#0000001a", emphasizedBorder: "#d9d9d9", shadow: "#000000",
+                            onAccent: "#ffffff", neutral: "#0536591a", error: "#e3193b", onError: "#ffffff"),
         dark: XgentPalette(accent: "#0a84ff", accentText: "#6eb4ff", background: "#171717",
                            surface: "#212121", card: "#2a2a2a", popover: "#2a2a2a", muted: "#303030",
                            text: "#ececec", secondaryText: "#b4b4b4", disabledText: "#7c7c80",
-                           border: "#ffffff1f", emphasizedBorder: "#4a4a4a", shadow: "#000000"),
+                           border: "#ffffff1f", emphasizedBorder: "#4a4a4a", shadow: "#000000",
+                           onAccent: "#ffffff", neutral: "#dfe2e533", error: "#f5394f", onError: "#ffffff"),
         radius: XgentRadii(inner: 8, element: 14, container: 26, overlay: 32, chat: 28),
         spacing: XgentSpacing(xs: 4, sm: 8, md: 12, lg: 16, xl: 24),
         control: XgentControlMetrics(small: 32, medium: 40, large: 44),
@@ -183,10 +185,11 @@ struct XgentNodeChildren: View {
     let nodes: [XgentNode]
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    var parentAxis: Axis? = nil
 
     var body: some View {
         ForEach(nodes) { node in
-            XgentNodeView(node: node, document: document, model: model)
+            XgentNodeView(node: node, document: document, model: model, parentAxis: parentAxis)
         }
     }
 }
@@ -225,11 +228,11 @@ private struct XgentNodeBoundsFrameModifier: ViewModifier {
     let maxHeight: CGFloat?
     let alignment: Alignment
 
-    init(node: XgentNode, alignment: Alignment) {
+    init(node: XgentNode, alignment: Alignment, parentAxis: Axis?) {
         minWidth = node.minWidth.map { CGFloat($0) }
         maxWidth = node.fill == true ? .infinity : node.maxWidth.map { CGFloat($0) }
         minHeight = node.minHeight.map { CGFloat($0) }
-        maxHeight = node.fill == true ? .infinity : node.maxHeight.map { CGFloat($0) }
+        maxHeight = node.fill == true && parentAxis != .horizontal ? .infinity : node.maxHeight.map { CGFloat($0) }
         self.alignment = alignment
     }
 
@@ -323,40 +326,29 @@ struct XgentNodeView: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    var parentAxis: Axis? = nil
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.xgentPresentationTheme) var presentationTheme
     @Environment(\.colorScheme) var colorScheme
     @State var expanded: Bool
 
-    init(node: XgentNode, document: XgentDocument, model: XgentPresentationModel) {
+    init(node: XgentNode, document: XgentDocument, model: XgentPresentationModel, parentAxis: Axis? = nil) {
         self.node = node
         self.document = document
         self.model = model
+        self.parentAxis = parentAxis
         _expanded = State(initialValue: node.variant == "timeline" ||
                           (node.kind == .thinking && node.status == "running"))
     }
 
     var children: XgentNodeChildren {
-        XgentNodeChildren(nodes: node.children ?? [], document: document, model: model)
+        XgentNodeChildren(nodes: node.children ?? [], document: document, model: model,
+                          parentAxis: node.kind == .hStack ? .horizontal : .vertical)
     }
     var textBinding: Binding<String> {
         Binding(get: { model.value(node, in: document).text },
                 set: { model.send(node, in: document, value: .string($0), editing: true) })
     }
-    var boolBinding: Binding<Bool> {
-        Binding(get: { model.value(node, in: document).boolean },
-                set: { model.send(node, in: document, value: .bool($0), editing: true) })
-    }
-    var numberBinding: Binding<Double> {
-        Binding(
-            get: {
-                if case .number(let number) = model.value(node, in: document) { return number }
-                return node.minimum ?? 0
-            },
-            set: { model.send(node, in: document, value: .number($0), editing: true) }
-        )
-    }
-
     private var frameAlignment: Alignment {
         switch node.alignment {
         case "center": return .center
@@ -374,13 +366,13 @@ struct XgentNodeView: View {
     }
 
     var body: some View {
-        // Wire nodes are heterogeneous by design. Erase that generated branch
+        // Wire nodes are heterogeneous by design. Erase the handwritten content
         // once, then apply small modifiers so swiftc never has to solve the
         // complete renderer and every layout/state modifier as one type tree.
-        AnyView(generatedContent)
+        AnyView(desktopContent)
             .modifier(XgentNodeInsetsModifier(node: node))
             .modifier(XgentNodeFixedFrameModifier(node: node, alignment: frameAlignment))
-            .modifier(XgentNodeBoundsFrameModifier(node: node, alignment: frameAlignment))
+            .modifier(XgentNodeBoundsFrameModifier(node: node, alignment: frameAlignment, parentAxis: parentAxis))
             .modifier(XgentNodeTextLayoutModifier(node: node))
             .modifier(XgentNodeControlModifier(
                 node: node, controlSize: controlSize,
@@ -388,42 +380,7 @@ struct XgentNodeView: View {
             ))
     }
 
-    var picker: some View {
-        Picker(node.label ?? "", selection: textBinding) {
-            ForEach(node.options ?? []) { option in
-                Text(option.label).tag(option.value).disabled(option.disabled == true)
-            }
-        }
-    }
 
-    @ViewBuilder var nativePicker: some View {
-        if node.variant == "compact" {
-            picker.pickerStyle(.menu).labelsHidden()
-        } else {
-            picker.pickerStyle(.menu)
-        }
-    }
-
-    @ViewBuilder var nativeButton: some View {
-        let button = Button(role: node.destructive == true ? .destructive : nil) {
-            model.send(node, in: document)
-        } label: {
-            nodeLabel.frame(minHeight: 32)
-        }
-        .buttonBorderShape(.roundedRectangle(radius: CGFloat(presentationTheme.radius.element)))
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, macOS 26.0, *) {
-            if node.prominent == true { button.buttonStyle(.glassProminent) }
-            else { button.buttonStyle(.glass) }
-        } else {
-            if node.prominent == true { button.buttonStyle(.borderedProminent) }
-            else { button.buttonStyle(.bordered) }
-        }
-        #else
-        if node.prominent == true { button.buttonStyle(.borderedProminent) }
-        else { button.buttonStyle(.bordered) }
-        #endif
-    }
 }
 
 struct XgentPresentationView: View {

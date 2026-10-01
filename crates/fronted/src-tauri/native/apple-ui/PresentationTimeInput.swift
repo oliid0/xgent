@@ -29,13 +29,18 @@ struct XgentTimeInput: View {
     @ObservedObject var model: XgentPresentationModel
 
     var body: some View {
-        DatePicker(node.label ?? "", selection: Binding(
-            get: { XgentTimeOfDay.date(model.value(node, in: document).text) ?? XgentTimeOfDay.date("09:00")! },
-            set: { model.send(node, in: document, value: .string(XgentTimeOfDay.string($0)), editing: true) }
-        ), displayedComponents: [.hourAndMinute])
-        .environment(\.calendar, XgentTimeOfDay.calendar)
-        .environment(\.timeZone, XgentTimeOfDay.timeZone)
-        .frame(minHeight: 44)
+        VStack(alignment: .leading, spacing: 8) {
+            XgentFieldLabel(node: node)
+            DatePicker(node.label ?? "", selection: Binding(
+                get: { XgentTimeOfDay.date(model.value(node, in: document).text) ?? XgentTimeOfDay.date("09:00")! },
+                set: { model.send(node, in: document, value: .string(XgentTimeOfDay.string($0)), editing: true) }
+            ), displayedComponents: [.hourAndMinute])
+            .labelsHidden()
+            .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
+            .environment(\.calendar, XgentTimeOfDay.calendar)
+            .environment(\.timeZone, XgentTimeOfDay.timeZone)
+            .modifier(XgentFieldSurface(node: node))
+        }
         .disabled(node.disabled == true || model.isBusy(node, in: document))
         .accessibilityIdentifier(node.id)
     }

@@ -106,7 +106,19 @@ test("mobile execution default permissions have generated command entries", () =
     [...pluginBuild.matchAll(/^\s*"([a-z_]+)",$/gm)].map((match) => match[1]),
   );
   for (const [, permission] of defaults.matchAll(/"allow-([a-z-]+)"/g)) {
+    if (permission === "native-event-listeners") continue;
     assert.ok(commands.has(permission.replaceAll("-", "_")), `missing ${permission} command`);
+  }
+});
+
+test("mobile Shell permits registering and retiring real native output listeners", () => {
+  const defaults = readFileSync(path.join(repoRoot, "crates/mobile-execution/permissions/default.toml"), "utf8");
+  const events = readFileSync(path.join(repoRoot, "crates/mobile-execution/permissions/events.toml"), "utf8");
+  assert.ok(defaults.includes('"allow-native-event-listeners"'));
+  assert.match(events, /identifier = "allow-native-event-listeners"/);
+  const allowed = events.match(/commands\.allow = \[([^\]]+)\]/)?.[1] ?? "";
+  for (const command of ["register_listener", "registerListener", "remove_listener", "removeListener"]) {
+    assert.ok(allowed.includes(`"${command}"`), `missing listener command ${command}`);
   }
 });
 

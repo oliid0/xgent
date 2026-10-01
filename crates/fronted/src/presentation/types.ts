@@ -1,7 +1,7 @@
 /** Serializable presentation contract. Business callbacks never cross the native boundary. */
-import type { PresentationKind } from "./kinds.generated";
+import type { PresentationKind } from "./protocol";
 
-export type { PresentationKind } from "./kinds.generated";
+export type { PresentationKind } from "./protocol";
 
 export type PresentationValue = string | number | boolean | null;
 
@@ -19,6 +19,10 @@ export type PresentationPalette = {
   border: string;
   emphasizedBorder: string;
   shadow: string;
+  onAccent?: string;
+  neutral?: string;
+  error?: string;
+  onError?: string;
 };
 
 export type PresentationTheme = {

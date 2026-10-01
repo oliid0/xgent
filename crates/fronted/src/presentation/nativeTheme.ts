@@ -1,7 +1,7 @@
 import { resolveThemeTokens } from "@astryxdesign/core/theme/tokens";
 import type { AppSettings } from "../lib/settings";
 import { createAppearanceTheme } from "../theme/appearanceTheme";
-import { type PresentationTokenName, presentationTokenMappings } from "./tokens.generated";
+import { type PresentationTokenName, presentationThemeTokens } from "./themeTokens";
 import type { PresentationPalette, PresentationTheme } from "./types";
 
 type FontZone = "chat" | "sidebar" | "workspaceTools";
@@ -9,7 +9,7 @@ type ThemeMode = "light" | "dark";
 type ResolvedTokens = Record<string, string>;
 
 function fallback(name: PresentationTokenName, mode: ThemeMode): string | number {
-  return presentationTokenMappings[name].fallback[mode === "light" ? 0 : 1];
+  return presentationThemeTokens[name].fallback[mode === "light" ? 0 : 1];
 }
 
 function raw(tokens: ResolvedTokens, name: PresentationTokenName, mode: ThemeMode) {
@@ -110,6 +110,10 @@ function palette(tokens: ResolvedTokens, mode: ThemeMode): PresentationPalette {
   return {
     accent: color("--color-accent"),
     accentText: color("--color-text-accent"),
+    onAccent: color("--color-on-accent"),
+    neutral: color("--color-neutral"),
+    error: color("--color-error"),
+    onError: color("--color-on-error"),
     background: color("--color-background-body"),
     surface: color("--color-background-surface"),
     card: color("--color-background-card"),

@@ -39,10 +39,11 @@ struct XgentNumberInput: View {
                 }
             )
             VStack(alignment: .leading, spacing: 8) {
-                Text(node.label ?? "").fixedSize(horizontal: false, vertical: true)
+                XgentFieldLabel(node: node)
                 HStack(spacing: 12) {
                     numberField(value)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .modifier(XgentFieldSurface(node: node))
                         .labelsHidden()
                         .accessibilityLabel(node.label ?? "")
                         .frame(minWidth: 60, maxWidth: .infinity)
@@ -50,6 +51,7 @@ struct XgentNumberInput: View {
                         .labelsHidden()
                         .accessibilityLabel(node.label ?? "")
                         .fixedSize()
+                        .frame(minHeight: 44)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

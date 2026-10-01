@@ -62,10 +62,15 @@ struct XgentPalette: Decodable {
     let border: String
     let emphasizedBorder: String
     let shadow: String
+    var onAccent: String? = nil
+    var neutral: String? = nil
+    var error: String? = nil
+    var onError: String? = nil
 
     func validate() throws {
         let colors = [accent, accentText, background, surface, card, popover, muted, text,
                       secondaryText, disabledText, border, emphasizedBorder, shadow]
+            + [onAccent, neutral, error, onError].compactMap { $0 }
         guard colors.allSatisfy({ $0.range(of: #"^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"#,
                                               options: .regularExpression) != nil }) else {
             throw XgentProtocolError.invalid

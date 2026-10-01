@@ -26,6 +26,10 @@ final class NotificationRenderingTests: XCTestCase {
                 .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: .light))
             #if os(iOS)
             let hosting = UIHostingController(rootView: view)
+            let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 720))
+            window.rootViewController = hosting
+            window.makeKeyAndVisible()
+            defer { window.isHidden = true; window.rootViewController = nil }
             hosting.view.frame = CGRect(x: 0, y: 0, width: 320, height: 720)
             hosting.view.layoutIfNeeded()
             try await Task.sleep(nanoseconds: 100_000_000)

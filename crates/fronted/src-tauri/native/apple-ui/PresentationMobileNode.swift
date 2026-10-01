@@ -220,21 +220,6 @@ struct XgentIOSNode: View {
             set: { model.send(node, in: document, value: .string($0), editing: true) }
         )
     }
-    private var boolBinding: Binding<Bool> {
-        Binding(
-            get: { model.value(node, in: document).boolean },
-            set: { model.send(node, in: document, value: .bool($0), editing: true) }
-        )
-    }
-    private var numberBinding: Binding<Double> {
-        Binding(
-            get: {
-                if case .number(let value) = model.value(node, in: document) { return value }
-                return node.minimum ?? 0
-            },
-            set: { model.send(node, in: document, value: .number($0), editing: true) }
-        )
-    }
     private var alignment: Alignment {
         switch node.alignment {
         case "center": return .center
@@ -283,7 +268,7 @@ struct XgentIOSNode: View {
             .lineLimit(node.maxLines)
             .fixedSize(horizontal: node.wrap == false, vertical: false)
             .disabled(node.disabled == true || model.isBusy(node, in: document))
-            .opacity(node.disabled == true ? 0.48 : 1)
+            .opacity(node.disabled == true && node.kind != .button && node.kind != .iconButton ? 0.48 : 1)
             .modifier(XgentIOSAccessibility(node: node))
     }
 
@@ -292,7 +277,7 @@ struct XgentIOSNode: View {
         case .vStack:
             VStack(alignment: .leading, spacing: node.spacing.map { CGFloat($0) }) { children }
         case .hStack:
-            HStack(spacing: node.spacing.map { CGFloat($0) }) { children }
+            XgentHorizontalControls(node: node) { children }
         case .scrollView:
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: CGFloat(theme.spacing.md)) { children }
@@ -332,16 +317,11 @@ struct XgentIOSNode: View {
         case .textArea:
             textArea
         case .toggle:
-            Toggle(isOn: boolBinding) { nodeLabel }.frame(minHeight: 44)
+            XgentSwitch(node: node, document: document, model: model)
         case .selector:
             selector
         case .segmentedControl:
-            if dynamicTypeSize.isAccessibilitySize {
-                selector
-            } else {
-                Picker(node.label ?? "", selection: textBinding) { pickerOptions }
-                    .pickerStyle(.segmented)
-            }
+            XgentSegmentedControl(node: node, document: document, model: model)
         case .menu:
             nativeMenu
         case .divider:
@@ -373,7 +353,7 @@ struct XgentIOSNode: View {
                     .foregroundStyle(Color(xgentHex: palette.secondaryText))
             }
         case .slider:
-            slider
+            XgentSlider(node: node, document: document, model: model)
         case .numberInput:
             XgentNumberInput(node: node, document: document, model: model)
         case .collapsible:
@@ -500,74 +480,11 @@ struct XgentIOSNode: View {
     }
 
     private var actionButton: some View {
-        Button(role: node.destructive == true ? .destructive : nil) {
-            model.send(node, in: document)
-        } label: {
-            HStack(spacing: 8) {
-                if model.isBusy(node, in: document) { ProgressView().controlSize(.small) }
-                if let icon = node.icon { Image(systemName: icon).frame(width: 20) }
-                Text(node.label ?? "")
-                    .font(node.variant == "compact"
-                        ? .caption.weight(.medium)
-                        : .body.weight(node.prominent == true ? .semibold : .regular))
-                    .lineLimit(document.mode == .sheet ? nil : (node.variant == "compact" ? 2 : 1))
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(minHeight: CGFloat(theme.control.medium))
-            .frame(maxWidth: document.mode == .sheet || node.variant == "compact" ? .infinity : nil)
-            .padding(.horizontal, node.variant == "compact" ? 6 : 14)
-            .foregroundStyle(buttonForeground)
-            .background(buttonBackground, in: RoundedRectangle(
-                cornerRadius: CGFloat(theme.radius.element), style: .continuous
-            ))
-            .contentShape(RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous))
-        }
-        .buttonStyle(.plain)
+        XgentActionButton(node: node, document: document, model: model)
     }
 
-    private var buttonForeground: Color {
-        if node.destructive == true { return .red }
-        return node.prominent == true ? .white : Color(xgentHex: palette.text)
-    }
-
-    private var buttonBackground: Color {
-        if node.prominent == true { return Color(xgentHex: palette.accent) }
-        if node.destructive == true { return Color.red.opacity(0.1) }
-        return Color(xgentHex: palette.muted)
-    }
-
-    @ViewBuilder private var textEntry: some View {
-        if node.secure == true {
-            SecureField(node.text ?? "", text: textBinding)
-                .accessibilityLabel(node.label ?? "")
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-        } else {
-            TextField(node.text ?? "", text: textBinding)
-                .accessibilityLabel(node.label ?? "")
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-        }
-    }
-
-    @ViewBuilder private var textInput: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            if let label = node.label, !label.isEmpty, document.mode == .sheet {
-                Text(label).font(.subheadline).foregroundStyle(.secondary)
-            }
-            textEntry
-                .textFieldStyle(.plain)
-                .padding(.horizontal, isFormRow ? 0 : 12)
-                .frame(maxWidth: .infinity, minHeight: isFormRow ? 32 : 42, alignment: .leading)
-                .background(isFormRow ? Color.clear : Color(xgentHex: palette.surface), in: RoundedRectangle(
-                    cornerRadius: CGFloat(theme.radius.element), style: .continuous
-                ))
-                .overlay {
-                    RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
-                        .stroke(isFormRow ? Color.clear : Color(xgentHex: palette.border), lineWidth: 1)
-                }
-        }
+    private var textInput: some View {
+        XgentTextInput(node: node, document: document, model: model)
     }
 
     private var colorBinding: Binding<Color> {
@@ -591,7 +508,7 @@ struct XgentIOSNode: View {
 
     private var textArea: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let label = node.label, !label.isEmpty { Text(label).font(.subheadline) }
+            XgentFieldLabel(node: node)
             if let language = node.language, !language.isEmpty {
                 XgentCodeEditor(text: textBinding, language: language, label: node.label ?? language,
                                 enabled: node.disabled != true, wrapText: node.wrap ?? true)
@@ -603,14 +520,8 @@ struct XgentIOSNode: View {
                         textView.keyboardDismissMode = .interactive
                     }
                     .frame(minHeight: 112)
-                    .padding(isFormRow ? 0 : 8)
-                    .background(isFormRow ? Color.clear : Color(xgentHex: palette.surface), in: RoundedRectangle(
-                        cornerRadius: CGFloat(theme.radius.element), style: .continuous
-                    ))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
-                            .stroke(isFormRow ? Color.clear : Color(xgentHex: palette.border), lineWidth: 1)
-                    }
+                    .modifier(XgentFieldSurface(node: node))
+                    .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
             }
         }
     }
@@ -636,45 +547,8 @@ struct XgentIOSNode: View {
             .sheet(isPresented: $pickingModel) {
                 XgentIOSModelPicker(node: node, document: document, model: model)
             }
-        } else if node.variant == "compact" {
-            Menu {
-                ForEach(node.options ?? []) { option in
-                    Button {
-                        model.send(node, in: document, value: .string(option.value), editing: true)
-                    } label: {
-                        if option.value == textBinding.wrappedValue {
-                            Label(option.label, systemImage: "checkmark")
-                        } else {
-                            Text(option.label)
-                        }
-                    }
-                    .disabled(option.disabled == true)
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    if let icon = node.icon { Image(systemName: icon) }
-                    Text(selectedOptionLabel).lineLimit(1)
-                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
-                }
-                .font(.subheadline.weight(.medium))
-                .frame(minHeight: 44)
-                .padding(.horizontal, 8)
-                .background(Color(xgentHex: palette.muted), in: Capsule())
-            }
-            .buttonStyle(.plain)
-        } else if dynamicTypeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: 8) {
-                nodeLabel.fixedSize(horizontal: false, vertical: true)
-                Picker(selection: textBinding) { pickerOptions } label: { nodeLabel }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         } else {
-            Picker(selection: textBinding) { pickerOptions } label: { nodeLabel }
-                .pickerStyle(.menu)
-                .frame(minHeight: 44)
+            XgentSelector(node: node, document: document, model: model)
         }
     }
 
@@ -682,36 +556,8 @@ struct XgentIOSNode: View {
         node.options?.first { $0.value == textBinding.wrappedValue }?.label ?? node.label ?? ""
     }
 
-    private var pickerOptions: some View {
-        ForEach(node.options ?? []) { option in
-            Text(option.label).tag(option.value).disabled(option.disabled == true)
-        }
-    }
-
-    @ViewBuilder private var menuItems: some View {
-        XgentIOSMenuItems(nodes: node.children ?? [], document: document, model: model)
-    }
-
-    @ViewBuilder private var nativeMenu: some View {
-        Menu { menuItems } label: {
-            if node.variant == "compact" {
-                Image(systemName: node.icon ?? "ellipsis")
-                    .font(.system(size: 20))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            } else if node.id == "tools" || node.variant == "secondary" {
-                Image(systemName: node.icon ?? "ellipsis")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(Color(xgentHex: palette.text))
-                    .frame(width: CGFloat(theme.control.large), height: CGFloat(theme.control.large))
-                    .background(Color(xgentHex: palette.muted), in: Circle())
-                    .overlay(Circle().stroke(Color(xgentHex: palette.border), lineWidth: 1))
-            } else {
-                nodeLabel
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(node.label ?? "")
+    private var nativeMenu: some View {
+        XgentNativeMenu(node: node, document: document, model: model)
     }
 
     @ViewBuilder private var nodeLabel: some View {
@@ -767,22 +613,6 @@ struct XgentIOSNode: View {
         .frame(maxWidth: .infinity, minHeight: 180)
     }
 
-    private var slider: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(node.label ?? "")
-                Spacer()
-                Text(numberBinding.wrappedValue.formatted()).foregroundStyle(.secondary)
-            }
-            Slider(
-                value: numberBinding,
-                in: (node.minimum ?? 0) ... (node.maximum ?? 1),
-                step: node.step ?? 0.1
-            )
-        }
-        .frame(minHeight: 44)
-    }
-
     private var codeBlock: some View {
         XgentCodeBlock(text: node.text ?? "", language: node.language, label: node.label)
     }
@@ -828,35 +658,7 @@ struct XgentIOSNode: View {
     }
 
     private var iconButton: some View {
-        Button { model.send(node, in: document) } label: {
-            Group {
-                if node.icon == "xgent.sidebar" { XgentIOSSidebarGlyph() }
-                else { Image(systemName: node.icon ?? "ellipsis").font(.system(size: 18, weight: .medium)) }
-            }
-            .frame(width: iconControlSize, height: iconControlSize)
-            .foregroundStyle(node.prominent == true ? Color.white : Color(xgentHex: palette.text))
-            .background(
-                node.prominent == true
-                    ? Color(xgentHex: palette.accent)
-                    : node.variant == "secondary"
-                        ? Color(xgentHex: palette.muted)
-                        : Color.clear,
-                in: Circle()
-            )
-            .overlay {
-                if node.variant == "secondary" {
-                    Circle().stroke(Color(xgentHex: palette.border), lineWidth: 1)
-                }
-            }
-            .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(node.label ?? "")
-    }
-
-    private var iconControlSize: CGFloat {
-        if node.id == "sidebar" || node.id == "tools" { return max(44, CGFloat(theme.control.large)) }
-        return max(44, CGFloat(theme.control.small))
+        XgentIconButton(node: node, document: document, model: model)
     }
 
     @ViewBuilder private var chatMessage: some View {
@@ -1089,77 +891,4 @@ struct XgentIOSNode: View {
     }
 }
 
-struct XgentIOSMenuItems: View {
-    let nodes: [XgentNode]
-    let document: XgentDocument
-    @ObservedObject var model: XgentPresentationModel
-
-    var body: some View {
-        ForEach(nodes) { child in
-            switch child.kind {
-            case .divider:
-                Divider()
-            case .menu:
-                Menu {
-                    AnyView(XgentIOSMenuItems(nodes: child.children ?? [], document: document, model: model))
-                } label: {
-                    Label(child.label ?? "", systemImage: child.icon ?? "ellipsis")
-                }
-                .disabled(child.disabled == true)
-            case .section, .settingsGroup:
-                Section {
-                    AnyView(XgentIOSMenuItems(nodes: child.children ?? [], document: document, model: model))
-                } header: {
-                    if let label = child.label, !label.isEmpty { Text(label) }
-                }
-            case .toggle:
-                Toggle(isOn: Binding(
-                    get: { model.value(child, in: document).boolean },
-                    set: { model.send(child, in: document, value: .bool($0), editing: true) }
-                )) {
-                    if let icon = child.icon { Label(child.label ?? "", systemImage: icon) }
-                    else { Text(child.label ?? "") }
-                }
-                .disabled(child.disabled == true)
-            case .selector, .segmentedControl:
-                Picker(child.label ?? "", selection: Binding(
-                    get: { model.value(child, in: document).text },
-                    set: { model.send(child, in: document, value: .string($0), editing: true) }
-                )) {
-                    ForEach(child.options ?? []) { option in
-                        Text(option.label).tag(option.value).disabled(option.disabled == true)
-                    }
-                }
-                .pickerStyle(.inline)
-                .disabled(child.disabled == true)
-            case .heading, .text, .badge:
-                Text(child.label ?? child.text ?? "")
-            default:
-                Button(role: child.destructive == true ? .destructive : nil) {
-                    model.send(child, in: document)
-                } label: {
-                    if child.selected == true {
-                        Label(child.label ?? "", systemImage: "checkmark")
-                    } else if let icon = child.icon {
-                        Label(child.label ?? "", systemImage: icon)
-                    } else { Text(child.label ?? child.text ?? "") }
-                }
-                .disabled(child.action == nil || child.disabled == true || model.isBusy(child, in: document))
-            }
-        }
-    }
-}
-
-struct XgentIOSSidebarGlyph: View {
-    var body: some View {
-        Path { path in
-            path.move(to: CGPoint(x: 3, y: 7))
-            path.addLine(to: CGPoint(x: 21, y: 7))
-            path.move(to: CGPoint(x: 3, y: 17))
-            path.addLine(to: CGPoint(x: 15, y: 17))
-        }
-        .stroke(style: StrokeStyle(lineWidth: 2, lineCap: .round))
-        .frame(width: 24, height: 24)
-    }
-}
 #endif

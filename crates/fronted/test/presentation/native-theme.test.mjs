@@ -10,6 +10,10 @@ test("native themes resolve Astryx tokens, CSS lengths, and per-surface font sca
           mode === "light"
             ? {
                 "--color-accent": "#112233",
+                "--color-on-accent": "#fafafa",
+                "--color-neutral": "rgba(5, 54, 89, 0.1)",
+                "--color-error": "#cc1234",
+                "--color-on-error": "#ffffef",
                 "--color-background-body": "#f0f1f2",
                 "--color-background-surface": "#ffffff",
                 "--color-text-primary": "#101112",
@@ -22,6 +26,10 @@ test("native themes resolve Astryx tokens, CSS lengths, and per-surface font sca
               }
             : {
                 "--color-accent": "rgb(170 187 204 / 80%)",
+                "--color-on-accent": "#121212",
+                "--color-neutral": "rgba(223, 226, 229, 0.2)",
+                "--color-error": "#ff789a",
+                "--color-on-error": "#111111",
                 "--color-background-body": "#111213",
                 "--color-background-surface": "#202122",
                 "--color-text-primary": "#f0f1f2",
@@ -56,6 +64,14 @@ test("native themes resolve Astryx tokens, CSS lengths, and per-surface font sca
   assert.equal(theme.light.accent, "#112233");
   assert.equal(theme.dark.accent, "#aabbcccc");
   assert.equal(theme.dark.background, "#111213");
+  assert.equal(theme.light.onAccent, "#fafafa");
+  assert.equal(theme.dark.onAccent, "#121212");
+  assert.equal(theme.light.neutral, "#0536591a");
+  assert.equal(theme.dark.neutral, "#dfe2e533");
+  assert.equal(theme.light.error, "#cc1234");
+  assert.equal(theme.dark.error, "#ff789a");
+  assert.equal(theme.light.onError, "#ffffef");
+  assert.equal(theme.dark.onError, "#111111");
   assert.deepEqual(theme.radius, { inner: 8, element: 8, container: 24, overlay: 30, chat: 32 });
   assert.deepEqual(theme.spacing, { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 });
   assert.deepEqual(theme.control, { small: 32, medium: 40, large: 44 });

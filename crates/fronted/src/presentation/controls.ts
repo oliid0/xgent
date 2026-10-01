@@ -1,6 +1,6 @@
 import type { PresentationHandler, PresentationNode, PresentationValue } from "./types";
 
-/** One validated action contract for declarative controls and generated SwiftUI. */
+/** Shared state/action contract; each client owns its control layout and styling. */
 export function presentationControls() {
   const handlers = new Map<string, PresentationHandler>();
   function bind(

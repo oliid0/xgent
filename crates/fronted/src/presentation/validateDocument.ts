@@ -1,7 +1,7 @@
-import { presentationComponentContracts, presentationMappedProperties } from "./kinds.generated";
+import { presentationActionContracts, presentationNodeProperties } from "./protocol";
 import type { PresentationDocument, PresentationHandler, PresentationNode } from "./types";
 
-const NODE_KEYS = new Set<string>(["id", "kind", ...presentationMappedProperties]);
+const NODE_KEYS = new Set<string>(["id", "kind", ...presentationNodeProperties]);
 const STATUS = new Set(["pending", "running", "completed", "error", "paused"]);
 const ROLE = new Set(["user", "assistant", "system"]);
 const ALIGNMENT = new Set(["leading", "center", "trailing"]);
@@ -93,7 +93,7 @@ export function validatePresentationDocument(
     for (const node of nodes) {
       if (!node.id || ids.has(node.id)) throw new Error(`Duplicate native node: ${node.id}`);
       ids.add(node.id);
-      const contract = presentationComponentContracts[node.kind];
+      const contract = presentationActionContracts[node.kind];
       if (!contract) throw new Error(`Unmapped native component: ${String(node.kind)}`);
       const unknown = Object.keys(node).find((key) => !NODE_KEYS.has(key));
       if (unknown) throw new Error(`Unmapped native property: ${node.kind}.${unknown}`);

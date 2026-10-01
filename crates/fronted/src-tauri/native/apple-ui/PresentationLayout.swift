@@ -129,7 +129,7 @@ private struct XgentPDFPreview: NSViewRepresentable {
 }
 #endif
 
-// Semantic layout mappings shared by all native screens. Business state remains in TS.
+// Handwritten native content for desktop conversations, files and tool panels.
 extension XgentNodeView {
     private var palette: XgentPalette { presentationTheme.palette(for: colorScheme) }
 
@@ -240,22 +240,6 @@ extension XgentNodeView {
         }
         .padding(24)
         .frame(maxWidth: .infinity, minHeight: 180)
-    }
-
-    var nativeSlider: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(node.label ?? "")
-                Spacer()
-                Text(numberBinding.wrappedValue.formatted()).foregroundStyle(.secondary)
-            }
-            Slider(
-                value: numberBinding,
-                in: (node.minimum ?? 0)...(node.maximum ?? 1),
-                step: node.step ?? 0.1
-            )
-        }
-        .frame(minHeight: 44)
     }
 
     var nativeProgressBar: some View {
@@ -617,87 +601,6 @@ extension XgentNodeView {
         .buttonStyle(.plain)
         .opacity(node.secondary == true ? 0.62 : 1)
     }
-    var nativeSettingsGroup: some View {
-        Section {
-            children
-        } header: {
-            if let label = node.label, !label.isEmpty { Text(label) }
-        }
-    }
-    var nativeSettingsLayout: some View {
-        let panes = node.children ?? []
-        return NavigationSplitView {
-            if let sidebar = panes.first {
-                XgentNodeView(node: sidebar, document: document, model: model)
-                    .frame(maxHeight: .infinity, alignment: .topLeading)
-                    .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 360)
-            }
-        } detail: {
-            if panes.count > 1 {
-                XgentNodeView(node: panes[1], document: document, model: model)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
-        }
-        .navigationSplitViewStyle(.balanced)
-        .frame(minWidth: 900, idealWidth: 1040, minHeight: 620, idealHeight: 720)
-    }
-    var nativeSection: some View {
-        Section {
-            children
-        } header: {
-            if let label = node.label, !label.isEmpty { Text(label) }
-        }
-    }
-
-    @ViewBuilder private var textEntry: some View {
-        if node.secure == true {
-            SecureField(node.text ?? "", text: textBinding)
-                .accessibilityLabel(node.label ?? "")
-        } else {
-            TextField(node.text ?? "", text: textBinding)
-                .accessibilityLabel(node.label ?? "")
-        }
-    }
-
-    @ViewBuilder var nativeTextInput: some View {
-        if document.mode == .sheet {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(node.label ?? "")
-                    textEntry
-                        .textFieldStyle(.plain)
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 40)
-                        .background(Color(xgentHex: palette.surface),
-                                    in: RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element),
-                                                         style: .continuous))
-                }
-            } else {
-                HStack(spacing: 12) {
-                    Text(node.label ?? "")
-                    Spacer(minLength: 12)
-                    textEntry
-                        .textFieldStyle(.plain)
-                        .multilineTextAlignment(.trailing)
-                        .frame(minWidth: 120, idealWidth: 220, maxWidth: 320)
-                }
-                .frame(minHeight: 44)
-            }
-        } else {
-            textEntry
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 40)
-                .background(Color(xgentHex: palette.surface),
-                            in: RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element),
-                                                 style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element), style: .continuous)
-                        .stroke(Color(xgentHex: palette.border), lineWidth: 1)
-                }
-        }
-    }
-
     private var colorBinding: Binding<Color> {
         Binding(
             get: { Color(xgentHex: model.value(node, in: document).text) },
@@ -724,7 +627,7 @@ extension XgentNodeView {
 
     var nativeTextArea: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let label = node.label, !label.isEmpty { Text(label).font(.subheadline) }
+            XgentFieldLabel(node: node)
             if let language = node.language, !language.isEmpty {
                 XgentCodeEditor(text: textBinding, language: language, label: node.label ?? language,
                                 enabled: node.disabled != true,
@@ -734,16 +637,9 @@ extension XgentNodeView {
             } else {
                 TextEditor(text: textBinding)
                     .scrollContentBackground(.hidden)
-                    .frame(minHeight: 100)
-                    .padding(8)
-                    .background(Color(xgentHex: palette.surface),
-                                in: RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element),
-                                                     style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element), style: .continuous)
-                            .stroke(Color(xgentHex: palette.border), lineWidth: 1)
-                    }
-                    .accessibilityLabel(node.label ?? node.text ?? "")
+                    .frame(minHeight: 112)
+                    .modifier(XgentFieldSurface(node: node))
+                    .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
             }
         }
     }
@@ -803,30 +699,7 @@ extension XgentNodeView {
         XgentAttachmentPicker(node: node, document: document, model: model)
     }
 
-    var iconButton: some View {
-        Button { model.send(node, in: document) } label: {
-            Group {
-                if node.icon == "xgent.sidebar" {
-                    Path { path in
-                        path.move(to: CGPoint(x: 4, y: 8))
-                        path.addLine(to: CGPoint(x: 20, y: 8))
-                        path.move(to: CGPoint(x: 4, y: 16))
-                        path.addLine(to: CGPoint(x: 14, y: 16))
-                    }
-                    .stroke(style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .frame(width: 24, height: 24)
-                } else {
-                    Image(systemName: node.icon ?? "ellipsis").font(.system(size: 20))
-                }
-            }
-            .frame(width: 44, height: 44)
-            .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(node.prominent == true ? Color.white : Color.primary)
-        .modifier(XgentGlassCircle(prominent: node.prominent == true))
-        .accessibilityLabel(node.label ?? "")
-    }
+
 }
 
 #if os(macOS)

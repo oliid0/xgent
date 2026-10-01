@@ -3,6 +3,7 @@
 [default]
 description = "Allows Xgent's bundled mobile execution environment to be inspected, installed, run, and cancelled."
 permissions = [
+  "allow-native-event-listeners",
   "allow-status",
   "allow-set-alpine-mirror",
   "allow-install",
