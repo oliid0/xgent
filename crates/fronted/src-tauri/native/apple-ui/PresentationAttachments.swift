@@ -128,11 +128,7 @@ struct XgentAttachmentPicker: View {
             }
             if !(node.children ?? []).isEmpty {
                 Divider()
-                #if os(iOS)
-                XgentIOSMenuItems(nodes: node.children ?? [], document: document, model: model)
-                #else
-                XgentNodeChildren(nodes: node.children ?? [], document: document, model: model)
-                #endif
+                XgentNativeMenuItems(nodes: node.children ?? [], document: document, model: model)
             }
         } label: {
             if importing { ProgressView().frame(width: controlSize, height: controlSize) }

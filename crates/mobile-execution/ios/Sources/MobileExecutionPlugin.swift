@@ -197,7 +197,7 @@ private func iosToolchainPayload(
 final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private let installationPreferenceKey = "xgent.mobileExecution.iosShellInstalled"
     private let installationVerificationKey = "xgent.mobileExecution.iosShellVerification"
-    private let installationVerificationVersion = "ios-a-shell-v4"
+    private let installationVerificationVersion = "ios-a-shell-v5"
     private let installationDirectoryName = "environment-v3"
     private let installationMarkerName = ".xgent-environment"
     private let installationProbeToken = "xgent-ios-shell-ready"
@@ -807,6 +807,12 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             }
         }
         var isDirectory: ObjCBool = false
+        for command in ["jsc", "jsc_core", "python3", "python3.9", "ffmpeg", "wasm3"] {
+            let marker = root.appendingPathComponent("bin/\(command)")
+            guard let contents = try? Data(contentsOf: marker), contents.isEmpty else {
+                throw MobileExecutionError.io("Missing native a-Shell command marker: \(command)")
+            }
+        }
         guard FileManager.default.fileExists(atPath: root.appendingPathComponent("terminfo").path,
                                             isDirectory: &isDirectory), isDirectory.boolValue else {
             throw MobileExecutionError.io("Missing a-Shell resource directory: terminfo")
@@ -1238,7 +1244,10 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         setenv("TMPDIR", temporary.path, 1)
         setenv(
             "PATH",
-            "\(workspace.path)/.xgent/python/bin:\(workspace.path)/bin:\(documentsBin):\(applicationBin):/usr/bin:/bin",
+            // Native commands are represented by empty files in applicationBin;
+            // ios_system dispatches them to signed frameworks. Host /usr/bin
+            // scripts on CoreSimulator must never override that registry.
+            "\(workspace.path)/.xgent/python/bin:\(workspace.path)/bin:\(documentsBin):\(applicationBin)",
             1
         )
         setenv("APPDIR", resources?.path ?? "", 1)

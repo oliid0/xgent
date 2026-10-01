@@ -1,6 +1,7 @@
 """Exercise the installed APK through accessibility and real touch input."""
 import os
 import re
+import shlex
 import subprocess
 import time
 import xml.etree.ElementTree as ET
@@ -11,6 +12,12 @@ evidence = Path(os.environ["RUNNER_TEMP"])
 
 def adb(*args):
     return subprocess.check_output(["adb", *args], timeout=30)
+
+
+def type_text(value):
+    # adb shell joins these arguments into a remote shell command. Quote the
+    # complete input payload so ;, $, quotes and redirects reach the text field.
+    adb("shell", "input", "text", shlex.quote(value.replace(" ", "%s")))
 
 
 def snapshot():
@@ -174,11 +181,11 @@ def run_terminal(command, expected_output=None, expected_exit=0, clear=True, exa
     if clear:
         tap({"清空终端记录", "Clear terminal history"})
     tap_terminal_input()
-    adb("shell", "input", "text", command.replace(" ", "%s"))
+    type_text(command)
     tap({"运行命令", "Run command"})
     if program_input is not None:
         tap_terminal_input()
-        adb("shell", "input", "text", program_input.replace(" ", "%s"))
+        type_text(program_input)
         tap({"发送输入", "Send input"})
     if eof:
         tap({"结束输入（EOF）", "End input (EOF)"})
@@ -224,7 +231,7 @@ run_terminal("bash --version", "GNU bash", exact=False)
 run_terminal("python3 --version", "Python 3.", exact=False)
 run_terminal("python3 -m pip --version", "pip ", exact=False)
 capture("python-pack")
-run_terminal('read answer; printf xgent-input-%s "$answer"', "xgent-input-ready",
+run_terminal('read answer; printf "xgent-input-$answer"', "xgent-input-ready",
              program_input="ready")
 capture("live-stdin")
 run_terminal("cat", "", eof=True)
