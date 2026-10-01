@@ -15,6 +15,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
   };
   const loader = createTsModuleLoader({ mocks: {
     react: {
+      useSyncExternalStore(_subscribe, getSnapshot) { return getSnapshot(); },
       useEffect() {},
       useState(initial) {
         const index = cursor++;
@@ -232,6 +233,9 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(document.formFactor, "desktop");
   const flatten = nodes => nodes.flatMap(node => [node, ...flatten(node.children ?? [])]);
   assert.ok(flatten(document.nodes).some(node => node.id === "desktop-appearance"), "default macOS system route exposes appearance");
+  for (const id of ["terminal-shell", "tray-show-titles", "tray-running-badge"]) {
+    assert.ok(flatten(document.nodes).some(node => node.id === id), `default macOS system route exposes ${id}`);
+  }
   assert.equal((await dispatch("appearance-customized", true)).ok, true);
   assert.equal((await dispatch("appearance-color:sidebarDark", "#123ABC")).ok, true);
   assert.equal(settings.customSettings.appearance.sidebarDark, "#123abc");
@@ -260,6 +264,7 @@ test("native Shell install reports progress, errors, and live and final package 
   };
   const loader = createTsModuleLoader({ mocks: {
     react: {
+      useSyncExternalStore(_subscribe, getSnapshot) { return getSnapshot(); },
       useEffect(effect) { effects.push(effect); },
       useState(initial) {
         const index = cursor++;

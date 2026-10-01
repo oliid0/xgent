@@ -9,9 +9,9 @@ final class DesktopSettingsRenderingTests: XCTestCase {
     @MainActor
     func testHandwrittenSettingsFitNarrowWideAndAccessibilityWindows() async throws {
         let widths: [CGFloat] = [640, 1040]
-        for width in widths {
+        for (width, systemTools) in widths.flatMap({ width in [false, true].map { (width, $0) } }) {
             for typeSize in [DynamicTypeSize.large, .accessibility3] {
-                let document = try fixture(appearance: true)
+                let document = try fixture(appearance: true, systemTools: systemTools)
                 let model = XgentPresentationModel()
                 model.update(document)
                 let view = XgentDesktopSettingsLayout(node: document.nodes[0], document: document, model: model)
@@ -37,7 +37,7 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                 }
                 XCTAssertGreaterThan(try XCTUnwrap(image.tiffRepresentation).count, 2_000)
                 let attachment = XCTAttachment(image: image)
-                attachment.name = "settings-manual-\(Int(width))-\(typeSize == .large ? "standard" : "accessibility-dark")"
+                attachment.name = "settings-manual-\(systemTools ? "system-tools-" : "")\(Int(width))-\(typeSize == .large ? "standard" : "accessibility-dark")"
                 attachment.lifetime = .keepAlways
                 add(attachment)
             }
@@ -70,7 +70,7 @@ final class DesktopSettingsRenderingTests: XCTestCase {
         XCTAssertEqual(actions.count, count)
     }
 
-    private func fixture(appearance: Bool = false) throws -> XgentDocument {
+    private func fixture(appearance: Bool = false, systemTools: Bool = false) throws -> XgentDocument {
         func node(_ id: String, _ kind: String, _ fields: [String: Any] = [:]) -> [String: Any] {
             var value = fields
             value["id"] = id
@@ -98,6 +98,19 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                 node("close-window-behavior", "Selector", ["label": "Closing the window", "value": "minimize", "action": "close-window-behavior", "options": [["value": "minimize", "label": "Minimize to tray"], ["value": "exit", "label": "Exit application"]]]),
             ]]),
         ]
+        let systemGroups = [
+            node("desktop-terminal", "SettingsGroup", ["label": "Terminal shell", "children": [
+                node("terminal-shell", "Selector", ["label": "Terminal shell", "value": "bash", "action": "terminal-shell", "options": [
+                    ["value": "auto", "label": "Platform default"], ["value": "bash", "label": "Bash"],
+                ]]),
+                node("desktop-shell-description", "Text", ["text": "Choose the shell used for new terminal sessions.", "secondary": true]),
+                node("desktop-shell-refresh", "Button", ["label": "Refresh status", "action": "desktop-shell-refresh"]),
+            ]]),
+            node("desktop-tray", "SettingsGroup", ["label": "Tray Menu", "children": [
+                node("tray-show-titles", "Switch", ["label": "Show conversation titles", "text": "When off, the tray menu shows Chat 1/2/3 instead of real titles for screen sharing.", "value": false, "action": "tray-show-titles"]),
+                node("tray-running-badge", "Switch", ["label": "Menu bar running badge", "text": "Show the running-chat count next to the macOS menu bar icon.", "value": true, "action": "tray-running-badge"]),
+            ]]),
+        ]
         let json: [String: Any] = [
             "version": 1, "surface": "settings-manual", "revision": 1, "mode": "sheet",
             "title": "Settings", "appearance": "light", "formFactor": "desktop", "nodes": [
@@ -113,7 +126,7 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                     ]]),
                     node("settings-detail", "ScrollView", ["children": [
                         node("settings-detail-title", "Heading", ["text": appearance ? "General" : "Providers"]),
-                    ] + (appearance ? appearanceGroups : [
+                    ] + (appearance ? (systemTools ? systemGroups : appearanceGroups) : [
                         node("provider-settings", "SettingsGroup", ["label": "Connection", "children": [
                             node("provider-name", "TextInput", ["label": "Provider name", "value": "Example provider", "action": "name"]),
                             node("provider-key", "TextInput", ["label": "API key", "value": "", "secure": true, "action": "key"]),

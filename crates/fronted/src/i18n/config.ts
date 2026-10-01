@@ -1916,6 +1916,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.terminalShellDesc":
       "终端始终复用同一个会话。Windows 可选择 PowerShell 或 Cmd，macOS 与 Linux 使用 Bash。",
     "settings.terminalShellAuto": "跟随平台默认",
+    "settings.terminalShellUnavailable": "未发现可用的终端 Shell，请刷新重试。",
     "settings.systemProxyEnable": "启用应用代理",
     "settings.systemProxyDesc":
       "生效范围：本地命令环境变量（Bash / 后台任务 / 自动化脚本）、勾选“使用应用代理”的供应商请求、Hook / Cron HTTP 任务、聊天图片加载、更新检查与技能下载。",
@@ -4932,6 +4933,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.terminalShellDesc":
       "The terminal always reuses one session. Windows offers PowerShell or Cmd; macOS and Linux use Bash.",
     "settings.terminalShellAuto": "Platform default",
+    "settings.terminalShellUnavailable": "No terminal shells were found. Refresh to try again.",
     "settings.systemProxyEnable": "Enable app proxy",
     "settings.systemProxyDesc":
       "Applies to: local command environment (Bash / background tasks / automation scripts), providers with “Use app proxy” checked, Hook / Cron HTTP tasks, chat image loading, update checks and skill downloads.",
