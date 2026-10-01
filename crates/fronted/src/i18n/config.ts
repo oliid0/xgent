@@ -195,7 +195,11 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.trayRunningBadgeDesc": "有对话运行时在 macOS 菜单栏图标旁显示数量。",
     /* ── App / Global ── */
     "app.errorBoundaryCopy": "复制错误信息",
-    "app.errorBoundaryDesc": "界面渲染发生错误，正在进行的任务不受影响。请重新加载页面。",
+    "app.errorBoundaryCopied": "错误信息已复制",
+    "app.errorBoundaryCopyFailed": "复制失败，请重试。",
+    "app.errorBoundaryDetails": "查看错误详情",
+    "app.errorBoundaryHideDetails": "收起错误详情",
+    "app.errorBoundaryDesc": "界面无法显示。可重新加载应用，或关闭设置返回对话。",
     "app.errorBoundaryReload": "重新加载",
     "app.errorBoundaryTitle": "页面出现异常",
     "app.loading": "正在加载设置...",
@@ -3130,8 +3134,12 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.trayRunningBadgeDesc": "Show the running-chat count next to the macOS menu bar icon.",
     /* ── App / Global ── */
     "app.errorBoundaryCopy": "Copy error details",
+    "app.errorBoundaryCopied": "Error details copied",
+    "app.errorBoundaryCopyFailed": "Copy failed. Please try again.",
+    "app.errorBoundaryDetails": "Show error details",
+    "app.errorBoundaryHideDetails": "Hide error details",
     "app.errorBoundaryDesc":
-      "A rendering error occurred. Ongoing tasks are not affected. Please reload the page.",
+      "The interface could not be displayed. Reload the application, or close settings to return to your conversation.",
     "app.errorBoundaryReload": "Reload",
     "app.errorBoundaryTitle": "Something went wrong",
     "app.loading": "Loading settings...",

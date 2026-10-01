@@ -18,6 +18,7 @@ import { NativeSurface } from "../../presentation/NativeSurface";
 import type { PresentationNode, PresentationTheme } from "../../presentation/types";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import { MobileFullscreenPanel, MobilePanelHeader } from "../chat/mobile/MobilePanelScaffold";
+import { SettingsModalShell } from "./SettingsModalShell";
 
 type FileEntry = { path: string; kind: string; hidden: boolean };
 type FileList = { entries: FileEntry[]; hasMore: boolean; total: number };
@@ -54,6 +55,7 @@ export function MobileEnvironmentBrowser(props: {
   const { rootPath, backend } = props;
   const { t } = useLocale();
   const [localOpen, setOpen] = useState(false);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const open = props.open ?? localOpen;
   const [directory, setDirectory] = useState("");
   const [entries, setEntries] = useState<FileEntry[]>([]);
@@ -330,7 +332,10 @@ export function MobileEnvironmentBrowser(props: {
         label={t("settings.mobileFilesBrowse")}
         variant="secondary"
         icon={<FolderOpen />}
-        onClick={() => {
+        onClick={(event) => {
+          // A body portal is below an open native dialog's top layer, regardless
+          // of z-index. Keep the destination in the settings dialog that owns it.
+          setPortalTarget(event.currentTarget.closest("dialog") ?? document.body);
           setDirectory("");
           setOpen(true);
         }}
@@ -338,128 +343,134 @@ export function MobileEnvironmentBrowser(props: {
       {open && typeof document !== "undefined"
         ? createPortal(
             <div style={{ position: "relative", zIndex: 1100 }}>
-              <MobileFullscreenPanel open label={t("settings.mobileFilesTitle")} onBack={close}>
-                <MobilePanelHeader
-                  title={t("settings.mobileFilesTitle")}
-                  subtitle={rootLabel}
-                  onBack={close}
-                  backLabel={t("settings.mobileFilesClose")}
-                  actions={
-                    <Button
-                      label={t("settings.mobileRefresh")}
-                      variant="secondary"
-                      isDisabled={loading || loadingMore}
-                      onClick={() => setReloadKey((value) => value + 1)}
-                    />
-                  }
-                />
-                <VStack gap={2} padding={3} className="min-h-0 shrink-0 overflow-x-auto">
-                  <Breadcrumbs label={t("settings.mobileFilesPath")} variant="supporting">
-                    <BreadcrumbItem
-                      isCurrent={parts.length === 0}
-                      onClick={parts.length ? () => navigate("") : undefined}
-                    >
-                      {rootLabel}
-                    </BreadcrumbItem>
-                    {firstVisiblePart > 0 ? (
+              <SettingsModalShell onClose={close} ariaLabel={t("settings.mobileFilesTitle")}>
+                <MobileFullscreenPanel open label={t("settings.mobileFilesTitle")} onBack={close}>
+                  <MobilePanelHeader
+                    title={t("settings.mobileFilesTitle")}
+                    subtitle={rootLabel}
+                    onBack={close}
+                    backLabel={t("settings.mobileFilesClose")}
+                    actions={
+                      <Button
+                        label={t("settings.mobileRefresh")}
+                        variant="secondary"
+                        isDisabled={loading || loadingMore}
+                        onClick={() => setReloadKey((value) => value + 1)}
+                      />
+                    }
+                  />
+                  <VStack gap={2} padding={3} className="min-h-0 shrink-0 overflow-x-auto">
+                    <Breadcrumbs label={t("settings.mobileFilesPath")} variant="supporting">
                       <BreadcrumbItem
-                        onClick={() => navigate(parts.slice(0, firstVisiblePart).join("/"))}
+                        isCurrent={parts.length === 0}
+                        onClick={parts.length ? () => navigate("") : undefined}
                       >
-                        …
+                        {rootLabel}
                       </BreadcrumbItem>
-                    ) : null}
-                    {parts.slice(firstVisiblePart).map((part, index) => {
-                      const depth = firstVisiblePart + index + 1;
-                      return (
+                      {firstVisiblePart > 0 ? (
                         <BreadcrumbItem
-                          key={depth}
-                          isCurrent={depth === parts.length}
-                          onClick={
-                            depth < parts.length
-                              ? () => navigate(parts.slice(0, depth).join("/"))
-                              : undefined
-                          }
+                          onClick={() => navigate(parts.slice(0, firstVisiblePart).join("/"))}
                         >
-                          {part}
+                          …
                         </BreadcrumbItem>
-                      );
-                    })}
-                  </Breadcrumbs>
-                </VStack>
-                <StackItem size="fill" isScrollable className="min-h-0">
-                  <VStack gap={3} padding={3}>
-                    {error ? <Banner status="error" title={error} collapsible={false} /> : null}
-                    {previewPath ? (
-                      <VStack gap={3}>
-                        <HStack gap={2} vAlign="center" wrap="wrap">
-                          <Button
-                            type="button"
-                            label={t("settings.mobileFilesBack")}
-                            variant="secondary"
-                            onClick={backToList}
-                          />
-                          <Text type="body" weight="medium" wordBreak="break-word">
-                            {entryName(previewPath)}
-                          </Text>
-                        </HStack>
-                        {previewLoading ? (
-                          <Spinner aria-label={t("settings.mobileFilesLoading")} />
-                        ) : null}
-                        {preview ? (
-                          <>
-                            <CodeBlock
-                              code={preview.content ?? ""}
-                              language="plaintext"
-                              title={entryName(previewPath)}
-                              size="sm"
-                              isWrapped
-                              width="100%"
-                            />
-                            {preview.truncated ? (
-                              <Text type="supporting" color="secondary">
-                                {t("settings.mobileFilesTruncated")}
-                              </Text>
-                            ) : null}
-                          </>
-                        ) : null}
-                      </VStack>
-                    ) : loading ? (
-                      <Spinner aria-label={t("settings.mobileFilesLoading")} />
-                    ) : entries.length === 0 && !error ? (
-                      <EmptyState title={t("settings.mobileFilesEmpty")} isCompact />
-                    ) : (
-                      <VStack gap={3}>
-                        <List density="compact" hasDividers header={t("settings.mobileFilesTitle")}>
-                          {entries.map((entry) => (
-                            <ListItem
-                              key={entry.path}
-                              label={entryName(entry.path)}
-                              description={entry.kind === "dir" ? undefined : entry.path}
-                              startContent={entry.kind === "dir" ? <Folder /> : <FileText />}
-                              onClick={() =>
-                                entry.kind === "dir"
-                                  ? navigate(entry.path)
-                                  : void openFile(entry.path)
-                              }
-                            />
-                          ))}
-                        </List>
-                        {hasMore ? (
-                          <Button
-                            type="button"
-                            label={t("settings.mobileFilesMore")}
-                            isLoading={loadingMore}
-                            isDisabled={loadingMore}
-                            onClick={() => void loadMore()}
-                          />
-                        ) : null}
-                      </VStack>
-                    )}
+                      ) : null}
+                      {parts.slice(firstVisiblePart).map((part, index) => {
+                        const depth = firstVisiblePart + index + 1;
+                        return (
+                          <BreadcrumbItem
+                            key={depth}
+                            isCurrent={depth === parts.length}
+                            onClick={
+                              depth < parts.length
+                                ? () => navigate(parts.slice(0, depth).join("/"))
+                                : undefined
+                            }
+                          >
+                            {part}
+                          </BreadcrumbItem>
+                        );
+                      })}
+                    </Breadcrumbs>
                   </VStack>
-                </StackItem>
-              </MobileFullscreenPanel>
+                  <StackItem size="fill" isScrollable className="min-h-0">
+                    <VStack gap={3} padding={3}>
+                      {error ? <Banner status="error" title={error} collapsible={false} /> : null}
+                      {previewPath ? (
+                        <VStack gap={3}>
+                          <HStack gap={2} vAlign="center" wrap="wrap">
+                            <Button
+                              type="button"
+                              label={t("settings.mobileFilesBack")}
+                              variant="secondary"
+                              onClick={backToList}
+                            />
+                            <Text type="body" weight="medium" wordBreak="break-word">
+                              {entryName(previewPath)}
+                            </Text>
+                          </HStack>
+                          {previewLoading ? (
+                            <Spinner aria-label={t("settings.mobileFilesLoading")} />
+                          ) : null}
+                          {preview ? (
+                            <>
+                              <CodeBlock
+                                code={preview.content ?? ""}
+                                language="plaintext"
+                                title={entryName(previewPath)}
+                                size="sm"
+                                isWrapped
+                                width="100%"
+                              />
+                              {preview.truncated ? (
+                                <Text type="supporting" color="secondary">
+                                  {t("settings.mobileFilesTruncated")}
+                                </Text>
+                              ) : null}
+                            </>
+                          ) : null}
+                        </VStack>
+                      ) : loading ? (
+                        <Spinner aria-label={t("settings.mobileFilesLoading")} />
+                      ) : entries.length === 0 && !error ? (
+                        <EmptyState title={t("settings.mobileFilesEmpty")} isCompact />
+                      ) : (
+                        <VStack gap={3}>
+                          <List
+                            density="compact"
+                            hasDividers
+                            header={t("settings.mobileFilesTitle")}
+                          >
+                            {entries.map((entry) => (
+                              <ListItem
+                                key={entry.path}
+                                label={entryName(entry.path)}
+                                description={entry.kind === "dir" ? undefined : entry.path}
+                                startContent={entry.kind === "dir" ? <Folder /> : <FileText />}
+                                onClick={() =>
+                                  entry.kind === "dir"
+                                    ? navigate(entry.path)
+                                    : void openFile(entry.path)
+                                }
+                              />
+                            ))}
+                          </List>
+                          {hasMore ? (
+                            <Button
+                              type="button"
+                              label={t("settings.mobileFilesMore")}
+                              isLoading={loadingMore}
+                              isDisabled={loadingMore}
+                              onClick={() => void loadMore()}
+                            />
+                          ) : null}
+                        </VStack>
+                      )}
+                    </VStack>
+                  </StackItem>
+                </MobileFullscreenPanel>
+              </SettingsModalShell>
             </div>,
-            document.body,
+            portalTarget ?? document.body,
           )
         : null}
     </>

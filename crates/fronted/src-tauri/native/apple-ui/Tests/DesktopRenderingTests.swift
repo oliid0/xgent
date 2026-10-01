@@ -21,16 +21,18 @@ final class DesktopRenderingTests: XCTestCase {
                 node("command", "CodeBlock", ["label": "Command", "language": "shell", "text": "pnpm check"]),
             ],
         ])
-        let live = try document(nodes: [
+        let liveNodes = [
             node("summary", "Text", ["text": "I found the settings behavior and am checking the fix."]),
             edited, checking,
-        ])
-        let completed = try document(nodes: [
+        ]
+        let completedNodes = [
             node("finished", "Collapsible", ["label": "Worked for 2m 38s", "variant": "work",
                                             "children": [edited, checking]]),
             node("reply", "Text", ["text": "The settings change is complete."]),
-        ])
+        ]
         for (width, appearance) in [(CGFloat(640), XgentDocument.Appearance.light), (CGFloat(1040), .dark)] {
+            let live = try document(nodes: liveNodes, appearance: appearance)
+            let completed = try document(nodes: completedNodes, appearance: appearance)
             let liveHeight = try await capture(live, name: "desktop-work-live-\(Int(width))",
                                                width: width, appearance: appearance)
             let completedHeight = try await capture(completed, name: "desktop-work-completed-\(Int(width))",
@@ -50,6 +52,8 @@ final class DesktopRenderingTests: XCTestCase {
         }
         .padding(20)
         .frame(width: width, alignment: .topLeading)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(Color(xgentHex: XgentPresentationTheme.fallback.palette(for: appearance == .dark ? .dark : .light).background))
         .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: appearance))
         .preferredColorScheme(appearance == .dark ? .dark : .light)
         let hosting = NSHostingView(rootView: content)
@@ -76,10 +80,10 @@ final class DesktopRenderingTests: XCTestCase {
         properties.merging(["id": id, "kind": kind]) { _, value in value }
     }
 
-    private func document(nodes: [[String: Any]]) throws -> XgentDocument {
+    private func document(nodes: [[String: Any]], appearance: XgentDocument.Appearance) throws -> XgentDocument {
         let json: [String: Any] = [
             "version": 1, "surface": "desktop-work", "revision": 1, "mode": "root",
-            "title": "Work", "appearance": "light", "nodes": nodes,
+            "title": "Work", "appearance": appearance.rawValue, "nodes": nodes,
         ]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: json))
         try document.validate()

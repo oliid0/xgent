@@ -204,23 +204,27 @@ extension XgentNodeView {
         .accessibilityElement(children: .combine)
     }
 
-    var nativeBanner: some View {
-        HStack(alignment: .top, spacing: CGFloat(presentationTheme.spacing.sm)) {
-            semanticStatusIcon
-            VStack(alignment: .leading, spacing: 4) {
-                if let label = node.label, !label.isEmpty {
-                    Text(label).font(.headline)
+    @ViewBuilder var nativeBanner: some View {
+        if node.variant == "error-screen" {
+            XgentErrorScreen(node: node, document: document, model: model)
+        } else {
+            HStack(alignment: .top, spacing: CGFloat(presentationTheme.spacing.sm)) {
+                semanticStatusIcon
+                VStack(alignment: .leading, spacing: 4) {
+                    if let label = node.label, !label.isEmpty {
+                        Text(label).font(.headline)
+                    }
+                    if let text = node.text, !text.isEmpty {
+                        Text(text).font(.subheadline).fixedSize(horizontal: false, vertical: true)
+                    }
+                    children
                 }
-                if let text = node.text, !text.isEmpty {
-                    Text(text).font(.subheadline).fixedSize(horizontal: false, vertical: true)
-                }
-                children
             }
+            .padding(CGFloat(presentationTheme.spacing.md))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(semanticColor.opacity(0.1),
+                        in: RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element), style: .continuous))
         }
-        .padding(CGFloat(presentationTheme.spacing.md))
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(semanticColor.opacity(0.1),
-                    in: RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element), style: .continuous))
     }
 
     var nativeEmptyState: some View {
@@ -388,6 +392,7 @@ extension XgentNodeView {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 

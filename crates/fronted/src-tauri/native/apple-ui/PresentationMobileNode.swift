@@ -358,7 +358,11 @@ struct XgentIOSNode: View {
                 .padding(.vertical, 4)
                 .background(statusColor.opacity(0.12), in: Capsule())
         case .banner:
-            banner
+            if node.variant == "error-screen" {
+                XgentErrorScreen(node: node, document: document, model: model)
+            } else {
+                banner
+            }
         case .emptyState:
             emptyState
         case .statusDot:

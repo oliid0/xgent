@@ -9,8 +9,8 @@ function deferred() {
   const promise = new Promise(yes => { resolve = yes; });
   return { promise, resolve };
 }
-function harness(invoke) {
-  const hooks = createReactHookHarness(), calls = [];
+function harness(invoke, options = {}) {
+  const hooks = createReactHookHarness(), calls = [], portals = [];
   let closes = 0;
   const props = { rootPath: "/app/alpine", backend: "android-proot", open: true,
     nativeSettingsSurfaceId: "settings-session", appearance: "dark", onClose() { closes++; props.open = false; } };
@@ -19,18 +19,21 @@ function harness(invoke) {
       : name === "Breadcrumbs" ? ["Breadcrumbs", "BreadcrumbItem"] : name === "List" ? ["List", "ListItem"] : [name]).map(symbol => [symbol, symbol]))
   ]));
   const loader = createTsModuleLoader({ mocks: {
-    ...mocks, react: hooks.react, "react-dom": { createPortal: child => child },
+    ...mocks, react: hooks.react, "react-dom": { createPortal: (child, target) => { portals.push(target); return child; } },
     "../../components/icons": {}, "../../i18n": { useLocale: () => ({ t: key => key }) },
     "../../presentation/NativeSurface": { NativeSurface: "NativeSurface" },
-    "../../runtime/applePresentation": { isApplePresentationRuntime: () => true },
-    "../chat/mobile/MobilePanelScaffold": {},
+    "../../runtime/applePresentation": { isApplePresentationRuntime: () => options.apple !== false },
+    "../chat/mobile/MobilePanelScaffold": { MobileFullscreenPanel: "MobileFullscreenPanel", MobilePanelHeader: "MobilePanelHeader" },
+    "./SettingsModalShell": { SettingsModalShell: "SettingsModalShell" },
     "@xgent/runtime": { async invoke(command, args) { calls.push({ command, args }); return invoke(command, args); } },
   } });
   const { MobileEnvironmentBrowser } = loader.loadModule("src/pages/settings/MobileEnvironmentBrowser.tsx");
   const { validatePresentationDocument } = loader.loadModule("src/presentation/validateDocument.ts");
+  let tree;
   const render = () => {
-    const result = hooks.render(() => MobileEnvironmentBrowser(props))?.props;
-    if (result) validatePresentationDocument({ ...result.document, surface: "shell-files", version: 1, revision: 1 }, result.handlers);
+    tree = hooks.render(() => MobileEnvironmentBrowser(props));
+    const result = tree?.props;
+    if (result?.document) validatePresentationDocument({ ...result.document, surface: "shell-files", version: 1, revision: 1 }, result.handlers);
     return result;
   };
   const dispatch = async (action, value = null) => {
@@ -41,7 +44,8 @@ function harness(invoke) {
     render(); // Commit state changes so navigation starts its effect before settling IPC.
     await pending; await settle(); return render();
   };
-  return { props, calls, render, dispatch, unmount: () => hooks.unmount(), get closes() { return closes; } };
+  function nodes(value) { if (!value || typeof value !== "object") return []; return [value, ...[value.props?.children].flat(2).flatMap(nodes)]; }
+  return { props, calls, portals, render, dispatch, find: predicate => nodes(tree).find(predicate), unmount: () => hooks.unmount(), get closes() { return closes; } };
 }
 
 test("installed Shell browser navigates folders, pages results and previews real bounded text on the retained native surface", async () => {
@@ -125,4 +129,34 @@ test("old Shell directory results and native actions cannot replace a new enviro
   assert.ok(JSON.stringify(h.render().document).includes("current"));
   old.handlers.get("shell-files-directory").run("");
   assert.equal(h.calls.some(c => c.args.path === "stale"), false);
+});
+
+test("Android Shell browser stays in the owning dialog top layer and reads actual Alpine files", async () => {
+  const previous = globalThis.document, body = {}, dialog = {};
+  globalThis.document = { body };
+  try {
+    for (const owner of [dialog, null]) {
+      const h = harness((command, args) => {
+        if (command === "fs_list") return { entries: args.path ? [{ path: "etc/alpine-release", kind: "file" }] : [{ path: "etc", kind: "dir" }], hasMore: false };
+        if (command === "fs_path_status") return { kind: "file", sizeBytes: 8 };
+        if (command === "fs_read_text") return { kind: "text", content: "3.22.5\n", truncated: false };
+        throw new Error(command);
+      }, { apple: false });
+      delete h.props.open;
+      h.render();
+      h.find(node => node.type === "Button" && node.props.label === "settings.mobileFilesBrowse").props.onClick({ currentTarget: { closest: selector => { assert.equal(selector, "dialog"); return owner; } } });
+      h.render(); await settle(); h.render();
+      assert.equal(h.portals.at(-1), owner ?? body);
+      assert.ok(h.find(node => node.type === "SettingsModalShell"));
+      assert.equal(h.find(node => node.type === "MobileFullscreenPanel").props.open, true);
+      h.find(node => node.type === "ListItem" && node.props.label === "etc").props.onClick();
+      h.render(); await settle(); h.render();
+      h.find(node => node.type === "ListItem" && node.props.label === "alpine-release").props.onClick();
+      await settle(); h.render();
+      assert.equal(h.find(node => node.type === "CodeBlock").props.code, "3.22.5\n");
+      assert.equal(h.calls.at(-1).args.workdir, "/app/alpine");
+      h.find(node => node.type === "SettingsModalShell").props.onClose(); h.render();
+      assert.equal(h.find(node => node.type === "MobileFullscreenPanel"), undefined); h.unmount();
+    }
+  } finally { if (previous === undefined) delete globalThis.document; else globalThis.document = previous; }
 });

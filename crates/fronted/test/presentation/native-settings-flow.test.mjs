@@ -45,6 +45,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
     "../pages/settings/BackupSyncSection": { BackupSyncSection: "BackupSyncSection" },
     "../pages/settings/NativeProviderRuntimeSettings": { NativeProviderRuntimeSettings: "NativeProviderRuntimeSettings" },
     "../pages/settings/NativeProviderModelSettings": { NativeProviderModelSettings: "NativeProviderModelSettings" },
+    "./SettingsModalShell": { SettingsModalShell: "SettingsModalShell" },
     "../pages/settings/useCodexOAuthAccounts": { useCodexOAuthAccounts: () => ({ status: { accounts: [] }, loaded: true, locked: false }) },
   } });
   const { NativeSettingsPage } = loader.loadModule("src/presentation/NativeSettingsPage.tsx");
@@ -266,6 +267,7 @@ test("native Shell install reports progress, errors, and live and final package 
     "../pages/settings/BackupSyncSection": { BackupSyncSection: "BackupSyncSection" },
     "../pages/settings/NativeProviderRuntimeSettings": { NativeProviderRuntimeSettings: "NativeProviderRuntimeSettings" },
     "../pages/settings/useCodexOAuthAccounts": { useCodexOAuthAccounts: () => ({ status: { accounts: [] }, loaded: true, locked: false }) },
+    "./SettingsModalShell": { SettingsModalShell: "SettingsModalShell" },
     "../lib/mobileExecution": {
       mobileExecutionStatus: async () => shellStatus,
       listExternalMobileWorkspaces: async () => [],

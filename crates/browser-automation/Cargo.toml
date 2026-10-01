@@ -33,4 +33,4 @@ webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 cairo-rs = { version = "0.18", features = ["png"] }
 
 [build-dependencies]
-tauri-plugin = "2.5.4"
+tauri-plugin = { version = "2.5.4", features = ["build"] }

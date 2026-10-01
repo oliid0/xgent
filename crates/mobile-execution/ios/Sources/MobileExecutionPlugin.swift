@@ -595,7 +595,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         ios_setDirectoryURL(cwd)
         let liveInput = request.interactiveStdin == true ? try CommandInputStream(onClosed: { [weak self] error in
             self?.trigger("inputState", data: [
-                "runId": request.runId, "ready": false, "error": error.map { $0 as Any } ?? NSNull()
+                "runId": request.runId, "ready": false, "error": (error as Any?) ?? NSNull()
             ])
         }) : nil
         let stdinFile: any CommandInputSource

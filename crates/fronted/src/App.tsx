@@ -94,9 +94,10 @@ function AppChrome(props: { children: ReactNode; nativeMobile?: boolean }) {
   // suppressed native menu (surfaces with their own menus opt out upstream).
   const { onRootContextMenu, onRootMouseDownCapture, contextMenuProps } = useNativeInputContextMenu(
     {
-      enabled: !props.nativeMobile,
+      enabled: !props.nativeMobile && !isApplePresentationRuntime(),
     },
   );
+  if (isApplePresentationRuntime()) return props.children;
   return (
     <ContextMenu {...contextMenuProps}>
       <VStack
@@ -789,7 +790,7 @@ export default function App() {
                     {settingsHydratedRef.current ? (
                       <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
                     ) : null}
-                    <AppErrorBoundary>
+                    <AppErrorBoundary appearance={settings.theme} nativeMobile={nativeMobile}>
                       <VStack width="100%" height="100%" gap={0}>
                         {nativeMobile && mobileStartup.failures.length > 0 ? (
                           <MobileStartupWarning
@@ -817,17 +818,24 @@ export default function App() {
                     </AppErrorBoundary>
                     {isApplePresentationRuntime() ? (
                       settingsOpen ? (
-                        <NativeSettingsPage
-                          settings={settings}
-                          setSettings={setSettings}
-                          reloadSettings={reloadPersistedSettings}
-                          saveState={settingsSaveState}
-                          onBack={closeSettings}
-                          initialSection={settingsSection}
-                          soulCreateRequestId={soulCreateRequestId}
+                        <AppErrorBoundary
+                          mode="sheet"
+                          appearance={settings.theme}
                           nativeMobile={nativeMobile}
-                          appUpdate={appUpdate}
-                        />
+                          onClose={closeSettings}
+                        >
+                          <NativeSettingsPage
+                            settings={settings}
+                            setSettings={setSettings}
+                            reloadSettings={reloadPersistedSettings}
+                            saveState={settingsSaveState}
+                            onBack={closeSettings}
+                            initialSection={settingsSection}
+                            soulCreateRequestId={soulCreateRequestId}
+                            nativeMobile={nativeMobile}
+                            appUpdate={appUpdate}
+                          />
+                        </AppErrorBoundary>
                       ) : null
                     ) : compactSettingsDialog ? (
                       <BottomSheet
