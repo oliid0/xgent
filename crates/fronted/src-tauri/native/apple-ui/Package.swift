@@ -17,6 +17,7 @@ let package = Package(
         .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", exact: "1.19.6"),
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.20.0"),
         .package(url: "https://github.com/danielsaidi/SystemNotification", exact: "1.4.1"),
+        .package(url: "https://github.com/cashapp/AccessibilitySnapshot", exact: "0.13.1"),
     ],
     targets: [
         .target(name: "XgentNativeUI", dependencies: [
@@ -39,6 +40,8 @@ let package = Package(
             .product(name: "LanguageSupport", package: "CodeEditorView"),
             .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
             .product(name: "SwiftTerm", package: "SwiftTerm"),
+            .product(name: "AccessibilitySnapshotParser", package: "AccessibilitySnapshot",
+                     condition: .when(platforms: [.iOS])),
         ],
                     path: "Tests"),
     ],

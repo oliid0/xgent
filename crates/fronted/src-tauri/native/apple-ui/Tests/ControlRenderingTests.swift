@@ -140,15 +140,14 @@ final class ControlRenderingTests: XCTestCase {
         XCTAssertTrue(field.isSecureTextEntry)
         XCTAssertEqual(field.autocapitalizationType, .none)
         XCTAssertEqual(field.autocorrectionType, .no)
-        field.text = "test-key"
-        field.sendActions(for: .editingChanged)
+        XCTAssertTrue(field.becomeFirstResponder())
+        field.insertText("test-key")
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertEqual(actions.last?.action, "key")
         XCTAssertEqual(actions.last?.value, .string("test-key"))
         let before = actions.count
         model.invalidate()
-        field.text = "stale-key"
-        field.sendActions(for: .editingChanged)
+        field.insertText("stale-key")
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertEqual(actions.count, before)
     }
@@ -164,6 +163,8 @@ final class ControlRenderingTests: XCTestCase {
         let content = view.modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: .light))
         #if os(iOS)
         let host = UIHostingController(rootView: content)
+        // Measure the control, excluding the simulator window's status-bar inset.
+        host.safeAreaRegions = []
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: width, height: 720))
         window.rootViewController = host
         window.makeKeyAndVisible()

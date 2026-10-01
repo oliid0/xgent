@@ -26,6 +26,8 @@ final class NotificationRenderingTests: XCTestCase {
                 .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: .light))
             #if os(iOS)
             let hosting = UIHostingController(rootView: view)
+            // Intrinsic card sizing must not include the hosting window's safe area.
+            hosting.safeAreaRegions = []
             let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 720))
             window.rootViewController = hosting
             window.makeKeyAndVisible()
