@@ -33,7 +33,7 @@ let package = Package(
             .product(name: "LanguageSupport", package: "CodeEditorView"),
             .product(name: "SwiftTerm", package: "SwiftTerm"),
             .product(name: "SystemNotification", package: "SystemNotification"),
-        ], path: ".", exclude: ["Tests"]),
+        ], path: ".", exclude: ["Tests", "TestHost"]),
         .testTarget(name: "XgentNativeUITests", dependencies: [
             "XgentNativeUI", .product(name: "MarkdownUI", package: "swift-markdown-ui"),
             .product(name: "Nuke", package: "Nuke"),

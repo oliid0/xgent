@@ -223,10 +223,19 @@ jobs:
           ')"
           echo "NATIVE_SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
 
-      - name: Test iOS package and capture native layouts
+      - name: Prepare the iOS application test host
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+          xcodegen generate --spec TestHost/project.yml --project TestHost
+
+      - name: Test hosted iOS package and capture native layouts
         run: |
           set -o pipefail
-          xcodebuild test -scheme XgentNativeUI -skipPackagePluginValidation \
+          xcodebuild test -project TestHost/XgentNativeTestHost.xcodeproj \
+            -scheme XgentNativeHostedTests -skipPackagePluginValidation \
             -destination "platform=iOS Simulator,id=$NATIVE_SIMULATOR_ID" \
             -resultBundlePath "$RUNNER_TEMP/native-ios.xcresult" \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/native-ios.log"

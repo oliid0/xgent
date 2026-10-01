@@ -1,0 +1,69 @@
+name: XgentNativeTestHost
+options:
+  deploymentTarget:
+    iOS: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    ENABLE_TESTABILITY: YES
+    CODE_SIGNING_ALLOWED: NO
+    GENERATE_INFOPLIST_FILE: YES
+packages:
+  XgentNativeUI:
+    path: ..
+  MarkdownUI:
+    url: https://github.com/gonzalezreal/swift-markdown-ui
+    exactVersion: 2.4.1
+  Nuke:
+    url: https://github.com/kean/Nuke
+    exactVersion: 13.2.0
+  CodeEditorView:
+    url: https://github.com/mchakravarty/CodeEditorView
+    exactVersion: 0.16.0
+  SnapshotTesting:
+    url: https://github.com/pointfreeco/swift-snapshot-testing
+    exactVersion: 1.19.6
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    exactVersion: 1.20.0
+  AccessibilitySnapshot:
+    url: https://github.com/cashapp/AccessibilitySnapshot
+    exactVersion: 0.13.1
+targets:
+  XgentNativeTestHost:
+    type: application
+    platform: iOS
+    sources: TestHostApp.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.xgent.native-test-host
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+  XgentNativeUITests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: ../Tests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.xgent.native-ui-tests
+    dependencies:
+      - target: XgentNativeTestHost
+      - package: XgentNativeUI
+      - package: MarkdownUI
+      - package: Nuke
+      - package: CodeEditorView
+        product: LanguageSupport
+      - package: SnapshotTesting
+      - package: SwiftTerm
+      - package: AccessibilitySnapshot
+        product: AccessibilitySnapshotParser
+schemes:
+  XgentNativeHostedTests:
+    build:
+      targets:
+        XgentNativeTestHost: all
+        XgentNativeUITests: [test]
+    test:
+      config: Debug
+      targets:
+        - name: XgentNativeUITests
+          parallelizable: false

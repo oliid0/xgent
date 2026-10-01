@@ -58,6 +58,14 @@ exports native screenshots and accessibility trees for rendered review. Mounted
 tests cover narrow/wide sizes, Dynamic Type, input, action lifecycle and terminals.
 Shared-store tests verify persistence, failures and runtime callbacks.
 
+iOS tests run in the minimal `native/apple-ui/TestHost` application. CI generates
+its Xcode project from the documented XcodeGen spec and runs
+`XgentNativeHostedTests`, using the existing test sources and exact package versions.
+The bare SwiftPM iOS runner does not execute UIApplicationMain: UIKit reports
+`UIApp is nil` and cannot dispatch control events. Rendering/AX tests must use the
+application host. macOS tests and the production device archive still use SwiftPM;
+the test host is excluded from the shipped library.
+
 Existing feature entry points alone do not prove platform parity. Complex combined
 browser/CUA/application/document/animation workflows require end-to-end execution
 on the actual platforms. `history.md` records current objectives, verified progress,
