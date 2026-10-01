@@ -74,6 +74,7 @@ import {
   removeNativeSurfaceSession,
   retainNativeSurfaceSession,
 } from "./NativeSurface";
+import { createNativeDesktopAppearance } from "./nativeDesktopAppearance";
 import { nativeOAuthAccounts } from "./nativeOAuthAccounts";
 import { createNativePresentationTheme } from "./nativeTheme";
 import type { PresentationNode } from "./types";
@@ -877,12 +878,18 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         ),
       ]),
     );
-    nodes.push({
-      id: "system-font",
-      kind: "Text",
-      secondary: true,
-      text: t("settings.native.accessibilityNote"),
-    });
+    if (nativeMobile) {
+      nodes.push({
+        id: "system-font",
+        kind: "Text",
+        secondary: true,
+        text: t("settings.native.accessibilityNote"),
+      });
+    } else {
+      const appearance = createNativeDesktopAppearance({ settings, setSettings }, t);
+      nodes.push(...appearance.nodes);
+      for (const [id, handler] of appearance.handlers) c.handlers.set(id, handler);
+    }
   } else if (page === "providers") {
     nodes.push(
       c.action(

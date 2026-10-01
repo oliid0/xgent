@@ -56,10 +56,11 @@ test("native settings mirrors compact navigation and persists shared system, pro
   let document;
   let rendered;
   let request = 0;
+  let mobile = true;
   const render = () => {
     cursor = 0;
     const result = NativeSettingsPage({ settings, setSettings: (update) => { settings = update(settings); },
-      nativeMobile: true, initialSection: "system", saveState: { status: "saved" }, onBack() {}, appUpdate: {} });
+      nativeMobile: mobile, initialSection: "system", saveState: { status: "saved" }, onBack() {}, appUpdate: {} });
     document = result.props.document;
     rendered = result;
     if (result.props.handlers) registry.register("settings", result.props.handlers);
@@ -225,6 +226,19 @@ test("native settings mirrors compact navigation and persists shared system, pro
   }
   await dispatch("back");
   assert.ok(!document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === "nav:skills" || node.id === "nav:mcp"));
+  mobile = false;
+  states.length = 0;
+  render();
+  assert.equal(document.formFactor, "desktop");
+  const flatten = nodes => nodes.flatMap(node => [node, ...flatten(node.children ?? [])]);
+  assert.ok(flatten(document.nodes).some(node => node.id === "desktop-appearance"), "default macOS system route exposes appearance");
+  assert.equal((await dispatch("appearance-customized", true)).ok, true);
+  assert.equal((await dispatch("appearance-color:sidebarDark", "#123ABC")).ok, true);
+  assert.equal(settings.customSettings.appearance.sidebarDark, "#123abc");
+  assert.equal((await dispatch("font-scale:chat", "1.2")).ok, true);
+  assert.equal(settings.customSettings.fontScale.chat, 1.2);
+  assert.equal((await dispatch("close-window-behavior", "exit")).ok, true);
+  assert.equal(settings.closeWindowBehavior, "exit");
 });
 
 test("native Shell install reports progress, errors, and live and final package output", async () => {

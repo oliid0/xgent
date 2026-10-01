@@ -36,6 +36,10 @@ export function createAppearanceTheme(appearance: AppearanceSettings, compact: b
         : {}),
       ...(appearance.customized
         ? {
+            // Presets retain explicit input tokens. Override accent here as
+            // well as its generated color scale so resolveThemeTokens/useTheme
+            // do not reapply the preset's accent over the custom selection.
+            "--color-accent": [appearance.accentLight, appearance.accentDark] as [string, string],
             "--color-background-body": [appearance.sidebarLight, appearance.sidebarDark] as [
               string,
               string,

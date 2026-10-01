@@ -11,7 +11,7 @@ final class DesktopSettingsRenderingTests: XCTestCase {
         let widths: [CGFloat] = [640, 1040]
         for width in widths {
             for typeSize in [DynamicTypeSize.large, .accessibility3] {
-                let document = try fixture()
+                let document = try fixture(appearance: true)
                 let model = XgentPresentationModel()
                 model.update(document)
                 let view = XgentDesktopSettingsLayout(node: document.nodes[0], document: document, model: model)
@@ -70,13 +70,34 @@ final class DesktopSettingsRenderingTests: XCTestCase {
         XCTAssertEqual(actions.count, count)
     }
 
-    private func fixture() throws -> XgentDocument {
+    private func fixture(appearance: Bool = false) throws -> XgentDocument {
         func node(_ id: String, _ kind: String, _ fields: [String: Any] = [:]) -> [String: Any] {
             var value = fields
             value["id"] = id
             value["kind"] = kind
             return value
         }
+        let appearanceGroups = [
+            node("desktop-appearance", "SettingsGroup", ["label": "Appearance", "children": [
+                node("thinking", "Switch", ["label": "Show reasoning and thinking", "value": true, "action": "thinking"]),
+                node("appearance-preset", "Selector", ["label": "Appearance preset", "value": "matcha", "action": "appearance-preset", "options": [
+                    ["value": "current", "label": "Current"], ["value": "stone", "label": "Stone"], ["value": "matcha", "label": "Matcha"],
+                ]]),
+                node("appearance-customized", "Switch", ["label": "Customize appearance", "value": true, "action": "appearance-customized"]),
+                node("appearance-color:accentLight", "ColorInput", ["label": "Light accent", "value": "#abcdef", "action": "appearance-color:accentLight"]),
+                node("appearance-color:accentDark", "ColorInput", ["label": "Dark accent", "value": "#123456", "action": "appearance-color:accentDark"]),
+                node("appearance-color:sidebarLight", "ColorInput", ["label": "Light sidebar", "value": "#ddeeff", "action": "appearance-color:sidebarLight"]),
+                node("appearance-color:sidebarDark", "ColorInput", ["label": "Dark sidebar", "value": "#151515", "action": "appearance-color:sidebarDark"]),
+                node("appearance-radius", "Selector", ["label": "Corner radius", "value": "24", "action": "appearance-radius", "options": [["value": "16", "label": "16px"], ["value": "24", "label": "24px"]]]),
+                node("appearance-reset", "Button", ["label": "Reset appearance", "action": "appearance-reset"]),
+            ]]),
+            node("desktop-font-size", "SettingsGroup", ["label": "Font size", "children": [
+                node("font-scale:chat", "Selector", ["label": "Chat font size", "value": "1.2", "action": "font-scale:chat", "options": [["value": "1", "label": "Standard"], ["value": "1.2", "label": "Extra large"]]]),
+            ]]),
+            node("desktop-window", "SettingsGroup", ["label": "Window", "children": [
+                node("close-window-behavior", "Selector", ["label": "Closing the window", "value": "minimize", "action": "close-window-behavior", "options": [["value": "minimize", "label": "Minimize to tray"], ["value": "exit", "label": "Exit application"]]]),
+            ]]),
+        ]
         let json: [String: Any] = [
             "version": 1, "surface": "settings-manual", "revision": 1, "mode": "sheet",
             "title": "Settings", "appearance": "light", "formFactor": "desktop", "nodes": [
@@ -84,14 +105,15 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                     node("settings-sidebar", "VStack", ["children": [
                         node("settings-search", "TextInput", ["label": "Search settings", "value": "", "action": "search"]),
                         node("settings-navigation", "List", ["children": [
-                            node("desktop-nav:general", "NavigationRow", ["label": "General", "icon": "gearshape", "action": "general"]),
-                            node("desktop-nav:providers", "NavigationRow", ["label": "Providers", "icon": "network", "selected": true, "action": "providers"]),
+                            node("desktop-nav:general", "NavigationRow", ["label": "General", "icon": "gearshape", "selected": appearance, "action": "general"]),
+                            node("desktop-nav:providers", "NavigationRow", ["label": "Providers", "icon": "network", "selected": !appearance, "action": "providers"]),
                             node("desktop-nav:backup", "NavigationRow", ["label": "Backup and synchronization", "icon": "icloud", "action": "backup"]),
                         ]]),
                         node("settings-close", "Button", ["label": "Back to Chat", "action": "close"]),
                     ]]),
                     node("settings-detail", "ScrollView", ["children": [
-                        node("settings-detail-title", "Heading", ["text": "Providers"]),
+                        node("settings-detail-title", "Heading", ["text": appearance ? "General" : "Providers"]),
+                    ] + (appearance ? appearanceGroups : [
                         node("provider-settings", "SettingsGroup", ["label": "Connection", "children": [
                             node("provider-name", "TextInput", ["label": "Provider name", "value": "Example provider", "action": "name"]),
                             node("provider-key", "TextInput", ["label": "API key", "value": "", "secure": true, "action": "key"]),
@@ -101,7 +123,7 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                             ]]),
                             node("provider-test", "Button", ["label": "Test connection and fetch available models", "action": "test", "prominent": true]),
                         ]]),
-                    ]]),
+                    ])]),
                 ]]),
             ],
         ]
