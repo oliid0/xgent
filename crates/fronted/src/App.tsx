@@ -1,6 +1,4 @@
-import { Banner } from "@astryxdesign/core/Banner";
 import { BottomSheet } from "@astryxdesign/core/BottomSheet";
-import { Button } from "@astryxdesign/core/Button";
 import { ContextMenu } from "@astryxdesign/core/ContextMenu";
 import { Dialog } from "@astryxdesign/core/Dialog";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
@@ -17,6 +15,7 @@ import {
 } from "@xgent/runtime";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
+import { AppConversationSurface, AppStartupSurface } from "./components/AppStartupSurface";
 import { useConfirmDialog } from "./components/astryx/useConfirmDialog";
 import { CronPromptRunner } from "./components/cron/CronPromptRunner";
 import { useNativeInputContextMenu } from "./components/input-context-menu/NativeInputContextMenu";
@@ -34,7 +33,7 @@ import { mobileExecutionStatus } from "./lib/mobileExecution";
 import {
   type MobileStartupStatus,
   mobileStartupFinished,
-  readMobileStartupStatus,
+  startMobileStartupPolling,
 } from "./lib/mobileStartup";
 import { trackMobileViewport } from "./lib/mobileViewport";
 import { setRetryErrorExtension } from "./lib/providers/runtime/streamRetry";
@@ -133,57 +132,6 @@ function applyRuntimeSystemDefaults(settings: AppSettings, defaultWorkdir: strin
   });
 }
 
-function AppStartupSurface(props: {
-  locale: AppSettings["locale"];
-  failures: string[];
-  settingsFailure?: string;
-  startupFailure?: string;
-}) {
-  if (props.settingsFailure || props.startupFailure)
-    return (
-      <Banner
-        status="error"
-        container="section"
-        title={props.settingsFailure ?? translate("app.mobileStartupDegraded", props.locale)}
-        description={props.startupFailure}
-        collapsible={false}
-        endContent={
-          <Button
-            size="sm"
-            variant="secondary"
-            label={translate("app.errorBoundaryReload", props.locale)}
-            onClick={() => window.location.reload()}
-          />
-        }
-      />
-    );
-  // Keep the launch background until the real application is ready, without
-  // introducing a separate loading page or mounting editable fallback settings.
-  if (props.failures.length === 0) return null;
-  return <MobileStartupWarning failures={props.failures} locale={props.locale} />;
-}
-
-function MobileStartupWarning(props: { failures: string[]; locale: AppSettings["locale"] }) {
-  if (props.failures.length === 0) return null;
-  return (
-    <Banner
-      status="warning"
-      container="section"
-      title={translate("app.mobileStartupDegraded", props.locale)}
-      description={props.failures.join(" · ")}
-      collapsible={false}
-      endContent={
-        <Button
-          size="sm"
-          variant="secondary"
-          label={translate("app.errorBoundaryReload", props.locale)}
-          onClick={() => window.location.reload()}
-        />
-      }
-    />
-  );
-}
-
 export default function App() {
   const browserRuntime = isBrowserRuntime();
 
@@ -213,57 +161,7 @@ export default function App() {
 
   useEffect(() => {
     if (!nativeMobile) return;
-    let cancelled = false;
-    let retryTimer: number | undefined;
-    let startupDelayReported = false;
-    const deadline = Date.now() + 30_000;
-
-    const poll = async () => {
-      try {
-        const status = await readMobileStartupStatus();
-        if (cancelled) return;
-        if (status.phase !== "starting") {
-          if (status.failures.length > 0) {
-            console.warn("Mobile services started in degraded mode", status.failures);
-          }
-          setMobileStartup(status);
-          return;
-        }
-        if (Date.now() >= deadline) {
-          const failures = ["Native service initialization did not finish within 30 seconds"];
-          if (!startupDelayReported) {
-            startupDelayReported = true;
-            console.warn("Mobile service initialization is taking longer than expected", failures);
-            // Command registration is already complete. Keep polling for recovery,
-            // but let independent pages open instead of trapping the whole app.
-            setMobileStartup({ phase: "degraded", failures, coreReady: false });
-          }
-          retryTimer = window.setTimeout(() => void poll(), 1_000);
-          return;
-        }
-        retryTimer = window.setTimeout(() => void poll(), 100);
-      } catch (error) {
-        if (cancelled) return;
-        // A transient IPC failure must not permanently lock the gated tree.
-        // Reuse the startup deadline; a persistent failure still exposes reload.
-        if (Date.now() < deadline) {
-          retryTimer = window.setTimeout(() => void poll(), 250);
-          return;
-        }
-        console.warn("Unable to read native mobile startup status", error);
-        setMobileStartup({
-          phase: "degraded",
-          failures: [error instanceof Error ? error.message : String(error)],
-          coreReady: false,
-        });
-      }
-    };
-
-    void poll();
-    return () => {
-      cancelled = true;
-      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
-    };
+    return startMobileStartupPolling(setMobileStartup);
   }, [nativeMobile]);
 
   useEffect(() => {
@@ -793,30 +691,26 @@ export default function App() {
                       <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
                     ) : null}
                     <AppErrorBoundary appearance={settings.theme} nativeMobile={nativeMobile}>
-                      <VStack width="100%" height="100%" gap={0}>
-                        {nativeMobile && mobileStartup.failures.length > 0 ? (
-                          <MobileStartupWarning
-                            failures={mobileStartup.failures}
-                            locale={settings.locale}
-                          />
-                        ) : null}
-                        <StackItem size="fill">
-                          <ChatPage
-                            settings={settings}
-                            setSettings={setSettings}
-                            getMcpSettings={getMcpSettings}
-                            getToolPolicies={getToolPolicies}
-                            context={context}
-                            setContext={setContext}
-                            onOpenSettings={openSettings}
-                            appUpdate={appUpdate}
-                            desktopBridgeEnabled={desktopBridgeEnabled}
-                            lanPcCommandHostReady={lanPcCommandHostReady}
-                            nativeMobile={nativeMobile}
-                            onRunningConversationCountChange={handleRunningConversationCountChange}
-                          />
-                        </StackItem>
-                      </VStack>
+                      <AppConversationSurface
+                        settings={settings}
+                        nativeMobile={nativeMobile}
+                        failures={mobileStartup.failures}
+                      >
+                        <ChatPage
+                          settings={settings}
+                          setSettings={setSettings}
+                          getMcpSettings={getMcpSettings}
+                          getToolPolicies={getToolPolicies}
+                          context={context}
+                          setContext={setContext}
+                          onOpenSettings={openSettings}
+                          appUpdate={appUpdate}
+                          desktopBridgeEnabled={desktopBridgeEnabled}
+                          lanPcCommandHostReady={lanPcCommandHostReady}
+                          nativeMobile={nativeMobile}
+                          onRunningConversationCountChange={handleRunningConversationCountChange}
+                        />
+                      </AppConversationSurface>
                     </AppErrorBoundary>
                     {isApplePresentationRuntime() ? (
                       settingsOpen ? (
@@ -903,7 +797,8 @@ export default function App() {
                   </>
                 ) : (
                   <AppStartupSurface
-                    locale={settings.locale}
+                    settings={settings}
+                    nativeMobile={nativeMobile}
                     failures={mobileStartup.failures}
                     settingsFailure={
                       nativeMobile && settingsReady && settingsSaveState.status === "error"

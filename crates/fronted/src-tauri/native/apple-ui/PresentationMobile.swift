@@ -142,7 +142,12 @@ struct XgentIOSPagePresentation: View {
     }
 
     @ViewBuilder private var page: some View {
-        if let serializedLayout {
+        if document.nodes.isEmpty {
+            XgentThemeBackground()
+        } else if document.mode == .root,
+                  let error = document.nodes.first(where: { $0.kind == .banner && $0.variant == "error-screen" }) {
+            ScrollView { XgentErrorScreen(node: error, document: document, model: model) }
+        } else if let serializedLayout {
             XgentIOSNode(node: serializedLayout, document: document, model: model)
         } else {
             VStack(spacing: 0) {

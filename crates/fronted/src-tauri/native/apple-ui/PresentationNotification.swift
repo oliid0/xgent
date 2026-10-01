@@ -2,7 +2,7 @@ import Accessibility
 import SwiftUI
 import SystemNotification
 
-private struct XgentNotificationCard: View {
+struct XgentNotificationCard: View {
     let document: XgentDocument
     let maximumHeight: CGFloat
     @ObservedObject var model: XgentPresentationModel
@@ -12,18 +12,27 @@ private struct XgentNotificationCard: View {
     @AccessibilityFocusState private var readingWithVoiceOver: Bool
     @State private var hovering = false
     @State private var scrolling = false
+    @State private var messageHeight: CGFloat = 44
     private var reading: Bool { hovering || readingWithVoiceOver || scrolling }
     private var message: XgentNode? { document.nodes.first }
 
     var body: some View {
         let palette = theme.palette(for: scheme)
         HStack(alignment: .top, spacing: 4) {
-            ViewThatFits(in: .vertical) {
+            Image(systemName: message?.icon ?? "info.circle")
+                .font(.system(size: 20))
+                .foregroundStyle(message?.status == "error" ? Color.red : Color(xgentHex: palette.accent))
+                .padding(.leading, 8)
+                .padding(.top, 12)
+                .accessibilityHidden(true)
+            ScrollView {
                 notificationMessage(palette: palette)
-                ScrollView { notificationMessage(palette: palette) }
-                    .scrollBounceBehavior(.basedOnSize)
-                    .onScrollPhaseChange { _, phase in scrolling = phase != .idle }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { messageHeight = $0 }
             }
+            .scrollBounceBehavior(.basedOnSize)
+            .onScrollPhaseChange { _, phase in scrolling = phase != .idle }
+            .frame(height: min(max(44, messageHeight), max(44, maximumHeight - 8)))
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityFocused($readingWithVoiceOver)
             Button { model.dismiss(document) } label: {
@@ -33,7 +42,6 @@ private struct XgentNotificationCard: View {
             .accessibilityLabel(message?.children?.first?.label ?? "Close")
         }
         .padding(4)
-        .frame(maxHeight: maximumHeight)
         .background(Color(xgentHex: palette.popover), in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.element)))
         .overlay { RoundedRectangle(cornerRadius: CGFloat(theme.radius.element)).stroke(Color(xgentHex: palette.border), lineWidth: 1) }
         .accessibilityIdentifier("xgent-native-notification")
@@ -51,11 +59,9 @@ private struct XgentNotificationCard: View {
 
     private func notificationMessage(palette: XgentPalette) -> some View {
         SystemNotificationMessage(
-                icon: Image(systemName: message?.icon ?? "info.circle"),
                 text: LocalizedStringKey(message?.text ?? ""),
                 style: .init(
-                    iconColor: message?.status == "error" ? .red : Color(xgentHex: palette.accent),
-                    iconTextSpacing: 10,
+                    iconTextSpacing: 0,
                     padding: .init(width: 12, height: 12),
                     textColor: Color(xgentHex: palette.text),
                     textFont: .system(size: fontSize * CGFloat(theme.fontScale)),

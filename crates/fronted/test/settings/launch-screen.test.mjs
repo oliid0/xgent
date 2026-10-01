@@ -45,3 +45,41 @@ for (const warm of [false, true]) {
     }
   });
 }
+
+for (const platform of ["ios", "macos"]) {
+  test(`${platform} boot failure uses native recovery, a real reload action and retires on painted launch`, async () => {
+    const previous = Object.fromEntries(["window", "document", "requestAnimationFrame", "localStorage"].map(key => [key, globalThis[key]]));
+    const documents = [], frames = [], commands = [], acknowledgements = [];
+    let receive, reloads = 0, domReads = 0, unsubscribed = 0;
+    const loader = createTsModuleLoader({ mocks: {
+      "@xgent/runtime": { isBrowserRuntime: () => false, invoke: async command => commands.push(command) },
+      "../runtimePlatform": { inferRuntimePlatform: () => platform },
+      "../../runtime/applePresentation": { isApplePresentationRuntime: () => true,
+        publishApplePresentation: async document => { documents.push(document); },
+        subscribeApplePresentation: handler => { receive = handler; return () => unsubscribed++; },
+        acknowledgeApplePresentation: async result => { acknowledgements.push(result); } },
+    } });
+    try {
+      globalThis.window = { location: { reload: () => reloads++ } };
+      globalThis.document = { documentElement: { dataset: {} }, getElementById: () => { domReads++; return { remove() {} }; } };
+      globalThis.requestAnimationFrame = run => frames.push(run);
+      globalThis.localStorage = { setItem() {} };
+      const launch = loader.loadModule("src/lib/system/launchScreen.ts");
+      launch.showFirstLaunch(); assert.equal(document.documentElement.dataset.nativePresentation, "true");
+      launch.showLaunchFailure(new Error("Chat controller import failed"));
+      for (let i = 0; i < 12; i++) await Promise.resolve();
+      assert.equal(domReads, 0); assert.equal(documents[0].nodes[0].text, "Chat controller import failed");
+      assert.equal(documents[0].formFactor, platform === "ios" ? "mobile" : "desktop");
+      receive({ surface: documents[0].surface, action: "launch:reload", requestId: "reload", value: null });
+      for (let i = 0; i < 12; i++) await Promise.resolve();
+      assert.equal(reloads, 1); assert.equal(acknowledgements[0].ok, true);
+      launch.finishLaunch(false);
+      for (let i = 0; i < 12; i++) await Promise.resolve();
+      while (frames.length) frames.shift()();
+      assert.equal(unsubscribed, 1); assert.equal(documents.at(-1).removed, true);
+      assert.equal(commands.length > 0, platform === "macos");
+    } finally {
+      for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete globalThis[key]; else globalThis[key] = value; }
+    }
+  });
+}

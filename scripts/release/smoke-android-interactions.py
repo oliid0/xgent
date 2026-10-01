@@ -126,7 +126,7 @@ if any(matches(node, {"安装基础环境", "Install base environment"}) for nod
 capture("shell-ready")
 tap({"浏览 Shell 文件", "Browse Shell files"}, timeout=300)
 tap({"etc"})
-tap({"alpine-release"})
+tap({"alpine-release", "alpine-release etc/alpine-release"}, scroll=True)
 deadline = time.monotonic() + 30
 while time.monotonic() < deadline:
     if any(re.search(r"\b3\.\d+\.\d+\b", node.get("text", "")) for node in snapshot().iter("node")):

@@ -49,7 +49,21 @@ export function validatePresentationDocument(
       throw new Error("Invalid native notification content");
     }
   }
-  if (!["root", "sheet", "alert", "sidebar", "panel", "toast"].includes(document.mode)) {
+  if (document.mode === "status" && !document.removed) {
+    const message = document.nodes[0];
+    if (
+      document.nodes.length !== 1 ||
+      message?.kind !== "Banner" ||
+      message.variant !== "service-status" ||
+      typeof message.label !== "string" ||
+      typeof message.text !== "string" ||
+      !message.children?.length ||
+      message.children.some((node) => node.kind !== "Button" || !node.action)
+    ) {
+      throw new Error("Invalid native service status content");
+    }
+  }
+  if (!["root", "sheet", "alert", "sidebar", "panel", "toast", "status"].includes(document.mode)) {
     throw new Error("Invalid native presentation mode");
   }
   if (document.mode === "panel" && !document.removed) {

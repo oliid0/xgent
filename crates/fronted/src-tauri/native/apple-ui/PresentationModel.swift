@@ -182,7 +182,7 @@ struct XgentNode: Decodable, Identifiable {
 }
 
 struct XgentDocument: Decodable, Identifiable {
-    enum Mode: String, Decodable { case root, sheet, alert, sidebar, panel, toast }
+    enum Mode: String, Decodable { case root, sheet, alert, sidebar, panel, toast, status }
     enum Appearance: String, Decodable { case system, light, dark }
     enum FormFactor: String, Decodable { case mobile, desktop }
     let version: Int
@@ -229,6 +229,12 @@ struct XgentDocument: Decodable, Identifiable {
                   close.kind == .button, close.action == dismissAction else { throw XgentProtocolError.invalid }
         }
         if readingAction != nil, mode != .toast { throw XgentProtocolError.invalid }
+        if mode == .status, removed != true {
+            guard nodes.count == 1, let message = nodes.first, message.kind == .banner,
+                  message.variant == "service-status", message.label != nil, message.text != nil,
+                  let actions = message.children, !actions.isEmpty,
+                  actions.allSatisfy({ $0.kind == .button && $0.action != nil }) else { throw XgentProtocolError.invalid }
+        }
         if mode == .panel, removed != true {
             guard formFactor == .desktop, dismissAction?.isEmpty == false,
                   let workspacePanel, workspacePanel.isValid else { throw XgentProtocolError.invalid }

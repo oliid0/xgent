@@ -18,6 +18,6 @@ if (!isBrowserRuntime()) {
 // Reveal the shell immediately; initialization no longer owns a splash page.
 showFirstLaunch();
 void import("./main").catch((error) => {
-  showLaunchFailure();
+  showLaunchFailure(error);
   console.error("Application startup failed", error);
 });

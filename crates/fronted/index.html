@@ -19,6 +19,7 @@
     <p id="launch-error" role="alert" hidden>加载失败，请重新打开应用。<a href="">重新加载</a></p>
     <script>
       function revealLaunchError() {
+        if (document.documentElement.dataset.nativePresentation === "true") return;
         const message = document.getElementById("launch-error");
         if (message) message.hidden = false;
       }

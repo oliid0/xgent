@@ -93,7 +93,7 @@ export type PresentationDocument = {
   version: 1;
   surface: string;
   revision: number;
-  mode: "root" | "sheet" | "alert" | "sidebar" | "panel" | "toast";
+  mode: "root" | "sheet" | "alert" | "sidebar" | "panel" | "toast" | "status";
   workspacePanel?: {
     focusRequest: number;
     openLabel: string;

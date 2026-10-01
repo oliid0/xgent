@@ -17,6 +17,33 @@ private final class NotificationActions {
 
 final class NotificationRenderingTests: XCTestCase {
     @MainActor
+    func testShortNotificationsHugContentAndLongNotificationsStayWithinTheirCardBudget() async throws {
+        for (message, expectedMaximum) in [("Backup saved", CGFloat(120)), (String(repeating: "Connection failed. ", count: 60), CGFloat(220))] {
+            let model = XgentPresentationModel(), document = try toast(surface: "measured", message: message)
+            model.update(document)
+            let view = XgentNotificationCard(document: document, maximumHeight: 220, model: model)
+                .frame(width: 320)
+                .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: .light))
+            #if os(iOS)
+            let hosting = UIHostingController(rootView: view)
+            hosting.view.frame = CGRect(x: 0, y: 0, width: 320, height: 720)
+            hosting.view.layoutIfNeeded()
+            try await Task.sleep(nanoseconds: 100_000_000)
+            let height = hosting.sizeThatFits(in: CGSize(width: 320, height: 720)).height
+            #else
+            let hosting = NSHostingView(rootView: view)
+            hosting.frame = CGRect(x: 0, y: 0, width: 320, height: 720)
+            hosting.layoutSubtreeIfNeeded()
+            try await Task.sleep(nanoseconds: 100_000_000)
+            let height = hosting.fittingSize.height
+            #endif
+            XCTAssertGreaterThanOrEqual(height, 44)
+            if message.count > 100 { XCTAssertGreaterThanOrEqual(height, 180) }
+            XCTAssertLessThanOrEqual(height, expectedMaximum)
+        }
+    }
+
+    @MainActor
     func testReadingDismissAndAnnouncementUseCurrentSurfaceAndRetireOnRemoval() throws {
         let model = XgentPresentationModel(), actions = NotificationActions()
         model.actionSink = actions.record

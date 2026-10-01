@@ -861,6 +861,15 @@ struct XgentRootLayout: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            if let status = model.documents.last(where: { $0.mode == .status }) {
+                XgentServiceStatusBanner(document: status, model: model)
+            }
+            application
+        }
+    }
+
+    @ViewBuilder private var application: some View {
         #if os(macOS)
         XgentDesktopWorkspaceLayout(model: model,
                                    minimumMainWidth: 440 + (sidebar == nil ? 0 : CGFloat(min(480, max(280, storedSidebarWidth)))),
