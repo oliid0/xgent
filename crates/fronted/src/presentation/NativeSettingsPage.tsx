@@ -40,7 +40,6 @@ import {
 } from "../lib/mobileExecution";
 import {
   type AppSettings,
-  applyMcpOpsToAppSettings,
   type CustomProvider,
   normalizeCustomProvider,
   normalizeFontScale,
@@ -65,8 +64,6 @@ import {
   personalPolicyKey,
 } from "../lib/tools/mobileAssistantPolicy";
 import { resolveRuntimeToolCapabilities } from "../lib/tools/runtimeToolCapabilities";
-import { MobileMcpPage } from "../pages/chat/mobile/MobileMcpPage";
-import { MobileSkillsPage } from "../pages/chat/mobile/MobileSkillsPage";
 import { canTestSyncConnection } from "../pages/settings/backupSyncForm";
 import { ComputerUseSection } from "../pages/settings/ComputerUseSection";
 import { CronSection } from "../pages/settings/CronSection";
@@ -80,7 +77,6 @@ import {
 import { SoulSection } from "../pages/settings/SoulSection";
 import { SshSettingsSection } from "../pages/settings/SshSettingsSection";
 import type { SectionId, SettingsPageProps } from "../pages/settings/types";
-import { isLanPcCommandHostReady } from "../runtime/lanPcCommandHost";
 import { presentationControls } from "./controls";
 import {
   NativeSurface,
@@ -124,11 +120,15 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   }, [sessionSurface]);
   const { settings, setSettings, nativeMobile = false } = props;
   const { t } = useLocale();
-  const [page, setPage] = useState(
-    nativeMobile && props.initialSection === "system"
-      ? ""
-      : (props.initialSection ?? (nativeMobile ? "" : "system")),
-  );
+  const initialPage =
+    props.initialSection === "mcp" || props.initialSection === "skills"
+      ? nativeMobile
+        ? ""
+        : "system"
+      : nativeMobile && props.initialSection === "system"
+        ? ""
+        : (props.initialSection ?? (nativeMobile ? "" : "system"));
+  const [page, setPage] = useState(initialPage);
   const [returnPage, setReturnPage] = useState("");
   const [settingsQuery, setSettingsQuery] = useState("");
   const [failure, setFailure] = useState<unknown>(null);
@@ -156,12 +156,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   );
   const [modelId, setModelId] = useState("");
   const [providerDeletePending, setProviderDeletePending] = useState(false);
-  const [mcpId, setMcpId] = useState("");
-  const [mcpUrl, setMcpUrl] = useState("");
-  const [mcpTransport, setMcpTransport] = useState<"http" | "sse" | "stdio">("http");
-  const [mcpCommand, setMcpCommand] = useState("");
-  const [mcpArgs, setMcpArgs] = useState("");
-  const [mcpDeleteId, setMcpDeleteId] = useState("");
   const [lanPairingCode, setLanPairingCode] = useState("");
   const [lanDeviceName, setLanDeviceName] = useState("Xgent mobile");
   const [lanPc, setLanPc] = useState<LanPcClientStatus>({ paired: false });
@@ -394,8 +388,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     system: t("settings.navSystem"),
     providers: t("settings.navProviders"),
     memory: t("settings.navMemory"),
-    mcp: "MCP",
-    skills: t("settings.navSkills"),
     soul: t("settings.navSoul"),
     other: t("settings.navOther"),
     hooks: t("settings.navHooks"),
@@ -411,27 +403,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     ssh: t("settings.navSsh"),
     about: t("settings.navAbout"),
   };
-  if (page === "skills")
-    return (
-      <MobileSkillsPage
-        settings={settings}
-        setSettings={setSettings}
-        onOpenSidebar={returnToSettings}
-        presentationMode="sheet"
-        nativeSettingsSurfaceId={sessionSurface}
-      />
-    );
-  if (page === "mcp" && nativeMobile)
-    return (
-      <MobileMcpPage
-        settings={settings}
-        setSettings={setSettings}
-        onOpenSidebar={returnToSettings}
-        allowStdio={isLanPcCommandHostReady()}
-        presentationMode="sheet"
-        nativeSettingsSurfaceId={sessionSurface}
-      />
-    );
   if (page === "ssh")
     return (
       <SshSettingsSection
@@ -640,9 +611,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         ...(visible("memory")
           ? [navigate("memory", "brain", t("settings.mobile.memoryDescription"))]
           : []),
-        ...(visible("skills")
-          ? [navigate("skills", "sparkles", t("settings.mobile.skillsDescription"))]
-          : []),
       ]),
       c.group("mobile-capabilities", t("settings.mobile.capabilitiesGroup"), [
         ...(visible("mobileAssistant")
@@ -653,9 +621,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           : []),
         ...(visible("mobileExecution")
           ? [navigate("mobileExecution", "terminal", t("settings.native.shellEnvironment"))]
-          : []),
-        ...(visible("mcp")
-          ? [navigate("mcp", "puzzlepiece.extension", t("settings.mobile.mcpDescription"))]
           : []),
         ...(visible("voice") ? [navigate("voice", "mic", t("settings.stt.desc"))] : []),
         ...(visible("other")
@@ -812,13 +777,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           ? [navigate("toolPermissions", "lock.shield")]
           : []),
         ...(visible("voice") ? [navigate("voice", "mic")] : []),
-        ...(visible("mcp") ? [navigate("mcp", "puzzlepiece.extension")] : []),
         ...(visible("other") ? [navigate("other", "ellipsis.circle")] : []),
         ...(visible("access") ? [navigate("access", "icloud")] : []),
         ...(visible("backup") ? [navigate("backup", "archivebox")] : []),
         ...(visible("soul") ? [navigate("soul", "person.crop.circle")] : []),
         ...(visible("memory") ? [navigate("memory", "brain")] : []),
-        ...(visible("skills") ? [navigate("skills", "sparkles")] : []),
         ...(visible("about") ? [navigate("about", "info.circle")] : []),
       ]),
     );
@@ -1399,126 +1362,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
                 organizerScope: scope as typeof previous.memory.organizerScope,
               }),
             ),
-        ),
-      ]),
-    );
-  } else if (page === "mcp") {
-    nodes.push(
-      ...settings.mcp.servers.map((server) =>
-        c.group(`mcp:${server.id}`, server.id, [
-          {
-            id: `mcp:${server.id}:detail`,
-            kind: "Text",
-            secondary: true,
-            text:
-              server.transport === "stdio"
-                ? `${server.command} ${server.args.join(" ")}`
-                : server.url,
-          },
-          c.toggle(
-            `mcp:${server.id}:enabled`,
-            t("settings.enable"),
-            server.enabled,
-            (enabled) =>
-              setSettings((previous) =>
-                applyMcpOpsToAppSettings(previous, [
-                  { kind: "setEnabled", serverIds: [server.id], enabled },
-                ]),
-              ),
-            !nativeMobile || server.transport !== "stdio",
-          ),
-          {
-            ...c.action(`mcp:${server.id}:remove`, t("settings.delete"), () =>
-              setMcpDeleteId(server.id),
-            ),
-            destructive: true,
-          },
-        ]),
-      ),
-    );
-    if (mcpDeleteId) {
-      nodes.push({
-        id: "mcp-delete-confirmation",
-        kind: "Banner",
-        label: t("settings.native.deleteMcp").replace("{name}", mcpDeleteId),
-        status: "paused",
-        children: [
-          {
-            ...c.action("mcp-delete-confirm", t("settings.delete"), () => {
-              const serverId = mcpDeleteId;
-              setSettings((previous) =>
-                applyMcpOpsToAppSettings(previous, [{ kind: "remove", serverId }]),
-              );
-              setMcpDeleteId("");
-            }),
-            destructive: true,
-          },
-          c.action("mcp-delete-cancel", t("settings.cancel"), () => setMcpDeleteId("")),
-        ],
-      });
-    }
-    nodes.push(
-      c.group("new-mcp", t("settings.native.connectMcp"), [
-        c.input("mcp-id", t("settings.native.name"), mcpId, setMcpId),
-        ...(!nativeMobile
-          ? [
-              c.select(
-                "mcp-transport",
-                t("settings.native.transport"),
-                mcpTransport,
-                [
-                  { value: "http", label: "HTTP" },
-                  { value: "sse", label: "SSE" },
-                  { value: "stdio", label: "stdio" },
-                ],
-                (value) => setMcpTransport(value as typeof mcpTransport),
-              ),
-            ]
-          : []),
-        ...(mcpTransport === "stdio" && !nativeMobile
-          ? [
-              c.input("mcp-command", t("settings.native.command"), mcpCommand, setMcpCommand),
-              c.input("mcp-args", t("settings.native.arguments"), mcpArgs, setMcpArgs),
-            ]
-          : [c.input("mcp-url", "URL", mcpUrl, setMcpUrl)]),
-        c.action(
-          "add-mcp",
-          t("settings.native.connect"),
-          () => {
-            const transport = nativeMobile ? "http" : mcpTransport;
-            const url = transport === "stdio" ? null : new URL(mcpUrl.trim());
-            if (url && !["https:", "http:"].includes(url.protocol))
-              throw new Error("MCP requires an HTTP(S) URL");
-            setSettings((previous) =>
-              applyMcpOpsToAppSettings(previous, [
-                {
-                  kind: "upsert",
-                  server: {
-                    id: mcpId.trim(),
-                    url: url?.toString() ?? "",
-                    transport,
-                    enabled: true,
-                    command: transport === "stdio" ? mcpCommand.trim() : "",
-                    args:
-                      transport === "stdio"
-                        ? mcpArgs
-                            .split(/\r?\n/)
-                            .map((value) => value.trim())
-                            .filter(Boolean)
-                        : [],
-                    timeoutMs: 60000,
-                  },
-                },
-              ]),
-            );
-            setMcpId("");
-            setMcpUrl("");
-            setMcpCommand("");
-            setMcpArgs("");
-          },
-          !!mcpId.trim() &&
-            (mcpTransport === "stdio" && !nativeMobile ? !!mcpCommand.trim() : !!mcpUrl.trim()) &&
-            !settings.mcp.servers.some((server) => server.id === mcpId.trim()),
         ),
       ]),
     );
@@ -2122,8 +1965,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     { id: "voice", icon: "mic" },
     { id: "soul", icon: "person.crop.circle" },
     { id: "memory", icon: "brain" },
-    { id: "mcp", icon: "puzzlepiece.extension" },
-    { id: "skills", icon: "sparkles" },
     { id: "other", icon: "ellipsis.circle" },
     { id: "access", icon: "icloud" },
     { id: "about", icon: "info.circle" },

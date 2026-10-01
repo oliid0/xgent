@@ -298,6 +298,13 @@ test("release packaging preserves native runtime resources without ABI drift", (
     assert.ok(commandDictionary.includes(`<key>${command}</key>`),
       `the native registry probe must check registered commands, not shell builtins: ${command}`);
   }
+  assert.match(iosPlugin, /Data\(request\.command\.utf8\)\.write\(to: scriptURL/);
+  assert.ok(iosPlugin.indexOf("guard ios_setAllowedPaths(allowedPaths)") <
+    iosPlugin.indexOf("Data(request.command.utf8).write(to: scriptURL"),
+  "the shell must allow its staged script path before writing outside the workspace root");
+  assert.match(iosPlugin, /ios_system\("dash " \+ quotedScript\)/);
+  assert.doesNotMatch(iosPlugin, /ios_system\("dash -c "/,
+    "ios_system's tokenizer must not reparse nested POSIX shell syntax");
   const install = iosPlugin.slice(iosPlugin.indexOf("@objc func install("), iosPlugin.indexOf("@objc func installToolchains("));
   assert.doesNotMatch(install, /set\(false, forKey: self\.installationPreferenceKey\)|removeObject\(forKey: self\.installationVerificationKey\)/,
     "failed reinstall must preserve the verification receipt of the rolled-back environment");

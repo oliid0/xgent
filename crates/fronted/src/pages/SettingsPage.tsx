@@ -28,7 +28,6 @@ import {
   Info,
   Keyboard,
   Mic,
-  Plug,
   Settings2,
   Shield,
   Sparkles,
@@ -41,15 +40,11 @@ import { useCompactViewport } from "../lib/responsive/compactViewport";
 import { THEME_OPTIONS, updateCustomSettings } from "../lib/settings";
 import { UI_THEME_PRESETS } from "../lib/settings/appearance";
 import { useMobileBackNavigation } from "../lib/useMobileBackNavigation";
-import { isLanPcCommandHostReady } from "../runtime/lanPcCommandHost";
-import { MobileMcpPage } from "./chat/mobile/MobileMcpPage";
-import { MobileSkillsPage } from "./chat/mobile/MobileSkillsPage";
 import { AboutSection } from "./settings/AboutSection";
 import { AccessSection } from "./settings/AccessSection";
 import { BackupSyncSection } from "./settings/BackupSyncSection";
 import { ComputerUseSection } from "./settings/ComputerUseSection";
 import { GlobalShortcutsSection } from "./settings/GlobalShortcutsSection";
-import { McpSettingsSection } from "./settings/McpSettingsSection";
 import { MobileAssistantSection } from "./settings/MobileAssistantSection";
 import { MobileExecutionSection } from "./settings/MobileExecutionSection";
 import { MemoryPanel } from "./settings/memory/MemoryPanel";
@@ -57,7 +52,6 @@ import { OtherSettingsSection } from "./settings/OtherSettingsSection";
 import { ProjectRootsSection } from "./settings/ProjectRootsSection";
 import { ProviderSettingsSection } from "./settings/ProviderSettingsSection";
 import { SettingsDetailLayerProvider } from "./settings/SettingsModalShell";
-import { SkillsSettingsForm } from "./settings/SkillsSettingsForm";
 import { SoulSection } from "./settings/SoulSection";
 import { SttSettingsSection } from "./settings/SttSettingsSection";
 import { SystemSettingsForm } from "./settings/SystemSettingsForm";
@@ -195,16 +189,6 @@ const NAV_ITEMS: NavDefinition[] = [
     descriptionKey: "settings.mobile.memoryDescription",
   },
   {
-    id: "skills",
-    icon: Sparkles,
-    descriptionKey: "settings.mobile.skillsDescription",
-  },
-  {
-    id: "mcp",
-    icon: Plug,
-    descriptionKey: "settings.mobile.mcpDescription",
-  },
-  {
     id: "other",
     icon: Terminal,
     descriptionKey: "settings.mobile.otherDescription",
@@ -321,13 +305,12 @@ export function SettingsPage(props: SettingsPageProps) {
         },
         {
           label: t("settings.mobile.personalGroup"),
-          ids: new Set<SectionId>(["soul", "memory", "skills", "mobileAssistant"]),
+          ids: new Set<SectionId>(["soul", "memory", "mobileAssistant"]),
         },
         {
           label: t("settings.mobile.capabilitiesGroup"),
           ids: new Set<SectionId>([
             "mobileExecution",
-            "mcp",
             "computerUse",
             "toolPermissions",
             "shortcuts",
@@ -360,13 +343,7 @@ export function SettingsPage(props: SettingsPageProps) {
   }, [navItems, section]);
 
   const saveIndicator = getSaveIndicator(saveState, t);
-  const compactHubDetail =
-    compactSettings && mobileDetailOpen && (section === "skills" || section === "mcp");
-  const sectionManagesScroll =
-    section === "providers" ||
-    section === "memory" ||
-    section === "mcp" ||
-    (compactSettings && section === "skills");
+  const sectionManagesScroll = section === "providers" || section === "memory";
   const sectionContent = (() => {
     // Resolve hidden destinations before mounting their effects, including deep links.
     if (!navItems.some((item) => item.id === section)) return null;
@@ -415,32 +392,8 @@ export function SettingsPage(props: SettingsPageProps) {
           />
         );
       case "skills":
-        return compactSettings ? (
-          <MobileSkillsPage
-            settings={settings}
-            setSettings={setSettings}
-            onOpenSidebar={() => setMobileDetailOpen(false)}
-            presentationMode="sheet"
-          />
-        ) : (
-          <SkillsSettingsForm settings={settings} setSettings={setSettings} />
-        );
       case "mcp":
-        return compactSettings ? (
-          <MobileMcpPage
-            settings={settings}
-            setSettings={setSettings}
-            onOpenSidebar={() => setMobileDetailOpen(false)}
-            allowStdio={!nativeMobile || isLanPcCommandHostReady()}
-            presentationMode="sheet"
-          />
-        ) : (
-          <McpSettingsSection
-            settings={settings}
-            setSettings={setSettings}
-            allowStdio={!nativeMobile}
-          />
-        );
+        return null;
       case "hooks":
       case "cron":
       case "ssh":
@@ -497,7 +450,7 @@ export function SettingsPage(props: SettingsPageProps) {
             className="settings-page settings-page-compact"
             data-edge-swipe-ignore
             header={
-              detailLayerDepth > 0 || compactHubDetail ? undefined : (
+              detailLayerDepth > 0 ? undefined : (
                 <VStack className="mobile-panel-header" width="100%" gap={0}>
                   <DialogHeader
                     title={mobileDetailOpen ? sectionLabels[section] : t("settings.title")}
@@ -537,24 +490,20 @@ export function SettingsPage(props: SettingsPageProps) {
                 <LayoutContent
                   key={section}
                   data-settings-section={section}
-                  padding={compactHubDetail ? 0 : 4}
+                  padding={4}
                   isScrollable={!sectionManagesScroll}
                   className="settings-section-enter"
                 >
-                  {compactHubDetail ? (
-                    sectionContent
-                  ) : (
-                    <VStack
-                      width="100%"
-                      maxWidth="var(--xgent-settings-content-max-width)"
-                      height={sectionManagesScroll ? "100%" : undefined}
-                      minHeight={sectionManagesScroll ? 0 : undefined}
-                      className="settings-section-shell"
-                      style={{ marginInline: "auto" }}
-                    >
-                      {sectionContent}
-                    </VStack>
-                  )}
+                  <VStack
+                    width="100%"
+                    maxWidth="var(--xgent-settings-content-max-width)"
+                    height={sectionManagesScroll ? "100%" : undefined}
+                    minHeight={sectionManagesScroll ? 0 : undefined}
+                    className="settings-section-shell"
+                    style={{ marginInline: "auto" }}
+                  >
+                    {sectionContent}
+                  </VStack>
                 </LayoutContent>
               ) : (
                 <LayoutContent padding={4} label={t("settings.title")}>

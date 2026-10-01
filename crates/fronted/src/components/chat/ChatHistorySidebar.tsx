@@ -1,6 +1,5 @@
 import { BottomSheet } from "@astryxdesign/core/BottomSheet";
 import { Button as AstryxButton, Button } from "@astryxdesign/core/Button";
-import { useCollapsible } from "@astryxdesign/core/Collapsible";
 import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
 import { Icon as AstryxIcon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -875,22 +874,17 @@ const ProjectRow = memo(function ProjectRow(props: {
               variant="ghost"
               label={project.name}
               type="button"
-              aria-label={project.name}
+              aria-label={`${t(expanded ? "chat.workspaceCollapse" : "chat.workspaceExpand")} ${project.name}`}
               aria-expanded={expanded}
               onClick={() => onToggleExpanded(project)}
-              className="flex h-7 w-5 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
             >
-              <ChevronRight
-                className={cn(
-                  "h-3 w-3 transition-transform motion-reduce:transition-none",
-                  expanded && "rotate-90",
-                )}
-              />
+              <ProjectFolderIcon className="h-4 w-4" />
             </AstryxButton>
           ) : null}
           <SideNavItem
             label={project.name}
-            icon={ProjectFolderIcon}
+            icon={isArchived ? ProjectFolderIcon : undefined}
             size="sm"
             isSelected={isActive}
             isDisabled={isArchived}
@@ -1300,14 +1294,8 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
   } = props;
   const { t } = useLocale();
   const soul = useSoul();
-  const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(true);
-  const projectsCollapsed = !workspaceManagerOpen;
-  const projectsDisclosure = useCollapsible({
-    isCollapsible: {
-      isOpen: workspaceManagerOpen,
-      onOpenChange: setWorkspaceManagerOpen,
-    },
-  });
+  // The section is only a label and action menu; each workspace owns its own disclosure.
+  const projectsCollapsed = false;
   // Ordinary chats stay below the workspace tree for quick mode switching.
   const recentCollapsed = false;
   const [expandedProjectIds, setExpandedProjectIds] = useState<ReadonlySet<string>>(
@@ -1584,7 +1572,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
       Math.min(projectsContentHeight, projectMinBodyHeight, resizeMaxHeight),
     );
     const defaultProjectsBodyHeight = clampSidebarSectionHeight(
-      Math.min(projectsContentHeight, Math.floor(available / 2)),
+      projectsContentHeight,
       resizeMinHeight,
       resizeMaxHeight,
     );
@@ -1975,7 +1963,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     return (
       <AstryxStack
         direction="vertical"
-        className="mb-1 ml-5 min-w-0 space-y-0.5 border-l border-border/50 pl-2"
+        className="mb-1 ml-8 min-w-0 space-y-0.5 pl-1"
         data-testid={`workspace-conversations-${project.id}`}
       >
         {visible.map(renderHistoryRow)}
@@ -2118,7 +2106,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     <SideNavItem
                       label={t("sidebar.mobile.projects")}
                       icon={FolderOpen}
-                      onClick={projectsDisclosure.toggle}
+                      onClick={() => projectsBodyRef.current?.scrollIntoView({ block: "nearest" })}
                       size="sm"
                     />
                     <SideNavItem
@@ -2209,25 +2197,6 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     title={t("chat.workspaceSection")}
                     endContent={
                       <>
-                        <IconButton
-                          label={
-                            projectsDisclosure.isOpen
-                              ? t("chat.workspaceCollapse")
-                              : t("chat.workspaceExpand")
-                          }
-                          icon={
-                            <ChevronRight
-                              className={cn(
-                                "h-4 w-4 transition-transform motion-reduce:transition-none",
-                                projectsDisclosure.isOpen && "rotate-90",
-                              )}
-                            />
-                          }
-                          variant="ghost"
-                          size={mobileExperience ? "lg" : "sm"}
-                          aria-expanded={projectsDisclosure.isOpen}
-                          onClick={projectsDisclosure.toggle}
-                        />
                         <MoreMenu
                           label={t("chat.workspaceMore")}
                           size={mobileExperience ? "lg" : "sm"}
@@ -2263,18 +2232,11 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                                 ]
                               : []),
                             {
-                              id: "workspace-manage",
-                              label: t("chat.workspaceSection"),
-                              icon: <FolderTree aria-hidden="true" />,
-                              onClick: projectsDisclosure.toggle,
-                            },
-                            {
                               id: "workspace-group-create",
                               label: t("chat.workspaceGroupCreate"),
                               icon: <FolderTree aria-hidden="true" />,
                               isDisabled: !onCreateWorkspaceGroup,
                               onClick: () => {
-                                setWorkspaceManagerOpen(true);
                                 setCreatingWorkspaceGroup(true);
                                 setWorkspaceGroupDraft("");
                               },
@@ -2296,12 +2258,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                 </AstryxStack>
                 <AstryxStack
                   direction="vertical"
-                  aria-hidden={!projectsDisclosure.isOpen}
-                  inert={!projectsDisclosure.isOpen}
-                  className={cn(
-                    "min-h-0 overflow-y-auto overflow-x-hidden transition-opacity duration-300 ease-out motion-reduce:transition-none",
-                    projectsDisclosure.isOpen ? "opacity-100" : "opacity-0",
-                  )}
+                  className="min-h-0 overflow-y-auto overflow-x-hidden"
                 >
                   <AstryxStack
                     direction="vertical"
@@ -2423,15 +2380,15 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                                   variant="ghost"
                                   label={group.name}
                                   type="button"
+                                  aria-expanded={!group.collapsed}
                                   onClick={() => onToggleWorkspaceGroupCollapsed?.(group.id)}
                                   className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 text-left text-[calc(11.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground hover:text-foreground"
                                 >
-                                  <ChevronRight
-                                    className={cn(
-                                      "h-3 w-3 shrink-0 transition-transform duration-200",
-                                      !group.collapsed && "rotate-90",
-                                    )}
-                                  />
+                                  {group.collapsed ? (
+                                    <FolderClosed className="h-4 w-4 shrink-0" />
+                                  ) : (
+                                    <FolderOpen className="h-4 w-4 shrink-0" />
+                                  )}
                                   <AstryxText
                                     as="span"
                                     type="inherit"
@@ -2471,18 +2428,14 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                               </>
                             )}
                           </AstryxStack>
-                          {!group.collapsed ? groupProjects.map(renderActiveProjectRow) : null}
+                          {!group.collapsed ? (
+                            <AstryxStack direction="vertical" className="ml-4">
+                              {groupProjects.map(renderActiveProjectRow)}
+                            </AstryxStack>
+                          ) : null}
                         </AstryxStack>
                       );
                     })}
-                    {workspaceProjectGroups.length > 0 && renderedProjects.length > 0 ? (
-                      <AstryxStack
-                        direction="vertical"
-                        className="px-2 pt-1 text-[calc(10.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground/70"
-                      >
-                        {t("chat.workspaceUngrouped")}
-                      </AstryxStack>
-                    ) : null}
                     {renderedProjects.map(renderActiveProjectRow)}
                     {hiddenProjectCount > 0 || showAllProjects ? (
                       <AstryxButton

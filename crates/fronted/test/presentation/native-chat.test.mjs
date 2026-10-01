@@ -12,6 +12,13 @@ function sidebarSnapshot(conversations = []) {
   };
 }
 
+function assistantWork(transcript, id) {
+  const message = transcript.children.find((node) => node.id === id);
+  const work = message.children.find((node) => node.id === `${id}:work`);
+  assert.equal(work?.kind, "Collapsible");
+  return work.children;
+}
+
 // Exercise the adapter and real action/composer stores without an Apple SDK.
 // Only React mounting and the native publication boundary are substituted.
 function harness(overrides = {}, options = {}) {
@@ -381,7 +388,7 @@ test("native iPhone opens More as a sheet menu and keeps compact sidebar routes"
   const list = layout.children.find((node) => node.id === "sidebar-list");
   assert.deepEqual(
     list.children.slice(0, 6).map((node) => node.id),
-    ["files", "sidebar-projects-toggle", "skills", "scheduled", "remote", "mcp"],
+    ["files", "skills", "scheduled", "remote", "mcp", "create-project"],
   );
   assert.equal(list.children.some((node) => node.id === "trajectory"), false);
   assert.equal(layout.children.some((node) => node.id === "sidebar-title"), true);
@@ -395,15 +402,14 @@ test("native iPhone opens More as a sheet menu and keeps compact sidebar routes"
       .find((node) => node.id === "sidebar-list")
       .children.some((node) => node.id === "project:project"),
   );
-  assert.equal((await h.dispatch("sidebar-projects-toggle", null, "sidebar")).ok, true);
+  assert.equal((await h.dispatch("project:project", null, "sidebar")).ok, true);
   h.render();
   sidebar = h.documents().find((item) => item.mode === "sidebar");
   assert.equal(
     sidebar.nodes[0].children
       .find((node) => node.id === "sidebar-list")
-      .children.some((node) => node.id === "project:project"), false,
+      .children.some((node) => node.id === "project:project"), true,
   );
-  assert.equal((await h.dispatch("sidebar-projects-toggle", null, "sidebar")).ok, true);
   h.render();
   for (const action of ["files", "skills", "scheduled", "remote", "mcp", "new-chat", "settings"]) {
     assert.equal((await h.dispatch(action, null, "sidebar")).ok, true);
@@ -418,6 +424,81 @@ test("native iPhone opens More as a sheet menu and keeps compact sidebar routes"
     "new-chat",
     "settings",
   ]);
+  h.unmount();
+});
+
+test("native sidebar keeps root folders visible and nests grouped workspaces and conversations", async () => {
+  const toggled = [];
+  const projectA = { id: "a", name: "Fort Mason", path: "/fort-mason" };
+  const projectB = { id: "b", name: "Flight Journal", path: "/flight-journal" };
+  const group = { id: "travel", name: "Travel", projectPaths: [projectA.path], collapsed: false };
+  const h = harness({
+    projects: [projectA, projectB],
+    workspaceProjectGroups: [group],
+    onToggleWorkspaceGroupCollapsed: (id) => {
+      toggled.push(id);
+      group.collapsed = !group.collapsed;
+    },
+    sidebarStore: {
+      subscribe: () => () => {},
+      getSnapshot: () => sidebarSnapshot([
+        { id: "work-a", title: "Map the venue", cwd: projectA.path },
+        { id: "work-b", title: "Integrate flight data", cwd: projectB.path },
+        { id: "chat", title: "Recent chat" },
+      ]),
+      loadWorkspaceHistory() {},
+    },
+  }, { mobile: true });
+  assert.equal((await h.dispatch("sidebar")).ok, true);
+  const rows = () => h.render().nodes[0] && h.documents()
+    .find((item) => item.mode === "sidebar").nodes[0].children
+    .find((node) => node.id === "sidebar-list").children;
+  let nodes = rows();
+  assert.ok(nodes.find((node) => node.id === "group:travel"));
+  assert.equal(nodes.find((node) => node.id === "project:a").indent, 18);
+  assert.equal(nodes.find((node) => node.id === "project:b").indent ?? 0, 0);
+  assert.ok(nodes.find((node) => node.id === "conversation:chat"));
+  assert.equal((await h.dispatch("project:a", null, "sidebar")).ok, true);
+  nodes = rows();
+  assert.equal(nodes.find((node) => node.id === "workspace-conversation:work-a").indent, 36);
+  assert.equal((await h.dispatch("group:travel", null, "sidebar")).ok, true);
+  nodes = rows();
+  assert.deepEqual(toggled, ["travel"]);
+  assert.equal(nodes.some((node) => node.id === "project:a"), false);
+  assert.ok(nodes.find((node) => node.id === "project:b"));
+  h.unmount();
+});
+
+test("native work stays visible while running and folds only after completion", () => {
+  const h = harness({}, { mobile: true });
+  const item = {
+    toolCall: { id: "inspect-1", name: "Read", arguments: { path: "src/App.tsx" } },
+    toolResult: { role: "toolResult", toolCallId: "inspect-1", toolName: "Read",
+      content: [{ type: "text", text: "file contents" }], isError: false, timestamp: 5000 },
+  };
+  h.props.liveTranscriptStore.updateLiveRounds(() => [{
+    round: 1, key: "live-round", blocks: [{ kind: "tool", item }],
+    runningToolCallIds: ["inspect-1"], thinkingOpen: false,
+  }]);
+  let transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
+  let liveWork = transcript.children.find((node) => node.id === "live:assistant").children[0];
+  assert.equal(liveWork.kind, "Section");
+  assert.equal(liveWork.id, "live:work");
+  assert.equal(liveWork.children[0].kind, "ToolCall");
+  assert.equal(liveWork.children[0].status, "running");
+  h.props.liveTranscriptStore.settle();
+  h.props.historyItems = [
+    { kind: "user", key: "prompt", segmentIndex: 0, timestamp: 1000,
+      text: "Inspect", attachments: [], isFromCompactedSegment: false },
+    { kind: "assistant", key: "answer", segmentIndex: 0, timestamp: 5000,
+      rounds: [{ round: 1, key: "r1", blocks: [{ kind: "tool", item },
+        { kind: "text", id: "reply", text: "Done" }] }], isFromCompactedSegment: false },
+  ];
+  transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
+  const answer = transcript.children.find((node) => node.id === "answer");
+  assert.equal(answer.children[0].kind, "Collapsible");
+  assert.equal(answer.children[0].children[0].kind, "ToolCall");
+  assert.equal(answer.children[1].kind, "Markdown");
   h.unmount();
 });
 
@@ -463,7 +544,7 @@ test("native chat and activity preserve file edit evidence from tool results", a
     }] }],
   }];
   const transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
-  const tool = transcript.children.find((node) => node.id === "answer").children[0];
+  const tool = assistantWork(transcript, "answer")[0];
   assert.equal(tool.kind, "ToolCall");
   const argumentsNode = tool.children.find((node) => node.id.endsWith(":arguments"));
   assert.equal(argumentsNode.label, "chat.toolDetails.arguments");
@@ -475,7 +556,7 @@ test("native chat and activity preserve file edit evidence from tool results", a
   assert.match(diff.text, /\+new line/);
   assert.match(diff.text, / unchanged/);
   assert.doesNotMatch(diff.text, /[-+] unchanged/);
-  const fileAction = transcript.children.find((node) => node.id === "answer").children.find(
+  const fileAction = assistantWork(transcript, "answer").find(
     (node) => node.id === "answer:changed-file:edit-1",
   );
   assert.equal(fileAction.label, "report.md");
@@ -509,7 +590,7 @@ test("native chat and activity show a Write overwrite diff when its preimage is 
     }] }],
   }];
   const transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
-  const tool = transcript.children.find((node) => node.id === "rewrite").children[0];
+  const tool = assistantWork(transcript, "rewrite")[0];
   const diff = tool.children.find((node) => node.language === "diff");
   assert.match(diff.text, /-old/);
   assert.match(diff.text, /\+new/);
@@ -554,7 +635,7 @@ test("native chat does not turn truncated or fuzzy Edit previews into a file dif
     ] }],
   }];
   const transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
-  const tools = transcript.children.find((node) => node.id === "edit-preview").children
+  const tools = assistantWork(transcript, "edit-preview")
     .filter((node) => node.kind === "ToolCall");
   for (const tool of tools) {
     assert.equal(tool.children.some((node) => node.language === "diff"), false);
@@ -593,7 +674,7 @@ test("native chat and activity show the exact full-file diff for a fuzzy multi E
     }] }],
   }];
   const transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
-  const tool = transcript.children.find((node) => node.id === "exact-edit").children[0];
+  const tool = assistantWork(transcript, "exact-edit")[0];
   const diff = tool.children.find((node) => node.language === "diff");
   assert.match(diff.text, /-old/);
   assert.match(diff.text, /\+new/);

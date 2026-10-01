@@ -72,8 +72,8 @@ test("mobile navigation and settings retain Astryx drawer and bottom-sheet hiera
   assert.match(chatPageSource, /activeView === "mcp-hub"[\s\S]*?<MobileMcpPage/);
   assert.match(mobileSkillsSource, /skills-hub-layout[\s\S]*?mode: "root"/);
   assert.match(mobileMcpSource, /mode: props\.presentationMode \?\? "root"/);
-  assert.match(nativeSettingsSource, /<MobileSkillsPage[\s\S]*?presentationMode="sheet"/);
-  assert.match(nativeSettingsSource, /<MobileMcpPage[\s\S]*?presentationMode="sheet"/);
+  assert.doesNotMatch(nativeSettingsSource, /<MobileSkillsPage|<MobileMcpPage|nav:skills|nav:mcp/);
+  assert.doesNotMatch(settingsSource, /id: "skills"|id: "mcp"/);
   assert.equal((mobileMcpSource.match(/<NativeSurface\b/g) ?? []).length, 1);
   assert.match(nativeBrowserSource, /browser-toolbar[\s\S]*?browser-address[\s\S]*?browser-close[\s\S]*?browser-viewport/);
   assert.match(nativeBrowserSource, /\.\.\.\(compact \? mobileChrome : \[\]\)/);
@@ -81,6 +81,7 @@ test("mobile navigation and settings retain Astryx drawer and bottom-sheet hiera
   assert.match(nativeFilesSource, /files-header[\s\S]*?files-search-row[\s\S]*?files-actions/);
   assert.doesNotMatch(nativeFilesSource, /id: "files-hidden"/);
   assert.match(appSource, /<BottomSheet[\s\S]*?height="tall"[\s\S]*?<SettingsPage/);
+  assert.match(appSource, /<BottomSheet[\s\S]*?purpose="form"[\s\S]*?height="tall"[\s\S]*?<SettingsPage/);
   assert.match(
     appSource,
     /<BottomSheet[\s\S]*?paddingBlockStart=\{5\}[\s\S]*?<SettingsPage/,

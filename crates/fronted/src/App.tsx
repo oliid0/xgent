@@ -836,7 +836,7 @@ export default function App() {
                           if (!isOpen) closeSettings();
                         }}
                         label={translate("settings.title", settings.locale)}
-                        purpose="info"
+                        purpose="form"
                         height="tall"
                       >
                         <AppErrorBoundary>

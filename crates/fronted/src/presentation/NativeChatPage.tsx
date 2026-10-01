@@ -52,6 +52,7 @@ import type {
   ReasoningLevel,
   SelectedModel,
   WorkspaceProject,
+  WorkspaceProjectGroup,
 } from "../lib/settings";
 import { workspaceProjectPathKey } from "../lib/settings";
 import { sortSidebarConversations } from "../lib/sidebar/reconcile";
@@ -64,6 +65,7 @@ import type {
 } from "../lib/tools/builtinTypes";
 import type { PendingToolApprovalSummary, ToolApprovalDecision } from "../lib/tools/toolApproval";
 import type { ChatQueueTurnPreview } from "../pages/chat/components/ChatComposerBar";
+import { workDuration } from "../pages/chat/transcript/workRecord";
 import { createNativeComposerStore } from "./composerStore";
 import { presentationControls } from "./controls";
 import { NativeSurface } from "./NativeSurface";
@@ -263,6 +265,7 @@ export type NativeChatPageProps = {
   hasMoreHistory: boolean;
   pendingApprovals: PendingToolApprovalSummary[];
   projects: WorkspaceProject[];
+  workspaceProjectGroups?: WorkspaceProjectGroup[];
   attachmentsEnabled: boolean;
   trajectoryAvailable: boolean;
   uploads: PendingUploadedFile[];
@@ -296,6 +299,7 @@ export type NativeChatPageProps = {
   onLoadEarlierHistory: () => Promise<unknown> | void;
   onDecide: (id: string, decision: ToolApprovalDecision) => { ok: boolean; message?: string };
   onCreateProject: () => void;
+  onToggleWorkspaceGroupCollapsed?: (groupId: string) => void;
   onOpenTerminal: () => void;
   onImportFiles: (files: File[]) => Promise<void>;
   onRemoveUpload: (path: string) => void;
@@ -395,6 +399,16 @@ function roundNodes(
   );
 }
 
+function splitWorkNodes(nodes: PresentationNode[]) {
+  let lastWork = -1;
+  nodes.forEach((node, index) => {
+    if (node.kind === "ToolCall" || node.kind === "Thinking") lastWork = index;
+  });
+  return lastWork < 0
+    ? { work: [] as PresentationNode[], answer: nodes }
+    : { work: nodes.slice(0, lastWork + 1), answer: nodes.slice(lastWork + 1) };
+}
+
 export function NativeChatPage(props: NativeChatPageProps) {
   const { t } = useLocale();
   const compact = isNativeMobileRuntime();
@@ -439,12 +453,11 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const [activityOpen, setActivityOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [sidebarSearchVisible, setSidebarSearchVisible] = useState(false);
-  const [sidebarProjectsOpen, setSidebarProjectsOpen] = useState(true);
   const [expandedProjectIds, setExpandedProjectIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
   useEffect(() => {
-    if (!sidebarOpen || !sidebarProjectsOpen) return;
+    if (!sidebarOpen) return;
     for (const project of props.projects) {
       if (
         expandedProjectIds.has(project.id) &&
@@ -459,7 +472,6 @@ export function NativeChatPage(props: NativeChatPageProps) {
     props.sidebarStore,
     sidebar.workspaceHistory,
     sidebarOpen,
-    sidebarProjectsOpen,
   ]);
   const recentChats = sortSidebarConversations(
     Array.from(sidebar.byId.values()).filter((item) => !item.cwd?.trim()),
@@ -555,32 +567,50 @@ export function NativeChatPage(props: NativeChatPageProps) {
     arguments: t("chat.toolDetails.arguments"),
     result: t("chat.toolDetails.result"),
   };
+  let lastUserAt: number | undefined;
   const messages: PresentationNode[] = props.historyItems.flatMap((item): PresentationNode[] => {
     if (item.kind === "assistant") {
       const artifacts = collectCloudArtifacts(item.rounds);
       const changedSummary = collectChangedFiles(item.rounds);
       const changedFiles = changedSummary?.files.filter((file) => !file.deleted) ?? [];
       const previewedFiles = collectPreviewedFiles(item.rounds, changedSummary);
+      const { work, answer } = splitWorkNodes(
+        roundNodes(item.rounds, item.key, showThinking, contentLabels),
+      );
+      const duration = workDuration(lastUserAt, item.timestamp);
+      const changedFileNodes: PresentationNode[] = changedFiles.map((file) => {
+        const id = `${item.key}:changed-file:${file.lastToolCallId}`;
+        return {
+          id,
+          kind: "Button",
+          label: file.path,
+          icon: "doc",
+          variant: "secondary",
+          size: "small",
+          accessibilityHint: t("projectTools.fileTree.openFile"),
+          action: action(id, () => props.onOpenWorkspaceFile(file.path)),
+        };
+      });
       return [
         {
           id: item.key,
           kind: "ChatMessage",
           role: "assistant",
           children: [
-            ...roundNodes(item.rounds, item.key, showThinking, contentLabels),
-            ...changedFiles.map((file): PresentationNode => {
-              const id = `${item.key}:changed-file:${file.lastToolCallId}`;
-              return {
-                id,
-                kind: "Button",
-                label: file.path,
-                icon: "doc",
-                variant: "secondary",
-                size: "small",
-                accessibilityHint: t("projectTools.fileTree.openFile"),
-                action: action(id, () => props.onOpenWorkspaceFile(file.path)),
-              };
-            }),
+            ...(work.length > 0
+              ? [
+                  {
+                    id: `${item.key}:work`,
+                    kind: "Collapsible" as const,
+                    label: duration
+                      ? t("chat.activity.worked").replace("{duration}", duration)
+                      : t("chat.activity.tools"),
+                    children: [...work, ...changedFileNodes],
+                  },
+                ]
+              : []),
+            ...answer,
+            ...(work.length > 0 ? [] : changedFileNodes),
             ...previewedFiles.map((file): PresentationNode => {
               const id = `${item.key}:previewed-file:${file.toolCallId}`;
               return {
@@ -625,6 +655,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
         },
       ];
     }
+    lastUserAt = item.timestamp;
     return [
       {
         id: item.key,
@@ -661,11 +692,40 @@ export function NativeChatPage(props: NativeChatPageProps) {
         status: "running",
       });
     if (liveChildren.length > 0) {
+      const { work, answer } = splitWorkNodes(liveChildren);
+      const liveChangedFiles =
+        collectChangedFiles(live.liveRounds)?.files.filter((file) => !file.deleted) ?? [];
       messages.push({
         id: "live:assistant",
         kind: "ChatMessage",
         role: "assistant",
-        children: liveChildren,
+        children: [
+          ...(work.length > 0
+            ? [
+                {
+                  id: "live:work",
+                  kind: "Section" as const,
+                  label: t("chat.mobileActivity.working"),
+                  children: [
+                    ...work,
+                    ...liveChangedFiles.map((file): PresentationNode => {
+                      const id = `live:changed-file:${file.lastToolCallId}`;
+                      return {
+                        id,
+                        kind: "Button",
+                        label: file.path,
+                        icon: "doc",
+                        variant: "secondary",
+                        size: "small",
+                        action: action(id, () => props.onOpenWorkspaceFile(file.path)),
+                      };
+                    }),
+                  ],
+                },
+              ]
+            : []),
+          ...answer,
+        ],
       });
     }
   }
@@ -1244,6 +1304,112 @@ export function NativeChatPage(props: NativeChatPageProps) {
       variant: compact ? "sidebar" : undefined,
     };
   };
+  const projectSidebarRows = (project: WorkspaceProject, indent = 0): PresentationNode[] => {
+    const expanded = expandedProjectIds.has(project.id);
+    const key = workspaceProjectPathKey(project.path);
+    const state = sidebar.workspaceHistory.get(key);
+    const conversations = sortSidebarConversations(
+      Array.from(sidebar.byId.values()).filter(
+        (item) => workspaceProjectPathKey(item.cwd ?? "") === key,
+      ),
+    );
+    const visible = conversations.slice(0, state?.limit ?? 10);
+    return [
+      {
+        ...sidebarButton(`project:${project.id}`, project.name, () => {
+          setExpandedProjectIds((current) => {
+            const next = new Set(current);
+            if (next.has(project.id)) next.delete(project.id);
+            else next.add(project.id);
+            return next;
+          });
+          props.onSelectProject(project);
+        }),
+        icon: expanded ? "folder.fill" : "folder",
+        indent,
+      },
+      ...(expanded
+        ? visible.map((conversation) => ({
+            ...sidebarButton(
+              `workspace-conversation:${conversation.id}`,
+              conversation.title,
+              () => {
+                props.onSelectConversation(conversation.id);
+                finishSidebarAction();
+              },
+            ),
+            indent: indent + 18,
+            icon: "bubble.left",
+            selected: props.conversationId === conversation.id,
+          }))
+        : []),
+      ...(expanded && (!state || (state.loading && visible.length === 0))
+        ? [
+            {
+              id: `workspace-loading:${project.id}`,
+              kind: "Text" as const,
+              text: t("sidebar.readingHistory"),
+              indent: indent + 18,
+            },
+          ]
+        : []),
+      ...(expanded && state?.error
+        ? [
+            {
+              ...sidebarButton(`workspace-retry:${project.id}`, t("presentation.retry"), () =>
+                props.sidebarStore.loadWorkspaceHistory(project.path),
+              ),
+              indent: indent + 18,
+            },
+          ]
+        : []),
+      ...(expanded && (state?.hasMore || conversations.length > visible.length)
+        ? [
+            {
+              ...sidebarButton(`workspace-more:${project.id}`, t("presentation.loadMore"), () =>
+                props.sidebarStore.loadWorkspaceHistory(project.path, true),
+              ),
+              indent: indent + 18,
+            },
+          ]
+        : []),
+    ];
+  };
+  const groupByPath = new Map<string, string>();
+  for (const group of props.workspaceProjectGroups ?? []) {
+    for (const path of group.projectPaths) {
+      const key = workspaceProjectPathKey(path);
+      if (!groupByPath.has(key)) groupByPath.set(key, group.id);
+    }
+  }
+  const projectQuery = query.toLocaleLowerCase();
+  const projectNodes: PresentationNode[] = [
+    ...(props.workspaceProjectGroups ?? []).flatMap((group): PresentationNode[] => {
+      const members = props.projects.filter(
+        (project) => groupByPath.get(workspaceProjectPathKey(project.path)) === group.id,
+      );
+      const groupMatches = group.name.toLocaleLowerCase().includes(projectQuery);
+      const visibleMembers = groupMatches
+        ? members
+        : members.filter((project) => project.name.toLocaleLowerCase().includes(projectQuery));
+      if (projectQuery && !groupMatches && visibleMembers.length === 0) return [];
+      return [
+        {
+          ...sidebarButton(`group:${group.id}`, group.name, () =>
+            props.onToggleWorkspaceGroupCollapsed?.(group.id),
+          ),
+          icon: group.collapsed ? "folder" : "folder.fill",
+        },
+        ...(!group.collapsed
+          ? visibleMembers.flatMap((project) => projectSidebarRows(project, 18))
+          : []),
+      ];
+    }),
+    ...props.projects
+      .filter((project) => !groupByPath.has(workspaceProjectPathKey(project.path)))
+      .filter((project) => project.name.toLocaleLowerCase().includes(projectQuery))
+      .flatMap((project) => projectSidebarRows(project)),
+  ];
   sidebarHandlers.set("search", {
     enabled: true,
     accepts: (value) => typeof value === "string",
@@ -1258,11 +1424,6 @@ export function NativeChatPage(props: NativeChatPageProps) {
     enabled: true,
     accepts: (value) => value === null,
     run: () => setSidebarSearchVisible(!sidebarSearchVisible),
-  });
-  sidebarHandlers.set("sidebar-projects-toggle", {
-    enabled: true,
-    accepts: (value) => value === null,
-    run: () => setSidebarProjectsOpen(!sidebarProjectsOpen),
   });
   sidebarHandlers.set("close", {
     enabled: true,
@@ -1428,15 +1589,6 @@ export function NativeChatPage(props: NativeChatPageProps) {
                               icon: "folder",
                             },
                             {
-                              ...sidebarButton(
-                                "sidebar-projects-toggle",
-                                t("sidebar.mobile.projects"),
-                                () => setSidebarProjectsOpen(!sidebarProjectsOpen),
-                              ),
-                              icon: "folder.fill",
-                              selected: sidebarProjectsOpen,
-                            },
-                            {
                               ...sidebarButton("skills", t("sidebar.mobile.plugins"), () => {
                                 finishSidebarAction();
                                 props.onOpenSkillsHub();
@@ -1485,104 +1637,16 @@ export function NativeChatPage(props: NativeChatPageProps) {
                       ...(!compact && props.trajectoryAvailable
                         ? [sidebarButton("trajectory", t("chat.trajectory.title"), openTrajectory)]
                         : []),
-                      ...(!compact || sidebarProjectsOpen
-                        ? [
-                            sidebarButton("create-project", t("chat.workspaceCreate"), () => {
-                              finishSidebarAction();
-                              props.onCreateProject();
-                            }),
-                            {
-                              id: "projects-label",
-                              kind: "Heading" as const,
-                              text: t("chat.workspaceSection"),
-                            },
-                            ...props.projects
-                              .filter((project) =>
-                                project.name
-                                  .toLocaleLowerCase()
-                                  .includes(query.toLocaleLowerCase()),
-                              )
-                              .flatMap((project): PresentationNode[] => {
-                                const expanded = expandedProjectIds.has(project.id);
-                                const key = workspaceProjectPathKey(project.path);
-                                const state = sidebar.workspaceHistory.get(key);
-                                const conversations = sortSidebarConversations(
-                                  Array.from(sidebar.byId.values()).filter(
-                                    (item) => workspaceProjectPathKey(item.cwd ?? "") === key,
-                                  ),
-                                );
-                                const visible = conversations.slice(0, state?.limit ?? 10);
-                                return [
-                                  {
-                                    ...sidebarButton(`project:${project.id}`, project.name, () => {
-                                      setExpandedProjectIds((current) => {
-                                        const next = new Set(current);
-                                        if (next.has(project.id)) next.delete(project.id);
-                                        else next.add(project.id);
-                                        return next;
-                                      });
-                                      props.onSelectProject(project);
-                                    }),
-                                    icon: expanded ? "folder.fill" : "folder",
-                                    selected: expanded,
-                                  },
-                                  ...(expanded
-                                    ? visible.map((conversation) => ({
-                                        ...sidebarButton(
-                                          `workspace-conversation:${conversation.id}`,
-                                          conversation.title,
-                                          () => {
-                                            props.onSelectConversation(conversation.id);
-                                            finishSidebarAction();
-                                          },
-                                        ),
-                                        indent: 18,
-                                        icon: "bubble.left",
-                                        selected: props.conversationId === conversation.id,
-                                      }))
-                                    : []),
-                                  ...(expanded &&
-                                  (!state || (state.loading && visible.length === 0))
-                                    ? [
-                                        {
-                                          id: `workspace-loading:${project.id}`,
-                                          kind: "Text" as const,
-                                          text: t("sidebar.readingHistory"),
-                                          indent: 18,
-                                        },
-                                      ]
-                                    : []),
-                                  ...(expanded && state?.error
-                                    ? [
-                                        sidebarButton(
-                                          `workspace-retry:${project.id}`,
-                                          t("presentation.retry"),
-                                          () =>
-                                            props.sidebarStore.loadWorkspaceHistory(project.path),
-                                        ),
-                                      ]
-                                    : []),
-                                  ...(expanded &&
-                                  (state?.hasMore || conversations.length > visible.length)
-                                    ? [
-                                        {
-                                          ...sidebarButton(
-                                            `workspace-more:${project.id}`,
-                                            t("presentation.loadMore"),
-                                            () =>
-                                              props.sidebarStore.loadWorkspaceHistory(
-                                                project.path,
-                                                true,
-                                              ),
-                                          ),
-                                          indent: 18,
-                                        },
-                                      ]
-                                    : []),
-                                ];
-                              }),
-                          ]
-                        : []),
+                      sidebarButton("create-project", t("chat.workspaceCreate"), () => {
+                        finishSidebarAction();
+                        props.onCreateProject();
+                      }),
+                      {
+                        id: "projects-label",
+                        kind: "Heading",
+                        text: t("chat.workspaceSection"),
+                      },
+                      ...projectNodes,
                       { id: "recents-label", kind: "Heading", text: t("chat.recentConversation") },
                       ...recentChats
                         .filter((conversation) =>

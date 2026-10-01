@@ -14,6 +14,10 @@ const settingsPageSource = await readFile(
   new URL("../../src/pages/SettingsPage.tsx", import.meta.url),
   "utf8",
 );
+const sidebarSource = await readFile(
+  new URL("../../src/components/chat/ChatHistorySidebar.tsx", import.meta.url),
+  "utf8",
+);
 const nestedSettingsShellSource = await readFile(
   new URL("../../src/pages/settings/SettingsModalShell.tsx", import.meta.url),
   "utf8",
@@ -62,15 +66,16 @@ test("provider API key uses the shared Astryx secret-field composition", () => {
   assert.match(secretTextInputSource, /label=\{visibilityLabel\}/);
 });
 
-test("settings navigation keeps functional skill and MCP destinations reachable", () => {
+test("settings omits duplicate skill and MCP entries while sidebar hubs remain reachable", () => {
   const navigationDefinitions = settingsPageSource.slice(
     settingsPageSource.indexOf("const NAV_ITEMS"),
     settingsPageSource.indexOf("function normalizeSettingsSection"),
   );
   assert.doesNotMatch(navigationDefinitions, /labelKey|settings\.group/);
   assert.doesNotMatch(navigationDefinitions, /id: "projectRoots"/);
-  assert.match(navigationDefinitions, /id: "skills"/);
-  assert.match(navigationDefinitions, /id: "mcp"/);
+  assert.doesNotMatch(navigationDefinitions, /id: "skills"|id: "mcp"/);
+  assert.match(sidebarSource, /onOpenSkillsHub/);
+  assert.match(sidebarSource, /onOpenMcpHub/);
 });
 
 test("nested settings workflows render as content layers instead of nested dialogs", () => {

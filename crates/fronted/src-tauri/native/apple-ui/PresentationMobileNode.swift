@@ -881,27 +881,18 @@ struct XgentIOSNode: View {
     }
 
     private var toolCall: some View {
-        DisclosureGroup(isExpanded: $expanded) {
-            VStack(alignment: .leading, spacing: 8) { children }.padding(.top, 8)
-        } label: {
-            HStack(alignment: .top, spacing: 8) {
-                statusIcon
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(node.label ?? "Tool")
-                        .font(.system(.subheadline, design: .monospaced).weight(.medium))
-                        .foregroundStyle(Color(xgentHex: palette.text))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .minimumScaleFactor(0.85)
-                    if let text = node.text, !text.isEmpty {
-                        Text(text).font(.caption)
-                            .foregroundStyle(Color(xgentHex: palette.secondaryText))
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+        Group {
+            if node.status == "running" {
+                VStack(alignment: .leading, spacing: 8) {
+                    toolCallLabel
+                    toolCallContent
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                DisclosureGroup(isExpanded: $expanded) {
+                    toolCallContent
+                } label: {
+                    toolCallLabel
+                }
             }
         }
         .tint(Color(xgentHex: palette.secondaryText))
@@ -912,6 +903,32 @@ struct XgentIOSNode: View {
         .overlay {
             RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
                 .stroke(Color(xgentHex: palette.border), lineWidth: 1)
+        }
+    }
+
+    private var toolCallContent: some View {
+        VStack(alignment: .leading, spacing: 8) { children }.padding(.top, 8)
+    }
+
+    private var toolCallLabel: some View {
+        HStack(alignment: .top, spacing: 8) {
+            statusIcon
+            VStack(alignment: .leading, spacing: 4) {
+                Text(node.label ?? "Tool")
+                    .font(.system(.subheadline, design: .monospaced).weight(.medium))
+                    .foregroundStyle(Color(xgentHex: palette.text))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .minimumScaleFactor(0.85)
+                if let text = node.text, !text.isEmpty {
+                    Text(text).font(.caption)
+                        .foregroundStyle(Color(xgentHex: palette.secondaryText))
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

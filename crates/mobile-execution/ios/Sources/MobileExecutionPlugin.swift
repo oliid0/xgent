@@ -548,6 +548,19 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 "Could not configure the allowed paths for this iOS shell run"
             )
         }
+        // ios_system tokenizes the command before dash receives its arguments.
+        // Nested quotes and shell metacharacters in a -c payload are not
+        // preserved by that tokenizer. Pass a script path instead.
+        let scriptDirectory = URL(fileURLWithPath: resourcePath)
+            .appendingPathComponent("home/tmp", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: scriptDirectory,
+            withIntermediateDirectories: true
+        )
+        let scriptURL = scriptDirectory
+            .appendingPathComponent(".xgent-command-\(UUID().uuidString).sh")
+        try Data(request.command.utf8).write(to: scriptURL, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: scriptURL) }
 
         ios_setDirectoryURL(cwd)
         let stdinFile = try TemporaryInput(data: stdin)
@@ -585,11 +598,10 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         if wasCancelled { ios_killpid(pid, SIGINT) }
         scheduleTimeout(runId: request.runId, pid: pid, timeoutMs: request.timeoutMs)
 
-        // ios_system dispatches commands; it is not a POSIX shell parser.
-        // Explicit dash avoids ios_system's legacy sh -c compatibility path
-        // and preserves loops, heredocs, variables and conditional execution.
-        let quotedCommand = "'" + request.command.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
-        var exitCode = ios_system("dash -c " + quotedCommand)
+        // The staged script is inside the installed resource tree, which is
+        // explicitly allowed above even when cwd is an external workspace.
+        let quotedScript = "\"" + scriptURL.path.replacingOccurrences(of: "\"", with: "\\\"") + "\""
+        var exitCode = ios_system("dash " + quotedScript)
         fflush(stdoutStream)
         fflush(stderrStream)
         ios_waitpid(pid)

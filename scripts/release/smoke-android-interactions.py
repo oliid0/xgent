@@ -66,7 +66,9 @@ def tap(labels, timeout=30, scroll=False, scroll_direction="down"):
                 str(width // 2), str(end_y), "400")
             swipes += 1
         time.sleep(1)
-    raise AssertionError(f"No enabled visible control: {labels}")
+    capture("missing-control")
+    visible = [node.get("text", "") for node in snapshot().iter("node") if node.get("text")]
+    raise AssertionError(f"No enabled visible control: {labels}; visible state: {visible[-30:]}")
 
 
 def tap_terminal_input(timeout=30):
@@ -121,6 +123,7 @@ if any(matches(node, {"安装基础环境", "Install base environment"}) for nod
         raise AssertionError("The bundled Shell environment did not become ready")
 # Wait for the install/refresh action to finish, then install actual packages
 # through the Android settings controls. A ready rootfs only contains BusyBox.
+capture("shell-ready")
 tap({"刷新状态", "Refresh status"}, timeout=300, scroll=True)
 tap({"Linux essentials"}, scroll=True)
 tap({"Python and pip"}, scroll=True)

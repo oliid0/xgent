@@ -6335,6 +6335,8 @@ export function ChatPage(props: ChatPageProps) {
           hasMoreHistory={conversationState.transcript.hasMoreBefore}
           pendingApprovals={pendingToolApprovals}
           projects={workspaceProjects}
+          workspaceProjectGroups={workspaceProjectGroups}
+          onToggleWorkspaceGroupCollapsed={handleToggleWorkspaceGroupCollapsed}
           attachmentsEnabled={canDropUpload}
           trajectoryAvailable={!nativeMobile && canShowTrajectory}
           uploads={pendingUploadedFiles}

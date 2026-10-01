@@ -41,8 +41,6 @@ test("native settings mirrors compact navigation and persists shared system, pro
     "../pages/settings/GlobalShortcutsSection": { GlobalShortcutsSection: "GlobalShortcutsSection" },
     "../pages/settings/HooksSection": { HooksSection: "HooksSection" },
     "../pages/settings/SoulSection": { SoulSection: "SoulSection" },
-    "../pages/chat/mobile/MobileSkillsPage": { MobileSkillsPage: "MobileSkillsPage" },
-    "../pages/chat/mobile/MobileMcpPage": { MobileMcpPage: "MobileMcpPage" },
   } });
   const { NativeSettingsPage } = loader.loadModule("src/presentation/NativeSettingsPage.tsx");
   const { getDefaultSettings } = loader.loadModule("src/lib/settings/index.ts");
@@ -75,9 +73,9 @@ test("native settings mirrors compact navigation and persists shared system, pro
     [
       ["mobile-theme", "settings.native.theme", ["theme", "appearance-preset", "appearance-customized"]],
       ["mobile-appearance", "settings.mobile.appearanceGroup", ["nav:system", "nav:providers"]],
-      ["mobile-personal", "settings.mobile.personalGroup", ["nav:soul", "nav:memory", "nav:skills"]],
+      ["mobile-personal", "settings.mobile.personalGroup", ["nav:soul", "nav:memory"]],
       ["mobile-capabilities", "settings.mobile.capabilitiesGroup", [
-        "nav:mobileAssistant", "nav:toolPermissions", "nav:mobileExecution", "nav:mcp", "nav:voice", "nav:other", "nav:access", "nav:backup", "nav:about",
+        "nav:mobileAssistant", "nav:toolPermissions", "nav:mobileExecution", "nav:voice", "nav:other", "nav:access", "nav:backup", "nav:about",
       ]],
     ],
   );
@@ -193,12 +191,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
     assert.ok(document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === `nav:${section}`), "return to the invoking settings category");
   }
   await dispatch("back");
-  await dispatch("nav:skills");
-  assert.equal(rendered.type, "MobileSkillsPage");
-  rendered.props.onOpenSidebar();
-  render();
-  await dispatch("nav:mcp");
-  assert.equal(rendered.type, "MobileMcpPage");
+  assert.ok(!document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === "nav:skills" || node.id === "nav:mcp"));
 });
 
 test("native Shell install reports progress, errors, and live and final package output", async () => {
@@ -237,8 +230,6 @@ test("native Shell install reports progress, errors, and live and final package 
     "../pages/settings/GlobalShortcutsSection": { GlobalShortcutsSection: "GlobalShortcutsSection" },
     "../pages/settings/HooksSection": { HooksSection: "HooksSection" },
     "../pages/settings/SoulSection": { SoulSection: "SoulSection" },
-    "../pages/chat/mobile/MobileSkillsPage": { MobileSkillsPage: "MobileSkillsPage" },
-    "../pages/chat/mobile/MobileMcpPage": { MobileMcpPage: "MobileMcpPage" },
     "../lib/mobileExecution": {
       mobileExecutionStatus: async () => shellStatus,
       listExternalMobileWorkspaces: async () => [],
