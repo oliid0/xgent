@@ -31,8 +31,8 @@ final class SidebarConversationRenderingTests: XCTestCase {
                 }
                 .frame(width: width, height: 720)
                 .dynamicTypeSize(size)
-                .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: size == .large ? .light : .dark))
                 .background { XgentThemeBackground() }
+                .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: size == .large ? .light : .dark))
                 #if os(iOS)
                 let host = UIHostingController(rootView: view)
                 host.safeAreaRegions = []
