@@ -4,6 +4,7 @@ struct XgentTextInput: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    @State private var secretFocused = false
 
     private var value: Binding<String> {
         Binding(get: { model.value(node, in: document).text },
@@ -12,13 +13,11 @@ struct XgentTextInput: View {
 
     @ViewBuilder private var entry: some View {
         if node.secure == true {
+            #if os(iOS)
+            XgentIOSSecretField(text: value, focused: $secretFocused, node: node)
+            #else
             SecureField(node.text ?? "", text: value)
-                #if os(iOS)
-                // Configuration secrets are not a login form. Avoid pairing the
-                // preceding provider/name field with Password AutoFill (yy's
-                // provider form uses the same explicit content type).
-                .textContentType(.oneTimeCode)
-                #endif
+            #endif
         }
         else { TextField(node.text ?? "", text: value) }
     }
@@ -28,7 +27,7 @@ struct XgentTextInput: View {
             XgentFieldLabel(node: node)
             entry
                 .textFieldStyle(.plain)
-                .modifier(XgentFieldSurface(node: node))
+                .modifier(XgentFieldSurface(node: node, active: secretFocused))
                 .accessibilityIdentifier(node.id)
                 .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
                 #if os(iOS)

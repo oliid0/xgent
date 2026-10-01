@@ -55,17 +55,15 @@ final class ControlAccessibilityTests: XCTestCase {
 
                 var bounds: [CGRect] = []
                 for element in [install, disabled, selector] {
-                    guard case let .frame(frame) = element.shape else {
-                        XCTFail("Native controls must expose a rectangular activation area")
-                        continue
-                    }
-                    let rect = CGRect(x: CGFloat(frame.minX), y: CGFloat(frame.minY),
-                                      width: CGFloat(frame.width), height: CGFloat(frame.height))
+                    // Rounded SwiftUI content shapes are paths, not frames.
+                    // The parser's UIKit bridge preserves their actual bounds.
+                    let path = element.shape.bezierPath
+                    let rect = path.bounds
                     XCTAssertGreaterThanOrEqual(rect.height, 43.5)
                     XCTAssertGreaterThanOrEqual(rect.minX, -1)
                     XCTAssertLessThanOrEqual(rect.maxX, width + 1)
                     let point = CGPoint(x: CGFloat(element.activationPoint.x), y: CGFloat(element.activationPoint.y))
-                    XCTAssertTrue(rect.insetBy(dx: -1, dy: -1).contains(point))
+                    XCTAssertTrue(path.contains(point))
                     for previous in bounds { XCTAssertFalse(previous.intersects(rect), "Independent controls must not overlap") }
                     bounds.append(rect)
                 }

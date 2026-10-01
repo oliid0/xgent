@@ -31,8 +31,9 @@ handwritten sidebar/detail cards on macOS, with a compact navigation alternative
 Field labels, switches, segmented controls, menus and numeric/time inputs retain
 their native semantics and adapt to available width and Dynamic Type.
 
-Configuration secrets use SecureField with an explicit non-login content type on
-iOS, avoiding Password AutoFill pairing with preceding provider/name fields.
+Configuration secrets use a secure UITextField inside SwiftUI on iOS and
+SecureField on macOS. iOS has explicit editing/focus/teardown callbacks and a
+non-login content type, avoiding Password AutoFill pairing with preceding fields.
 Conversation rows expose separate selection and action controls plus native
 context menus. Rename, pin, move and confirmed deletion use the same SidebarStore
 as Astryx, including pending/busy/running restrictions and backend rollback.

@@ -38,15 +38,16 @@ struct XgentSidebarConversationRow: View {
             }
             .buttonStyle(.plain)
             .disabled(node.disabled == true || model.isBusy(node, in: document))
-            .accessibilityIdentifier(node.id)
-            .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
-            .accessibilityValue(node.accessibilityValue ?? "")
-            .accessibilityAddTraits(node.selected == true ? .isSelected : [])
             .contextMenu {
                 if let menu {
                     XgentNativeMenuItems(nodes: menu.children ?? [], document: document, model: model)
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier(node.id)
+            .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
+            .accessibilityValue(node.accessibilityValue ?? "")
+            .accessibilityAddTraits(node.selected == true ? [.isButton, .isSelected] : .isButton)
             if let menu {
                 XgentNativeMenu(node: menu, document: document, model: model)
                     .accessibilityIdentifier(menu.id)

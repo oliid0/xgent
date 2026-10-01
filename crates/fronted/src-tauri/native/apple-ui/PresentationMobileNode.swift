@@ -249,8 +249,10 @@ struct XgentIOSNode: View {
 
     @ViewBuilder private var identified: some View {
         switch node.kind {
+        case .textInput:
+            rendered
         case .navigationRow where node.variant == "sidebar-conversation-row":
-            rendered.accessibilityElement(children: .contain)
+            rendered
         case .vStack, .hStack, .scrollView, .card, .section, .list,
              .settingsGroup, .settingsLayout, .composer, .chatLayout,
              .browserLayout, .chatMessage:

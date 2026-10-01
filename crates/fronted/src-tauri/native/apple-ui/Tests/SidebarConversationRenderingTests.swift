@@ -42,19 +42,6 @@ final class SidebarConversationRenderingTests: XCTestCase {
                 defer { window.isHidden = true; window.rootViewController = nil }
                 host.view.layoutIfNeeded()
                 try await Task.sleep(nanoseconds: 300_000_000)
-                let elements = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view).flattenToElements()
-                for id in ["selected", "running", "ordinary"] {
-                    let selection = try XCTUnwrap(elements.first { $0.identifier == id && $0.traits.contains(.button) })
-                    let menu = try XCTUnwrap(elements.first { $0.identifier == "\(id):menu" && $0.traits.contains(.button) })
-                    guard case let .frame(selectionFrame) = selection.shape, case let .frame(menuFrame) = menu.shape else {
-                        XCTFail("Selection and menu need independent activation bounds")
-                        continue
-                    }
-                    XCTAssertGreaterThanOrEqual(selectionFrame.height, 43.5)
-                    XCTAssertGreaterThanOrEqual(menuFrame.height, 43.5)
-                    XCTAssertLessThanOrEqual(selectionFrame.maxX, menuFrame.minX + 1)
-                    XCTAssertLessThanOrEqual(CGFloat(menuFrame.maxX), width + 1)
-                }
                 let strategy = Snapshotting<UIView, UIImage>.image(size: CGSize(width: width, height: 720))
                 let image = await withCheckedContinuation { continuation in
                     strategy.snapshot(host.view).run { continuation.resume(returning: $0) }
@@ -72,6 +59,26 @@ final class SidebarConversationRenderingTests: XCTestCase {
                 attachment.name = "sidebar-actions-\(Int(width))-\(size == .large ? "standard" : "large-dark")"
                 attachment.lifetime = .keepAlways
                 add(attachment)
+                #if os(iOS)
+                let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                let diagnostic = XCTAttachment(string: String(decoding: try encoder.encode(hierarchy), as: UTF8.self))
+                diagnostic.name = "sidebar-AX-\(Int(width))-\(size == .large ? "standard" : "large-dark")"
+                diagnostic.lifetime = .keepAlways
+                add(diagnostic)
+                let elements = hierarchy.flattenToElements()
+                for id in ["selected", "running", "ordinary"] {
+                    let selection = try XCTUnwrap(elements.first { $0.identifier == id && $0.traits.contains(.button) })
+                    let menu = try XCTUnwrap(elements.first { $0.identifier == "\(id):menu" && $0.traits.contains(.button) })
+                    let selectionFrame = selection.shape.bezierPath.bounds
+                    let menuFrame = menu.shape.bezierPath.bounds
+                    XCTAssertGreaterThanOrEqual(selectionFrame.height, 43.5)
+                    XCTAssertGreaterThanOrEqual(menuFrame.height, 43.5)
+                    XCTAssertLessThanOrEqual(selectionFrame.maxX, menuFrame.minX + 1)
+                    XCTAssertLessThanOrEqual(menuFrame.maxX, width + 1)
+                }
+                #endif
             }
         }
     }

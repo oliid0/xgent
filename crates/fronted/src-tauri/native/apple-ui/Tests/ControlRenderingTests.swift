@@ -147,6 +147,7 @@ final class ControlRenderingTests: XCTestCase {
         field.insertText("test-key")
         field.sendActions(for: .editingChanged)
         try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(field.text, "test-key")
         XCTAssertEqual(actions.last?.action, "key")
         XCTAssertEqual(actions.last?.value, .string("test-key"))
         let before = actions.count

@@ -139,6 +139,7 @@ struct XgentControlTypography: ViewModifier {
 
 struct XgentFieldSurface: ViewModifier {
     let node: XgentNode
+    var active = false
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @FocusState private var focused: Bool
@@ -159,7 +160,7 @@ struct XgentFieldSurface: ViewModifier {
             .background(Color(xgentHex: palette.surface), in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
-                    .stroke(Color(xgentHex: focused ? palette.accent : palette.emphasizedBorder), lineWidth: focused ? 2 : 1)
+                    .stroke(Color(xgentHex: focused || active ? palette.accent : palette.emphasizedBorder), lineWidth: focused || active ? 2 : 1)
                     .allowsHitTesting(false)
             }
     }
