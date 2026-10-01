@@ -25,6 +25,50 @@ final class MobileRenderingTests: XCTestCase {
     }
 
     @MainActor
+    func testWorkTimelineDuringAndAfterGeneration() async throws {
+        let tool = node("edit", "ToolCall", [
+            "label": "Edited workspace file", "text": "src/settings/ProviderConnection.swift",
+            "variant": "timeline", "status": "completed", "children": [
+                node("diff", "CodeBlock", ["label": "ProviderConnection.swift +2 -1", "language": "diff",
+                                            "text": "@@ -1,2 +1,2 @@\n-old setting\n+new setting"]),
+            ],
+        ])
+        let running = node("verify", "ToolCall", [
+            "label": "Checking the change", "text": "Running the relevant checks",
+            "variant": "timeline", "status": "running", "children": [
+                node("command", "CodeBlock", ["label": "Command", "language": "shell", "text": "pnpm check"]),
+            ],
+        ])
+        let work = node("work", "Section", ["label": "Working", "children": [
+            node("summary", "Text", ["text": "I found the settings behavior and am checking the fix."]),
+            tool, running,
+        ]])
+        func chat(with content: [[String: Any]]) throws -> XgentDocument {
+            try document(mode: "root", appearance: "light", nodes: [
+                node("chat", "ChatLayout", ["children": [
+                    node("toolbar", "HStack", ["children": [
+                        node("sidebar", "IconButton", ["label": "Open sidebar", "icon": "sidebar.left",
+                                                         "action": "sidebar"]),
+                    ]]),
+                    node("transcript", "ScrollView", ["children": [
+                        node("answer", "ChatMessage", ["role": "assistant", "children": content]),
+                    ]]),
+                ]]),
+            ])
+        }
+        let model = XgentPresentationModel()
+        let live = try chat(with: [work])
+        try await capture(XgentIOSRootPresentation(document: live, sidebar: nil, model: model),
+                          name: "work-timeline-live", width: 320)
+        let completed = try chat(with: [
+            node("finished", "Collapsible", ["label": "Worked for 2m 38s", "children": [tool]]),
+            node("reply", "Markdown", ["text": "The settings change is complete."]),
+        ])
+        try await capture(XgentIOSRootPresentation(document: completed, sidebar: nil, model: model),
+                          name: "work-timeline-completed", width: 320)
+    }
+
+    @MainActor
     func testStreamingQueueAtNarrowAndAccessibleSizes() async throws {
         for (name, width, typeSize) in [
             ("queue-narrow", CGFloat(320), DynamicTypeSize.large),
@@ -199,8 +243,25 @@ final class MobileRenderingTests: XCTestCase {
                 node("sidebar-execution-mode", "Badge", ["label": "Local workspace"]),
                 node("sidebar-search-toggle", "IconButton", ["label": "Search", "icon": "magnifyingglass", "action": "search"]),
                 node("sidebar-list", "List", ["children": [
-                    node("recent", "Heading", ["text": "Recent"]),
-                    node("conversation", "NavigationRow", ["label": "Review SwiftUI layout", "action": "open"]),
+                    node("workspaces", "Heading", ["text": "Workspaces"]),
+                    node("travel-group", "NavigationRow", ["label": "Destinations", "icon": "folder.fill",
+                                                            "variant": "sidebar", "action": "toggle-group"]),
+                    node("fort-mason", "NavigationRow", ["label": "Fort Mason", "icon": "folder.fill",
+                                                           "variant": "sidebar", "indent": 18, "action": "toggle-project"]),
+                    node("fort-chat", "NavigationRow", ["label": "Fort Mason live demo",
+                                                          "variant": "sidebar-conversation", "indent": 54,
+                                                          "selected": true, "action": "open-fort-chat"]),
+                    node("fort-work", "NavigationRow", ["label": "Choose a DevDay outfit",
+                                                          "variant": "sidebar-conversation", "indent": 54,
+                                                          "action": "open-fort-work"]),
+                    node("flight", "NavigationRow", ["label": "Flight Journal", "icon": "folder.fill",
+                                                       "variant": "sidebar", "action": "toggle-flight"]),
+                    node("flight-work", "NavigationRow", ["label": "Integrate flight data API",
+                                                            "variant": "sidebar-conversation", "indent": 36,
+                                                            "action": "open-flight-work"]),
+                    node("recent", "Heading", ["text": "Recent chats"]),
+                    node("conversation", "NavigationRow", ["label": "Review SwiftUI layout",
+                                                             "variant": "sidebar-conversation", "action": "open"]),
                 ]]),
                 node("sidebar-footer", "HStack", ["children": [
                     node("new-chat", "Button", ["label": "New chat", "action": "new"]),
@@ -210,6 +271,24 @@ final class MobileRenderingTests: XCTestCase {
         ])
         try await capture(XgentIOSRootPresentation(document: chat, sidebar: sidebar, model: model),
                           name: "sidebar-narrow", width: 320)
+
+        let collapsedSidebar = try document(mode: "sidebar", appearance: "light", nodes: [
+            node("sidebar-layout", "VStack", ["children": [
+                node("sidebar-title", "Heading", ["text": "Xgent"]),
+                node("sidebar-list", "List", ["children": [
+                    node("workspaces", "Heading", ["text": "Workspaces"]),
+                    node("travel-group", "NavigationRow", ["label": "Destinations", "icon": "folder",
+                                                            "variant": "sidebar", "action": "toggle-group"]),
+                    node("flight", "NavigationRow", ["label": "Flight Journal", "icon": "folder",
+                                                       "variant": "sidebar", "action": "toggle-flight"]),
+                    node("recent", "Heading", ["text": "Recent chats"]),
+                    node("conversation", "NavigationRow", ["label": "Review SwiftUI layout",
+                                                             "variant": "sidebar-conversation", "action": "open"]),
+                ]]),
+            ]]),
+        ])
+        try await capture(XgentIOSRootPresentation(document: chat, sidebar: collapsedSidebar, model: model),
+                          name: "sidebar-collapsed", width: 320)
     }
 
     @MainActor

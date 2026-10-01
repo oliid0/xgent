@@ -346,6 +346,7 @@ function roundNodes(
           {
             id: `${id}:tool:${block.item.toolCall.id}`,
             kind: "ToolCall",
+            variant: "timeline",
             label: block.item.toolCall.name,
             text: summarizeToolCall(block.item.toolCall, { includeName: false }),
             status: running
@@ -373,6 +374,7 @@ function roundNodes(
           {
             id: `${id}:search:${block.item.id}`,
             kind: "ToolCall",
+            variant: "timeline",
             label: labels.search,
             text: block.item.queries.join(", "),
             status:
@@ -1338,8 +1340,9 @@ export function NativeChatPage(props: NativeChatPageProps) {
                 finishSidebarAction();
               },
             ),
-            indent: indent + 18,
-            icon: "bubble.left",
+            indent: indent + (compact ? 36 : 18),
+            variant: compact ? "sidebar-conversation" : undefined,
+            icon: compact ? undefined : "bubble.left",
             selected: props.conversationId === conversation.id,
           }))
         : []),
@@ -1654,8 +1657,8 @@ export function NativeChatPage(props: NativeChatPageProps) {
                             .toLocaleLowerCase()
                             .includes(query.toLocaleLowerCase()),
                         )
-                        .map((conversation) =>
-                          sidebarButton(
+                        .map((conversation) => ({
+                          ...sidebarButton(
                             `conversation:${conversation.id}`,
                             conversation.title,
                             () => {
@@ -1663,7 +1666,9 @@ export function NativeChatPage(props: NativeChatPageProps) {
                               finishSidebarAction();
                             },
                           ),
-                        ),
+                          variant: compact ? "sidebar-conversation" : undefined,
+                          selected: props.conversationId === conversation.id,
+                        })),
                       ...(sidebar.recentHistory.hasMore
                         ? [
                             sidebarButton("more", t("presentation.loadMore"), () =>

@@ -187,8 +187,18 @@ struct XgentIOSNode: View {
     @ScaledMetric(relativeTo: .body) private var bodyScale = 1.0
     @ScaledMetric(relativeTo: .subheadline) private var supportingScale = 1.0
     @ScaledMetric(relativeTo: .caption) private var captionScale = 1.0
-    @State private var expanded = false
+    @State private var expanded: Bool
     @State private var pickingModel = false
+
+    init(node: XgentNode, document: XgentDocument, model: XgentPresentationModel,
+         parentAxis: Axis? = nil) {
+        self.node = node
+        self.document = document
+        self.model = model
+        self.parentAxis = parentAxis
+        _expanded = State(initialValue: node.variant == "timeline" ||
+                          (node.kind == .thinking && node.status == "running"))
+    }
 
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
     private var childAxis: Axis? {
@@ -776,23 +786,29 @@ struct XgentIOSNode: View {
                     }
                 }
                 Spacer(minLength: 8)
-                if node.selected == true {
+                if node.selected == true && node.variant == "sidebar-conversation" {
+                    Circle().fill(Color(xgentHex: palette.accent)).frame(width: 8, height: 8)
+                        .accessibilityHidden(true)
+                } else if node.selected == true {
                     Image(systemName: "checkmark").foregroundStyle(.tint)
-                } else if node.action != nil && node.variant != "sidebar" {
+                } else if node.action != nil && node.variant != "sidebar"
+                            && node.variant != "sidebar-conversation" {
                     Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
                 }
             }
             .frame(maxWidth: .infinity,
-                   minHeight: node.variant == "sidebar" || isFormRow ? 44 : 56,
+                   minHeight: node.variant == "sidebar" || node.variant == "sidebar-conversation" || isFormRow ? 44 : 56,
                    alignment: .leading)
-            .padding(.horizontal, isFormRow ? 0 : (node.variant == "sidebar" ? 8 : 12))
+            .padding(.horizontal, isFormRow ? 0 : (node.variant == "sidebar" || node.variant == "sidebar-conversation" ? 8 : 12))
             .background(
-                node.selected == true ? Color(xgentHex: palette.muted) : Color.clear,
+                node.selected == true && node.variant != "sidebar-conversation"
+                    ? Color(xgentHex: palette.muted) : Color.clear,
                 in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(node.selected == true ? .isSelected : [])
     }
 
     private var iconButton: some View {
@@ -896,13 +912,18 @@ struct XgentIOSNode: View {
             }
         }
         .tint(Color(xgentHex: palette.secondaryText))
-        .padding(10)
-        .background(Color(xgentHex: palette.surface).opacity(0.72), in: RoundedRectangle(
-            cornerRadius: CGFloat(theme.radius.element), style: .continuous
-        ))
+        .padding(node.variant == "timeline" ? 2 : 10)
+        .background {
+            if node.variant != "timeline" {
+                RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
+                    .fill(Color(xgentHex: palette.surface).opacity(0.72))
+            }
+        }
         .overlay {
-            RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
-                .stroke(Color(xgentHex: palette.border), lineWidth: 1)
+            if node.variant != "timeline" {
+                RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
+                    .stroke(Color(xgentHex: palette.border), lineWidth: 1)
+            }
         }
     }
 

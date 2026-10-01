@@ -460,7 +460,9 @@ test("native sidebar keeps root folders visible and nests grouped workspaces and
   assert.ok(nodes.find((node) => node.id === "conversation:chat"));
   assert.equal((await h.dispatch("project:a", null, "sidebar")).ok, true);
   nodes = rows();
-  assert.equal(nodes.find((node) => node.id === "workspace-conversation:work-a").indent, 36);
+  assert.equal(nodes.find((node) => node.id === "workspace-conversation:work-a").indent, 54);
+  assert.equal(nodes.find((node) => node.id === "workspace-conversation:work-a").variant, "sidebar-conversation");
+  assert.equal(nodes.find((node) => node.id === "workspace-conversation:work-a").icon, undefined);
   assert.equal((await h.dispatch("group:travel", null, "sidebar")).ok, true);
   nodes = rows();
   assert.deepEqual(toggled, ["travel"]);
@@ -485,6 +487,7 @@ test("native work stays visible while running and folds only after completion", 
   assert.equal(liveWork.kind, "Section");
   assert.equal(liveWork.id, "live:work");
   assert.equal(liveWork.children[0].kind, "ToolCall");
+  assert.equal(liveWork.children[0].variant, "timeline");
   assert.equal(liveWork.children[0].status, "running");
   h.props.liveTranscriptStore.settle();
   h.props.historyItems = [
@@ -498,6 +501,7 @@ test("native work stays visible while running and folds only after completion", 
   const answer = transcript.children.find((node) => node.id === "answer");
   assert.equal(answer.children[0].kind, "Collapsible");
   assert.equal(answer.children[0].children[0].kind, "ToolCall");
+  assert.equal(answer.children[0].children[0].variant, "timeline");
   assert.equal(answer.children[1].kind, "Markdown");
   h.unmount();
 });
@@ -802,8 +806,8 @@ test("native sidebar keeps workspace conversations nested above ordinary recent 
   h.render();
   const list = h.documents().find((item) => item.mode === "sidebar")
     .nodes[0].children.find((node) => node.id === "sidebar-list").children;
-  assert.ok(list.some((node) => node.id === "workspace-conversation:work" && node.indent === 18));
-  assert.ok(list.some((node) => node.id === "conversation:chat"));
+  assert.ok(list.some((node) => node.id === "workspace-conversation:work" && node.indent === 36));
+  assert.ok(list.some((node) => node.id === "conversation:chat" && node.variant === "sidebar-conversation"));
   assert.ok(!list.some((node) => node.id === "conversation:work"));
   assert.equal((await h.dispatch("workspace-conversation:work", null, "sidebar")).ok, true);
   assert.deepEqual(selected, ["project", "work"]);
