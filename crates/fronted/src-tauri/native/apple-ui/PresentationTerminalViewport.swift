@@ -17,7 +17,7 @@ struct XgentTerminalViewport: View {
         let palette = theme.palette(for: colorScheme)
         XgentPlatformTerminal(
             value: node.value?.text ?? "", fontSize: 13 * CGFloat(theme.fontScale),
-            foreground: Color(xgentHex: palette.text), background: Color(xgentHex: palette.background),
+            foreground: SwiftUI.Color(xgentHex: palette.text), background: SwiftUI.Color(xgentHex: palette.background),
             label: node.label ?? "Terminal", emit: { value in
                 model.send(node, in: document, value: .string(value), continuous: true)
             }
@@ -31,8 +31,8 @@ struct XgentTerminalViewport: View {
 struct XgentPlatformTerminal: UIViewRepresentable {
     let value: String
     let fontSize: CGFloat
-    let foreground: Color
-    let background: Color
+    let foreground: SwiftUI.Color
+    let background: SwiftUI.Color
     let label: String
     let emit: (String) -> Void
 
@@ -65,8 +65,8 @@ struct XgentPlatformTerminal: UIViewRepresentable {
 struct XgentPlatformTerminal: NSViewRepresentable {
     let value: String
     let fontSize: CGFloat
-    let foreground: Color
-    let background: Color
+    let foreground: SwiftUI.Color
+    let background: SwiftUI.Color
     let label: String
     let emit: (String) -> Void
 

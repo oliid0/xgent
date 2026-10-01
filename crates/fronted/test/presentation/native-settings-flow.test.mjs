@@ -44,6 +44,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
     "../pages/settings/memory/MemoryPanel": { MemoryPanel: "MemoryPanel" },
     "../pages/settings/BackupSyncSection": { BackupSyncSection: "BackupSyncSection" },
     "../pages/settings/NativeProviderRuntimeSettings": { NativeProviderRuntimeSettings: "NativeProviderRuntimeSettings" },
+    "../pages/settings/NativeProviderModelSettings": { NativeProviderModelSettings: "NativeProviderModelSettings" },
     "../pages/settings/useCodexOAuthAccounts": { useCodexOAuthAccounts: () => ({ status: { accounts: [] }, loaded: true, locked: false }) },
   } });
   const { NativeSettingsPage } = loader.loadModule("src/presentation/NativeSettingsPage.tsx");
@@ -184,6 +185,13 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.ok(provider.models.some((model) => model.id === "example-model"));
   assert.equal(settings.selectedModel.model, "fetched-model", "manual additions preserve the chosen model");
   const settingsSurface = rendered.props.sessionSurface;
+  assert.equal((await dispatch(`model-edit:${provider.id}:example-model`)).ok, true);
+  assert.equal(rendered.type, "NativeProviderModelSettings");
+  assert.equal(rendered.props.nativeSettingsSurfaceId, settingsSurface);
+  assert.equal(rendered.props.providerId, provider.id);
+  assert.equal(rendered.props.modelId, "example-model");
+  rendered.props.onBack(); render();
+  assert.ok(rendered.props.handlers.has("fetch-models"));
   assert.equal((await dispatch("provider-runtime-settings")).ok, true);
   assert.equal(rendered.type, "NativeProviderRuntimeSettings");
   assert.equal(rendered.props.nativeSettingsSurfaceId, settingsSurface);

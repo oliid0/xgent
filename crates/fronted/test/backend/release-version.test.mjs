@@ -20,6 +20,22 @@ test("Android zero-base repair versions produce an installable numeric base", as
   assert.deepEqual(tauriVersionConfig("0.0.0-repair.100"), { version: "0.0.0-repair.100" });
 });
 
+test("Apple config accepts dotted prerelease and build labels without leaking them into bundle versions", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "xgent-version-apple-"));
+  try {
+    for (const tag of ["v0.1.0-native-parity.20261001.a744cf4", "v2.3.4-beta.2+sha.abc", "v9.10.11"]) {
+      const config = path.join(dir, "apple.json"), output = path.join(dir, "metadata");
+      const result = runVersionScript([tag, "--tauri-config", config, "--tauri-platform", "apple", "--github-output", output, "--json"]);
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(JSON.parse(result.stdout).appVersion, tag.slice(1));
+      const version = JSON.parse(readFileSync(config, "utf8")).version;
+      assert.equal(version, tag.slice(1).split(/[-+]/, 1)[0]);
+      assert.match(version, /^\d+\.\d+\.\d+$/);
+      assert.ok(readFileSync(output, "utf8").includes(`release_tag=${tag}\n`));
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 function runVersionScript(args, env = {}) {
   return spawnSync(process.execPath, [versionScript, ...args], {
     cwd: repoRoot,

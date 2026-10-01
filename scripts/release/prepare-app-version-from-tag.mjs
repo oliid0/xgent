@@ -12,7 +12,7 @@ function usage() {
     "  --github-env <path>      Append XGENT_* variables for later workflow steps.",
     "  --github-output <path>   Append release metadata as GitHub Action step outputs.",
     "  --tauri-config <path>    Write a generated Tauri config overlay with the app version.",
-    "  --tauri-platform <name>  Version rules for default, windows or android bundlers.",
+    "  --tauri-platform <name>  Version rules for default, windows, android or apple bundlers.",
     "  --json                   Print metadata as JSON.",
   ].join("\n");
 }

@@ -96,6 +96,13 @@ import {
 import { CodexOAuthAccounts } from "./CodexOAuthAccounts";
 import { ModelFailoverSection } from "./ModelFailoverSection";
 import { ModelPicker } from "./modelPicker";
+import {
+  createModelEditDraft,
+  editedProviderModel,
+  type ModelEditDraft,
+  parseCostRate,
+  parsePositiveInteger,
+} from "./providerModelSettings";
 import { providerRuntimeActions, runtimeModelOptions } from "./providerRuntimeSettings";
 import {
   buildProviderModelsFetchKey,
@@ -130,15 +137,6 @@ const USAGE_QUERY_MODES: UsageQueryMode[] = [
   "custom",
 ];
 
-type ModelEditDraft = {
-  model: ProviderModelConfig;
-  contextWindow: string;
-  maxOutputToken: string;
-  costInput: string;
-  costOutput: string;
-  costCacheRead: string;
-  costCacheWrite: string;
-};
 type CcsProviderImportItem = {
   sourceId: string;
   appType: string;
@@ -218,25 +216,6 @@ function readCherryDataPath() {
   } catch {
     return null;
   }
-}
-
-function parsePositiveInteger(input: string): number | null {
-  const value = Number(input.trim());
-  if (!Number.isFinite(value)) return null;
-  const normalized = Math.floor(value);
-  return normalized > 0 ? normalized : null;
-}
-
-function parseCostRate(input: string): number | null {
-  const trimmed = input.trim();
-  if (!trimmed) return 0;
-  const value = Number(trimmed);
-  if (!Number.isFinite(value) || value < 0) return null;
-  return value;
-}
-
-function formatCostRate(value: number | undefined): string {
-  return typeof value === "number" && value > 0 ? String(value) : "";
 }
 
 type CustomHeaderKeyIssue = "reserved" | "invalid";
@@ -507,19 +486,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   function openModelSettings(modelId: string) {
     const target = models.find((item) => item.id === modelId);
     if (!target) return;
-    setEditingModel((prev) =>
-      prev?.model.id === target.id
-        ? null
-        : {
-            model: target,
-            contextWindow: String(target.contextWindow),
-            maxOutputToken: String(target.maxOutputToken),
-            costInput: formatCostRate(target.cost?.input),
-            costOutput: formatCostRate(target.cost?.output),
-            costCacheRead: formatCostRate(target.cost?.cacheRead),
-            costCacheWrite: formatCostRate(target.cost?.cacheWrite),
-          },
-    );
+    setEditingModel((prev) => (prev?.model.id === target.id ? null : createModelEditDraft(target)));
   }
 
   const editingModelContextWindow = editingModel
@@ -528,52 +495,11 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   const editingModelMaxOutputToken = editingModel
     ? parsePositiveInteger(editingModel.maxOutputToken)
     : null;
-  const editingModelCost = editingModel
-    ? {
-        input: parseCostRate(editingModel.costInput),
-        output: parseCostRate(editingModel.costOutput),
-        cacheRead: parseCostRate(editingModel.costCacheRead),
-        cacheWrite: parseCostRate(editingModel.costCacheWrite),
-      }
-    : null;
-  const editingModelCostValid =
-    editingModelCost === null ||
-    (editingModelCost.input !== null &&
-      editingModelCost.output !== null &&
-      editingModelCost.cacheRead !== null &&
-      editingModelCost.cacheWrite !== null);
-  const canSaveEditingModel =
-    editingModelContextWindow !== null &&
-    editingModelMaxOutputToken !== null &&
-    editingModelCostValid;
+  const canSaveEditingModel = editedProviderModel(editingModel) !== null;
 
   function saveInlineModelSettings() {
-    if (
-      !editingModel ||
-      editingModelContextWindow === null ||
-      editingModelMaxOutputToken === null ||
-      !editingModelCostValid
-    ) {
-      return;
-    }
-    const cost = editingModelCost
-      ? {
-          input: editingModelCost.input ?? 0,
-          output: editingModelCost.output ?? 0,
-          cacheRead: editingModelCost.cacheRead ?? 0,
-          cacheWrite: editingModelCost.cacheWrite ?? 0,
-        }
-      : undefined;
-    const hasCost =
-      cost !== undefined &&
-      (cost.input > 0 || cost.output > 0 || cost.cacheRead > 0 || cost.cacheWrite > 0);
-    const nextModel: ProviderModelConfig = {
-      ...editingModel.model,
-      contextWindow: editingModelContextWindow,
-      maxOutputToken: editingModelMaxOutputToken,
-      limitsSource: "user",
-      cost: hasCost ? cost : undefined,
-    };
+    const nextModel = editedProviderModel(editingModel);
+    if (!nextModel) return;
     setModels((prev) => prev.map((item) => (item.id === nextModel.id ? nextModel : item)));
     setEditingModel(null);
   }

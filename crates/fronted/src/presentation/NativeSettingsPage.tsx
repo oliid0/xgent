@@ -57,6 +57,7 @@ import { GlobalShortcutsSection } from "../pages/settings/GlobalShortcutsSection
 import { HooksSection } from "../pages/settings/HooksSection";
 import { MobileEnvironmentBrowser } from "../pages/settings/MobileEnvironmentBrowser";
 import { MemoryPanel } from "../pages/settings/memory/MemoryPanel";
+import { NativeProviderModelSettings } from "../pages/settings/NativeProviderModelSettings";
 import { NativeProviderRuntimeSettings } from "../pages/settings/NativeProviderRuntimeSettings";
 import {
   createDraftModelConfig,
@@ -138,6 +139,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [error, setError] = useState("");
   const [providerId, setProviderId] = useState("");
   const [providerRuntimeOpen, setProviderRuntimeOpen] = useState(false);
+  const [providerModelId, setProviderModelId] = useState("");
   // A stalled Shell/status request must not disable provider controls after
   // navigation. Only the latest operation in the current route owns feedback.
   const [operations] = useState(() => ({ scope: "", revision: 0 }));
@@ -392,6 +394,18 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     ssh: t("settings.navSsh"),
     about: t("settings.navAbout"),
   };
+  if (page === "providers" && providerModelId && provider)
+    return (
+      <NativeProviderModelSettings
+        key={`${provider.id}:${providerModelId}`}
+        settings={settings}
+        setSettings={setSettings}
+        providerId={provider.id}
+        modelId={providerModelId}
+        onBack={() => setProviderModelId("")}
+        nativeSettingsSurfaceId={sessionSurface}
+      />
+    );
   if (page === "providers" && providerRuntimeOpen)
     return (
       <NativeProviderRuntimeSettings
@@ -1106,29 +1120,39 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         c.group(
           "models",
           t("settings.native.enabledModels"),
-          provider.models.map((model) =>
-            c.toggle(
-              "model:" + model.id,
-              model.id,
-              provider.activeModels.includes(model.id),
-              (enabled) =>
-                setSettings((previous) =>
-                  updateCustomProviders(
-                    previous,
-                    previous.customProviders.map((item) =>
-                      item.id === provider.id
-                        ? {
-                            ...item,
-                            activeModels: enabled
-                              ? [...new Set([...item.activeModels, model.id])]
-                              : item.activeModels.filter((id) => id !== model.id),
-                          }
-                        : item,
+          provider.models.map((model) => ({
+            id: `model-row:${provider.id}:${model.id}`,
+            kind: "VStack",
+            children: [
+              c.toggle(
+                `model:${provider.id}:${model.id}`,
+                model.id,
+                provider.activeModels.includes(model.id),
+                (enabled) =>
+                  setSettings((previous) =>
+                    updateCustomProviders(
+                      previous,
+                      previous.customProviders.map((item) =>
+                        item.id === provider.id
+                          ? {
+                              ...item,
+                              activeModels: enabled
+                                ? [...new Set([...item.activeModels, model.id])]
+                                : item.activeModels.filter((id) => id !== model.id),
+                            }
+                          : item,
+                      ),
                     ),
                   ),
-                ),
-            ),
-          ),
+              ),
+              c.action(
+                `model-edit:${provider.id}:${model.id}`,
+                `${t("settings.modelSettings")} · ${model.id}`,
+                () => setProviderModelId(model.id),
+                !busy,
+              ),
+            ],
+          })),
         ),
       );
       nodes.push(

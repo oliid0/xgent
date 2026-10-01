@@ -7,7 +7,7 @@ import AppKit
 #endif
 
 @MainActor
-final class XgentTerminalCoordinator: NSObject, TerminalViewDelegate {
+final class XgentTerminalCoordinator: NSObject, @preconcurrency TerminalViewDelegate {
     var emit: (String) -> Void
     private var sessionId: String?
     private var generation: Int?
@@ -98,6 +98,17 @@ final class XgentTerminalCoordinator: NSObject, TerminalViewDelegate {
     func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
     func scrolled(source: TerminalView, position: Double) {}
     func bell(source: TerminalView) {}
+
+    // SwiftTerm 1.20 requires this observer even when notifyUpdateChanges is off.
+    // If a caller enables it, request painting of the updated terminal buffer.
+    func rangeChanged(source: TerminalView, startY: Int, endY: Int) {
+        guard !retired, startY <= endY else { return }
+        #if os(iOS)
+        source.setNeedsDisplay()
+        #else
+        source.setNeedsDisplay(source.bounds)
+        #endif
+    }
 
     func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {
         guard let url = URL(string: link), ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }

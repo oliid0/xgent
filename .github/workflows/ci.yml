@@ -201,7 +201,7 @@ jobs:
       - name: Test macOS package
         run: |
           set -o pipefail
-          xcodebuild test -scheme XgentNativeUI -destination 'platform=macOS' \
+          xcodebuild test -scheme XgentNativeUI -destination 'platform=macOS' -skipPackagePluginValidation \
             -resultBundlePath "$RUNNER_TEMP/native-macos.xcresult" \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/native-macos.log"
 
@@ -220,7 +220,7 @@ jobs:
       - name: Test iOS package and capture native layouts
         run: |
           set -o pipefail
-          xcodebuild test -scheme XgentNativeUI \
+          xcodebuild test -scheme XgentNativeUI -skipPackagePluginValidation \
             -destination "platform=iOS Simulator,id=$NATIVE_SIMULATOR_ID" \
             -resultBundlePath "$RUNNER_TEMP/native-ios.xcresult" \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/native-ios.log"

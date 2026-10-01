@@ -2212,6 +2212,8 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.contextWindow": "Context Window",
     "settings.maxOutputToken": "Max Output Token",
     "settings.positiveIntegerRequired": "请输入大于 0 的整数",
+    "settings.modelUnavailable": "该模型或供应商已移除，请返回供应商列表。",
+    "settings.modelParametersInvalid": "Token 限额必须大于 0，费用必须是非负数。",
     "settings.add": "添加",
     "settings.cancel": "取消",
     "settings.save": "保存",
@@ -5243,6 +5245,9 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.contextWindow": "Context Window",
     "settings.maxOutputToken": "Max Output Token",
     "settings.positiveIntegerRequired": "Please enter a positive integer",
+    "settings.modelUnavailable": "This model or provider was removed. Return to the provider list.",
+    "settings.modelParametersInvalid":
+      "Token limits must be positive and costs must be nonnegative numbers.",
     "settings.add": "Add",
     "settings.cancel": "Cancel",
     "settings.save": "Save",

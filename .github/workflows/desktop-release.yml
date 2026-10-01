@@ -155,7 +155,7 @@ jobs:
 
       - name: Prepare release version config
         working-directory: crates/fronted
-        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
+        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json --tauri-platform apple
 
       - name: Install pnpm
         shell: bash
@@ -825,7 +825,7 @@ jobs:
 
       - name: Prepare release version config
         working-directory: crates/fronted
-        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json
+        run: node ../../scripts/release/prepare-app-version-from-tag.mjs "$XGENT_RELEASE_TAG" --github-env "$GITHUB_ENV" --tauri-config src-tauri/tauri.version.generated.conf.json --tauri-platform apple
 
       - name: Prepare verified iOS shell resources
         run: |

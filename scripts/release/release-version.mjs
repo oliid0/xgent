@@ -80,7 +80,7 @@ export function tauriVersionConfig(appVersion, platform = "default", buildNumber
     throw new Error(`App version must be a valid semver string. Received: ${appVersion}`);
   }
 
-  if (!["default", "windows", "android"].includes(platform)) {
+  if (!["default", "windows", "android", "apple"].includes(platform)) {
     throw new Error(`Unsupported Tauri version platform: ${platform}`);
   }
 
@@ -88,6 +88,9 @@ export function tauriVersionConfig(appVersion, platform = "default", buildNumber
     // Android rejects a zero numeric base even when semver has a prerelease.
     version: platform === "windows" ? windowsInstallerVersion(appVersion, buildNumber)
       : platform === "android" ? appVersion.replace(/^0\.0\.0(?=$|[-+])/, "0.0.1")
+      // Apple bundle versions accept only the three numeric release components.
+      // Preserve prerelease/build metadata in the release tag and artifact names.
+      : platform === "apple" ? appVersion.split(/[-+]/, 1)[0]
       : appVersion,
   };
 }
