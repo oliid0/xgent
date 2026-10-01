@@ -1,438 +1,135 @@
 import { Button } from "@astryxdesign/core/Button";
 import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
 import { Selector } from "@astryxdesign/core/Selector";
+import { Spinner } from "@astryxdesign/core/Spinner";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Text as AstryxText, Text as Label } from "@astryxdesign/core/Text";
 import { TextInput as Input } from "@astryxdesign/core/TextInput";
-import { listen } from "@xgent/runtime";
-import { useCallback, useEffect, useState } from "react";
 import { useConfirmDialog } from "../../components/astryx/useConfirmDialog";
 import { AlertTriangle, Archive, ArchiveRestore, Cloud, Shield } from "../../components/icons";
 import { useLocale } from "../../i18n";
-import {
-  applyBackupImport,
-  BACKUP_SYNC_STATUS_EVENT,
-  type BackupDomainCounts,
-  type BackupManifest,
-  type BackupSyncConfigView,
-  type BackupSyncStatusEvent,
-  downloadBackup,
-  exportBackup,
-  fetchRemoteInfo,
-  loadSyncConfig,
-  peekBackupImport,
-  saveSyncConfig,
-  testSyncConnection,
-  uploadBackup,
-} from "../../lib/backup";
-import { normalizeSkillsSettings } from "../../lib/settings";
-import {
-  applySyncStatusEvent,
-  canTestSyncConnection,
-  detectPreset,
-  emptyForm,
-  formFromView,
-  isAutoSyncSuccess,
-  isDirty,
-  type PresetId,
-  SYNC_PRESETS,
-  type SyncForm,
-} from "./backupSyncForm";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
+import { SYNC_PRESETS } from "./backupSyncForm";
+import { NativeBackupSyncSection } from "./NativeBackupSyncSection";
 import type { SettingsSectionProps } from "./types";
-
-type Status = { kind: "ok" | "error"; text: string } | null;
-
-type SyncBusy = "load" | "test" | "save" | "upload" | "download" | null;
-
-function errorText(error: unknown): string {
-  if (error instanceof Error) return error.message.trim();
-  return String(error ?? "").trim();
-}
-
-function formatCreatedAt(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
-}
+import { useBackupSyncData } from "./useBackupSyncData";
 
 function formatTimestamp(value: number): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
 }
 
-function summarizeDomains(counts: BackupDomainCounts, t: (key: string) => string): string {
-  return [
-    `${t("settings.backupDomainProviders")} ${counts.providers}`,
-    `${t("settings.backupDomainMcp")} ${counts.mcp}`,
-    `${t("settings.backupDomainSystem")} ${counts.system}`,
-    `${t("settings.backupDomainSkills")} ${counts.skills}`,
-  ].join(" · ");
-}
-
-function describeSource(manifest: BackupManifest, t: (key: string) => string) {
-  const rows: [string, string][] = [
-    [t("settings.backupSourceDevice"), manifest.deviceName],
-    [t("settings.backupSourceTime"), formatCreatedAt(manifest.createdAt)],
-    [t("settings.backupSourceVersion"), manifest.appVersion],
-  ];
-  return (
-    <AstryxStack direction="vertical" className="space-y-1">
-      {rows.map(([label, value]) => (
-        <AstryxStack direction="horizontal" key={label} className="flex gap-2">
-          <AstryxText as="span" type="inherit" className="shrink-0 opacity-70">
-            {label}
-          </AstryxText>
-          <AstryxText as="span" type="inherit" className="break-all font-medium">
-            {value}
-          </AstryxText>
-        </AstryxStack>
-      ))}
-      <AstryxStack direction="vertical" className="pt-1">
-        {summarizeDomains(manifest.domains, t)}
-      </AstryxStack>
-    </AstryxStack>
-  );
-}
-
-export function BackupSyncSection(props: SettingsSectionProps) {
-  const { settings, setSettings, reloadSettings } = props;
+export function BackupSyncSection(props: SettingsSectionProps & { onBack?: () => void }) {
   const { t } = useLocale();
   const { confirm, dialog } = useConfirmDialog();
-  const [busy, setBusy] = useState<"export" | "import" | null>(null);
-  const [status, setStatus] = useState<Status>(null);
-
-  const [syncView, setSyncView] = useState<BackupSyncConfigView | null>(null);
-  const [form, setForm] = useState<SyncForm>(emptyForm);
-  const [preset, setPreset] = useState<PresetId>("custom");
-  const [syncBusy, setSyncBusy] = useState<SyncBusy>("load");
-  const [syncStatus, setSyncStatus] = useState<Status>(null);
-
-  const dirty = isDirty(form, syncView);
-  const syncLocked = syncBusy !== null;
-
-  const syncStateAfterRestore = useCallback(
-    async (skillsPayload: unknown) => {
-      await reloadSettings?.();
-      if (skillsPayload) {
-        const skills = normalizeSkillsSettings(skillsPayload);
-        setSettings((prev) => ({ ...prev, skills }));
-      }
-    },
-    [reloadSettings, setSettings],
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const view = await loadSyncConfig();
-        if (cancelled) return;
-        setSyncView(view);
-        setForm(formFromView(view));
-        setPreset(detectPreset(view.url));
-      } catch (error) {
-        if (!cancelled) setSyncStatus({ kind: "error", text: errorText(error) });
-      } finally {
-        if (!cancelled) setSyncBusy(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let unlisten: (() => void) | null = null;
-    let cancelled = false;
-    void listen<BackupSyncStatusEvent>(BACKUP_SYNC_STATUS_EVENT, (event) => {
-      setSyncView((prev) => applySyncStatusEvent(prev, event.payload));
-      if (isAutoSyncSuccess(event.payload)) {
-        setSyncStatus({ kind: "ok", text: t("settings.backupSyncAutoDone") });
-      }
-    }).then((fn) => {
-      if (cancelled) fn();
-      else unlisten = fn;
-    });
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [t]);
-
-  const patchForm = useCallback((patch: Partial<SyncForm>) => {
-    setSyncStatus(null);
-    setForm((prev) => ({ ...prev, ...patch }));
-  }, []);
-
-  const handlePresetChange = useCallback(
-    (value: string) => {
-      const next = value as PresetId;
-      setPreset(next);
-      const matched = SYNC_PRESETS.find((item) => item.id === next);
-
-      if (matched) patchForm({ url: matched.url });
-    },
-    [patchForm],
-  );
-
-  /**
-   * 开启自动同步前先确认一次。
-   *
-   * 开关一旦打开，此后每次改配置都会把含明文 API Key 的快照推到远端，
-   * 而且不再有任何逐次提示。这个后果值得一次显式点头；关闭方向无害，直接生效。
-   */
-  const handleAutoSyncChange = useCallback(
-    async (checked: boolean) => {
-      if (!checked) {
-        patchForm({ autoSync: false });
-        return;
-      }
-      const confirmed = await confirm({
-        title: t("settings.backupSyncAutoConfirmTitle"),
-        subtitle: t("settings.backupSyncAutoConfirmSubtitle"),
-        description: t("settings.backupSyncAutoConfirmDesc"),
-        confirmLabel: t("settings.backupSyncAutoConfirmAction"),
-        cancelLabel: t("settings.backupCancel"),
-        tone: "warning",
-      });
-      if (confirmed) patchForm({ autoSync: true });
-    },
-    [confirm, patchForm, t],
-  );
-
-  const handleSaveSync = useCallback(async () => {
-    setSyncBusy("save");
-    setSyncStatus(null);
-    try {
-      const view = await saveSyncConfig({
-        url: form.url,
-        username: form.username,
-        password: form.password,
-        passwordTouched: form.passwordTouched,
-        remoteDir: form.remoteDir,
-        profile: form.profile,
-        autoSync: form.autoSync,
-      });
-      setSyncView(view);
-      setForm(formFromView(view));
-      setPreset(detectPreset(view.url));
-
-      if (!canTestSyncConnection(view)) {
-        setSyncStatus({ kind: "ok", text: t("settings.backupSyncSaveDone") });
-        return;
-      }
-      try {
-        await testSyncConnection();
-        setSyncStatus({ kind: "ok", text: t("settings.backupSyncSaveAndTestDone") });
-      } catch (error) {
-        setSyncStatus({
-          kind: "error",
-          text: `${t("settings.backupSyncSaveAndTestFailed")}${errorText(error)}`,
-        });
-      }
-    } catch (error) {
-      setSyncStatus({
-        kind: "error",
-        text: errorText(error) || t("settings.backupSyncSaveFailed"),
-      });
-    } finally {
-      setSyncBusy(null);
-    }
-  }, [form, t]);
-
-  const handleTestSync = useCallback(async () => {
-    setSyncBusy("test");
-    setSyncStatus(null);
-    try {
-      await testSyncConnection();
-      setSyncStatus({ kind: "ok", text: t("settings.backupSyncTestDone") });
-    } catch (error) {
-      setSyncStatus({
-        kind: "error",
-        text: errorText(error) || t("settings.backupSyncTestFailed"),
-      });
-    } finally {
-      setSyncBusy(null);
-    }
-  }, [t]);
-
-  const handleUpload = useCallback(async () => {
-    setSyncBusy("upload");
-    setSyncStatus(null);
-    try {
-      const remote = await fetchRemoteInfo();
-      if (remote) {
-        const confirmed = await confirm({
-          title: t("settings.backupSyncUploadConfirmTitle"),
-          subtitle: t("settings.backupSyncUploadConfirmSubtitle"),
-          description: describeSource(remote.manifest, t),
-          confirmLabel: t("settings.backupSyncUpload"),
-          cancelLabel: t("settings.backupCancel"),
-          tone: "warning",
-        });
-        if (!confirmed) return;
-      }
-      const syncedAt = await uploadBackup(settings.skills);
-
-      setSyncView((prev) => (prev ? { ...prev, lastSyncAt: syncedAt, lastError: null } : prev));
-      setSyncStatus({ kind: "ok", text: t("settings.backupSyncUploadDone") });
-    } catch (error) {
-      setSyncStatus({
-        kind: "error",
-        text: errorText(error) || t("settings.backupSyncUploadFailed"),
-      });
-    } finally {
-      setSyncBusy(null);
-    }
-  }, [confirm, settings.skills, t]);
-
-  const handleDownload = useCallback(async () => {
-    setSyncBusy("download");
-    setSyncStatus(null);
-    try {
-      const remote = await fetchRemoteInfo();
-      if (!remote) {
-        setSyncStatus({ kind: "error", text: t("settings.backupSyncRemoteEmpty") });
-        return;
-      }
-      const confirmed = await confirm({
-        title: t("settings.backupSyncDownloadConfirmTitle"),
-        subtitle: t("settings.backupSyncDownloadConfirmSubtitle"),
-        description: describeSource(remote.manifest, t),
-        confirmLabel: t("settings.backupSyncDownload"),
-        cancelLabel: t("settings.backupCancel"),
-        tone: "warning",
-      });
-      if (!confirmed) return;
-
-      const outcome = await downloadBackup();
-      await syncStateAfterRestore(outcome.skills);
-
-      setSyncView((prev) => (prev ? { ...prev, lastError: null } : prev));
-      setSyncStatus({
-        kind: "ok",
-        text: `${t("settings.backupSyncDownloadDone")}${summarizeDomains(outcome.applied, t)}`,
-      });
-    } catch (error) {
-      setSyncStatus({
-        kind: "error",
-        text: errorText(error) || t("settings.backupSyncDownloadFailed"),
-      });
-    } finally {
-      setSyncBusy(null);
-    }
-  }, [confirm, syncStateAfterRestore, t]);
-
-  const handleExport = useCallback(async () => {
-    setBusy("export");
-    setStatus(null);
-    try {
-      const path = await exportBackup(settings.skills);
-
-      if (path) {
-        setStatus({ kind: "ok", text: `${t("settings.backupExportDone")}${path}` });
-      }
-    } catch (error) {
-      setStatus({ kind: "error", text: errorText(error) || t("settings.backupExportFailed") });
-    } finally {
-      setBusy(null);
-    }
-  }, [settings.skills, t]);
-
-  const handleImport = useCallback(async () => {
-    setBusy("import");
-    setStatus(null);
-    try {
-      const preview = await peekBackupImport();
-      if (!preview) return;
-
-      const confirmed = await confirm({
-        title: t("settings.backupImportConfirmTitle"),
-        subtitle: t("settings.backupImportConfirmSubtitle"),
-        description: describeSource(preview.manifest, t),
-        detail: preview.path,
-        confirmLabel: t("settings.backupImportConfirmAction"),
-        cancelLabel: t("settings.backupCancel"),
-        tone: "warning",
-      });
-      if (!confirmed) return;
-
-      const outcome = await applyBackupImport(preview.path);
-      await syncStateAfterRestore(outcome.skills);
-      setStatus({
-        kind: "ok",
-        text: `${t("settings.backupImportDone")}${summarizeDomains(outcome.applied, t)}`,
-      });
-    } catch (error) {
-      setStatus({ kind: "error", text: errorText(error) || t("settings.backupImportFailed") });
-    } finally {
-      setBusy(null);
-    }
-  }, [confirm, syncStateAfterRestore, t]);
+  const data = useBackupSyncData(props, confirm, t);
+  const {
+    busy,
+    status,
+    syncView,
+    form,
+    preset,
+    syncBusy,
+    syncStatus,
+    dirty,
+    patchForm,
+    handlePresetChange,
+    handleAutoSyncChange,
+    handleSaveSync,
+    handleTestSync,
+    handleUpload,
+    handleDownload,
+    handleExport,
+    handleImport,
+  } = data;
+  const syncLocked = data.locked;
+  if (isApplePresentationRuntime())
+    return (
+      <>
+        <NativeBackupSyncSection
+          settings={props.settings}
+          data={data}
+          onBack={props.onBack}
+          nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
+        />
+        {dialog}
+      </>
+    );
 
   return (
     <AstryxStack direction="vertical" className="space-y-6">
-      <AstryxStack
-        direction="vertical"
-        as="section"
-        className="space-y-3 rounded-2xl border border-border/60 bg-card p-4"
-      >
+      {data.operation === "load" ? <Spinner label={t("app.loading")} /> : null}
+      {!syncView && data.operation !== "load" ? (
+        <Button
+          label={t("presentation.retry")}
+          onClick={() => void data.reload()}
+          isDisabled={data.operation !== null}
+        />
+      ) : null}
+      {data.localAvailable ? (
         <AstryxStack
-          direction="horizontal"
-          className="flex items-center gap-2 text-sm font-medium text-foreground"
+          direction="vertical"
+          as="section"
+          className="space-y-3 rounded-2xl border border-border/60 bg-card p-4"
         >
-          <Archive className="h-4 w-4 text-muted-foreground" />
-          {t("settings.backupLocalTitle")}
-        </AstryxStack>
-        <AstryxText
-          as="p"
-          type="inherit"
-          display="block"
-          className="text-xs leading-relaxed text-muted-foreground"
-        >
-          {t("settings.backupLocalDesc")}
-        </AstryxText>
-
-        <AstryxStack direction="horizontal" className="flex flex-wrap gap-2">
-          <Button
-            label={t("settings.backupExport")}
-            variant="secondary"
-            size="sm"
-            isLoading={busy === "export"}
-            isDisabled={busy !== null}
-            onClick={() => void handleExport()}
-          />
-          <Button
-            label={t("settings.backupImport")}
-            variant="secondary"
-            size="sm"
-            isLoading={busy === "import"}
-            isDisabled={busy !== null}
-            onClick={() => void handleImport()}
-          />
-        </AstryxStack>
-
-        <AstryxStack
-          direction="horizontal"
-          className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"
-        >
-          <ArchiveRestore className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <AstryxText as="span" type="inherit">
-            {t("settings.backupAutoBackupHint")}
-          </AstryxText>
-        </AstryxStack>
-
-        {status ? (
           <AstryxStack
-            direction="vertical"
-            className={`break-all text-xs font-medium ${
-              status.kind === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
-            }`}
+            direction="horizontal"
+            className="flex items-center gap-2 text-sm font-medium text-foreground"
           >
-            {status.text}
+            <Archive className="h-4 w-4 text-muted-foreground" />
+            {t("settings.backupLocalTitle")}
           </AstryxStack>
-        ) : null}
-      </AstryxStack>
+          <AstryxText
+            as="p"
+            type="inherit"
+            display="block"
+            className="text-xs leading-relaxed text-muted-foreground"
+          >
+            {t("settings.backupLocalDesc")}
+          </AstryxText>
+
+          <AstryxStack direction="horizontal" className="flex flex-wrap gap-2">
+            <Button
+              label={t("settings.backupExport")}
+              variant="secondary"
+              size="sm"
+              isLoading={busy === "export"}
+              isDisabled={syncLocked}
+              onClick={() => void handleExport()}
+            />
+            <Button
+              label={t("settings.backupImport")}
+              variant="secondary"
+              size="sm"
+              isLoading={busy === "import"}
+              isDisabled={syncLocked}
+              onClick={() => void handleImport()}
+            />
+          </AstryxStack>
+
+          <AstryxStack
+            direction="horizontal"
+            className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"
+          >
+            <ArchiveRestore className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <AstryxText as="span" type="inherit">
+              {t("settings.backupAutoBackupHint")}
+            </AstryxText>
+          </AstryxStack>
+
+          {status ? (
+            <AstryxStack
+              direction="vertical"
+              className={`break-all text-xs font-medium ${
+                status.kind === "ok" ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
+              }`}
+            >
+              {status.text}
+            </AstryxStack>
+          ) : null}
+        </AstryxStack>
+      ) : null}
 
       <AstryxStack
         direction="vertical"
@@ -524,6 +221,15 @@ export function BackupSyncSection(props: SettingsSectionProps) {
                   patchForm({ password, passwordTouched: password.length > 0 });
                 }}
               />
+              {syncView?.hasPassword ? (
+                <Button
+                  label={t("settings.backupSyncClearPassword")}
+                  variant="ghost"
+                  size="sm"
+                  isDisabled={syncLocked}
+                  onClick={() => patchForm({ password: "", passwordTouched: true })}
+                />
+              ) : null}
             </AstryxStack>
           </AstryxGrid>
 
@@ -606,7 +312,7 @@ export function BackupSyncSection(props: SettingsSectionProps) {
             variant="secondary"
             size="sm"
             isLoading={syncBusy === "test"}
-            isDisabled={syncLocked || dirty}
+            isDisabled={syncLocked || dirty || !data.configured}
             onClick={() => void handleTestSync()}
           />
           <Button
@@ -614,7 +320,7 @@ export function BackupSyncSection(props: SettingsSectionProps) {
             variant="secondary"
             size="sm"
             isLoading={syncBusy === "upload"}
-            isDisabled={syncLocked || dirty}
+            isDisabled={syncLocked || dirty || !data.configured}
             onClick={() => void handleUpload()}
           />
           <Button
@@ -622,7 +328,7 @@ export function BackupSyncSection(props: SettingsSectionProps) {
             variant="secondary"
             size="sm"
             isLoading={syncBusy === "download"}
-            isDisabled={syncLocked || dirty}
+            isDisabled={syncLocked || dirty || !data.configured}
             onClick={() => void handleDownload()}
           />
         </AstryxStack>

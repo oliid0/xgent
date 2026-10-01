@@ -46,6 +46,8 @@ pub struct MobileExecutionStatus {
     #[serde(default)]
     pub selected_alpine_mirror: Option<String>,
     pub environment_version: Option<String>,
+    #[serde(default)]
+    pub environment_root_path: Option<String>,
     pub disk_usage_bytes: Option<u64>,
 }
 
@@ -147,6 +149,8 @@ pub struct RunRequest {
     pub cwd: Option<String>,
     pub timeout_ms: u64,
     pub stdin_base64: Option<String>,
+    #[serde(default)]
+    pub interactive_stdin: bool,
     pub wasi: Option<WasiInvocation>,
 }
 
@@ -180,4 +184,47 @@ pub struct CancelRequest {
 #[serde(rename_all = "camelCase")]
 pub struct CancelResponse {
     pub cancelled: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WriteInputRequest {
+    pub run_id: String,
+    pub data_base64: Option<String>,
+    #[serde(default)]
+    pub eof: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WriteInputResponse {
+    pub accepted_bytes: usize,
+    pub closed: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MobileExecutionStatus;
+
+    #[test]
+    fn status_preserves_environment_root_through_native_bridge() {
+        for (backend, root) in [
+            ("android-proot", "/data/user/0/com.ohi.xgent/files/rootfs"),
+            ("ios-a-shell", "/var/mobile/Library/Application Support/Xgent/environment-v3"),
+        ] {
+            let mut native = serde_json::json!({
+                "backend": backend, "available": true, "installed": true,
+                "capabilities": { "shell": true, "wasi": false, "network": true,
+                    "childProcesses": false, "userSelectedWorkspaces": true, "packageManagement": true },
+                "environmentRootPath": root
+            });
+            let status: MobileExecutionStatus = serde_json::from_value(native.clone()).unwrap();
+            assert_eq!(status.environment_root_path.as_deref(), Some(root));
+            assert_eq!(serde_json::to_value(status).unwrap()["environmentRootPath"], root);
+
+            native.as_object_mut().unwrap().remove("environmentRootPath");
+            let legacy: MobileExecutionStatus = serde_json::from_value(native).unwrap();
+            assert!(legacy.environment_root_path.is_none());
+        }
+    }
 }

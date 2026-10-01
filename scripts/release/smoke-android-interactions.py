@@ -169,12 +169,19 @@ tap({"工作工具", "Workspace tools"})
 tap({"打开终端", "Open terminal"})
 
 
-def run_terminal(command, expected_output=None, expected_exit=0, clear=True, exact=True):
+def run_terminal(command, expected_output=None, expected_exit=0, clear=True, exact=True,
+                 program_input=None, eof=False):
     if clear:
         tap({"清空终端记录", "Clear terminal history"})
     tap_terminal_input()
     adb("shell", "input", "text", command.replace(" ", "%s"))
     tap({"运行命令", "Run command"})
+    if program_input is not None:
+        tap_terminal_input()
+        adb("shell", "input", "text", program_input.replace(" ", "%s"))
+        tap({"发送输入", "Send input"})
+    if eof:
+        tap({"结束输入（EOF）", "End input (EOF)"})
     deadline = time.monotonic() + 45
     while time.monotonic() < deadline:
         nodes = list(snapshot().iter("node"))
@@ -217,4 +224,8 @@ run_terminal("bash --version", "GNU bash", exact=False)
 run_terminal("python3 --version", "Python 3.", exact=False)
 run_terminal("python3 -m pip --version", "pip ", exact=False)
 capture("python-pack")
-print("PASS: settings, bundled environment, native stdout, rootfs ls/cd, retained cwd, Bash and installed Python/pip pack")
+run_terminal('read answer; printf xgent-input-%s "$answer"', "xgent-input-ready",
+             program_input="ready")
+capture("live-stdin")
+run_terminal("cat", "", eof=True)
+print("PASS: settings, bundled environment, native stdout, rootfs ls/cd, retained cwd, Bash, Python/pip, live stdin and EOF")

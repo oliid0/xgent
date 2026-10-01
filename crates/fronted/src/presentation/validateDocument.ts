@@ -22,6 +22,28 @@ export function validatePresentationDocument(
   if (document.dismissAction && !handlers.has(document.dismissAction)) {
     throw new Error(`Missing native dismiss handler: ${document.dismissAction}`);
   }
+  if (!["root", "sheet", "alert", "sidebar", "panel"].includes(document.mode)) {
+    throw new Error("Invalid native presentation mode");
+  }
+  if (document.mode === "panel" && !document.removed) {
+    const panel = document.workspacePanel;
+    if (
+      document.formFactor !== "desktop" ||
+      !document.dismissAction ||
+      !panel ||
+      !Number.isSafeInteger(panel.focusRequest) ||
+      panel.focusRequest < 0 ||
+      [
+        panel.openLabel,
+        panel.returnLabel,
+        panel.expandLabel,
+        panel.restoreLabel,
+        panel.closeLabel,
+      ].some((label) => typeof label !== "string" || !label.trim())
+    ) {
+      throw new Error("Invalid native workspace panel");
+    }
+  }
   const ids = new Set<string>();
   const visit = (nodes: PresentationNode[], depth: number) => {
     if (depth >= 64 || ids.size + nodes.length > 20_000) {
@@ -82,6 +104,21 @@ export function validatePresentationDocument(
       if (node.step !== undefined && (!Number.isFinite(node.step) || node.step <= 0)) {
         throw new Error(`Invalid native step: ${node.id}`);
       }
+      if (
+        node.kind === "NumberInput" &&
+        (typeof node.value !== "number" ||
+          !Number.isFinite(node.value) ||
+          typeof node.minimum !== "number" ||
+          !Number.isFinite(node.minimum) ||
+          typeof node.maximum !== "number" ||
+          !Number.isFinite(node.maximum) ||
+          typeof node.step !== "number" ||
+          !Number.isFinite(node.step) ||
+          node.step <= 0 ||
+          node.value < node.minimum ||
+          node.value > node.maximum)
+      )
+        throw new Error(`Invalid native numeric input: ${node.id}`);
       if (node.total !== undefined && (!Number.isFinite(node.total) || node.total < 0)) {
         throw new Error(`Invalid native total: ${node.id}`);
       }

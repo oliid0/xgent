@@ -43,6 +43,7 @@ pub(crate) struct MobileShellRunInput {
     pub max_timeout_ms: Option<u64>,
     pub provider_id: Option<String>,
     pub run_id: Option<String>,
+    pub interactive_stdin: bool,
 }
 
 #[cfg(mobile)]
@@ -78,6 +79,7 @@ pub(crate) async fn run_mobile_shell(
         max_timeout_ms,
         provider_id,
         run_id,
+        interactive_stdin,
     } = input;
 
     // Local native execution must survive a degraded settings database. LAN
@@ -99,7 +101,7 @@ pub(crate) async fn run_mobile_shell(
 
     let mut lan_fallback_error = None;
     if let Some(settings) = settings.as_ref().filter(|settings| {
-        settings.prefer_lan_pc_execution && !settings.lan_control_url.trim().is_empty()
+        !interactive_stdin && settings.prefer_lan_pc_execution && !settings.lan_control_url.trim().is_empty()
     }) {
         if let Some(lan_pc_client) = lan_pc_client {
             let remote_workdir = lan_pc_client
@@ -181,6 +183,7 @@ pub(crate) async fn run_mobile_shell(
                 cwd,
                 timeout_ms: effective_timeout_ms,
                 stdin_base64: None,
+                interactive_stdin,
                 wasi: None,
             })
             .map_err(|error| error.to_string())
@@ -229,6 +232,7 @@ pub async fn shell_run(
     run_id: Option<String>,
     sandbox: bool,
     sandbox_allow_network: bool,
+    interactive_stdin: Option<bool>,
 ) -> Result<ShellRunResponse, String> {
     // Mobile uses the PRoot/a-Shell boundary rather than the desktop sandbox.
     let _ = (sandbox, sandbox_allow_network);
@@ -246,6 +250,7 @@ pub async fn shell_run(
             max_timeout_ms,
             provider_id,
             run_id,
+            interactive_stdin: interactive_stdin.unwrap_or(false),
         },
     )
     .await

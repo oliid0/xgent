@@ -1,6 +1,3 @@
-import type { ToolResultMessage } from "@earendil-works/pi-ai";
-import { generateDiffFile } from "@git-diff-view/file";
-import { invoke } from "@xgent/runtime";
 import {
   lazy,
   type MutableRefObject,
@@ -25,17 +22,8 @@ import {
   readChatLayoutPreferences,
   saveChatLayoutPreferences,
 } from "../lib/chat/layoutPreferences";
-import { collectChangedFiles } from "../lib/chat/messages/changedFiles";
-import { collectCloudArtifacts } from "../lib/chat/messages/cloudArtifacts";
 import { normalizeLogicalLineEndings } from "../lib/chat/messages/composerText";
-import { collectPreviewedFiles } from "../lib/chat/messages/previewedFiles";
-import { readStreamPreviewMeta } from "../lib/chat/messages/toolPreview";
-import {
-  safeStringify,
-  summarizeToolCall,
-  toolResultMessageToText,
-  type UiRound,
-} from "../lib/chat/messages/uiMessages";
+import { safeStringify, summarizeToolCall } from "../lib/chat/messages/uiMessages";
 import type { PendingUploadedFile } from "../lib/chat/messages/uploadedFiles";
 import { isTaskToolBlock, selectLatestTaskProgress } from "../lib/chat/taskProgress";
 import {
@@ -58,19 +46,17 @@ import { workspaceProjectPathKey } from "../lib/settings";
 import { sortSidebarConversations } from "../lib/sidebar/reconcile";
 import type { SidebarStore } from "../lib/sidebar/store";
 import { type DesktopSttCapture, startDesktopSttCapture } from "../lib/stt/desktopAudioCapture";
-import type {
-  EditResultDetails,
-  TaskListState,
-  WriteResultDetails,
-} from "../lib/tools/builtinTypes";
+import type { TaskListState } from "../lib/tools/builtinTypes";
 import type { PendingToolApprovalSummary, ToolApprovalDecision } from "../lib/tools/toolApproval";
 import type { ChatQueueTurnPreview } from "../pages/chat/components/ChatComposerBar";
-import { workDuration } from "../pages/chat/transcript/workRecord";
 import { createNativeComposerStore } from "./composerStore";
 import { presentationControls } from "./controls";
 import { NativeSurface } from "./NativeSurface";
+import { toolEvidenceNodes } from "./nativeChatEvidence";
 import { createNativeChatRuntimeControls } from "./nativeChatRuntimeControls";
+import { createNativeChatTranscript } from "./nativeChatTranscript";
 import { decodeNativeFiles } from "./nativeFiles";
+import { createNativeTaskProgress } from "./nativeTaskProgress";
 import { createNativePresentationTheme } from "./nativeTheme";
 import type { PresentationHandler, PresentationNode, PresentationValue } from "./types";
 
@@ -87,155 +73,6 @@ function activityIcon(toolName: string) {
     return "terminal";
   if (normalized.includes("edit") || normalized.includes("write")) return "doc.badge.gearshape";
   return "hammer";
-}
-
-function toolResultPreviewNodes(result: unknown, prefix: string): PresentationNode[] {
-  if (!result || typeof result !== "object") return [];
-  const content = (result as { content?: unknown }).content;
-  if (!Array.isArray(content)) return [];
-  return content.flatMap((raw, index): PresentationNode[] => {
-    if (!raw || typeof raw !== "object") return [];
-    const block = raw as Record<string, unknown>;
-    if (
-      block.type !== "image" ||
-      typeof block.data !== "string" ||
-      typeof block.mimeType !== "string" ||
-      !/^image\/(?:png|jpeg|webp|gif)$/.test(block.mimeType)
-    ) {
-      return [];
-    }
-    return [
-      {
-        id: `${prefix}:preview:${index}`,
-        kind: "MediaPreview",
-        label: `Image ${index + 1}`,
-        value: `data:${block.mimeType};base64,${block.data}`,
-        language: block.mimeType,
-      },
-    ];
-  });
-}
-
-function toolEvidenceNodes(
-  result: ToolResultMessage | undefined,
-  prefix: string,
-  argumentsText: string,
-  labels: { arguments: string; result: string },
-  args?: Record<string, unknown>,
-): PresentationNode[] {
-  const text = result ? toolResultMessageToText(result) : "";
-  const nodes: PresentationNode[] = argumentsText
-    ? [
-        {
-          id: `${prefix}:arguments`,
-          kind: "CodeBlock",
-          label: labels.arguments,
-          language: "json",
-          text: argumentsText,
-        },
-      ]
-    : [];
-  nodes.push(...toolResultPreviewNodes(result, prefix));
-  if (text) {
-    nodes.push({
-      id: `${prefix}:result`,
-      kind: "CodeBlock",
-      label: labels.result,
-      language: "text",
-      text,
-    });
-  }
-  if (!result || result.isError) return nodes;
-  const details = result.details;
-  if (details && typeof details === "object" && "kind" in details && details.kind === "edit") {
-    const edit = details as EditResultDetails;
-    if (edit.oldPreview || edit.newPreview) {
-      const path = edit.displayPath || edit.path;
-      const exactSnapshot =
-        typeof edit.beforeContent === "string" &&
-        typeof edit.afterContent === "string" &&
-        edit.beforeContent.length + edit.afterContent.length <= 200_000;
-      const previewMeta = args ? readStreamPreviewMeta(args) : undefined;
-      const oldText = exactSnapshot
-        ? edit.beforeContent
-        : typeof args?.old_string === "string" && previewMeta?.fields.old_string?.truncated !== true
-          ? args.old_string
-          : args?.old_string === undefined && edit.oldPreview.length <= 500
-            ? edit.oldPreview
-            : undefined;
-      const newText = exactSnapshot
-        ? edit.afterContent
-        : typeof args?.new_string === "string" && previewMeta?.fields.new_string?.truncated !== true
-          ? args.new_string
-          : args?.new_string === undefined && edit.newPreview.length <= 500
-            ? edit.newPreview
-            : undefined;
-      if (
-        oldText !== undefined &&
-        newText !== undefined &&
-        oldText.length + newText.length <= 200_000 &&
-        (exactSnapshot ||
-          ((edit.matchStrategy === undefined || edit.matchStrategy === "exact") &&
-            edit.replaceAll !== true &&
-            (edit.replacements ?? 1) === 1))
-      ) {
-        const diff = generateDiffFile(path, oldText, path, newText, "txt", "txt");
-        diff.initRaw();
-        nodes.push({
-          id: `${prefix}:diff`,
-          kind: "CodeBlock",
-          label: path,
-          language: "diff",
-          text: diff._diffList.join("\n"),
-        });
-      } else {
-        nodes.push({
-          id: `${prefix}:edit-preview`,
-          kind: "CodeBlock",
-          label: path,
-          language: "text",
-          text: `${edit.oldPreview}\n→\n${edit.newPreview}`,
-        });
-      }
-    }
-  } else if (
-    details &&
-    typeof details === "object" &&
-    "kind" in details &&
-    details.kind === "write"
-  ) {
-    const write = details as WriteResultDetails;
-    const content =
-      typeof args?.content === "string" &&
-      readStreamPreviewMeta(args)?.fields.content?.truncated !== true
-        ? args.content
-        : undefined;
-    if (
-      typeof write.beforeContent === "string" &&
-      content !== undefined &&
-      write.beforeContent.length + content.length <= 200_000
-    ) {
-      const path = write.displayPath || write.path;
-      const diff = generateDiffFile(path, write.beforeContent, path, content, "txt", "txt");
-      diff.initRaw();
-      nodes.push({
-        id: `${prefix}:diff`,
-        kind: "CodeBlock",
-        label: path,
-        language: "diff",
-        text: diff._diffList.join("\n"),
-      });
-    } else if (write.preview) {
-      nodes.push({
-        id: `${prefix}:content`,
-        kind: "CodeBlock",
-        label: write.displayPath || write.path,
-        language: "text",
-        text: write.preview,
-      });
-    }
-  }
-  return nodes;
 }
 
 export type NativeChatPageProps = {
@@ -282,6 +119,8 @@ export type NativeChatPageProps = {
   onSelectConversation: (id: string) => void;
   onSelectProject: (project: WorkspaceProject) => void;
   onNewConversation: () => void;
+  onNewSideConversation?: () => void;
+  onOpenConversationInSplit?: (id: string) => void;
   onOpenSettings: (
     section?: "skills" | "cron" | "ssh" | "mcp" | "mobileExecution" | "providers",
   ) => void;
@@ -304,112 +143,6 @@ export type NativeChatPageProps = {
   onImportFiles: (files: File[]) => Promise<void>;
   onRemoveUpload: (path: string) => void;
 };
-
-function roundNodes(
-  rounds: UiRound[],
-  prefix: string,
-  showThinking: boolean,
-  labels: { thinking: string; search: string; arguments: string; result: string },
-): PresentationNode[] {
-  return rounds.flatMap((round) =>
-    round.blocks.flatMap((block): PresentationNode[] => {
-      const id = `${prefix}:${round.key}`;
-      if (block.kind === "text") {
-        return [
-          {
-            id: `${id}:${block.id}`,
-            kind: "Markdown",
-            text: block.text,
-          },
-        ];
-      }
-      if (block.kind === "thinking") {
-        if (!showThinking) return [];
-        const running = "thinkingOpen" in round && round.thinkingOpen;
-        return [
-          {
-            id: `${id}:${block.id}`,
-            kind: "Thinking",
-            label: labels.thinking,
-            text: block.text,
-            status: running ? "running" : "completed",
-          },
-        ];
-      }
-      if (block.kind === "tool") {
-        if (isTaskToolBlock(block)) return [];
-        const running =
-          "runningToolCallIds" in round &&
-          Array.isArray(round.runningToolCallIds) &&
-          round.runningToolCallIds.includes(block.item.toolCall.id);
-        return [
-          {
-            id: `${id}:tool:${block.item.toolCall.id}`,
-            kind: "ToolCall",
-            variant: "timeline",
-            label: block.item.toolCall.name,
-            text: summarizeToolCall(block.item.toolCall, { includeName: false }),
-            status: running
-              ? "running"
-              : block.item.toolResult?.isError
-                ? "error"
-                : block.item.toolResult
-                  ? "completed"
-                  : "pending",
-            children: toolEvidenceNodes(
-              block.item.toolResult,
-              `${id}:tool:${block.item.toolCall.id}`,
-              safeStringify(block.item.toolCall.arguments),
-              labels,
-              block.item.toolCall.arguments,
-            ),
-          },
-        ];
-      }
-      if (block.kind === "hostedSearch") {
-        const sourceText = block.item.sources
-          .map((source) => `${source.title || source.url}\n${source.url}`)
-          .join("\n\n");
-        return [
-          {
-            id: `${id}:search:${block.item.id}`,
-            kind: "ToolCall",
-            variant: "timeline",
-            label: labels.search,
-            text: block.item.queries.join(", "),
-            status:
-              block.item.status === "searching"
-                ? "running"
-                : block.item.status === "failed"
-                  ? "error"
-                  : "completed",
-            children: sourceText
-              ? [
-                  {
-                    id: `${id}:search:${block.item.id}:sources`,
-                    kind: "Text",
-                    text: sourceText,
-                    secondary: true,
-                  },
-                ]
-              : [],
-          },
-        ];
-      }
-      return [];
-    }),
-  );
-}
-
-function splitWorkNodes(nodes: PresentationNode[]) {
-  let lastWork = -1;
-  nodes.forEach((node, index) => {
-    if (node.kind === "ToolCall" || node.kind === "Thinking") lastWork = index;
-  });
-  return lastWork < 0
-    ? { work: [] as PresentationNode[], answer: nodes }
-    : { work: nodes.slice(0, lastWork + 1), answer: nodes.slice(lastWork + 1) };
-}
 
 export function NativeChatPage(props: NativeChatPageProps) {
   const { t } = useLocale();
@@ -569,200 +302,20 @@ export function NativeChatPage(props: NativeChatPageProps) {
     arguments: t("chat.toolDetails.arguments"),
     result: t("chat.toolDetails.result"),
   };
-  let lastUserAt: number | undefined;
-  const messages: PresentationNode[] = props.historyItems.flatMap((item): PresentationNode[] => {
-    if (item.kind === "assistant") {
-      const artifacts = collectCloudArtifacts(item.rounds);
-      const changedSummary = collectChangedFiles(item.rounds);
-      const changedFiles = changedSummary?.files.filter((file) => !file.deleted) ?? [];
-      const previewedFiles = collectPreviewedFiles(item.rounds, changedSummary);
-      const { work, answer } = splitWorkNodes(
-        roundNodes(item.rounds, item.key, showThinking, contentLabels),
-      );
-      const duration = workDuration(lastUserAt, item.timestamp);
-      const changedFileNodes: PresentationNode[] = changedFiles.map((file) => {
-        const id = `${item.key}:changed-file:${file.lastToolCallId}`;
-        return {
-          id,
-          kind: "Button",
-          label: file.path,
-          icon: "doc",
-          variant: "secondary",
-          size: "small",
-          accessibilityHint: t("projectTools.fileTree.openFile"),
-          action: action(id, () => props.onOpenWorkspaceFile(file.path)),
-        };
-      });
-      return [
-        {
-          id: item.key,
-          kind: "ChatMessage",
-          role: "assistant",
-          children: [
-            ...(work.length > 0
-              ? [
-                  {
-                    id: `${item.key}:work`,
-                    kind: "Collapsible" as const,
-                    variant: "work",
-                    label: duration
-                      ? t("chat.activity.worked").replace("{duration}", duration)
-                      : t("chat.activity.tools"),
-                    children: [...work, ...changedFileNodes],
-                  },
-                ]
-              : []),
-            ...answer,
-            ...(work.length > 0 ? [] : changedFileNodes),
-            ...previewedFiles.map((file): PresentationNode => {
-              const id = `${item.key}:previewed-file:${file.toolCallId}`;
-              return {
-                id,
-                kind: "Button",
-                label: file.path,
-                icon: "doc",
-                variant: "secondary",
-                size: "small",
-                accessibilityHint: t("projectTools.fileTree.openFile"),
-                action: action(id, () => props.onOpenWorkspaceFile(file.path)),
-              };
-            }),
-            ...artifacts.map((artifact): PresentationNode => {
-              const id = `${item.key}:cloud-artifact:${artifact.taskId}:${artifact.artifactId}`;
-              const name =
-                artifact.localPath.replaceAll("\\", "/").split("/").pop() || artifact.artifactName;
-              return {
-                id,
-                kind: "Button",
-                label: name,
-                icon: "doc",
-                variant: "secondary",
-                size: "small",
-                accessibilityHint: t("chat.cloudArtifacts.inline"),
-                action: action(id, () =>
-                  invoke("cloud_task_open_artifact", { localPath: artifact.localPath }),
-                ),
-              };
-            }),
-          ],
-        },
-      ];
-    }
-    if (item.kind === "summary") {
-      return [
-        {
-          id: item.key,
-          kind: "ChatMessage",
-          role: "system",
-          children: [{ id: `${item.key}:text`, kind: "Markdown", text: item.content }],
-        },
-      ];
-    }
-    lastUserAt = item.timestamp;
-    return [
-      {
-        id: item.key,
-        kind: "ChatMessage",
-        role: "user",
-        children: [
-          {
-            id: `${item.key}:text`,
-            kind: "Markdown",
-            text: item.text,
-          },
-          ...item.attachments.map(
-            (attachment): PresentationNode => ({
-              id: `${item.key}:attachment:${attachment.relativePath}`,
-              kind: "Badge",
-              label: attachment.fileName,
-              status: "completed",
-            }),
-          ),
-        ],
-      },
-    ];
-  });
-  if (!live.isSettled) {
-    const liveChildren = roundNodes(live.liveRounds, "live", showThinking, contentLabels);
-    if (live.liveRounds.length === 0 && live.draftAssistantText) {
-      liveChildren.push({ id: "live:draft", kind: "Markdown", text: live.draftAssistantText });
-    }
-    if (live.toolStatus)
-      liveChildren.push({
-        id: "live:status",
-        kind: "StatusDot",
-        label: live.toolStatus,
-        status: "running",
-      });
-    if (liveChildren.length > 0) {
-      const { work, answer } = splitWorkNodes(liveChildren);
-      const liveChangedFiles =
-        collectChangedFiles(live.liveRounds)?.files.filter((file) => !file.deleted) ?? [];
-      messages.push({
-        id: "live:assistant",
-        kind: "ChatMessage",
-        role: "assistant",
-        children: [
-          ...(work.length > 0
-            ? [
-                {
-                  id: "live:work",
-                  kind: "Section" as const,
-                  label: t("chat.mobileActivity.working"),
-                  children: [
-                    ...work,
-                    ...liveChangedFiles.map((file): PresentationNode => {
-                      const id = `live:changed-file:${file.lastToolCallId}`;
-                      return {
-                        id,
-                        kind: "Button",
-                        label: file.path,
-                        icon: "doc",
-                        variant: "secondary",
-                        size: "small",
-                        action: action(id, () => props.onOpenWorkspaceFile(file.path)),
-                      };
-                    }),
-                  ],
-                },
-              ]
-            : []),
-          ...answer,
-        ],
-      });
-    }
-  }
+  const messages = createNativeChatTranscript(
+    props.historyItems,
+    live,
+    showThinking,
+    t,
+    action,
+    props.onOpenWorkspaceFile,
+  );
   const taskProgress = selectLatestTaskProgress(
     props.historyItems,
     live.liveRounds,
     props.taskList,
   );
-  const taskProgressNode: PresentationNode | undefined = taskProgress?.tasks.length
-    ? {
-        id: `task-progress:${taskProgress.runId}`,
-        kind: "TaskProgress",
-        label:
-          taskProgress.tasks.find((task) => task.status === "in_progress")?.activeForm ||
-          taskProgress.tasks.find((task) => task.status !== "completed")?.subject ||
-          t("chat.tasks.completed"),
-        text: `${taskProgress.tasks.filter((task) => task.status === "completed").length}/${taskProgress.tasks.length}`,
-        current: taskProgress.tasks.filter((task) => task.status === "completed").length,
-        total: taskProgress.tasks.length,
-        status: taskProgress.tasks.every((task) => task.status === "completed")
-          ? "completed"
-          : props.isSending
-            ? "running"
-            : "paused",
-        children: taskProgress.tasks.map((task) => ({
-          id: `task-progress:${taskProgress.runId}:${task.id}`,
-          kind: "TaskStep",
-          label: task.subject,
-          text: task.status === "in_progress" ? task.activeForm : task.description,
-          status:
-            task.status === "in_progress" ? (props.isSending ? "running" : "paused") : task.status,
-        })),
-      }
-    : undefined;
+  const taskProgressNode = createNativeTaskProgress(taskProgress, props.isSending, t);
   const activityItems = collectActivityItems(props.historyItems, live).filter(
     (item) => !isTaskToolBlock({ kind: "tool", item }),
   );
@@ -911,6 +464,19 @@ export function NativeChatPage(props: NativeChatPageProps) {
               variant: compact ? "secondary" : undefined,
             },
             { id: "toolbar-space", kind: "Spacer" },
+            ...(!compact && props.onNewSideConversation
+              ? [
+                  {
+                    ...button(
+                      "new-side-chat",
+                      t("chat.split.toolbar"),
+                      props.onNewSideConversation,
+                    ),
+                    kind: "IconButton" as const,
+                    icon: "rectangle.split.2x1",
+                  },
+                ]
+              : []),
             ...(compact
               ? [
                   {
@@ -1307,6 +873,34 @@ export function NativeChatPage(props: NativeChatPageProps) {
       variant: compact ? "sidebar" : undefined,
     };
   };
+  const conversationSidebarRow = (
+    row: PresentationNode,
+    conversationId: string,
+  ): PresentationNode => {
+    if (compact || !props.onOpenConversationInSplit || conversationId === props.conversationId)
+      return row;
+    const actionId = `split-conversation:${conversationId}`;
+    sidebarHandlers.set(actionId, {
+      enabled: true,
+      accepts: (value) => value === null,
+      run: () => props.onOpenConversationInSplit?.(conversationId),
+    });
+    return {
+      id: `${row.id}:row`,
+      kind: "HStack",
+      spacing: 4,
+      children: [
+        { ...row, fill: true },
+        {
+          id: actionId,
+          kind: "IconButton",
+          label: `${t("chat.split.toolbar")}: ${row.label}`,
+          icon: "rectangle.split.2x1",
+          action: actionId,
+        },
+      ],
+    };
+  };
   const projectSidebarRows = (project: WorkspaceProject, indent = 0): PresentationNode[] => {
     const expanded = expandedProjectIds.has(project.id);
     const key = workspaceProjectPathKey(project.path);
@@ -1332,20 +926,25 @@ export function NativeChatPage(props: NativeChatPageProps) {
         indent,
       },
       ...(expanded
-        ? visible.map((conversation) => ({
-            ...sidebarButton(
-              `workspace-conversation:${conversation.id}`,
-              conversation.title,
-              () => {
-                props.onSelectConversation(conversation.id);
-                finishSidebarAction();
+        ? visible.map((conversation) =>
+            conversationSidebarRow(
+              {
+                ...sidebarButton(
+                  `workspace-conversation:${conversation.id}`,
+                  conversation.title,
+                  () => {
+                    props.onSelectConversation(conversation.id);
+                    finishSidebarAction();
+                  },
+                ),
+                indent: indent + (compact ? 36 : 18),
+                variant: compact ? "sidebar-conversation" : undefined,
+                icon: compact ? undefined : "bubble.left",
+                selected: props.conversationId === conversation.id,
               },
+              conversation.id,
             ),
-            indent: indent + (compact ? 36 : 18),
-            variant: compact ? "sidebar-conversation" : undefined,
-            icon: compact ? undefined : "bubble.left",
-            selected: props.conversationId === conversation.id,
-          }))
+          )
         : []),
       ...(expanded && (!state || (state.loading && visible.length === 0))
         ? [
@@ -1658,18 +1257,23 @@ export function NativeChatPage(props: NativeChatPageProps) {
                             .toLocaleLowerCase()
                             .includes(query.toLocaleLowerCase()),
                         )
-                        .map((conversation) => ({
-                          ...sidebarButton(
-                            `conversation:${conversation.id}`,
-                            conversation.title,
-                            () => {
-                              props.onSelectConversation(conversation.id);
-                              finishSidebarAction();
+                        .map((conversation) =>
+                          conversationSidebarRow(
+                            {
+                              ...sidebarButton(
+                                `conversation:${conversation.id}`,
+                                conversation.title,
+                                () => {
+                                  props.onSelectConversation(conversation.id);
+                                  finishSidebarAction();
+                                },
+                              ),
+                              variant: compact ? "sidebar-conversation" : undefined,
+                              selected: props.conversationId === conversation.id,
                             },
+                            conversation.id,
                           ),
-                          variant: compact ? "sidebar-conversation" : undefined,
-                          selected: props.conversationId === conversation.id,
-                        })),
+                        ),
                       ...(sidebar.recentHistory.hasMore
                         ? [
                             sidebarButton("more", t("presentation.loadMore"), () =>

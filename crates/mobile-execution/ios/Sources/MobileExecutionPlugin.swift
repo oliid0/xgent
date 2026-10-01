@@ -32,11 +32,18 @@ private struct RunArgs: Decodable {
     let cwd: String?
     let timeoutMs: UInt64
     let stdinBase64: String?
+    let interactiveStdin: Bool?
     let wasi: WasiArgs?
 }
 
 private struct CancelArgs: Decodable {
     let runId: String
+}
+
+private struct WriteInputArgs: Decodable {
+    let runId: String
+    let dataBase64: String?
+    let eof: Bool
 }
 
 private struct PickExternalWorkspaceArgs: Decodable {
@@ -199,6 +206,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private let stateLock = NSLock()
     private let initializationLock = NSLock()
     private var activeCommand: ActiveCommand?
+    private var activeInputs: [String: CommandInputStream] = [:]
     private var scheduledRuns = Set<String>()
     private var cancelledRuns = Set<String>()
     private var earlyCancelledRuns: [String] = []
@@ -463,6 +471,22 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         invoke.resolve(["cancelled": scheduled])
     }
 
+    @objc func writeInput(_ invoke: Invoke) throws {
+        let request = try invoke.parseArgs(WriteInputArgs.self)
+        try validateRunId(request.runId)
+        let encoded = request.dataBase64 ?? ""
+        guard encoded.utf8.count <= 24 * 1024, let bytes = Data(base64Encoded: encoded),
+              bytes.count <= 16 * 1024, !bytes.isEmpty || request.eof else {
+            throw MobileExecutionError.invalidRequest("Input is invalid or exceeds 16 KiB")
+        }
+        stateLock.lock()
+        let input = activeInputs[request.runId]
+        stateLock.unlock()
+        guard let input else { throw MobileExecutionError.invalidRequest("This command has no open input stream") }
+        try input.enqueue(bytes, eof: request.eof)
+        invoke.resolve(["acceptedBytes": bytes.count, "closed": request.eof])
+    }
+
     private func execute(_ request: RunArgs) throws -> [String: Any] {
         guard environmentInstalled else {
             throw MobileExecutionError.invalidRequest(
@@ -478,6 +502,9 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         let workspace = try resolveWorkspace(request.workdir)
         let cwd = try resolveCwd(request.cwd, in: workspace)
         let input = try decodeInput(request.stdinBase64)
+        guard request.interactiveStdin != true || (input?.count ?? 0) <= 16 * 1024 else {
+            throw MobileExecutionError.invalidRequest("Live initial input exceeds 16 KiB")
+        }
         let startedAt = DispatchTime.now().uptimeNanoseconds
         let result: AShellCommandResult
         if let wasi = request.wasi {
@@ -566,7 +593,20 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         defer { try? FileManager.default.removeItem(at: scriptURL) }
 
         ios_setDirectoryURL(cwd)
-        let stdinFile = try TemporaryInput(data: stdin)
+        let liveInput = request.interactiveStdin == true ? try CommandInputStream(onClosed: { [weak self] error in
+            self?.trigger("inputState", data: [
+                "runId": request.runId, "ready": false, "error": error.map { $0 as Any } ?? NSNull()
+            ])
+        }) : nil
+        let stdinFile: any CommandInputSource
+        if let liveInput { stdinFile = liveInput }
+        else { stdinFile = try TemporaryInput(data: stdin) }
+        defer {
+            stateLock.lock()
+            activeInputs.removeValue(forKey: request.runId)
+            stateLock.unlock()
+            stdinFile.close()
+        }
         let emitOutput: (String, Data) -> Void = { [weak self] stream, bytes in
             self?.trigger("output", data: [
                 "runId": request.runId,
@@ -575,10 +615,25 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             ])
         }
         let stdout = try BoundedPOSIXPipe(onOutput: { emitOutput("stdout", $0) })
+        defer { stdout.closeWriter() }
         let stderr = try BoundedPOSIXPipe(onOutput: { emitOutput("stderr", $0) })
+        defer { stderr.closeWriter() }
         let stdinStream = try stdinFile.duplicateStream()
+        var stdinClosed = false
+        defer { if !stdinClosed { fclose(stdinStream) } }
         let stdoutStream = try stdout.makeWriteStream()
+        var stdoutClosed = false
+        defer { if !stdoutClosed { fclose(stdoutStream) } }
         let stderrStream = try stderr.makeWriteStream()
+        var stderrClosed = false
+        defer { if !stderrClosed { fclose(stderrStream) } }
+        if let liveInput {
+            if let stdin, !stdin.isEmpty { try liveInput.enqueue(stdin, eof: false) }
+            stateLock.lock()
+            activeInputs[request.runId] = liveInput
+            stateLock.unlock()
+            trigger("inputState", data: ["runId": request.runId, "ready": true, "error": NSNull()])
+        }
 
         thread_stdin = nil
         thread_stdout = nil
@@ -622,8 +677,11 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         thread_stdout = nil
         thread_stderr = nil
         fclose(stdinStream)
+        stdinClosed = true
         fclose(stdoutStream)
+        stdoutClosed = true
         fclose(stderrStream)
+        stderrClosed = true
         stdinFile.close()
         stdout.closeWriter()
         stderr.closeWriter()
@@ -956,6 +1014,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 cwd: nil,
                 timeoutMs: 30_000,
                 stdinBase64: nil,
+                interactiveStdin: false,
                 wasi: nil
             )
             let result = try executeShell(
@@ -1035,6 +1094,9 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         try validateRunId(request.runId)
         guard request.wasi == nil || request.command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw MobileExecutionError.invalidRequest("Use either a shell command or a WASI invocation, not both")
+        }
+        guard request.interactiveStdin != true || request.wasi == nil else {
+            throw MobileExecutionError.invalidRequest("Live input is available for shell commands only")
         }
         guard request.wasi != nil || !request.command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw MobileExecutionError.invalidRequest("command is required for shell execution")

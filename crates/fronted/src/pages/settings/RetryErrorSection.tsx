@@ -12,58 +12,22 @@ import { useState } from "react";
 import { RefreshCw, X } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import { RETRYABLE_PRESET_HTTP_STATUS_CODES } from "../../lib/settings";
+import { providerRuntimeActions } from "./providerRuntimeSettings";
 import type { SettingsSectionProps } from "./types";
 
 export function RetryErrorSection({ settings, setSettings }: SettingsSectionProps) {
   const { t } = useLocale();
   const [patternDraft, setPatternDraft] = useState("");
 
-  function togglePresetCode(code: number, enabled: boolean) {
-    setSettings((previous) => {
-      const current = previous.retryErrorSettings.presetStatusCodes;
-      return {
-        ...previous,
-        retryErrorSettings: {
-          ...previous.retryErrorSettings,
-          presetStatusCodes: enabled
-            ? current.includes(code)
-              ? current
-              : [...current, code]
-            : current.filter((item) => item !== code),
-        },
-      };
-    });
-  }
-
+  const {
+    togglePresetCode,
+    removePattern,
+    addPattern: persistPattern,
+  } = providerRuntimeActions(setSettings);
   function addPattern() {
-    const pattern = patternDraft.trim();
-    if (!pattern) return;
+    if (!patternDraft.trim()) return;
+    persistPattern(patternDraft);
     setPatternDraft("");
-    setSettings((previous) => {
-      const exists = previous.retryErrorSettings.customPatterns.some(
-        (item) => item.toLocaleLowerCase() === pattern.toLocaleLowerCase(),
-      );
-      if (exists) return previous;
-      return {
-        ...previous,
-        retryErrorSettings: {
-          ...previous.retryErrorSettings,
-          customPatterns: [...previous.retryErrorSettings.customPatterns, pattern],
-        },
-      };
-    });
-  }
-
-  function removePattern(pattern: string) {
-    setSettings((previous) => ({
-      ...previous,
-      retryErrorSettings: {
-        ...previous.retryErrorSettings,
-        customPatterns: previous.retryErrorSettings.customPatterns.filter(
-          (item) => item !== pattern,
-        ),
-      },
-    }));
   }
 
   return (

@@ -37,6 +37,13 @@ import {
   readRunReport,
   successfulDecisionKeys,
 } from "../../../lib/memory/organizer/runRecord";
+import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
+import type { AppSettings } from "../../../lib/settings";
+import { presentationControls } from "../../../presentation/controls";
+import { NativeSurface } from "../../../presentation/NativeSurface";
+import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
+import type { PresentationNode } from "../../../presentation/types";
+import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import {
   deriveManualApplyDisplay,
   displayedFinalSummary,
@@ -63,6 +70,8 @@ export function OrganizerHistoryModal(props: {
   onClose: () => void;
   workdir?: string;
   onMemoryChanged?: () => void;
+  settings: AppSettings;
+  nativeSettingsSurfaceId?: string;
 }) {
   const { t, onClose, workdir, onMemoryChanged } = props;
   const [statusFilter, setStatusFilter] = useState<"all" | MemoryOrganizeRunStatus>("all");
@@ -221,6 +230,236 @@ export function OrganizerHistoryModal(props: {
     } finally {
       setClearingHistory(false);
     }
+  }
+
+  if (isApplePresentationRuntime()) {
+    const c = presentationControls();
+    const busy = loading || clearingHistory || applyingPreview;
+    const nodes: PresentationNode[] = [
+      c.action("back", t("settings.memorySettingsClose"), onClose, !busy),
+    ];
+    if (error)
+      nodes.push({ id: "memory-history-error", kind: "Banner", label: error, status: "error" });
+    if (historyFeedback)
+      nodes.push({ id: "memory-history-feedback", kind: "Text", text: historyFeedback });
+    if (busy)
+      nodes.push({
+        id: "memory-history-progress",
+        kind: "Progress",
+        label: t("settings.memoryRefresh"),
+      });
+    if (clearConfirmOpen) {
+      nodes.push(
+        c.group("memory-history-confirm", t("settings.memoryOrganizerClearHistoryConfirmTitle"), [
+          {
+            id: "memory-history-confirm-description",
+            kind: "Text",
+            text: t("settings.memoryOrganizerClearHistoryConfirmDescription"),
+          },
+          {
+            ...c.action(
+              "memory-history-confirm-action",
+              t("settings.memoryOrganizerClearHistory"),
+              clearHistory,
+              !busy,
+            ),
+            destructive: true,
+          },
+          c.action(
+            "memory-history-cancel",
+            t("settings.memoryCancel"),
+            () => setClearConfirmOpen(false),
+            !busy,
+          ),
+        ]),
+      );
+    } else {
+      nodes.push(
+        c.select(
+          "memory-history-status",
+          t("settings.memoryOrganizerHistoryAll"),
+          statusFilter,
+          [
+            { value: "all", label: t("settings.memoryOrganizerHistoryAll") },
+            ...["succeeded", "failed", "skipped", "running"].map((value) => ({
+              value,
+              label: organizerStatusLabel(value as MemoryOrganizeRunStatus, t),
+            })),
+          ],
+          (value) => setStatusFilter(value as typeof statusFilter),
+          !busy,
+        ),
+        c.action("memory-history-refresh", t("settings.memoryRefresh"), () => reload(), !busy),
+        {
+          ...c.action(
+            "memory-history-clear",
+            t("settings.memoryOrganizerClearHistory"),
+            () => setClearConfirmOpen(true),
+            !busy && !!runs.length,
+          ),
+          destructive: true,
+        },
+      );
+      if (runs.length)
+        nodes.push(
+          c.select(
+            "memory-history-run",
+            t("settings.memoryOrganizerHistory"),
+            selectedRun?.runId ?? "",
+            runs.map((run) => ({
+              value: run.runId,
+              label: `${formatTime(run.createdAt)} · ${organizerStatusLabel(run.status, t)} · ${(run.finalSummary || run.runId).slice(0, 100)}`,
+            })),
+            (runId) => {
+              void reload(runId);
+            },
+            !busy,
+          ),
+        );
+      else if (!loading)
+        nodes.push({
+          id: "memory-history-empty",
+          kind: "EmptyState",
+          label: t("settings.memoryOrganizerHistoryEmpty"),
+          icon: "clock",
+        });
+      if (selectedRun) {
+        nodes.push(
+          c.group("memory-history-summary", t("settings.memoryOrganizerFinalSummary"), [
+            {
+              id: "memory-history-run-meta",
+              kind: "Text",
+              text: `${organizerStatusLabel(selectedRun.status, t)} · ${organizerTriggerLabel(selectedRun.trigger, t)} · ${modelNameFromRun(selectedRun)}`,
+            },
+            {
+              id: "memory-history-summary-text",
+              kind: "Markdown",
+              text:
+                displayedFinalSummary(selectedRun, manualApplyDisplay) ||
+                t("settings.memoryOrganizerHistoryPending"),
+            },
+            ...(
+              [
+                ["InputCount", selectedRun.inputCount],
+                ["ClusterCount", selectedRun.clusterCount],
+                ["SafeApplied", selectedRun.safeApplied],
+                ["ReviewSkipped", selectedRun.reviewSkipped],
+                ["CreatedCount", selectedRun.createdCount],
+                ["UpdatedCount", selectedRun.updatedCount],
+                ["DeletedCount", selectedRun.deletedCount],
+                ["ParseFailures", selectedRun.parseFailures],
+              ] as const
+            ).map(([name, value]) => ({
+              id: `memory-history-count:${name}`,
+              kind: "Text" as const,
+              text: `${t(`settings.memoryOrganizer${name}`)}: ${value}`,
+            })),
+          ]),
+        );
+        if (safeDecisions.length) {
+          nodes.push(
+            c.group(
+              "memory-history-decisions",
+              t("settings.memoryOrganizerManualPreview"),
+              safeDecisions.map((decision, index) => {
+                const key = organizerDecisionKey(decision, index);
+                const checked =
+                  manualApplyDisplay.status && manualApplyDisplay.status !== "pending"
+                    ? manualApplyDisplay.appliedDecisionKeys.size === 0
+                      ? decision.applyStatus !== "failed"
+                      : manualApplyDisplay.appliedDecisionKeys.has(key)
+                    : selectedDecisionKeys.has(key);
+                return c.group(`memory-decision:${index}`, decision.slug, [
+                  c.toggle(
+                    `memory-decision-select:${index}`,
+                    `${decision.op} · ${decision.slug}`,
+                    checked,
+                    () => togglePreviewDecision(key),
+                    canApplyManualPreview && !busy,
+                  ),
+                  {
+                    id: `memory-decision-detail:${index}`,
+                    kind: "CodeBlock",
+                    language: "json",
+                    text: JSON.stringify(decision, null, 2),
+                  },
+                ]);
+              }),
+            ),
+          );
+          nodes.push(
+            c.action(
+              "memory-history-apply",
+              t("settings.memoryOrganizerApplySelected"),
+              applyManualPreview,
+              canApplyManualPreview && !busy && !!selectedDecisionKeys.size,
+            ),
+          );
+        }
+        if (reviewItems.length)
+          nodes.push(
+            c.group(
+              "memory-history-review",
+              t("settings.memoryOrganizerReviewNotes"),
+              reviewItems.map((item, index) => ({
+                id: `memory-review:${index}`,
+                kind: "Text" as const,
+                text: `${item.severity} · ${item.slug ?? ""} · ${item.message}`,
+              })),
+            ),
+          );
+        if (clusterSummaries.length)
+          nodes.push(
+            c.group(
+              "memory-history-clusters",
+              t("settings.memoryOrganizerClusterSummaries"),
+              clusterSummaries.map((text, index) => ({
+                id: `memory-cluster:${index}`,
+                kind: "Markdown" as const,
+                text,
+              })),
+            ),
+          );
+        if (rejectionBuckets.length)
+          nodes.push({
+            id: "memory-rejection-buckets",
+            kind: "CodeBlock",
+            label: t("settings.memoryOrganizerRejectionBuckets"),
+            language: "json",
+            text: JSON.stringify(rejectionBuckets, null, 2),
+          });
+        if (rawBlocks.length)
+          nodes.push({
+            id: "memory-history-raw",
+            kind: "Collapsible",
+            label: t("settings.memoryOrganizerTrimmedProtocol"),
+            children: [
+              {
+                id: "memory-history-raw-content",
+                kind: "CodeBlock",
+                language: "json",
+                text: JSON.stringify(rawBlocks, null, 2),
+              },
+            ],
+          });
+      }
+    }
+    return (
+      <NativeSurface
+        sessionSurface={props.nativeSettingsSurfaceId}
+        document={{
+          mode: "sheet",
+          title: t("settings.memoryOrganizerHistory"),
+          appearance: props.settings.theme,
+          formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
+          theme: createNativePresentationTheme(props.settings, isNativeMobileRuntime()),
+          nodes,
+          dismissAction: "back",
+        }}
+        handlers={c.handlers}
+        onError={(error) => console.error("Native memory history failed", error)}
+      />
+    );
   }
 
   return (

@@ -75,11 +75,33 @@ final class ShellInstallationTests: XCTestCase {
         XCTAssertEqual(exit.label, "Exit: 0")
         XCTAssertTrue(output.label.contains("xgent-python-modules-ok"))
         XCTAssertTrue(output.label.contains("pip 22."))
+
+        tap(app.buttons["clear"], in: app)
+        tap(command, in: app)
+        command.typeText("read answer; printf 'xgent-input-%s' \"$answer\"")
+        tap(app.buttons["run"], in: app)
+        let programInput = app.textFields["program-input"]
+        tap(programInput, in: app)
+        programInput.typeText("ready")
+        tap(app.buttons["send-input"], in: app)
+        XCTAssertTrue(exit.waitForExistence(timeout: 45), "Live stdin must unblock the actual command")
+        XCTAssertEqual(exit.label, "Exit: 0")
+        XCTAssertTrue(output.label.contains("xgent-input-ready"))
+
+        tap(app.buttons["clear"], in: app)
+        tap(command, in: app)
+        command.typeText("cat")
+        tap(app.buttons["run"], in: app)
+        tap(app.buttons["input-eof"], in: app)
+        XCTAssertTrue(exit.waitForExistence(timeout: 45), "EOF must finish a command waiting on stdin")
+        XCTAssertEqual(exit.label, "Exit: 0")
     }
 
     private func tap(_ element: XCUIElement, in app: XCUIApplication) {
         XCTAssertTrue(element.waitForExistence(timeout: 30), "Missing control: \(element)")
         for _ in 0..<6 where !element.isHittable { app.swipeUp() }
+        let ready = NSPredicate(format: "enabled == true AND hittable == true")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: ready, object: element)], timeout: 30), .completed)
         XCTAssertTrue(element.isEnabled && element.isHittable, "Control must accept touch: \(element)")
         element.tap()
     }

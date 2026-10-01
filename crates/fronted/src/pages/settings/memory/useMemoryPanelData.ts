@@ -6,7 +6,7 @@
 // Shared by every frontend runtime. Platform differences belong in the
 // runtime boundary, never in this data hook.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   formatMemoryError,
   type MemoryMeta,
@@ -50,6 +50,21 @@ export type MemoryEditDraft = {
 
 export function useMemoryPanelData(input: { workdir?: string; t: (key: string) => string }) {
   const { workdir, t } = input;
+  const lifetime = useRef({ workdir, active: true, epoch: 0, read: 0, list: 0, mutating: false });
+  if (lifetime.current.workdir !== workdir) {
+    lifetime.current.active = false;
+    lifetime.current = { workdir, active: true, epoch: 0, read: 0, list: 0, mutating: false };
+  }
+  const scope = lifetime.current;
+  useEffect(() => {
+    scope.active = true;
+    return () => {
+      scope.active = false;
+      scope.epoch++;
+      scope.read++;
+      scope.list++;
+    };
+  }, [scope]);
   const [entries, setEntries] = useState<MemoryMeta[]>([]);
   const [quota, setQuota] = useState<MemoryQuota | null>(null);
   const [selected, setSelected] = useState<MemoryReadResponse | null>(null);
@@ -67,6 +82,9 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
   });
 
   async function reload(keepEntry?: string | null) {
+    if (!scope.active) return false;
+    const sequence = ++scope.list;
+    const readSequence = scope.read;
     setLoading(true);
     setError(null);
     setNotice(null);
@@ -75,32 +93,35 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         memoryList({ workdir, includeAllProjects: true, includeDaily: true, limit: 1000 }),
         memoryPathsInfo(),
       ]);
+      if (!scope.active || sequence !== scope.list) return false;
       setEntries(list.entries);
       setQuota(list.quota);
       setPathsInfo(info);
       const keepKey =
         keepEntry === undefined ? (selectedEntry ? entryKey(selectedEntry) : null) : keepEntry;
-      if (keepKey) {
+      if (keepKey && readSequence === scope.read) {
         const found =
           list.entries.find((entry) => entryKey(entry) === keepKey) ??
           list.entries.find((entry) => entry.slug === keepKey);
         if (found) {
-          if (!(await openEntry(found))) return false;
+          if (!(await openEntry(found, true))) return false;
         } else {
           setSelected(null);
           setSelectedEntry(null);
         }
       }
-      return true;
+      return scope.active && sequence === scope.list;
     } catch (err) {
-      setError(formatMemoryError(err));
+      if (scope.active && sequence === scope.list) setError(formatMemoryError(err));
       return false;
     } finally {
-      setLoading(false);
+      if (scope.active && sequence === scope.list) setLoading(false);
     }
   }
 
-  async function openEntry(entry: MemoryMeta) {
+  async function openEntry(entry: MemoryMeta, reloadAfterMutation = false) {
+    if (!scope.active || (scope.mutating && !reloadAfterMutation)) return false;
+    const sequence = ++scope.read;
     setError(null);
     setNotice(null);
     try {
@@ -110,6 +131,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         workdir: selectedEntryWorkdir(entry, workdir),
         workdirHash: entry.scope === "project" ? entry.workdirHash : undefined,
       });
+      if (!scope.active || sequence !== scope.read) return false;
       setSelected(read);
       setSelectedEntry(entry);
       setEditDraft({
@@ -119,13 +141,16 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
       });
       return true;
     } catch (err) {
-      setError(formatMemoryError(err));
+      if (scope.active && sequence === scope.read) setError(formatMemoryError(err));
       return false;
     }
   }
 
   /** Returns true when the entry was created (so the caller can reset its form). */
   async function createEntry(draft: MemoryCreateDraft) {
+    if (!scope.active || scope.mutating) return false;
+    const epoch = scope.epoch;
+    scope.mutating = true;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -142,19 +167,25 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         body: draft.body,
         actor: "user",
       });
+      if (!scope.active || scope.epoch !== epoch) return false;
       if (!(await reload(result.slug))) return false;
       setNotice(t("settings.memoryCreated"));
       return true;
     } catch (err) {
-      setError(formatMemoryError(err));
+      if (scope.active && scope.epoch === epoch) setError(formatMemoryError(err));
       return false;
     } finally {
-      setSaving(false);
+      if (scope.active && scope.epoch === epoch) {
+        scope.mutating = false;
+        setSaving(false);
+      }
     }
   }
 
   async function saveSelected() {
-    if (!selected) return;
+    if (!selected || !scope.active || scope.mutating) return;
+    const epoch = scope.epoch;
+    scope.mutating = true;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -170,19 +201,25 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         mode: isDaily ? "append" : "replace",
         actor: "user",
       });
+      if (!scope.active || scope.epoch !== epoch) return;
       setEditDraft((prev) => ({ ...prev, appendBody: "" }));
       if (await reload(selectedEntry ? entryKey(selectedEntry) : result.slug)) {
         setNotice(t("settings.saved"));
       }
     } catch (err) {
-      setError(formatMemoryError(err));
+      if (scope.active && scope.epoch === epoch) setError(formatMemoryError(err));
     } finally {
-      setSaving(false);
+      if (scope.active && scope.epoch === epoch) {
+        scope.mutating = false;
+        setSaving(false);
+      }
     }
   }
 
   async function acceptSelected() {
-    if (!selected) return;
+    if (!selected || !scope.active || scope.mutating) return;
+    const epoch = scope.epoch;
+    scope.mutating = true;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -193,18 +230,24 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         workdir: selectedEntryWorkdir(selectedEntry, workdir),
         workdirHash: selectedEntry?.scope === "project" ? selectedEntry.workdirHash : undefined,
       });
+      if (!scope.active || scope.epoch !== epoch) return;
       if (await reload(selectedEntry ? entryKey(selectedEntry) : selected.slug)) {
         setNotice(t("settings.memoryAccepted"));
       }
     } catch (err) {
-      setError(formatMemoryError(err));
+      if (scope.active && scope.epoch === epoch) setError(formatMemoryError(err));
     } finally {
-      setSaving(false);
+      if (scope.active && scope.epoch === epoch) {
+        scope.mutating = false;
+        setSaving(false);
+      }
     }
   }
 
   async function deleteSelected() {
-    if (!selected) return;
+    if (!selected || !scope.active || scope.mutating) return;
+    const epoch = scope.epoch;
+    scope.mutating = true;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -216,23 +259,30 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         workdirHash: selectedEntry?.scope === "project" ? selectedEntry.workdirHash : undefined,
         actor: "user",
       });
+      if (!scope.active || scope.epoch !== epoch) return;
       setSelected(null);
       setSelectedEntry(null);
       if (await reload()) setNotice(t("settings.memoryDeleted"));
     } catch (err) {
-      setError(formatMemoryError(err));
+      if (scope.active && scope.epoch === epoch) setError(formatMemoryError(err));
     } finally {
-      setSaving(false);
+      if (scope.active && scope.epoch === epoch) {
+        scope.mutating = false;
+        setSaving(false);
+      }
     }
   }
 
   async function wipeAll() {
-    if (saving) return;
+    if (!scope.active || scope.mutating) return;
+    const epoch = scope.epoch;
+    scope.mutating = true;
     setSaving(true);
     setError(null);
     setNotice(null);
     try {
       const info = await memoryWipeAll();
+      if (!scope.active || scope.epoch !== epoch) return;
       setPathsInfo(info);
       setEntries([]);
       setQuota((prev) =>
@@ -248,9 +298,12 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
       setSelectedEntry(null);
       setNotice(t("settings.memoryCleared"));
     } catch (err) {
-      setError(formatMemoryError(err));
+      if (scope.active && scope.epoch === epoch) setError(formatMemoryError(err));
     } finally {
-      setSaving(false);
+      if (scope.active && scope.epoch === epoch) {
+        scope.mutating = false;
+        setSaving(false);
+      }
     }
   }
 
@@ -285,6 +338,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reload identity changes every render; workdir is the trigger
   useEffect(() => {
+    setSaving(false);
     setSelected(null);
     setSelectedEntry(null);
     void reload(null);
@@ -319,12 +373,30 @@ export function useOrganizeRunHistory(input: { statusFilter: "all" | MemoryOrgan
   const [selectedRun, setSelectedRun] = useState<MemoryOrganizeRun | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const history = useRef({ filter: statusFilter, active: true, generation: 0, selectionId: "" });
+  if (history.current.filter !== statusFilter) {
+    history.current.active = false;
+    history.current = { filter: statusFilter, active: true, generation: 0, selectionId: "" };
+  }
+  const scope = history.current;
+  useEffect(() => {
+    scope.active = true;
+    return () => {
+      scope.active = false;
+      scope.generation += 1;
+    };
+  }, [scope]);
 
   async function reload(
     selectRunId?: string,
     options?: { quiet?: boolean; keepSelection?: boolean },
   ) {
+    if (!scope.active || history.current !== scope) return;
     const quiet = options?.quiet === true;
+    const generation = ++scope.generation;
+    const current = () =>
+      scope.active && history.current === scope && scope.generation === generation;
+    if (selectRunId && !quiet) scope.selectionId = selectRunId;
     if (!quiet) {
       setLoading(true);
       setError(null);
@@ -334,17 +406,21 @@ export function useOrganizeRunHistory(input: { statusFilter: "all" | MemoryOrgan
         status: statusFilter === "all" ? undefined : statusFilter,
         limit: 80,
       });
+      if (!current()) return;
       setRuns(response.runs);
-      const nextId =
-        selectRunId ||
-        (options?.keepSelection === false ? undefined : selectedRun?.runId) ||
-        response.runs[0]?.runId;
+      const requestedId =
+        options?.keepSelection === false ? undefined : scope.selectionId || selectedRun?.runId;
+      const nextId = response.runs.some((run) => run.runId === requestedId)
+        ? requestedId
+        : response.runs[0]?.runId;
       const next = nextId ? await memoryOrganizeRunRead({ runId: nextId }) : null;
+      if (!current()) return;
+      scope.selectionId = next?.runId ?? response.runs[0]?.runId ?? "";
       setSelectedRun(next ?? response.runs[0] ?? null);
     } catch (err) {
-      setError(formatMemoryError(err));
+      if (current()) setError(formatMemoryError(err));
     } finally {
-      if (!quiet) {
+      if (current()) {
         setLoading(false);
       }
     }
@@ -363,7 +439,7 @@ export function useOrganizeRunHistory(input: { statusFilter: "all" | MemoryOrgan
   useEffect(() => {
     if (!hasActiveRun) return;
     const interval = window.setInterval(() => {
-      void reload(selectedRun?.runId, { quiet: true });
+      void reload(undefined, { quiet: true });
     }, PANEL_RUN_POLL_INTERVAL_MS);
     return () => window.clearInterval(interval);
   }, [hasActiveRun, selectedRun?.runId, statusFilter]);

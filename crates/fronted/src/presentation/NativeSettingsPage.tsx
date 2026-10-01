@@ -2,18 +2,6 @@ import { invoke } from "@xgent/runtime";
 import { useEffect, useState } from "react";
 import { SUPPORTED_LOCALES, useLocale } from "../i18n";
 import {
-  applyBackupImport,
-  type BackupSyncConfigView,
-  downloadBackup,
-  exportBackup,
-  fetchRemoteInfo,
-  loadSyncConfig,
-  peekBackupImport,
-  saveSyncConfig,
-  testSyncConnection,
-  uploadBackup,
-} from "../lib/backup";
-import {
   checkMobileAssistantPermissions,
   type MobileAssistantStatus,
   type MobilePermissionStates,
@@ -44,14 +32,12 @@ import {
   normalizeCustomProvider,
   normalizeFontScale,
   normalizeSettings,
-  normalizeSkillsSettings,
   STT_PROVIDER_IDS,
   type SttProviderId,
   type SttProviderSettings,
   updateAccessSettings,
   updateCustomProviders,
   updateCustomSettings,
-  updateMemorySettings,
   updateSystem,
 } from "../lib/settings";
 import { UI_THEME_PRESETS } from "../lib/settings/appearance";
@@ -64,12 +50,14 @@ import {
   personalPolicyKey,
 } from "../lib/tools/mobileAssistantPolicy";
 import { resolveRuntimeToolCapabilities } from "../lib/tools/runtimeToolCapabilities";
-import { canTestSyncConnection } from "../pages/settings/backupSyncForm";
+import { BackupSyncSection } from "../pages/settings/BackupSyncSection";
 import { ComputerUseSection } from "../pages/settings/ComputerUseSection";
 import { CronSection } from "../pages/settings/CronSection";
 import { GlobalShortcutsSection } from "../pages/settings/GlobalShortcutsSection";
 import { HooksSection } from "../pages/settings/HooksSection";
 import { MobileEnvironmentBrowser } from "../pages/settings/MobileEnvironmentBrowser";
+import { MemoryPanel } from "../pages/settings/memory/MemoryPanel";
+import { NativeProviderRuntimeSettings } from "../pages/settings/NativeProviderRuntimeSettings";
 import {
   createDraftModelConfig,
   fetchModelsFromApi,
@@ -78,12 +66,14 @@ import {
 import { SoulSection } from "../pages/settings/SoulSection";
 import { SshSettingsSection } from "../pages/settings/SshSettingsSection";
 import type { SectionId, SettingsPageProps } from "../pages/settings/types";
+import { useCodexOAuthAccounts } from "../pages/settings/useCodexOAuthAccounts";
 import { presentationControls } from "./controls";
 import {
   NativeSurface,
   removeNativeSurfaceSession,
   retainNativeSurfaceSession,
 } from "./NativeSurface";
+import { nativeOAuthAccounts } from "./nativeOAuthAccounts";
 import { createNativePresentationTheme } from "./nativeTheme";
 import type { PresentationNode } from "./types";
 
@@ -147,6 +137,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [busyScope, setBusyScope] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [providerId, setProviderId] = useState("");
+  const [providerRuntimeOpen, setProviderRuntimeOpen] = useState(false);
   // A stalled Shell/status request must not disable provider controls after
   // navigation. Only the latest operation in the current route owns feedback.
   const [operations] = useState(() => ({ scope: "", revision: 0 }));
@@ -167,18 +158,20 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [accessStatus, setAccessStatus] = useState("");
   const [githubToken, setGithubToken] = useState("");
   const [voiceTest, setVoiceTest] = useState<{ ok: boolean; message: string } | null>(null);
-  const [backupConfirmation, setBackupConfirmation] = useState<
-    | { kind: "import"; path: string }
-    | { kind: "upload" }
-    | { kind: "download" }
-    | { kind: "auto-sync" }
-    | null
-  >(null);
-  const [backupStatus, setBackupStatus] = useState<{ ok: boolean; message: string } | null>(null);
-  const [backupConfig, setBackupConfig] = useState<BackupSyncConfigView | null>(null);
-  const [backupPassword, setBackupPassword] = useState("");
   const c = presentationControls();
   const provider = settings.customProviders.find((item) => item.id === providerId);
+  const oauth = useCodexOAuthAccounts(
+    {
+      value: provider?.oauthAccountId ?? "",
+      onChange: (oauthAccountId) =>
+        patchProvider({ oauthAccountId, apiKeyConfigured: !!oauthAccountId }),
+      browserRuntime: false,
+      enabled:
+        page === "providers" && provider?.type === "codex" && provider.authMode === "oauth-managed",
+      scopeKey: `${page}:${providerId}:${provider?.authMode ?? "api-key"}`,
+    },
+    t,
+  );
   // Keep the entered endpoint like the desktop provider form. Persistence strips
   // API suffixes in base-URL mode; switching to an exact endpoint must restore it.
   const providerUrl =
@@ -315,12 +308,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         );
       }).catch(() => undefined);
     }
-    if (page === "backup") {
-      void work(async () => {
-        setBackupConfig(await loadSyncConfig());
-        setBackupPassword("");
-      }).catch(() => undefined);
-    }
   }, [page, nativeMobile]);
   useEffect(() => {
     if (page !== "mobileAssistant" || !nativeMobile) return;
@@ -405,6 +392,16 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     ssh: t("settings.navSsh"),
     about: t("settings.navAbout"),
   };
+  if (page === "providers" && providerRuntimeOpen)
+    return (
+      <NativeProviderRuntimeSettings
+        settings={settings}
+        setSettings={setSettings}
+        providerType={provider?.type ?? "codex"}
+        onBack={() => setProviderRuntimeOpen(false)}
+        nativeSettingsSurfaceId={sessionSurface}
+      />
+    );
   if (page === "mobileExecution" && shellFilesOpen && shell?.installed && shell.environmentRootPath)
     return (
       <MobileEnvironmentBrowser
@@ -449,6 +446,26 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       <SoulSection
         settings={settings}
         createRequestId={props.soulCreateRequestId}
+        onBack={returnToSettings}
+        nativeSettingsSurfaceId={sessionSurface}
+      />
+    );
+  if (page === "backup")
+    return (
+      <BackupSyncSection
+        settings={settings}
+        setSettings={setSettings}
+        reloadSettings={props.reloadSettings}
+        onBack={returnToSettings}
+        nativeSettingsSurfaceId={sessionSurface}
+      />
+    );
+  if (page === "memory")
+    return (
+      <MemoryPanel
+        settings={settings}
+        setSettings={setSettings}
+        compact={nativeMobile}
         onBack={returnToSettings}
         nativeSettingsSurfaceId={sessionSurface}
       />
@@ -853,6 +870,14 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       text: t("settings.native.accessibilityNote"),
     });
   } else if (page === "providers") {
+    nodes.push(
+      c.action(
+        "provider-runtime-settings",
+        t("settings.openCustomSettings"),
+        () => setProviderRuntimeOpen(true),
+        !busy,
+      ),
+    );
     if (!provider) {
       nodes.push(
         c.group(
@@ -897,7 +922,12 @@ export function NativeSettingsPage(props: SettingsPageProps) {
               value,
               label: value === "codex" ? "OpenAI compatible" : value,
             })),
-            (type) => patchProvider({ type: type as CustomProvider["type"] }),
+            (type) =>
+              patchProvider({
+                type: type as CustomProvider["type"],
+                authMode: "api-key",
+                oauthAccountId: undefined,
+              }),
           ),
           c.input("provider-url", "Base URL", providerUrl, (baseUrl) => {
             setProviderUrlDraft({ id: provider.id, value: baseUrl });
@@ -922,13 +952,100 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             provider.isFullUrl,
             (isFullUrl) => patchProvider({ isFullUrl, baseUrl: providerUrl }),
           ),
-          c.input(
-            "provider-key",
-            "API Key",
-            provider.apiKey,
-            (apiKey) => patchProvider({ apiKey }),
-            true,
-          ),
+          ...(provider.type === "codex" || provider.type === "claude_code"
+            ? [
+                c.select(
+                  "provider-auth",
+                  t("settings.providerAuthMethod"),
+                  provider.authMode ?? "api-key",
+                  [
+                    { value: "api-key", label: t("settings.providerAuthApiKey") },
+                    ...(provider.type === "codex"
+                      ? [{ value: "oauth-managed", label: t("settings.providerAuthOAuth") }]
+                      : []),
+                    { value: "oauth-token", label: t("settings.providerAuthToken") },
+                  ],
+                  (authMode) =>
+                    patchProvider({
+                      authMode: authMode as CustomProvider["authMode"],
+                      oauthAccountId: undefined,
+                      apiKey: authMode === "oauth-managed" ? "" : provider.apiKey,
+                      apiKeyConfigured: authMode !== "oauth-managed" && !!provider.apiKey,
+                      customHeaders:
+                        authMode === "oauth-token"
+                          ? provider.customHeaders
+                          : provider.customHeaders?.filter(
+                              (header) => header.key.toLowerCase() !== "chatgpt-account-id",
+                            ),
+                    }),
+                ),
+              ]
+            : []),
+          ...(provider.authMode === "oauth-managed"
+            ? [
+                {
+                  id: "oauth-managed-hint",
+                  kind: "Text" as const,
+                  text: t("settings.providerOAuthManagedHintCodex"),
+                  secondary: true,
+                },
+              ]
+            : [
+                c.input(
+                  "provider-key",
+                  provider.authMode === "oauth-token"
+                    ? t("settings.providerOAuthToken")
+                    : "API Key",
+                  provider.apiKey,
+                  (apiKey) => patchProvider({ apiKey }),
+                  true,
+                ),
+              ]),
+          ...(provider.authMode === "oauth-token"
+            ? [
+                {
+                  id: "oauth-token-hint",
+                  kind: "Text" as const,
+                  secondary: true,
+                  text: t(
+                    provider.type === "claude_code"
+                      ? "settings.providerOAuthHintAnthropic"
+                      : "settings.providerOAuthHintCodex",
+                  ),
+                },
+                ...(provider.type === "codex"
+                  ? [
+                      c.input(
+                        "provider-oauth-account-id",
+                        t("settings.providerOAuthAccountId"),
+                        provider.customHeaders?.find(
+                          (header) => header.key.toLowerCase() === "chatgpt-account-id",
+                        )?.value ?? "",
+                        (value) =>
+                          patchProvider({
+                            customHeaders: [
+                              ...(provider.customHeaders ?? []).filter(
+                                (header) => header.key.toLowerCase() !== "chatgpt-account-id",
+                              ),
+                              ...(value.trim()
+                                ? [{ key: "chatgpt-account-id", value: value.trim() }]
+                                : []),
+                            ],
+                          }),
+                        false,
+                        true,
+                        (value) => value.trim(),
+                      ),
+                      {
+                        id: "oauth-account-hint",
+                        kind: "Text" as const,
+                        text: t("settings.providerOAuthAccountIdHint"),
+                        secondary: true,
+                      },
+                    ]
+                  : []),
+              ]
+            : []),
           ...(provider.type === "codex"
             ? [
                 c.select(
@@ -983,6 +1100,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           ),
         ]),
       );
+      if (provider.authMode === "oauth-managed")
+        nodes.push(nativeOAuthAccounts(c, oauth, provider.oauthAccountId ?? "", t));
       nodes.push(
         c.group(
           "models",
@@ -1362,33 +1481,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     );
   } else if (page === "toolPermissions") {
     appendToolPolicyGroups();
-  } else if (page === "memory") {
-    nodes.push(
-      c.group("memory", titles.memory, [
-        c.toggle(
-          "organizer",
-          t("settings.native.organizeMemory"),
-          settings.memory.organizerEnabled,
-          (organizerEnabled) =>
-            setSettings((previous) => updateMemorySettings(previous, { organizerEnabled })),
-        ),
-        c.select(
-          "scope",
-          t("settings.native.scope"),
-          settings.memory.organizerScope,
-          ["all", "global", "projects", "current-project"].map((value) => ({
-            value,
-            label: value,
-          })),
-          (scope) =>
-            setSettings((previous) =>
-              updateMemorySettings(previous, {
-                organizerScope: scope as typeof previous.memory.organizerScope,
-              }),
-            ),
-        ),
-      ]),
-    );
   } else if (page === "voice") {
     if (nativeMobile) {
       nodes.push(
@@ -1741,212 +1833,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     );
     if (accessStatus)
       nodes.push({ id: "access-status", kind: "Banner", label: accessStatus, status: "completed" });
-  } else if (page === "backup") {
-    const restore = async (run: () => Promise<{ skills: unknown }>) => {
-      const outcome = await run();
-      await props.reloadSettings?.();
-      if (outcome.skills) {
-        const skills = normalizeSkillsSettings(outcome.skills);
-        setSettings((previous) => ({ ...previous, skills }));
-      }
-    };
-    const patchBackupConfig = (patch: Partial<BackupSyncConfigView>) =>
-      setBackupConfig((current) => (current ? { ...current, ...patch } : current));
-    if (backupConfig) {
-      nodes.push(
-        c.group("backup-connection", t("settings.backupSyncTitle"), [
-          c.input("backup-url", "WebDAV URL", backupConfig.url, (url) =>
-            patchBackupConfig({ url }),
-          ),
-          c.input(
-            "backup-username",
-            t("settings.backupSyncUsername"),
-            backupConfig.username,
-            (username) => patchBackupConfig({ username }),
-          ),
-          c.input(
-            "backup-password",
-            t("settings.backupSyncPassword"),
-            backupPassword,
-            setBackupPassword,
-            true,
-          ),
-          c.input(
-            "backup-directory",
-            t("settings.backupSyncRemoteDir"),
-            backupConfig.remoteDir,
-            (remoteDir) => patchBackupConfig({ remoteDir }),
-          ),
-          c.input(
-            "backup-profile",
-            t("settings.backupSyncProfile"),
-            backupConfig.profile,
-            (profile) => patchBackupConfig({ profile }),
-          ),
-          ...(!nativeMobile
-            ? [
-                c.toggle(
-                  "backup-auto",
-                  t("settings.backupSyncAuto"),
-                  backupConfig.autoSync,
-                  (autoSync) => {
-                    if (!autoSync) {
-                      patchBackupConfig({ autoSync: false });
-                      return;
-                    }
-                    patchBackupConfig({ autoSync: true });
-                    setBackupConfirmation({ kind: "auto-sync" });
-                  },
-                ),
-              ]
-            : []),
-          c.action(
-            "backup-save-connection",
-            t("settings.save"),
-            () =>
-              work(async () => {
-                const next = await saveSyncConfig({
-                  url: backupConfig.url,
-                  username: backupConfig.username,
-                  password: backupPassword,
-                  passwordTouched: Boolean(backupPassword),
-                  remoteDir: backupConfig.remoteDir,
-                  profile: backupConfig.profile,
-                  autoSync: backupConfig.autoSync,
-                });
-                setBackupConfig(next);
-                setBackupPassword("");
-                if (!canTestSyncConnection(next)) {
-                  setBackupStatus({ ok: true, message: t("settings.backupSyncSaveDone") });
-                  return;
-                }
-                try {
-                  await testSyncConnection();
-                  setBackupStatus({
-                    ok: true,
-                    message: t("settings.backupSyncSaveAndTestDone"),
-                  });
-                } catch (cause) {
-                  const message = cause instanceof Error ? cause.message : String(cause);
-                  setBackupStatus({
-                    ok: false,
-                    message: `${t("settings.backupSyncSaveAndTestFailed")}${message}`,
-                  });
-                }
-              }),
-            !busy && !!backupConfig.url.trim(),
-          ),
-          c.action(
-            "backup-test-connection",
-            t("settings.backupSyncTest"),
-            () =>
-              work(async () => {
-                await testSyncConnection();
-                setBackupStatus({ ok: true, message: t("settings.backupSyncTestDone") });
-              }),
-            !busy && !!backupConfig.url.trim(),
-          ),
-        ]),
-      );
-    }
-    if (!nativeMobile)
-      nodes.push(
-        c.group("backup-local", t("settings.backupLocalTitle"), [
-          c.action("backup-export", t("settings.backupExport"), () =>
-            work(async () => {
-              const path = await exportBackup(settings.skills);
-              if (path)
-                setBackupStatus({ ok: true, message: `${t("settings.backupExportDone")}${path}` });
-            }),
-          ),
-          c.action("backup-import", t("settings.backupImport"), () =>
-            work(async () => {
-              const preview = await peekBackupImport();
-              if (preview) setBackupConfirmation({ kind: "import", path: preview.path });
-            }),
-          ),
-        ]),
-      );
-    nodes.push(
-      c.group("backup-cloud", t("settings.backupSyncTitle"), [
-        c.action("backup-upload", t("settings.backupSyncUpload"), async () => {
-          const remote = await fetchRemoteInfo();
-          if (remote) setBackupConfirmation({ kind: "upload" });
-          else {
-            await uploadBackup(settings.skills);
-            setBackupStatus({ ok: true, message: t("settings.backupSyncUploadDone") });
-          }
-        }),
-        c.action("backup-download", t("settings.backupSyncDownload"), async () => {
-          const remote = await fetchRemoteInfo();
-          if (!remote) {
-            setBackupStatus({ ok: false, message: t("settings.backupSyncRemoteEmpty") });
-            return;
-          }
-          setBackupConfirmation({ kind: "download" });
-        }),
-      ]),
-    );
-    if (backupConfirmation) {
-      const confirmLabel =
-        backupConfirmation.kind === "import"
-          ? t("settings.backupImportConfirmAction")
-          : backupConfirmation.kind === "upload"
-            ? t("settings.backupSyncUpload")
-            : backupConfirmation.kind === "download"
-              ? t("settings.backupSyncDownload")
-              : t("settings.backupSyncAutoConfirmAction");
-      nodes.push({
-        id: "backup-confirmation",
-        kind: "Banner",
-        label:
-          backupConfirmation.kind === "import"
-            ? t("settings.backupImportConfirmTitle")
-            : backupConfirmation.kind === "upload"
-              ? t("settings.backupSyncUploadConfirmTitle")
-              : backupConfirmation.kind === "download"
-                ? t("settings.backupSyncDownloadConfirmTitle")
-                : t("settings.backupSyncAutoConfirmTitle"),
-        text:
-          backupConfirmation.kind === "auto-sync"
-            ? `${t("settings.backupSyncAutoConfirmSubtitle")}\n${t("settings.backupSyncAutoConfirmDesc")}`
-            : undefined,
-        status: "paused",
-        children: [
-          c.action("backup-confirm", confirmLabel, () =>
-            work(async () => {
-              const pending = backupConfirmation;
-              setBackupConfirmation(null);
-              if (pending.kind === "import") {
-                await restore(() => applyBackupImport(pending.path));
-                setBackupStatus({ ok: true, message: t("settings.backupImportDone") });
-              } else if (pending.kind === "upload") {
-                await uploadBackup(settings.skills);
-                setBackupStatus({ ok: true, message: t("settings.backupSyncUploadDone") });
-              } else if (pending.kind === "download") {
-                await restore(downloadBackup);
-                setBackupStatus({ ok: true, message: t("settings.backupSyncDownloadDone") });
-              } else {
-                patchBackupConfig({ autoSync: true });
-              }
-            }),
-          ),
-          c.action("backup-cancel", t("settings.backupCancel"), () => {
-            if (backupConfirmation.kind === "auto-sync") {
-              patchBackupConfig({ autoSync: false });
-            }
-            setBackupConfirmation(null);
-          }),
-        ],
-      });
-    }
-    if (backupStatus)
-      nodes.push({
-        id: "backup-status",
-        kind: "Banner",
-        label: backupStatus.message,
-        status: backupStatus.ok ? "completed" : "error",
-      });
   } else if (page === "about") {
     nodes.push({
       id: "about",

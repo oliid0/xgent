@@ -41,6 +41,10 @@ test("native settings mirrors compact navigation and persists shared system, pro
     "../pages/settings/GlobalShortcutsSection": { GlobalShortcutsSection: "GlobalShortcutsSection" },
     "../pages/settings/HooksSection": { HooksSection: "HooksSection" },
     "../pages/settings/SoulSection": { SoulSection: "SoulSection" },
+    "../pages/settings/memory/MemoryPanel": { MemoryPanel: "MemoryPanel" },
+    "../pages/settings/BackupSyncSection": { BackupSyncSection: "BackupSyncSection" },
+    "../pages/settings/NativeProviderRuntimeSettings": { NativeProviderRuntimeSettings: "NativeProviderRuntimeSettings" },
+    "../pages/settings/useCodexOAuthAccounts": { useCodexOAuthAccounts: () => ({ status: { accounts: [] }, loaded: true, locked: false }) },
   } });
   const { NativeSettingsPage } = loader.loadModule("src/presentation/NativeSettingsPage.tsx");
   const { getDefaultSettings } = loader.loadModule("src/lib/settings/index.ts");
@@ -136,6 +140,19 @@ test("native settings mirrors compact navigation and persists shared system, pro
   discoveryError = undefined;
   assert.equal((await dispatch("fetch-models")).ok, true);
   assert.equal(discoveryOptions.modelsUrl, "https://catalog.example.test/v1/models");
+  const authField = document.nodes.flatMap(node => node.children ?? []).find(node => node.id === "provider-auth");
+  assert.deepEqual(authField.options.map(option => option.value), ["api-key", "oauth-managed", "oauth-token"]);
+  await dispatch("provider-auth", "oauth-token");
+  await dispatch("provider-key", "manual-access-token");
+  const accountEdit = await dispatch("provider-oauth-account-id", " account-routing-id ");
+  assert.equal(accountEdit.acceptedValue, "account-routing-id");
+  assert.equal(settings.customProviders.at(-1).authMode, "oauth-token");
+  assert.deepEqual(settings.customProviders.at(-1).customHeaders, [{ key: "chatgpt-account-id", value: "account-routing-id" }]);
+  await dispatch("fetch-models");
+  assert.equal(discoveryOptions.authMode, "oauth-token");
+  assert.equal(discoveryOptions.customHeaders[0].value, "account-routing-id");
+  await dispatch("provider-auth", "api-key");
+  assert.equal(settings.customProviders.at(-1).customHeaders.length, 0);
   assert.ok(settings.customProviders.at(-1).activeModels.includes("fetched-model"));
   assert.deepEqual(settings.selectedModel, {
     customProviderId: settings.customProviders.at(-1).id,
@@ -166,6 +183,13 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.ok(provider.activeModels.includes("example-model"));
   assert.ok(provider.models.some((model) => model.id === "example-model"));
   assert.equal(settings.selectedModel.model, "fetched-model", "manual additions preserve the chosen model");
+  const settingsSurface = rendered.props.sessionSurface;
+  assert.equal((await dispatch("provider-runtime-settings")).ok, true);
+  assert.equal(rendered.type, "NativeProviderRuntimeSettings");
+  assert.equal(rendered.props.nativeSettingsSurfaceId, settingsSurface);
+  assert.equal(rendered.props.providerType, provider.type);
+  rendered.props.onBack(); render();
+  assert.ok(rendered.props.handlers.has("fetch-models"), "Back returns to the same provider detail");
   await dispatch("back");
   await dispatch("back");
   await dispatch("nav:mobileAssistant");
@@ -230,6 +254,10 @@ test("native Shell install reports progress, errors, and live and final package 
     "../pages/settings/GlobalShortcutsSection": { GlobalShortcutsSection: "GlobalShortcutsSection" },
     "../pages/settings/HooksSection": { HooksSection: "HooksSection" },
     "../pages/settings/SoulSection": { SoulSection: "SoulSection" },
+    "../pages/settings/memory/MemoryPanel": { MemoryPanel: "MemoryPanel" },
+    "../pages/settings/BackupSyncSection": { BackupSyncSection: "BackupSyncSection" },
+    "../pages/settings/NativeProviderRuntimeSettings": { NativeProviderRuntimeSettings: "NativeProviderRuntimeSettings" },
+    "../pages/settings/useCodexOAuthAccounts": { useCodexOAuthAccounts: () => ({ status: { accounts: [] }, loaded: true, locked: false }) },
     "../lib/mobileExecution": {
       mobileExecutionStatus: async () => shellStatus,
       listExternalMobileWorkspaces: async () => [],

@@ -151,6 +151,7 @@ pub async fn hook_run_script(
             max_timeout_ms: Some(MAX_HOOK_TIMEOUT_MS),
             provider_id: None,
             run_id: Some(run_id.clone()),
+            interactive_stdin: false,
         },
     )
     .await;

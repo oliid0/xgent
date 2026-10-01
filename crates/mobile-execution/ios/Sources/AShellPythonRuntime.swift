@@ -20,45 +20,57 @@ enum AShellPythonRuntime {
         let setPath: PythonSetPath
     }
 
-    private static let runtime: Runtime? = {
-        guard let frameworks = Bundle.main.privateFrameworksURL,
-              let handle = dlopen(
+    private static let runtime: Result<Runtime, MobileExecutionError> = {
+        guard let frameworks = Bundle.main.privateFrameworksURL else {
+            return .failure(.io("The app's signed framework directory is unavailable"))
+        }
+        guard let handle = dlopen(
                 frameworks.appendingPathComponent("python3_ios.framework/python3_ios").path,
                 RTLD_NOW | RTLD_GLOBAL
-              ) else { return nil }
+              ) else {
+            return .failure(.io("Could not load bundled Python: \(loaderError())"))
+        }
         guard let main = dlsym(handle, "Py_BytesMain"),
               let setPath = dlsym(handle, "Py_SetPath") else {
+            let error = loaderError()
             dlclose(handle)
-            return nil
+            return .failure(.io("The bundled Python API is unavailable: \(error)"))
         }
-        return Runtime(
+        return .success(Runtime(
             handle: handle,
             main: unsafeBitCast(main, to: PythonEntryPoint.self),
             setPath: unsafeBitCast(setPath, to: PythonSetPath.self)
-        )
+        ))
     }()
+
+    private static func loaderError() -> String {
+        dlerror().map { String(cString: $0) } ?? "Unknown dynamic loader error"
+    }
 
     static func register() throws {
         // A direct function-pointer reference keeps the callback in the static
         // plugin archive; verify its export because replaceCommand silently
         // ignores a function stripped by the application linker.
         let callback: PythonEntryPoint = xgentPythonMain
-        let address = unsafeBitCast(callback, to: UnsafeMutableRawPointer.self)
         guard let process = dlopen(nil, RTLD_NOW) else {
             throw MobileExecutionError.io("Could not access the Python command bridge")
         }
         defer { dlclose(process) }
-        guard dlsym(process, "xgent_python_main") == address, runtime != nil else {
-            throw MobileExecutionError.io("The bundled Python command bridge is unavailable")
+        guard dlsym(process, "xgent_python_main") != nil else {
+            throw MobileExecutionError.io("The Python command bridge is not exported: \(loaderError())")
         }
-        replaceCommand("python3", "xgent_python_main", true)
+        _ = try runtime.get()
+        withExtendedLifetime(callback) {
+            replaceCommand("python3", "xgent_python_main", true)
+        }
     }
 
     static func run(
         argc: Int32,
         argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
     ) -> Int32 {
-        guard let runtime, let home = getenv("PYTHONHOME"), let argv, argc > 0 else {
+        guard case .success(let runtime) = runtime,
+              let home = getenv("PYTHONHOME"), let argv, argc > 0 else {
             fputs("The bundled Python runtime is not configured\n", thread_stderr ?? stderr)
             return 1
         }
@@ -79,7 +91,7 @@ enum AShellPythonRuntime {
 }
 
 @_cdecl("xgent_python_main")
-func xgentPythonMain(
+public func xgentPythonMain(
     argc: Int32,
     argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {

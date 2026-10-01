@@ -1,0 +1,34 @@
+import type { TaskProgressSnapshot } from "../lib/chat/taskProgress";
+import type { PresentationNode } from "./types";
+
+export function createNativeTaskProgress(
+  taskProgress: TaskProgressSnapshot | null,
+  running: boolean,
+  t: (key: string) => string,
+): PresentationNode | undefined {
+  return taskProgress?.tasks.length
+    ? {
+        id: `task-progress:${taskProgress.runId}`,
+        kind: "TaskProgress",
+        label:
+          taskProgress.tasks.find((task) => task.status === "in_progress")?.activeForm ||
+          taskProgress.tasks.find((task) => task.status !== "completed")?.subject ||
+          t("chat.tasks.completed"),
+        text: `${taskProgress.tasks.filter((task) => task.status === "completed").length}/${taskProgress.tasks.length}`,
+        current: taskProgress.tasks.filter((task) => task.status === "completed").length,
+        total: taskProgress.tasks.length,
+        status: taskProgress.tasks.every((task) => task.status === "completed")
+          ? "completed"
+          : running
+            ? "running"
+            : "paused",
+        children: taskProgress.tasks.map((task) => ({
+          id: `task-progress:${taskProgress.runId}:${task.id}`,
+          kind: "TaskStep",
+          label: task.subject,
+          text: task.status === "in_progress" ? task.activeForm : task.description,
+          status: task.status === "in_progress" ? (running ? "running" : "paused") : task.status,
+        })),
+      }
+    : undefined;
+}

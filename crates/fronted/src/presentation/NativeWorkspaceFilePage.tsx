@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorkspaceCodeEditorOpenRequest } from "../components/workspace-editor/WorkspaceCodeEditorOverlay";
 import type { WorkspaceFilePreviewOpenRequest } from "../components/workspace-editor/WorkspaceFilePreviewOverlay";
+import { buildSandboxedHtmlPreviewSource } from "../components/workspace-editor/workspaceHtmlPreview";
 import {
   getWorkspacePreviewKind,
   isWorkspaceEditablePreviewPath,
@@ -12,6 +13,7 @@ import type { AppSettings } from "../lib/settings";
 import { invokeFs, isFsBackendError } from "../lib/tools/fsBackend";
 import { NativeSurface } from "./NativeSurface";
 import { createNativePresentationTheme } from "./nativeTheme";
+import { createNativeWorkspacePanel } from "./nativeWorkspacePanel";
 import type { PresentationHandler, PresentationNode, PresentationValue } from "./types";
 
 type ReadEditableTextResponse = {
@@ -174,6 +176,7 @@ function NativeWorkspaceFileSession(
   const readGeneration = useRef(0);
   const [failure, setFailure] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<PendingConfirmation>(null);
+  const [previewMode, setPreviewMode] = useState<"preview" | "source">("preview");
 
   useEffect(() => {
     mounted.current = true;
@@ -352,6 +355,27 @@ function NativeWorkspaceFileSession(
             }
           : current,
       );
+      if (snapshot.mode === "preview" && workspacePathExtension(snapshot.path) === "docx") {
+        setLoaded((current) => (current ? { ...current, data: null } : current));
+        try {
+          const preview = await invokeFs<ReadWorkspacePreviewResponse>("fs_read_workspace_image", {
+            workdir: snapshot.request.workdir,
+            path: snapshot.path,
+          });
+          if (mounted.current)
+            setLoaded((current) =>
+              current
+                ? {
+                    ...current,
+                    data: preview.data,
+                    mimeType: preview.mimeType,
+                  }
+                : current,
+            );
+        } catch (error) {
+          if (mounted.current) setFailure(message(error, t("workspaceFilePreview.openFailed")));
+        }
+      }
       return loadedRef.current?.content === loadedRef.current?.savedContent;
     } catch (error) {
       if (!mounted.current) return false;
@@ -427,13 +451,20 @@ function NativeWorkspaceFileSession(
     action: bind(id, run, (value) => value === null, enabled),
   });
   const previewKind = loaded ? getWorkspacePreviewKind(loaded.path) : null;
+  const formattedPreview =
+    loaded?.mode === "preview" &&
+    (previewKind === "html" ||
+      previewKind === "markdown" ||
+      (previewKind === "document" && workspacePathExtension(loaded.path) === "docx"));
+  const renderedPreview =
+    formattedPreview && previewKind !== "document" && previewMode === "preview";
   const mediaPreview = Boolean(
     loaded &&
       (["image", "pdf", "audio", "video"].includes(previewKind ?? "") ||
-        (compact &&
-          (previewKind === "spreadsheet" ||
-            previewKind === "presentation" ||
-            (previewKind === "document" && workspacePathExtension(loaded.path) !== "docx")))),
+        previewKind === "spreadsheet" ||
+        previewKind === "presentation" ||
+        (previewKind === "document" &&
+          (workspacePathExtension(loaded.path) !== "docx" || previewMode === "preview"))),
   );
   const contentNode: PresentationNode = loading
     ? {
@@ -445,47 +476,58 @@ function NativeWorkspaceFileSession(
             ? t("workspaceFilePreview.loading")
             : t("workspaceEditor.opening"),
       }
-    : mediaPreview && loaded?.data
+    : renderedPreview && loaded?.content !== null && loaded?.content !== undefined
       ? {
-          id: "workspace-file-media",
-          kind: "MediaPreview",
+          id: "workspace-file-rendered",
+          kind: previewKind === "html" ? "HTMLPreview" : "Markdown",
           label: basename(loaded.path),
-          value: loaded.data,
-          language: loaded.mimeType,
+          text:
+            previewKind === "html"
+              ? buildSandboxedHtmlPreviewSource(loaded.content)
+              : loaded.content,
           fill: true,
         }
-      : canEdit && loaded?.content !== null && loaded?.content !== undefined
+      : mediaPreview && loaded?.data
         ? {
-            id: "workspace-file-editor",
-            kind: "TextArea",
+            id: "workspace-file-media",
+            kind: loaded.mimeType === "text/html" ? "HTMLPreview" : "MediaPreview",
             label: basename(loaded.path),
-            value: loaded.content,
-            language: workspacePathExtension(loaded.path) || "text",
+            value: loaded.data,
+            language: loaded.mimeType,
             fill: true,
-            action: bind(
-              "workspace-file-editor",
-              (value) =>
-                setLoaded((current) =>
-                  current ? { ...current, content: value as string } : current,
-                ),
-              (value) => typeof value === "string",
-            ),
           }
-        : loaded?.content
+        : canEdit && loaded?.content !== null && loaded?.content !== undefined
           ? {
-              id: "workspace-file-preview-text",
-              kind: previewKind === "markdown" ? "Markdown" : "CodeBlock",
+              id: "workspace-file-editor",
+              kind: "TextArea",
               label: basename(loaded.path),
-              text: loaded.content,
+              value: loaded.content,
               language: workspacePathExtension(loaded.path) || "text",
               fill: true,
+              action: bind(
+                "workspace-file-editor",
+                (value) =>
+                  setLoaded((current) =>
+                    current ? { ...current, content: value as string } : current,
+                  ),
+                (value) => typeof value === "string",
+              ),
             }
-          : {
-              id: "workspace-file-empty",
-              kind: "EmptyState",
-              icon: "doc.questionmark",
-              label: t("workspaceFilePreview.renderFailed"),
-            };
+          : loaded?.content
+            ? {
+                id: "workspace-file-preview-text",
+                kind: previewKind === "markdown" ? "Markdown" : "CodeBlock",
+                label: basename(loaded.path),
+                text: loaded.content,
+                language: workspacePathExtension(loaded.path) || "text",
+                fill: true,
+              }
+            : {
+                id: "workspace-file-empty",
+                kind: "EmptyState",
+                icon: "doc.questionmark",
+                label: t("workspaceFilePreview.renderFailed"),
+              };
 
   const nodes: PresentationNode[] = [
     {
@@ -495,7 +537,7 @@ function NativeWorkspaceFileSession(
       children: [
         {
           id: "workspace-file-toolbar",
-          kind: "HStack",
+          kind: "TerminalToolbar",
           padding: 10,
           children: [
             {
@@ -513,7 +555,6 @@ function NativeWorkspaceFileSession(
                   },
                 ]
               : []),
-            { id: "workspace-file-spacer", kind: "Spacer" },
             ...(canEdit
               ? [
                   button(
@@ -545,6 +586,26 @@ function NativeWorkspaceFileSession(
             ),
           ],
         },
+        ...(formattedPreview
+          ? [
+              {
+                id: "workspace-file-view-mode",
+                kind: "SegmentedControl" as const,
+                label: t("workspaceFilePreview.title"),
+                value: previewMode,
+                options: [
+                  { value: "preview", label: t("workspaceFilePreview.preview") },
+                  { value: "source", label: t("workspaceFilePreview.source") },
+                ],
+                padding: 10,
+                action: bind(
+                  "workspace-file-view-mode",
+                  (value) => setPreviewMode(value as "preview" | "source"),
+                  (value) => value === "preview" || value === "source",
+                ),
+              },
+            ]
+          : []),
         {
           id: "workspace-file-path",
           kind: "Text",
@@ -636,7 +697,7 @@ function NativeWorkspaceFileSession(
   return (
     <NativeSurface
       document={{
-        mode: "root",
+        ...createNativeWorkspacePanel(t, compact, activeRequest.id),
         title:
           activeMode === "preview" ? t("workspaceFilePreview.title") : t("workspaceEditor.title"),
         appearance: props.settings.theme,

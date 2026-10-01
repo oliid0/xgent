@@ -232,6 +232,13 @@ impl ProviderOAuthService {
         let stored = parse_codex_token(token, None)?;
         let account_id = stored.id.clone();
         {
+            // Cancellation can arrive while the token exchange is in flight.
+            // Consume the flow before publishing credentials so a retired login
+            // cannot reappear, and concurrent polls cannot complete it twice.
+            let mut pending = self.pending.write().await;
+            if pending.remove(flow_id).is_none() {
+                return Err("OpenAI sign-in session was cancelled; start again".to_string());
+            }
             let mut store = self.store.write().await;
             store.accounts.insert(account_id.clone(), stored);
             if store.default_account_id.is_none() {
@@ -239,7 +246,6 @@ impl ProviderOAuthService {
             }
             self.persist(&store)?;
         }
-        self.pending.write().await.remove(flow_id);
         let status = self.codex_status().await;
         let account = status
             .accounts
@@ -249,6 +255,10 @@ impl ProviderOAuthService {
             state: ProviderOAuthPollState::Complete,
             account,
         })
+    }
+
+    pub async fn cancel_codex_device_flow(&self, flow_id: &str) {
+        self.pending.write().await.remove(flow_id);
     }
 
     pub async fn codex_status(&self) -> ProviderOAuthStatus {

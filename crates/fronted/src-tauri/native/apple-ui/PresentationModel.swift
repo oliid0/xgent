@@ -182,7 +182,7 @@ struct XgentNode: Decodable, Identifiable {
 }
 
 struct XgentDocument: Decodable, Identifiable {
-    enum Mode: String, Decodable { case root, sheet, alert, sidebar }
+    enum Mode: String, Decodable { case root, sheet, alert, sidebar, panel }
     enum Appearance: String, Decodable { case system, light, dark }
     enum FormFactor: String, Decodable { case mobile, desktop }
     let version: Int
@@ -192,6 +192,7 @@ struct XgentDocument: Decodable, Identifiable {
     let title: String
     let appearance: Appearance
     let formFactor: FormFactor?
+    let workspacePanel: XgentWorkspacePanelControls?
     let theme: XgentPresentationTheme?
     let nodes: [XgentNode]
     let dismissAction: String?
@@ -219,6 +220,10 @@ struct XgentDocument: Decodable, Identifiable {
 
     func validate() throws {
         guard version == 1, !surface.isEmpty, revision > 0 else { throw XgentProtocolError.invalid }
+        if mode == .panel, removed != true {
+            guard formFactor == .desktop, dismissAction?.isEmpty == false,
+                  let workspacePanel, workspacePanel.isValid else { throw XgentProtocolError.invalid }
+        }
         try theme?.validate()
         var ids = Set<String>()
         func visit(_ nodes: [XgentNode], depth: Int) throws {
@@ -247,6 +252,13 @@ struct XgentDocument: Decodable, Identifiable {
                     guard minimum <= maximum else { throw XgentProtocolError.invalid }
                 }
                 if let step = node.step { guard step > 0 else { throw XgentProtocolError.invalid } }
+                if node.kind == .numberInput {
+                    guard let limits = XgentNumberInputConstraints(minimum: node.minimum, maximum: node.maximum, step: node.step),
+                          let storedValue = node.value, case .number(let value) = storedValue,
+                          limits.range.contains(value) else {
+                        throw XgentProtocolError.invalid
+                    }
+                }
                 if let total = node.total { guard total >= 0 else { throw XgentProtocolError.invalid } }
                 if let options = node.options {
                     guard Set(options.map(\.value)).count == options.count else { throw XgentProtocolError.invalid }
@@ -383,23 +395,27 @@ final class XgentPresentationModel: ObservableObject {
         return true
     }
 
-    func send(_ node: XgentNode, in document: XgentDocument, value: XgentValue = .null, editing: Bool = false) {
+    func send(_ node: XgentNode, in document: XgentDocument, value: XgentValue = .null,
+              editing: Bool = false, continuous: Bool = false) {
         guard active else { return }
+        guard !continuous || (node.kind == .terminalViewport && !editing) else { return }
         guard node.disabled != true,
               let current = documents.first(where: { $0.surface == document.surface })?.node(id: node.id),
               current.kind == node.kind, current.action == node.action,
               current.disabled != true, let action = current.action else { return }
         let nodeKey = key(document.surface, node.id)
-        if !editing && busy.contains(nodeKey) { return }
+        if !editing && !continuous && busy.contains(nodeKey) { return }
         let requestId = UUID().uuidString
         if editing {
             edits[nodeKey] = value
             editRequests[nodeKey] = requestId
             acknowledgedEdits.remove(nodeKey)
-        } else { busy.insert(nodeKey) }
+        } else if !continuous { busy.insert(nodeKey) }
         pending[requestId] = (document.surface, nodeKey, document.revision)
         emit(XgentAction(surface: document.surface, action: action, requestId: requestId, value: value))
     }
+
+    func isDismissing(_ document: XgentDocument) -> Bool { busy.contains(key(document.surface, "$dismiss")) }
 
     func dismiss(_ document: XgentDocument) {
         guard active else { return }

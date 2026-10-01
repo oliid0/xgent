@@ -81,3 +81,11 @@ pub(crate) async fn cancel<R: Runtime>(
 ) -> Result<CancelResponse> {
     on_worker(move || app.mobile_execution().cancel(request)).await
 }
+
+#[command]
+pub(crate) async fn write_input<R: Runtime>(
+    app: AppHandle<R>,
+    request: WriteInputRequest,
+) -> Result<WriteInputResponse> {
+    on_worker(move || app.mobile_execution().write_input(request)).await
+}

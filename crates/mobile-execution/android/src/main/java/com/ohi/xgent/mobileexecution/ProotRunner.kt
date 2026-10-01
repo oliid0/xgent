@@ -15,6 +15,7 @@ internal data class AndroidRunRequest(
     val cwd: String,
     val timeoutMs: Long,
     val stdin: ByteArray?,
+    val interactiveStdin: Boolean = false,
 )
 
 internal data class AndroidRunResult(
@@ -51,6 +52,7 @@ internal class ProotRunner(
     private val tempDir: File,
     private val allowedHostRoots: () -> List<File>,
     private val activeProcesses: ConcurrentHashMap<String, Process>,
+    private val activeInputs: ConcurrentHashMap<String, CommandInputStream>,
     private val cancelledRuns: MutableSet<String>,
 ) {
     private val binaries = ProotBinaries.resolve(nativeLibraryDir)
@@ -58,6 +60,7 @@ internal class ProotRunner(
     fun execute(
         request: AndroidRunRequest,
         noSeccomp: Boolean = File(rootfsDir, NO_SECCOMP_MARKER).isFile,
+        onInputState: ((Boolean, String?) -> Unit)? = null,
         onOutput: ((String, ByteArray) -> Unit)? = null,
     ): AndroidRunResult {
         require(binaries.available) { "PRoot binaries are unavailable for this Android ABI" }
@@ -96,18 +99,28 @@ internal class ProotRunner(
 
         val stdout = BoundedStreamCollector(process.inputStream, onOutput = { onOutput?.invoke("stdout", it) })
         val stderr = BoundedStreamCollector(process.errorStream, onOutput = { onOutput?.invoke("stderr", it) })
-        val stdinWriter = request.stdin?.let { bytes ->
-            thread(name = "xgent-proot-stdin", isDaemon = true) {
-                runCatching {
-                    process.outputStream.use { stream ->
-                        stream.write(bytes)
-                        stream.flush()
+        val liveInput = if (request.interactiveStdin) CommandInputStream(process.outputStream) { error ->
+            onInputState?.invoke(false, error)
+        } else null
+        val stdinWriter = if (liveInput != null) {
+            request.stdin?.takeIf { it.isNotEmpty() }?.let { liveInput.enqueue(it, false) }
+            activeInputs[request.runId] = liveInput
+            onInputState?.invoke(true, null)
+            null
+        } else {
+            request.stdin?.let { bytes ->
+                thread(name = "xgent-proot-stdin", isDaemon = true) {
+                    runCatching {
+                        process.outputStream.use { stream ->
+                            stream.write(bytes)
+                            stream.flush()
+                        }
                     }
                 }
+            } ?: run {
+                process.outputStream.close()
+                null
             }
-        } ?: run {
-            process.outputStream.close()
-            null
         }
 
         val startedAt = System.nanoTime()

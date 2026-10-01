@@ -24,6 +24,19 @@ function setup(action) {
   return { controller: new BrowserSessionController(client), client, opens: () => opens };
 }
 
+test("explicit browser opens request native focus without agent output repeatedly stealing the tab", async () => {
+  const { controller } = setup(async (id, action) => ({ sessionId: id, action }));
+  await controller.ensureSession({ sessionId: "main" });
+  assert.equal(controller.getSnapshot().panelFocusRequest, 0);
+  controller.openPanel("main", "user");
+  assert.equal(controller.getSnapshot().panelFocusRequest, 1);
+  controller.openPanel("main", "agent");
+  assert.equal(controller.getSnapshot().panelFocusRequest, 1);
+  controller.closePanel();
+  controller.openPanel("main", "user");
+  assert.equal(controller.getSnapshot().panelFocusRequest, 2);
+});
+
 test("concurrent tab creation reserves distinct ids and deduplicates the same agent tab", async () => {
   const { controller, opens } = setup();
   const [a, b] = await Promise.all([controller.newSession(), controller.newSession()]);

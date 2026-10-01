@@ -15,6 +15,7 @@ let package = Package(
         .package(url: "https://github.com/swhitty/SwiftDraw", exact: "0.29.0"),
         .package(url: "https://github.com/mchakravarty/CodeEditorView", exact: "0.16.0"),
         .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", exact: "1.19.6"),
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.20.0"),
     ],
     targets: [
         .target(name: "XgentNativeUI", dependencies: [
@@ -28,12 +29,14 @@ let package = Package(
             .product(name: "SwiftDraw", package: "SwiftDraw"),
             .product(name: "CodeEditorView", package: "CodeEditorView"),
             .product(name: "LanguageSupport", package: "CodeEditorView"),
+            .product(name: "SwiftTerm", package: "SwiftTerm"),
         ], path: ".", exclude: ["Tests"]),
         .testTarget(name: "XgentNativeUITests", dependencies: [
             "XgentNativeUI", .product(name: "MarkdownUI", package: "swift-markdown-ui"),
             .product(name: "Nuke", package: "Nuke"),
             .product(name: "LanguageSupport", package: "CodeEditorView"),
             .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+            .product(name: "SwiftTerm", package: "SwiftTerm"),
         ],
                     path: "Tests"),
     ],

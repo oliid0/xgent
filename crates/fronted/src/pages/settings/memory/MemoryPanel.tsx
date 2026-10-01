@@ -27,8 +27,10 @@ import { useLocale } from "../../../i18n";
 import type { MemoryMeta } from "../../../lib/memory/api";
 import { MEMORY_TYPES, type MemoryType } from "../../../lib/memory/schema";
 import type { AppSettings } from "../../../lib/settings";
+import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import { SettingsModalShell } from "../SettingsModalShell";
 import { MemorySettingsDrawer } from "./MemorySettingsDrawer";
+import { NativeMemoryPanel } from "./NativeMemoryPanel";
 import {
   entryKey,
   entryTitle,
@@ -61,6 +63,8 @@ export function MemoryPanel(props: {
   settings: AppSettings;
   setSettings: (updater: (prev: AppSettings) => AppSettings) => void;
   compact?: boolean;
+  onBack?: () => void;
+  nativeSettingsSurfaceId?: string;
 }) {
   const { t } = useLocale();
   const workdir = props.workdir?.trim() || undefined;
@@ -71,6 +75,7 @@ export function MemoryPanel(props: {
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
   const [compactDetailOpen, setCompactDetailOpen] = useState(false);
   const [draft, setDraft] = useState<MemoryCreateDraft>(EMPTY_CREATE_DRAFT);
+  const data = useMemoryPanelData({ workdir, t });
   const {
     entries,
     quota,
@@ -91,7 +96,7 @@ export function MemoryPanel(props: {
     deleteSelected,
     wipeAll,
     watchOrganizerRun,
-  } = useMemoryPanelData({ workdir, t });
+  } = data;
 
   const modelOptions = useMemo<MemoryModelOption[]>(
     () =>
@@ -225,6 +230,26 @@ export function MemoryPanel(props: {
   }
 
   if (settingsDrawerOpen) {
+    if (isApplePresentationRuntime())
+      return (
+        <MemorySettingsDrawer
+          modelOptions={modelOptions}
+          settings={props.settings}
+          setSettings={props.setSettings}
+          workdir={workdir}
+          saving={saving}
+          error={error}
+          notice={notice}
+          t={t}
+          onClose={() => setSettingsDrawerOpen(false)}
+          onRequestWipe={wipeAll}
+          onOrganizerRunQueued={watchOrganizerRun}
+          onMemoryChanged={() => {
+            void reload();
+          }}
+          nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
+        />
+      );
     return (
       <SettingsModalShell
         onClose={() => setSettingsDrawerOpen(false)}
@@ -249,6 +274,19 @@ export function MemoryPanel(props: {
       </SettingsModalShell>
     );
   }
+
+  if (isApplePresentationRuntime())
+    return (
+      <NativeMemoryPanel
+        data={data}
+        settings={props.settings}
+        workdir={workdir}
+        t={t}
+        onBack={props.onBack}
+        onSettings={() => setSettingsDrawerOpen(true)}
+        nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
+      />
+    );
 
   return (
     <>

@@ -44,7 +44,7 @@ function harness(options = {}) {
       },
     },
     "../i18n": { useLocale: () => ({ t: translate }) },
-    "../lib/runtimePlatform": { isNativeMobileRuntime: () => true },
+    "../lib/runtimePlatform": { isNativeMobileRuntime: () => options.compact !== false },
     "./NativeSurface": { NativeSurface: "NativeSurface" },
     "./nativeTheme": { createNativePresentationTheme: () => undefined },
     "../lib/tools/fsBackend": {
@@ -119,6 +119,82 @@ function writeResult(content) {
   return { path: "a.txt", mtimeMs: 11, contentHash: "written", bytesWritten: Buffer.byteLength(content), totalLines: 1 };
 }
 
+test("HTML preview and source share the guarded draft/save flow on both Apple form factors", async () => {
+  for (const compact of [true, false]) {
+    const h = harness({ compact });
+    h.files.set("output.html", '<!doctype html><head></head><button>Original</button>');
+    h.props.previewOpen = true;
+    h.props.previewRequest = { ...h.props.editorRequest, path: "output.html", id: 2 };
+    h.render();
+    await h.flush();
+    assert.equal(h.node("workspace-file-rendered").kind, "HTMLPreview");
+    assert.ok(h.node("workspace-file-rendered").text.includes("data-xgent-html-preview-bootstrap"));
+    assert.equal(h.render().formFactor, compact ? "mobile" : "desktop");
+    assert.equal((await h.dispatch("workspace-file-view-mode", "invalid")).ok, false);
+    await h.dispatch("workspace-file-view-mode", "source");
+    assert.equal(h.node("workspace-file-editor").value, h.files.get("output.html"));
+    const draft = '<head></head><button onclick="this.textContent=\'Ready\'">Run</button>';
+    await h.dispatch("workspace-file-editor", draft);
+    await h.dispatch("workspace-file-view-mode", "preview");
+    assert.ok(h.node("workspace-file-rendered").text.includes(draft.slice(13)));
+    assert.ok(h.node("workspace-file-unsaved"));
+    assert.equal(h.calls.filter(([command]) => command.startsWith("fs_read")).length, 1);
+    await h.dispatch("workspace-file-save");
+    assert.equal(h.files.get("output.html"), draft);
+    assert.equal(h.calls.at(-1)[1].expected_content_hash, "initial");
+    assert.equal(h.node("workspace-file-unsaved"), undefined);
+    h.unmount();
+  }
+});
+
+test("Markdown switches between actual Markdown and editable source without discarding unsaved changes", async () => {
+  const h = harness(); h.files.set("notes.md", "# Notes\n\n| Task | Status |\n| --- | --- |\n| Report | Done |");
+  h.props.previewOpen = true; h.props.previewRequest = { ...h.props.editorRequest, path: "notes.md", id: 2 };
+  h.render();
+  await h.flush();
+  assert.equal(h.node("workspace-file-rendered").kind, "Markdown");
+  await h.dispatch("workspace-file-view-mode", "source");
+  h.render();
+  await h.dispatch("workspace-file-editor", "# Edited");
+  h.render();
+  await h.dispatch("workspace-file-view-mode", "preview");
+  assert.equal(h.node("workspace-file-rendered").text, "# Edited");
+  await h.dispatch("workspace-file-close"); assert.equal(h.closed, 0);
+  await h.dispatch("workspace-file-confirm-cancel");
+  assert.equal(h.node("workspace-file-rendered").text, "# Edited"); h.unmount();
+});
+
+test("office previews use the backend MIME and bytes on macOS as well as iOS", async () => {
+  for (const compact of [true, false]) for (const [path, mimeType] of [
+    ["sheet.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+    ["slides.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+    ["converted.ppt", "application/pdf"], ["legacy.doc", "text/html"],
+  ]) {
+    const data = Buffer.from(mimeType === "text/html" ? "<table><tr><td>Report</td></tr></table>" : "office data").toString("base64");
+    const h = harness({ compact, read: (_command, args) => ({ ...readResult(args.path, "extracted text"), data, mimeType }) });
+    h.props.previewOpen = true; h.props.previewRequest = { ...h.props.editorRequest, path, id: 2 };
+    h.render();
+    await h.flush();
+    assert.equal(h.node("workspace-file-media").kind, mimeType === "text/html" ? "HTMLPreview" : "MediaPreview");
+    assert.equal(h.node("workspace-file-media").value, data);
+    assert.equal(h.node("workspace-file-media").language, mimeType);
+    assert.equal(h.node("workspace-file-editor"), undefined); h.unmount();
+  }
+});
+
+test("DOCX keeps a real document preview and routes source edits to the existing document writer", async () => {
+  const h = harness({ compact: false, read: (_command, args) => ({ ...readResult(args.path, "Document"), data: Buffer.from("docx bytes").toString("base64") }) });
+  h.props.previewOpen = true; h.props.previewRequest = { ...h.props.editorRequest, path: "report.docx", id: 2 };
+  h.render();
+  await h.flush();
+  assert.equal(h.node("workspace-file-media").kind, "MediaPreview");
+  await h.dispatch("workspace-file-view-mode", "source");
+  h.render();
+  await h.dispatch("workspace-file-editor", "Edited document"); h.render(); await h.dispatch("workspace-file-save");
+  assert.equal(h.calls.find(([name]) => name === "fs_write_docx_text")[1].expected_content_hash, "initial");
+  assert.equal(h.calls.at(-1)[0], "fs_read_workspace_image"); h.unmount();
+});
+
 test("native file switches retire reads and native actions from the preceding session", async () => {
   const wait = Promise.withResolvers();
   const h = harness({ read: (_command, args) => args.path === "a.txt" ? wait.promise : readResult(args.path, "Second") });
@@ -192,7 +268,7 @@ test("save-and-reload completes its read after a successful write", async () => 
   h.unmount();
 });
 
-test("DOCX saves use returned metadata and retain edits without reloading the document", async () => {
+test("DOCX saves refresh preview bytes and retain later edits with returned metadata", async () => {
   const wait = Promise.withResolvers();
   const h = harness({ write: () => wait.promise });
   h.props.editorOpen = false; h.props.previewOpen = true;
@@ -203,7 +279,8 @@ test("DOCX saves use returned metadata and retain edits without reloading the do
   await h.dispatch("workspace-file-editor", "Continued document"); h.render();
   const response = writeResult("Written document"); delete response.totalLines;
   wait.resolve(response); await saving; h.render();
-  assert.equal(h.calls.at(-1)[0], "fs_write_docx_text");
+  assert.ok(h.calls.some(([name]) => name === "fs_write_docx_text"));
+  assert.equal(h.calls.at(-1)[0], "fs_read_workspace_image");
   assert.equal(h.node("workspace-file-editor").value, "Continued document");
   assert.ok(h.node("workspace-file-unsaved"));
   h.unmount();

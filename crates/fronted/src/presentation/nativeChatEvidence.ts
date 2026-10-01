@@ -1,0 +1,267 @@
+import type { ToolResultMessage } from "@earendil-works/pi-ai";
+import { generateDiffFile } from "@git-diff-view/file";
+import { readStreamPreviewMeta } from "../lib/chat/messages/toolPreview";
+import {
+  safeStringify,
+  summarizeToolCall,
+  toolResultMessageToText,
+  type UiRound,
+} from "../lib/chat/messages/uiMessages";
+import { isTaskToolBlock } from "../lib/chat/taskProgress";
+import type { EditResultDetails, WriteResultDetails } from "../lib/tools/builtinTypes";
+import type { PresentationNode } from "./types";
+
+function toolResultPreviewNodes(result: unknown, prefix: string): PresentationNode[] {
+  if (!result || typeof result !== "object") return [];
+  const content = (result as { content?: unknown }).content;
+  if (!Array.isArray(content)) return [];
+  return content.flatMap((raw, index): PresentationNode[] => {
+    if (!raw || typeof raw !== "object") return [];
+    const block = raw as Record<string, unknown>;
+    if (
+      block.type !== "image" ||
+      typeof block.data !== "string" ||
+      typeof block.mimeType !== "string" ||
+      !/^image\/(?:png|jpeg|webp|gif)$/.test(block.mimeType)
+    ) {
+      return [];
+    }
+    return [
+      {
+        id: `${prefix}:preview:${index}`,
+        kind: "MediaPreview",
+        label: `Image ${index + 1}`,
+        value: `data:${block.mimeType};base64,${block.data}`,
+        language: block.mimeType,
+      },
+    ];
+  });
+}
+
+export function toolEvidenceNodes(
+  result: ToolResultMessage | undefined,
+  prefix: string,
+  argumentsText: string,
+  labels: { arguments: string; result: string },
+  args?: Record<string, unknown>,
+): PresentationNode[] {
+  const text = result ? toolResultMessageToText(result) : "";
+  const nodes: PresentationNode[] = argumentsText
+    ? [
+        {
+          id: `${prefix}:arguments`,
+          kind: "CodeBlock",
+          label: labels.arguments,
+          language: "json",
+          text: argumentsText,
+        },
+      ]
+    : [];
+  nodes.push(...toolResultPreviewNodes(result, prefix));
+  if (text) {
+    nodes.push({
+      id: `${prefix}:result`,
+      kind: "CodeBlock",
+      label: labels.result,
+      language: "text",
+      text,
+    });
+  }
+  if (!result || result.isError) return nodes;
+  const details = result.details;
+  if (details && typeof details === "object" && "kind" in details && details.kind === "edit") {
+    const edit = details as EditResultDetails;
+    if (edit.oldPreview || edit.newPreview) {
+      const path = edit.displayPath || edit.path;
+      const exactSnapshot =
+        typeof edit.beforeContent === "string" &&
+        typeof edit.afterContent === "string" &&
+        edit.beforeContent.length + edit.afterContent.length <= 200_000;
+      const previewMeta = args ? readStreamPreviewMeta(args) : undefined;
+      const oldText = exactSnapshot
+        ? edit.beforeContent
+        : typeof args?.old_string === "string" && previewMeta?.fields.old_string?.truncated !== true
+          ? args.old_string
+          : args?.old_string === undefined && edit.oldPreview.length <= 500
+            ? edit.oldPreview
+            : undefined;
+      const newText = exactSnapshot
+        ? edit.afterContent
+        : typeof args?.new_string === "string" && previewMeta?.fields.new_string?.truncated !== true
+          ? args.new_string
+          : args?.new_string === undefined && edit.newPreview.length <= 500
+            ? edit.newPreview
+            : undefined;
+      if (
+        oldText !== undefined &&
+        newText !== undefined &&
+        oldText.length + newText.length <= 200_000 &&
+        (exactSnapshot ||
+          ((edit.matchStrategy === undefined || edit.matchStrategy === "exact") &&
+            edit.replaceAll !== true &&
+            (edit.replacements ?? 1) === 1))
+      ) {
+        const diff = generateDiffFile(path, oldText, path, newText, "txt", "txt");
+        diff.initRaw();
+        nodes.push({
+          id: `${prefix}:diff`,
+          kind: "CodeBlock",
+          label: path,
+          language: "diff",
+          text: diff._diffList.join("\n"),
+        });
+      } else {
+        nodes.push({
+          id: `${prefix}:edit-preview`,
+          kind: "CodeBlock",
+          label: path,
+          language: "text",
+          text: `${edit.oldPreview}\n→\n${edit.newPreview}`,
+        });
+      }
+    }
+  } else if (
+    details &&
+    typeof details === "object" &&
+    "kind" in details &&
+    details.kind === "write"
+  ) {
+    const write = details as WriteResultDetails;
+    const content =
+      typeof args?.content === "string" &&
+      readStreamPreviewMeta(args)?.fields.content?.truncated !== true
+        ? args.content
+        : undefined;
+    if (
+      typeof write.beforeContent === "string" &&
+      content !== undefined &&
+      write.beforeContent.length + content.length <= 200_000
+    ) {
+      const path = write.displayPath || write.path;
+      const diff = generateDiffFile(path, write.beforeContent, path, content, "txt", "txt");
+      diff.initRaw();
+      nodes.push({
+        id: `${prefix}:diff`,
+        kind: "CodeBlock",
+        label: path,
+        language: "diff",
+        text: diff._diffList.join("\n"),
+      });
+    } else if (write.preview) {
+      nodes.push({
+        id: `${prefix}:content`,
+        kind: "CodeBlock",
+        label: write.displayPath || write.path,
+        language: "text",
+        text: write.preview,
+      });
+    }
+  }
+  return nodes;
+}
+
+export function roundNodes(
+  rounds: UiRound[],
+  prefix: string,
+  showThinking: boolean,
+  labels: { thinking: string; search: string; arguments: string; result: string },
+): PresentationNode[] {
+  return rounds.flatMap((round) =>
+    round.blocks.flatMap((block): PresentationNode[] => {
+      const id = `${prefix}:${round.key}`;
+      if (block.kind === "text") {
+        return [
+          {
+            id: `${id}:${block.id}`,
+            kind: "Markdown",
+            text: block.text,
+          },
+        ];
+      }
+      if (block.kind === "thinking") {
+        if (!showThinking) return [];
+        const running = "thinkingOpen" in round && round.thinkingOpen;
+        return [
+          {
+            id: `${id}:${block.id}`,
+            kind: "Thinking",
+            label: labels.thinking,
+            text: block.text,
+            status: running ? "running" : "completed",
+          },
+        ];
+      }
+      if (block.kind === "tool") {
+        if (isTaskToolBlock(block)) return [];
+        const running =
+          "runningToolCallIds" in round &&
+          Array.isArray(round.runningToolCallIds) &&
+          round.runningToolCallIds.includes(block.item.toolCall.id);
+        return [
+          {
+            id: `${id}:tool:${block.item.toolCall.id}`,
+            kind: "ToolCall",
+            variant: "timeline",
+            label: block.item.toolCall.name,
+            text: summarizeToolCall(block.item.toolCall, { includeName: false }),
+            status: running
+              ? "running"
+              : block.item.toolResult?.isError
+                ? "error"
+                : block.item.toolResult
+                  ? "completed"
+                  : "pending",
+            children: toolEvidenceNodes(
+              block.item.toolResult,
+              `${id}:tool:${block.item.toolCall.id}`,
+              safeStringify(block.item.toolCall.arguments),
+              labels,
+              block.item.toolCall.arguments,
+            ),
+          },
+        ];
+      }
+      if (block.kind === "hostedSearch") {
+        const sourceText = block.item.sources
+          .map((source) => `${source.title || source.url}\n${source.url}`)
+          .join("\n\n");
+        return [
+          {
+            id: `${id}:search:${block.item.id}`,
+            kind: "ToolCall",
+            variant: "timeline",
+            label: labels.search,
+            text: block.item.queries.join(", "),
+            status:
+              block.item.status === "searching"
+                ? "running"
+                : block.item.status === "failed"
+                  ? "error"
+                  : "completed",
+            children: sourceText
+              ? [
+                  {
+                    id: `${id}:search:${block.item.id}:sources`,
+                    kind: "Text",
+                    text: sourceText,
+                    secondary: true,
+                  },
+                ]
+              : [],
+          },
+        ];
+      }
+      return [];
+    }),
+  );
+}
+
+export function splitWorkNodes(nodes: PresentationNode[]) {
+  let lastWork = -1;
+  nodes.forEach((node, index) => {
+    if (node.kind === "ToolCall" || node.kind === "Thinking") lastWork = index;
+  });
+  return lastWork < 0
+    ? { work: [] as PresentationNode[], answer: nodes }
+    : { work: nodes.slice(0, lastWork + 1), answer: nodes.slice(lastWork + 1) };
+}

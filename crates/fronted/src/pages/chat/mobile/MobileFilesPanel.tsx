@@ -36,6 +36,7 @@ import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/ty
 import { NativeSurface } from "../../../presentation/NativeSurface";
 import { decodeNativeFiles } from "../../../presentation/nativeFiles";
 import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
+import { createNativeWorkspacePanel } from "../../../presentation/nativeWorkspacePanel";
 import type {
   PresentationHandler,
   PresentationNode,
@@ -1018,7 +1019,7 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
   return (
     <NativeSurface
       document={{
-        mode: "root",
+        ...createNativeWorkspacePanel(t, isNativeMobileRuntime()),
         title: t("sidebar.myFiles"),
         appearance: props.settings.theme,
         formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",

@@ -42,7 +42,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::pick_external_workspace,
             commands::remove_external_workspace,
             commands::run,
-            commands::cancel
+            commands::cancel,
+            commands::write_input
         ])
         .setup(|app, api| {
             #[cfg(mobile)]

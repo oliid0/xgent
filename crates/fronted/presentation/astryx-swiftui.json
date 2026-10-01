@@ -15,7 +15,7 @@
     "missingRenderer": "reject-generation",
     "stateOwnership": "TypeScript owns business state; SwiftUI owns only ephemeral focus, disclosure and presentation state",
     "actionOwnership": "Every interactive native node dispatches a validated typed action to the shared TypeScript handler",
-    "webBoundary": "WebKit may render remote browser content only and must never render application chrome"
+    "webBoundary": "WebKit may render browser content and isolated workspace HTML artifacts only, with no application bridge in artifact previews; never application chrome"
   },
   "propertyMappings": {
     "label": { "wireType": "string", "swift": "Text/Label/accessibilityLabel according to component contract" },
@@ -61,27 +61,28 @@
   },
   "eventMappings": {
     "press": { "payload": "null", "kinds": ["Button", "Menu", "NavigationRow", "IconButton", "TreeRow", "ActivityPreview"] },
-    "changeText": { "payload": "string", "kinds": ["TextInput", "TextArea", "ComposerInput"] },
+    "changeText": { "payload": "string", "kinds": ["TextInput", "TextArea", "ComposerInput", "TimeInput"] },
     "changeColor": { "payload": "hex-color", "kinds": ["ColorInput"] },
     "changeSelection": { "payload": "string", "kinds": ["Selector", "SegmentedControl"] },
     "changeBoolean": { "payload": "boolean", "kinds": ["Switch"] },
-    "changeNumber": { "payload": "number", "kinds": ["Slider"] },
+    "changeNumber": { "payload": "number", "kinds": ["Slider", "NumberInput"] },
     "pickFiles": { "payload": "serialized-file-array", "kinds": ["FilePicker"] },
     "reportViewport": { "payload": "validated-geometry-json", "kinds": ["BrowserViewport"] },
+    "streamTerminal": { "payload": "validated-session-input-or-resize-json", "kinds": ["TerminalViewport"] },
     "dismiss": { "payload": "null", "kinds": [], "scope": "document" }
   },
   "renderStrategies": {
     "native": {
       "policy": "Direct SwiftUI control or layout; no HTML/WebView fallback",
-      "kinds": ["VStack", "HStack", "ScrollView", "Section", "Text", "Heading", "Button", "TextInput", "ColorInput", "TextArea", "Switch", "Selector", "SegmentedControl", "Menu", "Divider", "Progress", "ProgressBar", "Badge", "Banner", "EmptyState", "StatusDot", "Slider", "Collapsible", "Markdown", "CodeBlock", "List", "TreeRow", "SettingsGroup", "SettingsLayout", "NavigationRow", "IconButton", "Spacer", "ComposerInput", "ChatMessage", "Thinking", "ToolCall", "TaskStep"]
+      "kinds": ["VStack", "HStack", "ScrollView", "Section", "Text", "Heading", "Button", "TextInput", "NumberInput", "TimeInput", "ColorInput", "TextArea", "Switch", "Selector", "SegmentedControl", "Menu", "Divider", "Progress", "ProgressBar", "Badge", "Banner", "EmptyState", "StatusDot", "Slider", "Collapsible", "Markdown", "CodeBlock", "List", "TreeRow", "SettingsGroup", "SettingsLayout", "NavigationRow", "IconButton", "Spacer", "ComposerInput", "ChatMessage", "Thinking", "ToolCall", "TaskStep"]
     },
     "polyfill": {
       "policy": "SwiftUI composition reproducing Astryx geometry, tokens, states and motion",
-      "kinds": ["Card", "Composer", "ChatLayout", "ActivityPreview", "TaskProgress", "BrowserLayout"]
+      "kinds": ["Card", "Composer", "ChatLayout", "ActivityPreview", "TaskProgress", "BrowserLayout", "TerminalLayout", "TerminalToolbar"]
     },
     "systemBridge": {
       "policy": "Native framework view embedded inside SwiftUI; never application WebView UI",
-      "kinds": ["BrowserViewport", "MediaPreview", "FilePicker"]
+      "kinds": ["BrowserViewport", "HTMLPreview", "MediaPreview", "FilePicker", "TerminalViewport"]
     }
   },
   "platforms": {
@@ -97,13 +98,14 @@
     "mobileMore": "sheet > terminal + shell management + browser + browser settings + git review + SSH + background tasks",
     "activityStrip": "HStack > ActivityPreview + Spacer + TaskProgress",
     "settings": "sheet > fixed Astryx header + continuous scroll groups + native Menu/Toggle; desktop uses NavigationSplitView",
-    "workspaceFile": "BrowserLayout > toolbar + guarded TextArea or MediaPreview + metadata",
+    "workspaceFile": "BrowserLayout > wrapping toolbar + source/preview selector + guarded TextArea, Markdown, isolated HTMLPreview or MediaPreview + metadata",
+    "desktopWorkspace": "root/sidebar + HSplitView auxiliary panel documents; shared sessions with closable tabs, persistent width, full-panel narrow fallback and explicit return/reopen",
     "browser": "BrowserLayout > fixed header + tabs + address controls + flexible BrowserViewport(WebKit web content only)",
     "confirmation": "alert > explanatory Text + destructive/primary action + cancel"
   },
   "frameworks": {
     "SwiftUI": "application presentation, controls, layout, navigation, accessibility and Liquid Glass",
-    "WebKit": "browser page content only; never application chrome",
+    "WebKit": "browser page and isolated workspace HTML content only; never application chrome",
     "PDFKit": "PDF workspace preview",
     "AVKit": "audio and video workspace preview",
     "PhotosUI": "privacy-preserving photo selection",
@@ -293,10 +295,22 @@
       "declaration": "nativeTextInput"
     },
     {
+      "kind": "NumberInput",
+      "swiftCase": "numberInput",
+      "astryx": "NumberInput/NumberInput",
+      "declaration": "XgentNumberInput(node: node, document: document, model: model)"
+    },
+    {
       "kind": "ColorInput",
       "swiftCase": "colorInput",
       "astryx": "TextInput/TextInput",
       "declaration": "nativeColorInput"
+    },
+    {
+      "kind": "TimeInput",
+      "swiftCase": "timeInput",
+      "astryx": "TimeInput/TimeInput",
+      "declaration": "XgentTimeInput(node: node, document: document, model: model)"
     },
     {
       "kind": "TextArea",
@@ -509,10 +523,34 @@
       "declaration": "nativeMediaPreview"
     },
     {
+      "kind": "HTMLPreview",
+      "swiftCase": "htmlPreview",
+      "astryx": "Layout/StackItem",
+      "declaration": "XgentHTMLPreview(source: node.text ?? \"\", encoded: node.value?.text ?? \"\", label: node.label ?? \"HTML preview\")"
+    },
+    {
       "kind": "FilePicker",
       "swiftCase": "filePicker",
       "astryx": "FileInput/FileInput",
       "declaration": "filePicker"
+    },
+    {
+      "kind": "TerminalLayout",
+      "swiftCase": "terminalLayout",
+      "astryx": "Layout/Layout",
+      "declaration": "nativeTerminalLayout"
+    },
+    {
+      "kind": "TerminalViewport",
+      "swiftCase": "terminalViewport",
+      "astryx": "Layout/LayoutContent",
+      "declaration": "nativeTerminalViewport"
+    },
+    {
+      "kind": "TerminalToolbar",
+      "swiftCase": "terminalToolbar",
+      "astryx": "Toolbar/Toolbar",
+      "declaration": "nativeTerminalToolbar"
     }
   ]
 }

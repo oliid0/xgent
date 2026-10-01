@@ -149,6 +149,11 @@ jobs:
           CARGO_TERM_COLOR: always
         run: cargo test --manifest-path crates/fronted/src-tauri/Cargo.toml chat_history --lib
 
+      - name: Test mobile status native bridge serialization
+        env:
+          CARGO_TERM_COLOR: always
+        run: cargo test --manifest-path crates/fronted/src-tauri/Cargo.toml -p tauri-plugin-mobile-execution status_preserves_environment_root --lib
+
   architecture:
     name: Architecture Guard
     runs-on: ubuntu-latest

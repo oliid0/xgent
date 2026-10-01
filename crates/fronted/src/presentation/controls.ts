@@ -62,6 +62,37 @@ export function presentationControls() {
         ),
       };
     },
+    number(
+      id: string,
+      label: string,
+      value: number,
+      minimum: number,
+      maximum: number,
+      step: number,
+      run: (value: number) => unknown,
+      enabled = true,
+      normalize?: (value: number) => number,
+    ): PresentationNode {
+      return {
+        id,
+        kind: "NumberInput",
+        label,
+        value,
+        minimum,
+        maximum,
+        step,
+        ...bind(
+          id,
+          (next) => run(next as number),
+          (next) => typeof next === "number" && Number.isFinite(next),
+          enabled,
+          (next) => {
+            const number = normalize ? normalize(next as number) : (next as number);
+            return Math.min(maximum, Math.max(minimum, number));
+          },
+        ),
+      };
+    },
     toggle(
       id: string,
       label: string,

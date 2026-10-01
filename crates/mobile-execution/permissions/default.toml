@@ -12,4 +12,5 @@ permissions = [
   "allow-remove-external-workspace",
   "allow-run",
   "allow-cancel",
+  "allow-write-input",
 ]

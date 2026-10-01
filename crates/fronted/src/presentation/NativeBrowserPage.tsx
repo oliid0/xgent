@@ -10,6 +10,7 @@ import { isNativeMobileRuntime } from "../lib/runtimePlatform";
 import type { AppSettings } from "../lib/settings";
 import { NativeSurface } from "./NativeSurface";
 import { createNativePresentationTheme } from "./nativeTheme";
+import { createNativeWorkspacePanel } from "./nativeWorkspacePanel";
 import type { PresentationHandler, PresentationNode, PresentationValue } from "./types";
 
 type NativeViewport = {
@@ -394,7 +395,7 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
   return (
     <NativeSurface
       document={{
-        mode: "root",
+        ...createNativeWorkspacePanel(t, compact, state.panelFocusRequest ?? 0),
         title: t("browser.title"),
         appearance: props.settings.theme,
         formFactor: compact ? "mobile" : "desktop",

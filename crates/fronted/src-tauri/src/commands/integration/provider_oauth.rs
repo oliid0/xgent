@@ -20,6 +20,15 @@ pub async fn provider_oauth_poll_codex(
 }
 
 #[tauri::command]
+pub async fn provider_oauth_cancel_codex(
+    flow_id: String,
+    service: tauri::State<'_, Arc<ProviderOAuthService>>,
+) -> Result<(), String> {
+    service.cancel_codex_device_flow(flow_id.trim()).await;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn provider_oauth_status_codex(
     service: tauri::State<'_, Arc<ProviderOAuthService>>,
 ) -> Result<ProviderOAuthStatus, String> {

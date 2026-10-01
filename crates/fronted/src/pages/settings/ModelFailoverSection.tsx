@@ -13,7 +13,8 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 
 import { ChevronDown, ChevronUp, Waypoints } from "../../components/icons";
 import { useLocale } from "../../i18n";
-import type { ModelFailoverProviderSettings, ProviderId } from "../../lib/settings";
+import type { ProviderId } from "../../lib/settings";
+import { providerRuntimeActions } from "./providerRuntimeSettings";
 import type { SettingsSectionProps } from "./types";
 
 const PROVIDER_TYPES: readonly ProviderId[] = ["claude_code", "codex", "gemini", "xai", "deepseek"];
@@ -35,37 +36,8 @@ export function ModelFailoverSection({
   const { t } = useLocale();
   const providerTypes = selectedProviderType ? [selectedProviderType] : PROVIDER_TYPES;
 
-  const updateProvider = (
-    providerType: ProviderId,
-    patch: Partial<ModelFailoverProviderSettings>,
-  ) => {
-    setSettings((previous) => ({
-      ...previous,
-      modelFailover: {
-        ...previous.modelFailover,
-        [providerType]: { ...previous.modelFailover[providerType], ...patch },
-      },
-    }));
-  };
-
-  const toggleQueueProvider = (providerType: ProviderId, providerId: string) => {
-    const current = settings.modelFailover[providerType];
-    updateProvider(providerType, {
-      queue: current.queue.includes(providerId)
-        ? current.queue.filter((id) => id !== providerId)
-        : [...current.queue, providerId],
-    });
-  };
-
-  const moveQueueProvider = (providerType: ProviderId, providerId: string, offset: -1 | 1) => {
-    const current = settings.modelFailover[providerType];
-    const index = current.queue.indexOf(providerId);
-    const target = index + offset;
-    if (index < 0 || target < 0 || target >= current.queue.length) return;
-    const queue = current.queue.slice();
-    [queue[index], queue[target]] = [queue[target], queue[index]];
-    updateProvider(providerType, { queue });
-  };
+  const { updateProvider, toggleQueueProvider, moveQueueProvider } =
+    providerRuntimeActions(setSettings);
 
   return (
     <VStack gap={5}>

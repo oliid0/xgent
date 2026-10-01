@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "remove_external_workspace",
     "run",
     "cancel",
+    "write_input",
 ];
 
 fn main() {

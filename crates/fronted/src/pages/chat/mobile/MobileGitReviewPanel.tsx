@@ -27,6 +27,7 @@ import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
 import type { AppSettings } from "../../../lib/settings";
 import { NativeSurface } from "../../../presentation/NativeSurface";
 import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
+import { createNativeWorkspacePanel } from "../../../presentation/nativeWorkspacePanel";
 import type {
   PresentationHandler,
   PresentationNode,
@@ -625,7 +626,8 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
     return (
       <NativeSurface
         document={{
-          mode: "root",
+          ...createNativeWorkspacePanel(t, isNativeMobileRuntime()),
+          dismissAction: "git-close",
           title: t("chat.mobileGit.title"),
           appearance: props.settings.theme,
           formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",

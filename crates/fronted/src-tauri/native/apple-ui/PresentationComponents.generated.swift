@@ -61,7 +61,9 @@ enum XgentNodeKind: String, Decodable {
     case heading = "Heading"
     case button = "Button"
     case textInput = "TextInput"
+    case numberInput = "NumberInput"
     case colorInput = "ColorInput"
+    case timeInput = "TimeInput"
     case textArea = "TextArea"
     case toggle = "Switch"
     case selector = "Selector"
@@ -97,15 +99,19 @@ enum XgentNodeKind: String, Decodable {
     case browserViewport = "BrowserViewport"
     case browserLayout = "BrowserLayout"
     case mediaPreview = "MediaPreview"
+    case htmlPreview = "HTMLPreview"
     case filePicker = "FilePicker"
+    case terminalLayout = "TerminalLayout"
+    case terminalViewport = "TerminalViewport"
+    case terminalToolbar = "TerminalToolbar"
 }
 
 extension XgentNodeKind {
     var renderStrategy: XgentRenderStrategy {
         switch self {
-        case .vStack, .hStack, .scrollView, .section, .text, .heading, .button, .textInput, .colorInput, .textArea, .toggle, .selector, .segmentedControl, .menu, .divider, .progress, .progressBar, .badge, .banner, .emptyState, .statusDot, .slider, .collapsible, .markdown, .codeBlock, .list, .treeRow, .settingsGroup, .settingsLayout, .navigationRow, .iconButton, .spacer, .composerInput, .chatMessage, .thinking, .toolCall, .taskStep: return .native
-        case .card, .composer, .chatLayout, .activityPreview, .taskProgress, .browserLayout: return .polyfill
-        case .browserViewport, .mediaPreview, .filePicker: return .systemBridge
+        case .vStack, .hStack, .scrollView, .section, .text, .heading, .button, .textInput, .numberInput, .timeInput, .colorInput, .textArea, .toggle, .selector, .segmentedControl, .menu, .divider, .progress, .progressBar, .badge, .banner, .emptyState, .statusDot, .slider, .collapsible, .markdown, .codeBlock, .list, .treeRow, .settingsGroup, .settingsLayout, .navigationRow, .iconButton, .spacer, .composerInput, .chatMessage, .thinking, .toolCall, .taskStep: return .native
+        case .card, .composer, .chatLayout, .activityPreview, .taskProgress, .browserLayout, .terminalLayout, .terminalToolbar: return .polyfill
+        case .browserViewport, .htmlPreview, .mediaPreview, .filePicker, .terminalViewport: return .systemBridge
         }
     }
 
@@ -120,7 +126,9 @@ extension XgentNodeKind {
         case .heading: return Set([])
         case .button: return Set(["press"])
         case .textInput: return Set(["changeText"])
+        case .numberInput: return Set(["changeNumber"])
         case .colorInput: return Set(["changeColor"])
+        case .timeInput: return Set(["changeText"])
         case .textArea: return Set(["changeText"])
         case .toggle: return Set(["changeBoolean"])
         case .selector: return Set(["changeSelection"])
@@ -156,7 +164,11 @@ extension XgentNodeKind {
         case .browserViewport: return Set(["reportViewport"])
         case .browserLayout: return Set([])
         case .mediaPreview: return Set([])
+        case .htmlPreview: return Set([])
         case .filePicker: return Set(["pickFiles"])
+        case .terminalLayout: return Set([])
+        case .terminalViewport: return Set(["streamTerminal"])
+        case .terminalToolbar: return Set([])
         }
     }
 }
@@ -183,8 +195,12 @@ extension XgentNodeView {
             nativeButton
         case .textInput:
             nativeTextInput
+        case .numberInput:
+            XgentNumberInput(node: node, document: document, model: model)
         case .colorInput:
             nativeColorInput
+        case .timeInput:
+            XgentTimeInput(node: node, document: document, model: model)
         case .textArea:
             nativeTextArea
         case .toggle:
@@ -255,8 +271,16 @@ extension XgentNodeView {
             nativeBrowserLayout
         case .mediaPreview:
             nativeMediaPreview
+        case .htmlPreview:
+            XgentHTMLPreview(source: node.text ?? "", encoded: node.value?.text ?? "", label: node.label ?? "HTML preview")
         case .filePicker:
             filePicker
+        case .terminalLayout:
+            nativeTerminalLayout
+        case .terminalViewport:
+            nativeTerminalViewport
+        case .terminalToolbar:
+            nativeTerminalToolbar
         }
     }
 }

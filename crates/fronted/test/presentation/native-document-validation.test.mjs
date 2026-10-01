@@ -7,6 +7,20 @@ const { validatePresentationDocument } = loader.loadModule(
   "src/presentation/validateDocument.ts",
 );
 
+test("desktop panels require a valid focus token, translated controls and a real close handler", () => {
+  const { createNativeWorkspacePanel } = loader.loadModule("src/presentation/nativeWorkspacePanel.ts");
+  const handlers = new Map([["close", { enabled: true, accepts: value => value === null, run() {} }]]);
+  const panel = { ...document({ id: "content", kind: "Text", text: "Actual content" }),
+    ...createNativeWorkspacePanel(key => key, false, 2), formFactor: "desktop", dismissAction: "close" };
+  assert.doesNotThrow(() => validatePresentationDocument(panel, handlers));
+  assert.equal(createNativeWorkspacePanel(key => key, true).mode, "root");
+  for (const patch of [{ formFactor: "mobile" }, { dismissAction: undefined },
+    { workspacePanel: undefined }, { workspacePanel: { ...panel.workspacePanel, focusRequest: -1 } },
+    { workspacePanel: { ...panel.workspacePanel, closeLabel: " " } }]) {
+    assert.throws(() => validatePresentationDocument({ ...panel, ...patch }, handlers), /workspace panel/);
+  }
+});
+
 function document(node) {
   return {
     version: 1,

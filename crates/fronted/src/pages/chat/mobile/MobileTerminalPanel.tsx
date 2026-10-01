@@ -204,9 +204,19 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   const { t } = useLocale();
   const guestFilesystem =
     !preferLanPcExecution && isTauriRuntime() && inferRuntimePlatform() === "android";
+  const liveInputEnabled =
+    !preferLanPcExecution &&
+    mode === "terminal" &&
+    isTauriRuntime() &&
+    ["android", "ios"].includes(inferRuntimePlatform());
   const [command, setCommand] = useState(initialCommand);
   const [entries, setEntries] = useState<TerminalEntry[]>([]);
   const [activeRunId, setActiveRunId] = useState("");
+  const [inputText, setInputText] = useState("");
+  const [inputReady, setInputReady] = useState(false);
+  const [inputBusy, setInputBusy] = useState(false);
+  const [inputError, setInputError] = useState("");
+  const inputState = useRef({ runId: "", ready: false, busy: false }).current;
   const [sessionCwd, setSessionCwd] = useState("");
   const [previousSessionCwd, setPreviousSessionCwd] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -218,6 +228,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
     active: true,
     runId: "",
     pendingCancelIds: [] as string[],
+    listeners: new Set<() => Promise<void>>(),
   }).current;
   if (runScope.key !== runScopeKey) {
     if (runScope.runId) runScope.pendingCancelIds.push(runScope.runId);
@@ -326,9 +337,32 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
       runScope.runId = id;
       setCommand("");
       setActiveRunId(id);
+      inputState.runId = id;
+      inputState.ready = false;
+      inputState.busy = false;
+      setInputReady(false);
+      setInputBusy(false);
+      setInputText("");
+      setInputError("");
       setEntries((current) => [...current.slice(-19), { id, command: nextCommand }]);
       let removeOutputListener: (() => Promise<void>) | undefined;
+      let removeInputListener: (() => Promise<void>) | undefined;
       try {
+        if (liveInputEnabled) {
+          // Register before starting the command: a fast process may announce
+          // readiness before shell_run returns. Input observation is required.
+          removeInputListener = await listenNativePlugin<{
+            runId: string;
+            ready: boolean;
+            error?: string | null;
+          }>("mobile-execution", "inputState", (event) => {
+            if (!isCurrentRun(id) || event.runId !== id || typeof event.ready !== "boolean") return;
+            inputState.ready = event.ready;
+            setInputReady(event.ready);
+            if (typeof event.error === "string") setInputError(event.error);
+          });
+          runScope.listeners.add(removeInputListener);
+        }
         if (isTauriRuntime()) {
           try {
             const decoders = { stdout: new TextDecoder(), stderr: new TextDecoder() };
@@ -355,6 +389,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
                 // The final Shell result remains available if one event is malformed.
               }
             });
+            runScope.listeners.add(removeOutputListener);
           } catch {
             // Live observation is optional; a failed listener must not block Shell.
           }
@@ -370,6 +405,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           run_id: id,
           sandbox: false,
           sandbox_allow_network: true,
+          ...(liveInputEnabled ? { interactive_stdin: true } : {}),
         });
         if (!isCurrentRun(id)) return;
         setEntries((current) =>
@@ -387,14 +423,31 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           current.map((entry) => (entry.id === id ? { ...entry, error } : entry)),
         );
       } finally {
-        if (removeOutputListener) void removeOutputListener().catch(() => undefined);
+        for (const remove of [removeOutputListener, removeInputListener]) {
+          if (remove && runScope.listeners.delete(remove)) void remove().catch(() => undefined);
+        }
+        if (inputState.runId === id) {
+          inputState.runId = "";
+          inputState.ready = false;
+          inputState.busy = false;
+        }
         if (isCurrentRun(id)) {
           runScope.runId = "";
           setActiveRunId("");
+          setInputReady(false);
+          setInputBusy(false);
         }
       }
     },
-    [previousSessionCwd, sessionCwd, workdir, runRevision, runScopeKey, guestFilesystem],
+    [
+      previousSessionCwd,
+      sessionCwd,
+      workdir,
+      runRevision,
+      runScopeKey,
+      guestFilesystem,
+      liveInputEnabled,
+    ],
   );
 
   useEffect(() => {
@@ -408,6 +461,8 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
     }
     return () => {
       runScope.active = false;
+      for (const remove of runScope.listeners) void remove().catch(() => undefined);
+      runScope.listeners.clear();
       const runId = runScope.runId;
       runScope.runId = "";
       if (runId) void invoke("shell_cancel", { run_id: runId }).catch(() => undefined);
@@ -416,6 +471,13 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
 
   useEffect(() => {
     setActiveRunId("");
+    inputState.runId = "";
+    inputState.ready = false;
+    inputState.busy = false;
+    setInputReady(false);
+    setInputBusy(false);
+    setInputText("");
+    setInputError("");
     setSessionCwd("");
     setPreviousSessionCwd("");
     setEntries([]);
@@ -449,7 +511,79 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   const cancel = async () => {
     const runId = runScope.runId;
     if (!runId || !isCurrentRun(runId)) return;
-    await invoke("shell_cancel", { run_id: runId }).catch(() => undefined);
+    inputState.ready = false;
+    setInputReady(false);
+    try {
+      await invoke("shell_cancel", { run_id: runId });
+    } catch (cause) {
+      if (!isCurrentRun(runId)) return;
+      const message = cause instanceof Error ? cause.message : String(cause);
+      setInputError(message);
+      setEntries((current) =>
+        current.map((entry) => (entry.id === runId ? { ...entry, error: message } : entry)),
+      );
+    }
+  };
+
+  const closePanel = () => {
+    if (!isCurrentScope()) return;
+    const id = runScope.runId;
+    runScope.runId = "";
+    runScope.active = false;
+    runScope.revision += 1;
+    inputState.ready = false;
+    for (const remove of runScope.listeners) void remove().catch(() => undefined);
+    runScope.listeners.clear();
+    if (id) void invoke("shell_cancel", { run_id: id }).catch(() => undefined);
+    onClose();
+  };
+
+  const sendInput = async (eof = false) => {
+    const id = inputState.runId;
+    if (!isCurrentRun(id) || !inputState.ready || inputState.busy) return;
+    const text = inputText;
+    const bytes = new TextEncoder().encode(eof ? "" : `${text}\n`);
+    if (bytes.length > 16 * 1024) {
+      setInputError(t("chat.mobileTerminal.inputTooLarge"));
+      return;
+    }
+    inputState.busy = true;
+    setInputBusy(true);
+    setInputError("");
+    try {
+      const response = await invoke<{ acceptedBytes: number; closed: boolean }>(
+        "plugin:mobile-execution|write_input",
+        {
+          request: {
+            runId: id,
+            dataBase64: bytes.length
+              ? btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(""))
+              : null,
+            eof,
+          },
+        },
+      );
+      if (!isCurrentRun(id)) return;
+      if (
+        response.acceptedBytes !== bytes.length ||
+        typeof response.closed !== "boolean" ||
+        (eof && !response.closed)
+      ) {
+        throw new Error(t("chat.mobileTerminal.inputRejected"));
+      }
+      if (!eof) setInputText((current) => (current === text ? "" : current));
+      if (response.closed) {
+        inputState.ready = false;
+        setInputReady(false);
+      }
+    } catch (cause) {
+      if (isCurrentRun(id)) setInputError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (isCurrentRun(id)) {
+        inputState.busy = false;
+        setInputBusy(false);
+      }
+    }
   };
 
   if (isApplePresentationRuntime()) {
@@ -457,9 +591,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
     c.handlers.set("close", {
       enabled: true,
       accepts: (value) => value === null,
-      run: () => {
-        if (isCurrentScope()) onClose();
-      },
+      run: closePanel,
     });
     const nodes: PresentationNode[] = [
       {
@@ -515,9 +647,47 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
       ...(activeRunId
         ? [{ id: "running", kind: "Progress" as const, label: t("chat.mobileTerminal.running") }]
         : []),
-      c.input("command", "Command", command, (value) => {
-        if (isCurrentScope()) setCommand(value);
-      }),
+      ...(activeRunId && liveInputEnabled
+        ? [
+            c.group("live-input", t("chat.mobileTerminal.programInput"), [
+              c.input(
+                "program-input",
+                t("chat.mobileTerminal.programInput"),
+                inputText,
+                (value) => {
+                  if (isCurrentRun(inputState.runId)) setInputText(value);
+                },
+                false,
+                inputReady && !inputBusy,
+              ),
+              c.action(
+                "send-input",
+                t("chat.mobileTerminal.sendInput"),
+                () => sendInput(),
+                inputReady && !inputBusy,
+              ),
+              c.action(
+                "input-eof",
+                t("chat.mobileTerminal.inputEof"),
+                () => sendInput(true),
+                inputReady && !inputBusy,
+              ),
+              ...(inputError
+                ? [{ id: "input-error", kind: "Text" as const, text: inputError }]
+                : []),
+            ]),
+          ]
+        : []),
+      c.input(
+        "command",
+        "Command",
+        command,
+        (value) => {
+          if (isCurrentScope()) setCommand(value);
+        },
+        false,
+        !activeRunId && !!workdir,
+      ),
       c.action(
         "run",
         t("chat.send"),
@@ -556,7 +726,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   }
 
   return (
-    <MobileFullscreenPanel open label={panelTitle} onBack={onClose}>
+    <MobileFullscreenPanel open label={panelTitle} onBack={closePanel}>
       <HStack
         as="header"
         gap={2}
@@ -589,7 +759,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           tooltip={t("chat.mobileTerminal.close")}
           icon={<X />}
           variant="ghost"
-          onClick={onClose}
+          onClick={closePanel}
         />
       </HStack>
 
@@ -719,6 +889,35 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
         </VStack>
       </StackItem>
 
+      {activeRunId && liveInputEnabled ? (
+        <VStack
+          gap={2}
+          padding={3}
+          className="shrink-0 border-t border-[var(--color-border-subtle)]"
+        >
+          <TextInput
+            label={t("chat.mobileTerminal.programInput")}
+            value={inputText}
+            onChange={setInputText}
+            onEnter={() => void sendInput()}
+            isDisabled={!inputReady || inputBusy}
+            width="100%"
+          />
+          <HStack gap={2}>
+            <Button
+              label={t("chat.mobileTerminal.sendInput")}
+              onClick={() => void sendInput()}
+              isDisabled={!inputReady || inputBusy}
+            />
+            <Button
+              label={t("chat.mobileTerminal.inputEof")}
+              onClick={() => void sendInput(true)}
+              isDisabled={!inputReady || inputBusy}
+            />
+          </HStack>
+          {inputError ? <Text>{inputError}</Text> : null}
+        </VStack>
+      ) : null}
       <HStack
         as="form"
         gap={2}

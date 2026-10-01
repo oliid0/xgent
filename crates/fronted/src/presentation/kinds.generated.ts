@@ -10,7 +10,9 @@ export type PresentationKind =
   | "Heading"
   | "Button"
   | "TextInput"
+  | "NumberInput"
   | "ColorInput"
+  | "TimeInput"
   | "TextArea"
   | "Switch"
   | "Selector"
@@ -46,7 +48,11 @@ export type PresentationKind =
   | "BrowserViewport"
   | "BrowserLayout"
   | "MediaPreview"
-  | "FilePicker";
+  | "HTMLPreview"
+  | "FilePicker"
+  | "TerminalLayout"
+  | "TerminalViewport"
+  | "TerminalToolbar";
 
 export type PresentationRenderStrategy = "native" | "polyfill" | "systemBridge";
 
@@ -106,7 +112,9 @@ export const presentationComponentContracts: Record<
   Heading: { strategy: "native", events: [] },
   Button: { strategy: "native", events: ["press"] },
   TextInput: { strategy: "native", events: ["changeText"] },
+  NumberInput: { strategy: "native", events: ["changeNumber"] },
   ColorInput: { strategy: "native", events: ["changeColor"] },
+  TimeInput: { strategy: "native", events: ["changeText"] },
   TextArea: { strategy: "native", events: ["changeText"] },
   Switch: { strategy: "native", events: ["changeBoolean"] },
   Selector: { strategy: "native", events: ["changeSelection"] },
@@ -142,5 +150,9 @@ export const presentationComponentContracts: Record<
   BrowserViewport: { strategy: "systemBridge", events: ["reportViewport"] },
   BrowserLayout: { strategy: "polyfill", events: [] },
   MediaPreview: { strategy: "systemBridge", events: [] },
+  HTMLPreview: { strategy: "systemBridge", events: [] },
   FilePicker: { strategy: "systemBridge", events: ["pickFiles"] },
+  TerminalLayout: { strategy: "polyfill", events: [] },
+  TerminalViewport: { strategy: "systemBridge", events: ["streamTerminal"] },
+  TerminalToolbar: { strategy: "polyfill", events: [] },
 };

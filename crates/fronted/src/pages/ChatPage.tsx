@@ -293,6 +293,7 @@ import {
 } from "../lib/workspaceRootGrants";
 import { NativeBrowserPage } from "../presentation/NativeBrowserPage";
 import { NativeChatPage } from "../presentation/NativeChatPage";
+import { NativeDesktopTerminalPanel } from "../presentation/NativeDesktopTerminalPanel";
 import { NativeWorkspaceFilePage } from "../presentation/NativeWorkspaceFilePage";
 import { isApplePresentationRuntime } from "../runtime/applePresentation";
 import {
@@ -5483,6 +5484,31 @@ export function ChatPage(props: ChatPageProps) {
     setSplitConversationError(null);
   }, []);
 
+  const handleOpenSplitWorkspaceFile = useCallback(
+    (path: string) => {
+      const sideWorkdir =
+        splitConversationRecord?.cwd ||
+        (splitConversationId
+          ? conversationRuntimeCacheRef.current.get(splitConversationId)?.workdir
+          : null) ||
+        activeWorkspaceProjectPath;
+      const projectPathKey = workspaceProjectPathKey(sideWorkdir || "");
+      if (!sideWorkdir || !projectPathKey) throw new Error(t("workspaceEditor.openFailed"));
+      const request = { workdir: sideWorkdir, projectPathKey, path };
+      if (isWorkspacePreviewPath(path) || isWorkspaceEditablePreviewPath(path))
+        openWorkspaceFilePreview(request);
+      else openWorkspaceEditorFile(request);
+    },
+    [
+      splitConversationRecord?.cwd,
+      splitConversationId,
+      activeWorkspaceProjectPath,
+      openWorkspaceFilePreview,
+      openWorkspaceEditorFile,
+      t,
+    ],
+  );
+
   const handleNewRightSideChat = useCallback(() => {
     const identity = createConversationIdentity();
     ensureConversationRuntimeEntry(identity.conversationId, {
@@ -6362,6 +6388,8 @@ export function ChatPage(props: ChatPageProps) {
             setActiveView("chat");
             handleDesktopNewConversation();
           }}
+          onNewSideConversation={!nativeMobile ? handleNewRightSideChat : undefined}
+          onOpenConversationInSplit={!nativeMobile ? handleOpenConversationInSplit : undefined}
           onOpenSettings={(section) => onOpenSettings(section)}
           onOpenSkillsHub={() => {
             cacheActiveComposerDraft();
@@ -6417,19 +6445,34 @@ export function ChatPage(props: ChatPageProps) {
             onOpenSidebar={() => setNativeSidebarOpenRequestId((request) => request + 1)}
           />
         ) : null}
-        <MobileSshPanel
-          open={mobileWorkspaceDestination?.kind === "ssh"}
-          workdir={mobileWorkspacePath}
-          projectPathKey={mobileWorkspacePathKey}
-          hosts={settings.ssh.hosts}
-          associatedHostIds={mobileAssociatedSshHostIds}
-          onAssociatedHostIdsChange={handleMobileSshProjectHostIdsChange}
-          onOpenSettings={() => {
-            setMobileWorkspaceDestination(null);
-            onOpenSettings("ssh");
-          }}
-          onClose={() => setMobileWorkspaceDestination(null)}
-        />
+        {!nativeMobile ? (
+          <NativeDesktopTerminalPanel
+            open={mobileWorkspaceDestination?.kind === "ssh"}
+            kind="ssh"
+            workdir={mobileWorkspacePath}
+            projectPathKey={mobileWorkspacePathKey}
+            client={tauriTerminalClient}
+            settings={settings}
+            associatedHostIds={mobileAssociatedSshHostIds}
+            onAssociatedHostIdsChange={handleMobileSshProjectHostIdsChange}
+            onOpenSshSettings={() => onOpenSettings("ssh")}
+            onClose={() => setMobileWorkspaceDestination(null)}
+          />
+        ) : (
+          <MobileSshPanel
+            open={mobileWorkspaceDestination?.kind === "ssh"}
+            workdir={mobileWorkspacePath}
+            projectPathKey={mobileWorkspacePathKey}
+            hosts={settings.ssh.hosts}
+            associatedHostIds={mobileAssociatedSshHostIds}
+            onAssociatedHostIdsChange={handleMobileSshProjectHostIdsChange}
+            onOpenSettings={() => {
+              setMobileWorkspaceDestination(null);
+              onOpenSettings("ssh");
+            }}
+            onClose={() => setMobileWorkspaceDestination(null)}
+          />
+        )}
         <MobileWorkspaceCreateDialog
           settings={settings}
           open={mobileWorkspaceCreateOpen}
@@ -6440,16 +6483,27 @@ export function ChatPage(props: ChatPageProps) {
           }}
           onClose={() => setMobileWorkspaceCreateOpen(false)}
         />
-        <MobileTerminalPanel
-          open={mobileTerminalOpen}
-          workdir={mobileWorkspacePath}
-          mode={mobileTerminalDestination?.mode ?? "terminal"}
-          preferLanPcExecution={
-            settings.access.preferLanPcExecution && Boolean(settings.access.lanControlUrl.trim())
-          }
-          sshHosts={settings.ssh.hosts}
-          onClose={() => setMobileWorkspaceDestination(null)}
-        />
+        {!nativeMobile && mobileTerminalDestination?.mode === "terminal" ? (
+          <NativeDesktopTerminalPanel
+            open={mobileTerminalOpen}
+            workdir={mobileWorkspacePath}
+            projectPathKey={mobileWorkspacePathKey}
+            client={tauriTerminalClient}
+            settings={settings}
+            onClose={() => setMobileWorkspaceDestination(null)}
+          />
+        ) : (
+          <MobileTerminalPanel
+            open={mobileTerminalOpen}
+            workdir={mobileWorkspacePath}
+            mode={mobileTerminalDestination?.mode ?? "terminal"}
+            preferLanPcExecution={
+              settings.access.preferLanPcExecution && Boolean(settings.access.lanControlUrl.trim())
+            }
+            sshHosts={settings.ssh.hosts}
+            onClose={() => setMobileWorkspaceDestination(null)}
+          />
+        )}
         <MobileGitReviewPanel
           open={mobileWorkspaceDestination?.kind === "git-review"}
           workdir={mobileWorkspacePath}
@@ -6483,6 +6537,27 @@ export function ChatPage(props: ChatPageProps) {
           setSettings={setSettings}
           onClose={() => setMobileWorkspaceDestination(null)}
         />
+        {!nativeMobile && splitConversationId ? (
+          <SplitConversationPane
+            key={splitConversationId}
+            settings={settings}
+            width="100%"
+            conversationId={splitConversationId}
+            record={splitConversationRecord}
+            loading={splitConversationLoading}
+            error={splitConversationError}
+            liveTranscriptStore={getConversationLiveTranscriptStore(splitConversationId)}
+            isRunning={isConversationRunning(splitConversationId)}
+            isAgentMode={isAgentMode}
+            showUsage={isAgentDevExecutionMode}
+            onActivate={handleActivateSplitConversation}
+            onRetry={() => setSplitConversationReload((value) => value + 1)}
+            onClose={handleCloseSplitConversation}
+            onSend={sendSideConversation}
+            onStop={() => requestConversationStop(splitConversationId)}
+            onOpenWorkspaceFile={handleOpenSplitWorkspaceFile}
+          />
+        ) : null}
         <NativeBrowserPage settings={settings} />
         <NativeWorkspaceFilePage
           settings={settings}
@@ -7165,6 +7240,8 @@ export function ChatPage(props: ChatPageProps) {
                 >
                   <SplitConversationPane
                     key={splitConversationId}
+                    settings={settings}
+                    onOpenWorkspaceFile={handleOpenSplitWorkspaceFile}
                     width="100%"
                     conversationId={splitConversationId}
                     record={splitConversationRecord}

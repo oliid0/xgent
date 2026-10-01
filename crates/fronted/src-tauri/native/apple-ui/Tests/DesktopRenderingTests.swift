@@ -30,7 +30,7 @@ final class DesktopRenderingTests: XCTestCase {
                                             "children": [edited, checking]]),
             node("reply", "Text", ["text": "The settings change is complete."]),
         ])
-        for (width, appearance) in [(CGFloat(640), "light"), (CGFloat(1040), "dark")] {
+        for (width, appearance) in [(CGFloat(640), XgentDocument.Appearance.light), (CGFloat(1040), .dark)] {
             let liveHeight = try await capture(live, name: "desktop-work-live-\(Int(width))",
                                                width: width, appearance: appearance)
             let completedHeight = try await capture(completed, name: "desktop-work-completed-\(Int(width))",
@@ -42,7 +42,7 @@ final class DesktopRenderingTests: XCTestCase {
 
     @MainActor
     private func capture(_ document: XgentDocument, name: String, width: CGFloat,
-                         appearance: String) async throws -> CGFloat {
+                         appearance: XgentDocument.Appearance) async throws -> CGFloat {
         let model = XgentPresentationModel()
         model.update(document)
         let content = VStack(alignment: .leading, spacing: 12) {
@@ -51,7 +51,7 @@ final class DesktopRenderingTests: XCTestCase {
         .padding(20)
         .frame(width: width, alignment: .topLeading)
         .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: appearance))
-        .preferredColorScheme(appearance == "dark" ? .dark : .light)
+        .preferredColorScheme(appearance == .dark ? .dark : .light)
         let hosting = NSHostingView(rootView: content)
         hosting.frame = CGRect(x: 0, y: 0, width: width, height: 720)
         hosting.layoutSubtreeIfNeeded()

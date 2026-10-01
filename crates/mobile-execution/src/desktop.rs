@@ -24,6 +24,7 @@ impl<R: Runtime> MobileExecution<R> {
             alpine_mirrors: Vec::new(),
             selected_alpine_mirror: None,
             environment_version: None,
+            environment_root_path: None,
             disk_usage_bytes: None,
         })
     }
@@ -70,5 +71,9 @@ impl<R: Runtime> MobileExecution<R> {
 
     pub fn cancel(&self, _request: CancelRequest) -> crate::Result<CancelResponse> {
         Ok(CancelResponse { cancelled: false })
+    }
+
+    pub fn write_input(&self, _request: WriteInputRequest) -> crate::Result<WriteInputResponse> {
+        Err(crate::Error::Unavailable)
     }
 }

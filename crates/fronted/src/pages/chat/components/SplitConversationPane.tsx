@@ -8,14 +8,23 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
-import { useRef, useState } from "react";
-
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { ToolApprovalBar } from "../../../components/chat/ToolApprovalBar";
 import { X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { LiveTranscriptStore } from "../../../lib/chat/conversation/liveTranscriptStore";
 import type { ChatHistoryRecord } from "../../../lib/chat/history/chatHistory";
 import type { ScrollFollowHandle } from "../../../lib/chat-scroll/useScrollFollow";
+import type { AppSettings } from "../../../lib/settings";
+import {
+  answerToolApproval,
+  getPendingToolApprovalsSnapshot,
+  subscribeToolApprovalsForConversation,
+  type ToolApprovalDecision,
+} from "../../../lib/tools/toolApproval";
+import { NativeSplitConversationPane } from "../../../presentation/NativeSplitConversationPane";
+import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import { ChatTranscript } from "../transcript/ChatTranscript";
 
 const resolveNoEarlierHistory = () => Promise.resolve();
@@ -23,6 +32,7 @@ const ignoreResend = () => undefined;
 const ignoreSettings = () => undefined;
 
 export type SplitConversationPaneProps = {
+  settings: AppSettings;
   width: number | string;
   conversationId: string;
   record: ChatHistoryRecord | null;
@@ -33,6 +43,7 @@ export type SplitConversationPaneProps = {
   isAgentMode: boolean;
   showUsage: boolean;
   onOpenFileLink?: (link: ChatFileLink) => void;
+  onOpenWorkspaceFile: (path: string) => void;
   onActivate: () => void;
   onRetry: () => void;
   onClose: () => void;
@@ -46,26 +57,115 @@ export function SplitConversationPane(props: SplitConversationPaneProps) {
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const approvalSubscribe = useCallback(
+    (listener: () => void) => subscribeToolApprovalsForConversation(props.conversationId, listener),
+    [props.conversationId],
+  );
+  const approvalSnapshot = useCallback(
+    () => getPendingToolApprovalsSnapshot(props.conversationId),
+    [props.conversationId],
+  );
+  const pendingApprovals = useSyncExternalStore(
+    approvalSubscribe,
+    approvalSnapshot,
+    approvalSnapshot,
+  );
+  const scope = useRef({
+    id: props.conversationId,
+    active: true,
+    revision: 0,
+    sending: false,
+  }).current;
+  if (scope.id !== props.conversationId) {
+    scope.id = props.conversationId;
+    scope.revision++;
+    scope.sending = false;
+  }
+  useEffect(() => {
+    scope.active = true;
+    setDraft("");
+    setSendError(null);
+    setSubmitting(false);
+    return () => {
+      scope.active = false;
+      scope.revision++;
+      scope.sending = false;
+    };
+  }, [scope, props.conversationId]);
   const submit = async () => {
-    if (!props.onSend || !draft.trim() || submitting || props.isRunning) return;
+    if (
+      !scope.active ||
+      !props.onSend ||
+      !draft.trim() ||
+      scope.sending ||
+      props.loading ||
+      props.isRunning
+    )
+      return;
+    const revision = scope.revision;
+    const conversationId = props.conversationId;
+    const current = () =>
+      scope.active && scope.id === conversationId && scope.revision === revision;
     const text = draft;
+    scope.sending = true;
     setDraft("");
     setSubmitting(true);
     setSendError(null);
     try {
-      if (!(await props.onSend(text))) {
+      if (!(await props.onSend(text)) && current()) {
         setDraft((current) => current || text);
         setSendError("Message was not sent. Check the selected model and try again.");
       }
     } catch (error) {
-      setDraft((current) => current || text);
-      setSendError(error instanceof Error ? error.message : String(error));
+      if (current()) {
+        setDraft((value) => value || text);
+        setSendError(error instanceof Error ? error.message : String(error));
+      }
     } finally {
-      setSubmitting(false);
+      if (current()) {
+        scope.sending = false;
+        setSubmitting(false);
+      }
     }
   };
   const title = props.record?.title || t("chat.pendingTitle");
   const historyItems = props.record?.state.transcript.items ?? [];
+  const retire = () => {
+    scope.active = false;
+    scope.revision++;
+    scope.sending = false;
+  };
+  const close = () => {
+    retire();
+    props.onClose();
+  };
+  const activate = () => {
+    retire();
+    props.onActivate();
+  };
+  const decide = (toolCallId: string, decision: ToolApprovalDecision) => {
+    if (!scope.active || scope.id !== props.conversationId)
+      return { ok: false, message: t("chat.toolApproval.failed") };
+    return answerToolApproval(toolCallId, decision, { conversationId: props.conversationId });
+  };
+
+  if (isApplePresentationRuntime()) {
+    return (
+      <NativeSplitConversationPane
+        {...props}
+        pendingApprovals={pendingApprovals}
+        onDecide={decide}
+        onClose={close}
+        onActivate={activate}
+        draft={draft}
+        onDraftChange={setDraft}
+        sendError={sendError}
+        submitting={submitting}
+        onSubmit={submit}
+        onError={setSendError}
+      />
+    );
+  }
 
   return (
     <VStack
@@ -92,7 +192,7 @@ export function SplitConversationPane(props: SplitConversationPaneProps) {
               size="sm"
               variant="ghost"
               isDisabled={props.loading || !props.record}
-              onClick={props.onActivate}
+              onClick={activate}
             />
             <IconButton
               label={t("chat.split.close")}
@@ -100,7 +200,7 @@ export function SplitConversationPane(props: SplitConversationPaneProps) {
               size="sm"
               variant="ghost"
               icon={<Icon icon={X} size="sm" color="inherit" />}
-              onClick={props.onClose}
+              onClick={close}
             />
           </HStack>
         }
@@ -144,6 +244,18 @@ export function SplitConversationPane(props: SplitConversationPaneProps) {
           <Banner status="info" title={t("chat.split.empty")} container="section" />
         </Center>
       )}
+      {pendingApprovals.length ? (
+        <ToolApprovalBar
+          pending={pendingApprovals}
+          onDecide={(id, decision) => Promise.resolve(decide(id, decision))}
+          onDecideAll={async (decision) => {
+            for (const approval of pendingApprovals) {
+              const result = decide(approval.toolCallId, decision);
+              if (!result.ok) throw new Error(result.message || t("chat.toolApproval.failed"));
+            }
+          }}
+        />
+      ) : null}
       {props.onSend ? (
         <VStack
           as="form"

@@ -22,6 +22,7 @@ export type BrowserControllerState = {
   sessions: BrowserSessionSummary[];
   activeSessionId: string | null;
   panelOpen: boolean;
+  panelFocusRequest: number;
   panelOpenSource: "agent" | "user" | null;
   busySessionIds: string[];
   humanAssistance: BrowserHumanAssistance | null;
@@ -157,6 +158,7 @@ export class BrowserSessionController {
     sessions: [],
     activeSessionId: null,
     panelOpen: false,
+    panelFocusRequest: 0,
     panelOpenSource: null,
     busySessionIds: [],
     humanAssistance: null,
@@ -397,6 +399,7 @@ export class BrowserSessionController {
         : this.state.activeSessionId;
     this.update({
       panelOpen: true,
+      panelFocusRequest: this.state.panelFocusRequest + (source === "user" ? 1 : 0),
       panelOpenSource: source,
       activeSessionId: nextSessionId,
       error: null,

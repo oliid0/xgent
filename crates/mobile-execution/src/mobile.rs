@@ -87,4 +87,8 @@ impl<R: Runtime> MobileExecution<R> {
             .run_mobile_plugin("cancel", request)
             .map_err(Into::into)
     }
+
+    pub fn write_input(&self, request: WriteInputRequest) -> crate::Result<WriteInputResponse> {
+        self.0.run_mobile_plugin("writeInput", request).map_err(Into::into)
+    }
 }

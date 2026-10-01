@@ -54,7 +54,6 @@ import {
   Zap,
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
-import { buildModelOptions } from "../../lib/chat/page/chatPageHelpers";
 import {
   isLocalAccessSecretSentinel,
   LOCAL_ACCESS_SECRET_SENTINEL,
@@ -65,7 +64,6 @@ import {
   isValidCustomHeaderKey,
   isValidCustomHeaderValue,
 } from "../../lib/providers/customHeaders";
-import { parseModelValue, toModelValue } from "../../lib/providers/llm";
 import {
   type ProviderUsageResult,
   testProviderUsage,
@@ -76,8 +74,6 @@ import {
   type CodexRequestFormat,
   type CustomProvider,
   getDefaultUsageQueryConfig,
-  normalizeModelFailoverSettings,
-  normalizeRetryErrorSettings,
   normalizeUsageQueryConfig,
   PROVIDER_RETRY_DEFAULT_MAX_RETRIES,
   PROVIDER_RETRY_MAX_RETRIES_LIMITS,
@@ -89,7 +85,6 @@ import {
   type UsageQueryConfig,
   type UsageQueryMode,
   updateCustomProviders,
-  updateCustomSettings,
 } from "../../lib/settings";
 import { createUuid } from "../../lib/shared/id";
 import { cn } from "../../lib/shared/utils";
@@ -101,6 +96,7 @@ import {
 import { CodexOAuthAccounts } from "./CodexOAuthAccounts";
 import { ModelFailoverSection } from "./ModelFailoverSection";
 import { ModelPicker } from "./modelPicker";
+import { providerRuntimeActions, runtimeModelOptions } from "./providerRuntimeSettings";
 import {
   buildProviderModelsFetchKey,
   createDraftModelConfig,
@@ -2190,64 +2186,17 @@ function ProviderAdvancedSettingsPanel(
 ) {
   const { settings, setSettings, providerType, onClose } = props;
   const { t } = useLocale();
-  const modelOptions = useMemo(() => buildModelOptions(settings), [settings]);
-  const conversationTitleModel = settings.customSettings.conversationTitleModel;
-  const commitMessageModel = settings.customSettings.commitMessageModel;
-  const selectedValue = conversationTitleModel
-    ? toModelValue(conversationTitleModel.customProviderId, conversationTitleModel.model)
-    : "";
-  // A stored model that is no longer among the active options still shows as
-  // selected (same fallback-entry approach as the cron prompt form).
-  const titleModelOptions =
-    conversationTitleModel && !modelOptions.some((option) => option.value === selectedValue)
-      ? [
-          ...modelOptions,
-          {
-            value: selectedValue,
-            label: conversationTitleModel.model,
-            providerName: conversationTitleModel.customProviderId,
-          },
-        ]
-      : modelOptions;
-  const commitSelectedValue = commitMessageModel
-    ? toModelValue(commitMessageModel.customProviderId, commitMessageModel.model)
-    : "";
-  const commitModelOptions =
-    commitMessageModel && !modelOptions.some((option) => option.value === commitSelectedValue)
-      ? [
-          ...modelOptions,
-          {
-            value: commitSelectedValue,
-            label: commitMessageModel.model,
-            providerName: commitMessageModel.customProviderId,
-          },
-        ]
-      : modelOptions;
-
-  function handleModelChange(key: "conversationTitleModel" | "commitMessageModel", value: string) {
-    // "" comes from the picker's follow-current entry and parses to undefined.
-    setSettings((prev) =>
-      updateCustomSettings(prev, {
-        [key]: parseModelValue(value) ?? undefined,
-      }),
-    );
-  }
-
-  function resetRuntimeConfiguration() {
-    setSettings((previous) => ({
-      ...previous,
-      modelFailover: normalizeModelFailoverSettings({}, previous.customProviders),
-      retryErrorSettings: normalizeRetryErrorSettings({}),
-      customProviders: updateCustomProviders(
-        previous,
-        previous.customProviders.map((provider) => ({
-          ...provider,
-          retryPolicy: undefined,
-          usageQuery: getDefaultUsageQueryConfig(),
-        })),
-      ).customProviders,
-    }));
-  }
+  const {
+    available: modelOptions,
+    value: selectedValue,
+    options: titleModelOptions,
+  } = useMemo(() => runtimeModelOptions(settings, "conversationTitleModel"), [settings]);
+  const { value: commitSelectedValue, options: commitModelOptions } = useMemo(
+    () => runtimeModelOptions(settings, "commitMessageModel"),
+    [settings],
+  );
+  const { setModel: handleModelChange, resetRuntimeConfiguration } =
+    providerRuntimeActions(setSettings);
 
   return (
     <VStack height="100%" minHeight={0} gap={0}>

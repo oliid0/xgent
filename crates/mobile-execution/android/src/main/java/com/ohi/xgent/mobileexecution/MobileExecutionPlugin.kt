@@ -45,12 +45,20 @@ class RunArgs {
     var cwd: String? = null
     var timeoutMs: Long? = null
     var stdinBase64: String? = null
+    var interactiveStdin: Boolean = false
     var wasi: WasiArgs? = null
 }
 
 @InvokeArg
 class CancelArgs {
     var runId: String? = null
+}
+
+@InvokeArg
+class WriteInputArgs {
+    var runId: String? = null
+    var dataBase64: String? = null
+    var eof: Boolean = false
 }
 
 @InvokeArg
@@ -69,6 +77,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
         Thread(task, "xgent-mobile-execution").apply { isDaemon = true }
     }
     private val activeProcesses = ConcurrentHashMap<String, Process>()
+    private val activeInputs = ConcurrentHashMap<String, CommandInputStream>()
     private val scheduledRuns = ConcurrentHashMap.newKeySet<String>()
     private val cancelledRuns = ConcurrentHashMap.newKeySet<String>()
     private val cancellationLock = Any()
@@ -103,6 +112,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                     externalWorkspaces.allowedRoots()
             },
             activeProcesses = activeProcesses,
+            activeInputs = activeInputs,
             cancelledRuns = cancelledRuns,
         )
     }
@@ -318,7 +328,13 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
                     invoke.resolve(cancelledPayload(request))
                     return@execute
                 }
-                invoke.resolve(runner.execute(request) { stream, bytes ->
+                invoke.resolve(runner.execute(request, onInputState = { ready, error ->
+                    trigger("inputState", JSObject().apply {
+                        put("runId", request.runId)
+                        put("ready", ready)
+                        put("error", error ?: org.json.JSONObject.NULL)
+                    })
+                }) { stream, bytes ->
                     trigger("output", JSObject().apply {
                         put("runId", request.runId)
                         put("stream", stream)
@@ -328,9 +344,28 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
             } catch (error: Exception) {
                 invoke.reject("Mobile command failed: ${error.message}")
             } finally {
-                activeProcesses.remove(request.runId)
+                activeProcesses.remove(request.runId)?.let { process ->
+                    if (process.isAlive) process.destroyForcibly()
+                }
+                activeInputs.remove(request.runId)?.close()
                 finishRun(request.runId)
             }
+        }
+    }
+
+    @Command
+    fun writeInput(invoke: Invoke) {
+        runCatching {
+            val args = invoke.parseArgs(WriteInputArgs::class.java)
+            val runId = requireRunId(args.runId)
+            val encoded = args.dataBase64.orEmpty()
+            require(encoded.length <= 24 * 1024 && encoded.matches(Regex("(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?"))) { "Input Base64 is invalid" }
+            val bytes = Base64.decode(encoded, Base64.NO_WRAP)
+            val input = activeInputs[runId] ?: error("This command has no open input stream")
+            input.enqueue(bytes, args.eof)
+            JSObject().apply { put("acceptedBytes", bytes.size); put("closed", args.eof) }
+        }.onSuccess(invoke::resolve).onFailure { error ->
+            invoke.reject("Could not send command input: ${error.message}")
         }
     }
 
@@ -476,8 +511,10 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
             cwd = cwd?.trim().orEmpty(),
             timeoutMs = (timeoutMs ?: DEFAULT_TIMEOUT_MS).coerceIn(MIN_TIMEOUT_MS, MAX_TIMEOUT_MS),
             stdin = decodedStdin,
+            interactiveStdin = interactiveStdin,
         ).also { request ->
             require(request.workdir.isNotBlank()) { "workdir is required" }
+            require(!request.interactiveStdin || (decodedStdin?.size ?: 0) <= 16 * 1024) { "Live initial input exceeds 16 KiB" }
             require(request.command.isNotBlank()) { "command is required" }
             require(request.command.length <= MAX_COMMAND_CHARS) {
                 "command exceeds $MAX_COMMAND_CHARS characters"

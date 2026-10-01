@@ -544,6 +544,7 @@ private struct XgentSheetView: View {
     }
     private var usesFullHeightContainer: Bool {
         visibleNodes.contains { $0.kind == .settingsLayout } ||
+            visibleNodes.contains { $0.kind == .terminalLayout } ||
             (visibleNodes.count == 1 && visibleNodes.first?.kind == .list)
     }
 

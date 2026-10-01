@@ -327,6 +327,8 @@ struct XgentIOSNode: View {
         case .colorInput:
             ColorPicker(node.label ?? "", selection: colorBinding, supportsOpacity: false)
                 .frame(minHeight: 44)
+        case .timeInput:
+            XgentTimeInput(node: node, document: document, model: model)
         case .textArea:
             textArea
         case .toggle:
@@ -368,6 +370,8 @@ struct XgentIOSNode: View {
             }
         case .slider:
             slider
+        case .numberInput:
+            XgentNumberInput(node: node, document: document, model: model)
         case .collapsible:
             XgentDisclosure(node: node, document: document, model: model)
                 .id(node.value?.text ?? node.id)
@@ -417,8 +421,16 @@ struct XgentIOSNode: View {
             taskStep
         case .browserViewport:
             browserViewport
+        case .terminalLayout:
+            XgentTerminalLayout(node: node, document: document, model: model)
+        case .terminalToolbar:
+            XgentTerminalToolbar(node: node, document: document, model: model)
+        case .terminalViewport:
+            XgentTerminalViewport(node: node, document: document, model: model)
         case .mediaPreview:
             mediaPreview
+        case .htmlPreview:
+            XgentHTMLPreview(source: node.text ?? "", encoded: node.value?.text ?? "", label: node.label ?? "HTML preview")
         case .filePicker:
             XgentAttachmentPicker(
                 node: node,
@@ -1035,6 +1047,7 @@ struct XgentIOSNode: View {
                 .onChange(of: proxy.frame(in: .global)) { _, rect in
                     reportBrowserViewport(rect, visible: true)
                 }
+                .onDisappear { reportBrowserViewport(proxy.frame(in: .global), visible: false) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityLabel(node.label ?? "Browser content")

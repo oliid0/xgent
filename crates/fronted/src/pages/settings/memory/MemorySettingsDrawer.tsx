@@ -26,6 +26,7 @@ import {
   memoryQuotaSummary,
 } from "../../../lib/memory/api";
 import { deriveQuotaLadder } from "../../../lib/memory/organizer/quota";
+import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
 import {
   type AppSettings,
   computeNextMemoryOrganizerRunAt,
@@ -34,6 +35,11 @@ import {
   type MemoryOrganizerScope,
   updateMemorySettings,
 } from "../../../lib/settings";
+import { presentationControls } from "../../../presentation/controls";
+import { NativeSurface } from "../../../presentation/NativeSurface";
+import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
+import type { PresentationNode } from "../../../presentation/types";
+import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import { OrganizerHistoryModal } from "./OrganizerHistoryModal";
 import {
   formatTime,
@@ -72,6 +78,7 @@ export function MemorySettingsDrawer(props: {
   onRequestWipe: () => void | Promise<void>;
   onOrganizerRunQueued?: (runId: string) => void;
   onMemoryChanged?: () => void;
+  nativeSettingsSurfaceId?: string;
 }) {
   const {
     modelOptions,
@@ -284,10 +291,234 @@ export function MemorySettingsDrawer(props: {
   if (historyOpen) {
     return (
       <OrganizerHistoryModal
+        settings={settings}
+        nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
         t={t}
         workdir={workdir}
         onClose={() => setHistoryOpen(false)}
         onMemoryChanged={onMemoryChanged}
+      />
+    );
+  }
+
+  if (isApplePresentationRuntime()) {
+    const c = presentationControls();
+    const busy = saving || organizerSubmitting;
+    const options = (empty: string) => [
+      { value: "", label: t(empty) },
+      ...modelOptions.map((option) => ({ value: option.value, label: option.label })),
+    ];
+    const nodes: PresentationNode[] = [
+      c.action("back", t("settings.memorySettingsClose"), onClose, !busy),
+    ];
+    if (error)
+      nodes.push({ id: "memory-settings-error", kind: "Banner", label: error, status: "error" });
+    if (notice)
+      nodes.push({
+        id: "memory-settings-notice",
+        kind: "Banner",
+        label: notice,
+        status: "completed",
+      });
+    if (organizerFeedback)
+      nodes.push({ id: "memory-organizer-feedback", kind: "Text", text: organizerFeedback });
+    if (quotaLadder.bannerKey && quotaLadder.tightestScope)
+      nodes.push({
+        id: "memory-quota-warning",
+        kind: "Banner",
+        status: "error",
+        label: t(quotaLadder.bannerKey)
+          .replace("{scope}", memoryScopeLabel(quotaLadder.tightestScope.scope, t))
+          .replace("{used}", String(quotaLadder.tightestScope.used))
+          .replace("{limit}", String(quotaLadder.tightestScope.limit)),
+      });
+    if (drawerWipeConfirmOpen) {
+      nodes.push(
+        c.group("memory-settings-wipe-confirm", t("settings.memoryWipeConfirmTitle"), [
+          {
+            id: "memory-wipe-description",
+            kind: "Text",
+            text: t("settings.memoryWipeConfirmDescription"),
+          },
+          {
+            ...c.action(
+              "memory-settings-wipe-confirm-action",
+              t("settings.memoryWipeAll"),
+              async () => {
+                await onRequestWipe();
+                setDrawerWipeConfirmOpen(false);
+              },
+              !busy,
+            ),
+            destructive: true,
+          },
+          c.action(
+            "memory-settings-wipe-cancel",
+            t("settings.memoryCancel"),
+            () => setDrawerWipeConfirmOpen(false),
+            !busy,
+          ),
+        ]),
+      );
+    } else {
+      const time = c.input(
+        "memory-organizer-time",
+        t("settings.memoryOrganizerTime"),
+        timeLocalDraft,
+        setTimeLocalDraft,
+        false,
+        !organizerTimingDisabled && !busy,
+      );
+      c.handlers.get(time.action!)!.accepts = (value) =>
+        typeof value === "string" &&
+        value.length === 5 &&
+        /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+      nodes.push(
+        c.group("memory-driver-models", t("settings.memoryDriverModels"), [
+          c.select(
+            "memory-organizer-model",
+            t("settings.memoryOrganizerModel"),
+            memoryOrganizerModel,
+            options("settings.memoryModelNone"),
+            handleOrganizerModelChange,
+            !busy,
+          ),
+          c.select(
+            "memory-summary-model",
+            t("settings.memorySummaryModel"),
+            conversationSummaryModel,
+            options("settings.memorySummaryModelFollow"),
+            handleSummaryModelChange,
+            !busy,
+          ),
+          ...(modelOptions.length
+            ? []
+            : [
+                {
+                  id: "memory-model-empty",
+                  kind: "Text" as const,
+                  text: t("settings.memoryModelEmpty"),
+                },
+              ]),
+        ]),
+      );
+      nodes.push(
+        c.group("memory-organizer-settings", t("settings.memoryOrganizerTitle"), [
+          c.toggle(
+            "memory-organizer-enabled",
+            t("settings.memoryOrganizerToggle"),
+            settings.memory.organizerEnabled,
+            () => handleOrganizerToggle(),
+            canEnableOrganizer && !busy,
+          ),
+          c.select(
+            "memory-organizer-frequency",
+            t("settings.memoryOrganizerSchedule"),
+            settings.memory.organizerSchedule.frequency,
+            MEMORY_ORGANIZER_FREQUENCIES.map((item) => ({
+              value: item.value,
+              label: t(item.labelKey),
+            })),
+            (frequency) =>
+              updateOrganizerSchedule({ frequency: frequency as MemoryOrganizerFrequency }),
+            canEnableOrganizer && !busy,
+          ),
+          { ...time, kind: "TimeInput" },
+          ...(settings.memory.organizerSchedule.frequency === "weekly"
+            ? [
+                c.select(
+                  "memory-organizer-weekday",
+                  t("settings.memoryOrganizerWeekday"),
+                  String(settings.memory.organizerSchedule.weekday ?? 1),
+                  MEMORY_ORGANIZER_WEEKDAYS.map((key, index) => ({
+                    value: String(index),
+                    label: t(key),
+                  })),
+                  (weekday) => updateOrganizerSchedule({ weekday: Number(weekday) }),
+                  !organizerTimingDisabled && !busy,
+                ),
+              ]
+            : []),
+          c.select(
+            "memory-organizer-scope",
+            t("settings.memoryOrganizerScope"),
+            settings.memory.organizerScope,
+            MEMORY_ORGANIZER_SCOPES.map((item) => ({ value: item.value, label: t(item.labelKey) })),
+            (organizerScope) =>
+              setSettings((prev) =>
+                updateMemorySettings(prev, {
+                  organizerScope: organizerScope as MemoryOrganizerScope,
+                }),
+              ),
+            !busy,
+          ),
+          c.select(
+            "memory-organizer-mode",
+            t("settings.memoryOrganizerMode"),
+            settings.memory.organizerMode,
+            MEMORY_ORGANIZER_MODES.map((item) => ({ value: item.value, label: t(item.labelKey) })),
+            (organizerMode) =>
+              setSettings((prev) =>
+                updateMemorySettings(prev, { organizerMode: organizerMode as MemoryOrganizerMode }),
+              ),
+            !busy,
+          ),
+          ...(settings.memory.organizerEnabled && settings.memory.organizerNextRunAt
+            ? [
+                {
+                  id: "memory-next-run",
+                  kind: "Text" as const,
+                  text: `${t("settings.memoryOrganizerNextRun")} ${formatTime(settings.memory.organizerNextRunAt)}`,
+                },
+              ]
+            : []),
+          c.action(
+            "memory-organizer-history",
+            t("settings.memoryOrganizerHistory"),
+            () => setHistoryOpen(true),
+            !busy,
+          ),
+          c.action(
+            "memory-organizer-run",
+            t("settings.memoryOrganizerRunNow"),
+            handleRunNow,
+            !!settings.memory.organizerModel && !busy,
+          ),
+        ]),
+      );
+      nodes.push(
+        c.group("memory-danger-zone", t("settings.memorySettingsDangerZone"), [
+          {
+            id: "memory-wipe-description",
+            kind: "Text",
+            text: t("settings.memorySettingsWipeDescription"),
+          },
+          {
+            ...c.action(
+              "memory-settings-wipe",
+              t("settings.memoryWipeAll"),
+              () => setDrawerWipeConfirmOpen(true),
+              !busy,
+            ),
+            destructive: true,
+          },
+        ]),
+      );
+    }
+    return (
+      <NativeSurface
+        sessionSurface={props.nativeSettingsSurfaceId}
+        document={{
+          mode: "sheet",
+          title: t("settings.memorySettingsTitle"),
+          appearance: settings.theme,
+          formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
+          theme: createNativePresentationTheme(settings, isNativeMobileRuntime()),
+          nodes,
+          dismissAction: "back",
+        }}
+        handlers={c.handlers}
+        onError={(error) => console.error("Native memory settings failed", error)}
       />
     );
   }

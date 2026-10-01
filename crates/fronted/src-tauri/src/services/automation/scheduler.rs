@@ -579,6 +579,7 @@ async fn execute_mobile_bash(
             max_timeout_ms: Some(timeout_ms),
             provider_id: None,
             run_id: Some(format!("cron-{}-{}", task.id, Uuid::new_v4())),
+            interactive_stdin: false,
         },
     )
     .await;

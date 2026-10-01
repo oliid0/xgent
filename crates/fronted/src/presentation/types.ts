@@ -93,7 +93,15 @@ export type PresentationDocument = {
   version: 1;
   surface: string;
   revision: number;
-  mode: "root" | "sheet" | "alert" | "sidebar";
+  mode: "root" | "sheet" | "alert" | "sidebar" | "panel";
+  workspacePanel?: {
+    focusRequest: number;
+    openLabel: string;
+    returnLabel: string;
+    expandLabel: string;
+    restoreLabel: string;
+    closeLabel: string;
+  };
   title: string;
   appearance: "system" | "light" | "dark";
   formFactor?: "mobile" | "desktop";

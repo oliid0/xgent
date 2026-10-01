@@ -48,7 +48,7 @@ function harness(options = {}) {
   const run = async (command) => {
     render().handlers.get("command").run(command);
     await render().handlers.get("run").run(null);
-    return calls.at(-1).args;
+    return calls.at(-1)?.args;
   };
   function find(type, predicate = () => true, node = hooks.render(() => MobileTerminalPanel(props))) {
     if (Array.isArray(node)) return node.map(item => find(type, predicate, item)).find(Boolean);
@@ -152,8 +152,11 @@ test("native terminal streams UTF-8 stdout and stderr, then replaces them with t
   const running = h.render().handlers.get("run").run(null);
   await tick();
   const runId = h.calls.find(call => call.command === "shell_run").args.run_id;
-  assert.deepEqual(h.subscriptions, [{ plugin: "mobile-execution", event: "output" }]);
-  assert.equal(h.listenerCount, 1);
+  assert.deepEqual(h.subscriptions, [
+    { plugin: "mobile-execution", event: "inputState" },
+    { plugin: "mobile-execution", event: "output" },
+  ]);
+  assert.equal(h.listenerCount, 2);
   const chinese = Buffer.from("中文");
   h.emitOutput(outputEvent(runId, "stdout", chinese.subarray(0, 2)));
   h.emitOutput(outputEvent(runId, "stdout", chinese.subarray(2)));
@@ -196,7 +199,7 @@ test("Android terminal shows live output and ignores late output from the previo
   assert.equal(h.find("CodeBlock", value => value.title === "stdout")?.props.code, "live new");
   old.resolve({ exitCode: 0, stdout: "obsolete", stderr: "", cancelled: false });
   await tick();
-  assert.equal(h.listenerCount, 1);
+  assert.equal(h.listenerCount, 2);
   assert.equal(JSON.stringify(h.find("MobileFullscreenPanel")).includes("obsolete"), false);
   next.resolve({ exitCode: 0, stdout: "done", stderr: "", cancelled: false });
   await tick();
@@ -204,7 +207,9 @@ test("Android terminal shows live output and ignores late output from the previo
 });
 
 test("native output listener failure still executes and displays the command result", async () => {
-  const h = harness({ native: true, listen: async () => { throw new Error("unavailable"); } });
+  const h = harness({ native: true, listen: async (_plugin, event) => {
+    if (event === "output") throw new Error("unavailable");
+  } });
   await h.run("pwd");
   assert.equal(h.calls.filter(call => call.command === "shell_run").length, 1);
   assert.equal(h.listenerCount, 0);
@@ -335,4 +340,140 @@ test("Android terminal form uses the same scoped run and retires old output", as
   next.resolve({ exitCode: 0, stdout: "new output", stderr: "", cancelled: false });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(JSON.stringify(h.find("MobileFullscreenPanel")).includes("new output"), true);
+});
+
+function inputHarness(apple, extra = {}) {
+  const command = deferred();
+  const h = harness({ apple, native: true, platform: apple ? "ios" : "android",
+    invoke: (name, args) => {
+      if (name === "shell_run") return command.promise;
+      if (name === "shell_cancel") return { cancelled: true };
+      if (extra.write) return extra.write(args.request);
+      return { acceptedBytes: Buffer.from(args.request.dataBase64 ?? "", "base64").length,
+        closed: args.request.eof };
+    }, ...extra });
+  const input = (value) => apple
+    ? h.render().handlers.get("program-input").run(value)
+    : h.find("TextInput", p => p.label === "chat.mobileTerminal.programInput").props.onChange(value);
+  const send = (eof = false) => apple
+    ? h.render().handlers.get(eof ? "input-eof" : "send-input").run(null)
+    : h.find("Button", p => p.label === `chat.mobileTerminal.${eof ? "inputEof" : "sendInput"}`).props.onClick();
+  const enabled = () => apple ? h.render().handlers.get("send-input").enabled
+    : !h.find("Button", p => p.label === "chat.mobileTerminal.sendInput").props.isDisabled;
+  const start = async () => {
+    let running;
+    if (apple) {
+      h.render().handlers.get("command").run("read answer; printf %s \"$answer\"");
+      running = h.render().handlers.get("run").run(null);
+    } else {
+      h.find("TextInput").props.onChange("read answer; printf %s \"$answer\"");
+      running = h.find("HStack", p => p.as === "form").props.onSubmit({ preventDefault() {} });
+    }
+    await tick();
+    const request = h.calls.find(c => c.command === "shell_run").args;
+    return { running, request, runId: request.run_id };
+  };
+  return Object.assign(h, { start, input, send, enabled, command,
+    writes: () => h.calls.filter(c => c.command === "plugin:mobile-execution|write_input"),
+    ready: runId => h.emitOutput({ runId, ready: true }) });
+}
+
+test("iOS and Android send Unicode stdin and empty lines, then explicit EOF to the same local run", async () => {
+  for (const apple of [true, false]) {
+    const h = inputHarness(apple);
+    const { running, request, runId } = await h.start();
+    assert.equal(request.interactive_stdin, true);
+    assert.equal(h.enabled(), false);
+    await h.send();
+    assert.equal(h.writes().length, 0);
+    h.ready("wrong-run"); assert.equal(h.enabled(), false);
+    h.ready(runId); assert.equal(h.enabled(), true);
+    h.input("你好 👋"); await h.send();
+    assert.equal(Buffer.from(h.writes()[0].args.request.dataBase64, "base64").toString(), "你好 👋\n");
+    await h.send();
+    assert.equal(Buffer.from(h.writes()[1].args.request.dataBase64, "base64").toString(), "\n");
+    h.input("not sent by EOF"); await h.send(true);
+    assert.deepEqual(h.writes()[2].args.request, { runId, dataBase64: null, eof: true });
+    assert.equal(h.enabled(), false);
+    await h.send(); assert.equal(h.writes().length, 3);
+    h.command.resolve({ exitCode: 0, stdout: "done", stderr: "", cancelled: false });
+    await running; await tick();
+    assert.equal(h.render()?.handlers?.has("send-input") ?? false, false);
+    h.unmount();
+  }
+});
+
+test("input queue rejection keeps the draft, prevents duplicate sends, and allows a real retry", async () => {
+  for (const apple of [true, false]) {
+    const first = deferred(); let count = 0;
+    const h = inputHarness(apple, { write: request => {
+      if (++count === 1) return first.promise;
+      return { acceptedBytes: Buffer.from(request.dataBase64, "base64").length, closed: false };
+    } });
+    const { runId } = await h.start(); h.ready(runId); h.input("retry me");
+    const sending = h.send(); await h.send();
+    assert.equal(h.writes().length, 1); assert.equal(h.enabled(), false);
+    first.reject(new Error("queue full")); await sending; await tick();
+    assert.equal(h.enabled(), true);
+    assert.ok(JSON.stringify(apple ? h.render().document : h.find("MobileFullscreenPanel")).includes("queue full"));
+    await h.send();
+    assert.equal(Buffer.from(h.writes()[1].args.request.dataBase64, "base64").toString(), "retry me\n");
+    h.unmount(); h.command.resolve({ exitCode: 0, stdout: "", stderr: "", cancelled: false });
+    await tick();
+  }
+});
+
+test("oversized Unicode input is measured in bytes and retained until shortened", async () => {
+  const h = inputHarness(true); const { runId } = await h.start(); h.ready(runId);
+  h.input("文".repeat(6000)); await h.send();
+  assert.equal(h.writes().length, 0);
+  assert.ok(JSON.stringify(h.render().document).includes("chat.mobileTerminal.inputTooLarge"));
+  h.input("文".repeat(100)); await h.send(); assert.equal(h.writes().length, 1);
+  h.unmount(); h.command.resolve({ exitCode: 0, stdout: "", stderr: "", cancelled: false }); await tick();
+});
+
+test("input observation failure prevents starting a process with an unusable input pipe", async () => {
+  const h = harness({ native: true, listen: async (_plugin, event) => {
+    if (event === "inputState") throw new Error("input subscription failed");
+  } });
+  await h.run("read answer");
+  assert.equal(h.calls.some(c => c.command === "shell_run"), false);
+  assert.ok(JSON.stringify(h.render().document).includes("input subscription failed"));
+});
+
+test("close retires input and listeners immediately, before parent props or the command result change", async () => {
+  const h = inputHarness(true); const { runId } = await h.start(); h.ready(runId); h.input("stale");
+  const old = h.render(); old.handlers.get("close").run(null);
+  await old.handlers.get("send-input").run(null);
+  h.emitOutput({ runId, ready: true });
+  assert.equal(h.writes().length, 0);
+  assert.equal(h.listenerCount, 0);
+  assert.ok(h.calls.some(c => c.command === "shell_cancel" && c.args.run_id === runId));
+  h.command.resolve({ exitCode: 0, stdout: "obsolete", stderr: "", cancelled: false }); await tick();
+  assert.equal(JSON.stringify(h.render().document).includes("obsolete"), false);
+});
+
+test("a failed stop is visible and the same active run can be cancelled again", async () => {
+  const command = deferred(); let attempts = 0;
+  const h = harness({ native: true, invoke: (name) => {
+    if (name === "shell_run") return command.promise;
+    if (name === "shell_cancel" && ++attempts === 1) throw new Error("stop failed");
+    return { cancelled: true };
+  } });
+  h.render().handlers.get("command").run("cat");
+  const running = h.render().handlers.get("run").run(null); await tick();
+  await h.render().handlers.get("cancel").run(null);
+  assert.ok(JSON.stringify(h.render().document).includes("stop failed"));
+  await h.render().handlers.get("cancel").run(null); assert.equal(attempts, 2);
+  command.resolve({ exitCode: 0, stdout: "", stderr: "", cancelled: true }); await running;
+  h.unmount();
+});
+
+test("PC delegation and non-terminal modes never opt into local mobile stdin", async () => {
+  for (const settings of [{ preferLanPcExecution: true }, { mode: "git" }, { mode: "ssh" }]) {
+    const h = harness({ native: true }); Object.assign(h.props, settings);
+    const request = await h.run("pwd");
+    assert.equal(request.interactive_stdin, undefined);
+    assert.equal(h.subscriptions.some(s => s.event === "inputState"), false);
+  }
 });
