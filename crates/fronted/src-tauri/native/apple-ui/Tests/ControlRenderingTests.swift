@@ -136,7 +136,16 @@ final class ControlRenderingTests: XCTestCase {
         window.makeKeyAndVisible()
         defer { window.isHidden = true; window.rootViewController = nil }
         try await Task.sleep(nanoseconds: 300_000_000)
-        let field = try XCTUnwrap(textField(in: window))
+        let nativeFields = textFields(in: window)
+        let diagnostic = XCTAttachment(string: nativeFields.map { field in
+            "id=\(field.accessibilityIdentifier ?? "nil") class=\(type(of: field)) secure=\(field.isSecureTextEntry) AX=\(field.isAccessibilityElement) hidden=\(field.isHidden) frame=\(field.frame) delegate=\(String(describing: field.delegate)) targets=\(field.allTargets.count)"
+        }.joined(separator: "\n"))
+        diagnostic.name = "secure-field-native-control-identity"
+        diagnostic.lifetime = .keepAlways
+        add(diagnostic)
+        let field = try XCTUnwrap(textField(in: window, identifier: "password"))
+        XCTAssertTrue(field.delegate is XgentIOSSecretField.Coordinator)
+        XCTAssertFalse(field.allTargets.isEmpty)
         XCTAssertTrue(field.isSecureTextEntry)
         XCTAssertEqual(field.autocapitalizationType, .none)
         XCTAssertEqual(field.autocorrectionType, .no)
@@ -158,10 +167,13 @@ final class ControlRenderingTests: XCTestCase {
         XCTAssertEqual(actions.count, before)
     }
 
-    @MainActor private func textField(in view: UIView) -> UITextField? {
-        if let field = view as? UITextField { return field }
-        for child in view.subviews { if let field = textField(in: child) { return field } }
+    @MainActor private func textField(in view: UIView, identifier: String) -> UITextField? {
+        if let field = view as? UITextField, field.accessibilityIdentifier == identifier { return field }
+        for child in view.subviews { if let field = textField(in: child, identifier: identifier) { return field } }
         return nil
+    }
+    @MainActor private func textFields(in view: UIView) -> [UITextField] {
+        (view as? UITextField).map { [$0] } ?? view.subviews.flatMap { textFields(in: $0) }
     }
     #endif
 

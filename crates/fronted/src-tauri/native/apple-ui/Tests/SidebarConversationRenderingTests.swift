@@ -42,6 +42,9 @@ final class SidebarConversationRenderingTests: XCTestCase {
                 defer { window.isHidden = true; window.rootViewController = nil }
                 host.view.layoutIfNeeded()
                 try await Task.sleep(nanoseconds: 300_000_000)
+                // SnapshotTesting's UIView strategy reparents then removes
+                // this view. Parse while it is still mounted in its real host.
+                let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
                 let strategy = Snapshotting<UIView, UIImage>.image(size: CGSize(width: width, height: 720))
                 let image = await withCheckedContinuation { continuation in
                     strategy.snapshot(host.view).run { continuation.resume(returning: $0) }
@@ -60,7 +63,6 @@ final class SidebarConversationRenderingTests: XCTestCase {
                 attachment.lifetime = .keepAlways
                 add(attachment)
                 #if os(iOS)
-                let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
                 let diagnostic = XCTAttachment(string: String(decoding: try encoder.encode(hierarchy), as: UTF8.self))

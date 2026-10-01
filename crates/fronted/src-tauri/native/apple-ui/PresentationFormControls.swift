@@ -22,14 +22,28 @@ struct XgentTextInput: View {
         else { TextField(node.text ?? "", text: value) }
     }
 
+    @ViewBuilder private var accessibleEntry: some View {
+        #if os(iOS)
+        if node.secure == true {
+            // UIKit owns the secure trait and label. A SwiftUI AX wrapper
+            // replaces that native field with a traitless virtual element.
+            entry
+        } else {
+            entry.accessibilityIdentifier(node.id)
+                .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
+        }
+        #else
+        entry.accessibilityIdentifier(node.id)
+            .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
+        #endif
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             XgentFieldLabel(node: node)
-            entry
+            accessibleEntry
                 .textFieldStyle(.plain)
                 .modifier(XgentFieldSurface(node: node, active: secretFocused))
-                .accessibilityIdentifier(node.id)
-                .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
                 #if os(iOS)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()

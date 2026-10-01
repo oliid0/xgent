@@ -144,15 +144,14 @@ struct XgentFieldSurface: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     @FocusState private var focused: Bool
 
-    func body(content: Content) -> some View {
+    @ViewBuilder func body(content: Content) -> some View {
         let palette = theme.palette(for: colorScheme)
         #if os(iOS)
         let metrics = XgentControlMetricsAdapter(node: node, theme: theme, mobile: true)
         #else
         let metrics = XgentControlMetricsAdapter(node: node, theme: theme, mobile: false)
         #endif
-        content
-            .focused($focused)
+        let surface = content
             .modifier(XgentControlTypography(node: node))
             .padding(.horizontal, metrics.horizontalPadding)
             .padding(.vertical, CGFloat(theme.spacing.xs))
@@ -163,6 +162,12 @@ struct XgentFieldSurface: ViewModifier {
                     .stroke(Color(xgentHex: focused || active ? palette.accent : palette.emphasizedBorder), lineWidth: focused || active ? 2 : 1)
                     .allowsHitTesting(false)
             }
+        #if os(iOS)
+        if node.secure == true { surface }
+        else { surface.focused($focused) }
+        #else
+        surface.focused($focused)
+        #endif
     }
 }
 
