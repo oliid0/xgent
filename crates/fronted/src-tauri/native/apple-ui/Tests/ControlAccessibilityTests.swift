@@ -34,6 +34,13 @@ final class ControlAccessibilityTests: XCTestCase {
 
                 let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
                 let elements = hierarchy.flattenToElements()
+                // Preserve the real AX tree even when an assertion fails.
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                let attachment = XCTAttachment(string: String(decoding: try encoder.encode(hierarchy), as: UTF8.self))
+                attachment.name = "controls-accessibility-\(Int(width))-\(size == .large ? "standard" : "large-dark")"
+                attachment.lifetime = .keepAlways
+                add(attachment)
                 let install = try XCTUnwrap(elements.first { $0.identifier == "install" && $0.traits.contains(.button) })
                 XCTAssertEqual(install.label, "Install Shell environment and software packages")
                 let disabled = try XCTUnwrap(elements.first { $0.identifier == "unavailable" && $0.traits.contains(.button) })
@@ -62,12 +69,6 @@ final class ControlAccessibilityTests: XCTestCase {
                     for previous in bounds { XCTAssertFalse(previous.intersects(rect), "Independent controls must not overlap") }
                     bounds.append(rect)
                 }
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                let attachment = XCTAttachment(string: String(decoding: try encoder.encode(hierarchy), as: UTF8.self))
-                attachment.name = "controls-accessibility-\(Int(width))-\(size == .large ? "standard" : "large-dark")"
-                attachment.lifetime = .keepAlways
-                add(attachment)
             }
         }
     }

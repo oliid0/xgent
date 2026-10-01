@@ -9,6 +9,9 @@ function sidebarSnapshot(conversations = []) {
     workspaceHistory: new Map(),
     recentHistory: { limit: 80, hasMore: false, loading: false, loaded: true, error: null },
     hasMore: false,
+    mutations: new Map(),
+    mutationErrors: new Map(),
+    runningConversationIds: new Set(),
   };
 }
 
@@ -75,6 +78,7 @@ function harness(overrides = {}, options = {}) {
     isSending: false, errorMessage: null, hasMoreHistory: false, pendingApprovals: [],
     projects: [], attachmentsEnabled: true, uploads: [], isUploading: false,
     onSend() {}, onStop() {}, onSelectModel() {}, onSelectConversation() {}, onSelectProject() {},
+    onConversationDeleted() {}, onConversationCwdChanged() {},
     queuedTurns: [], onRunQueuedTurnNow() {}, onMoveQueuedTurnUp() {}, onEditQueuedTurn() {}, onRemoveQueuedTurn() {},
     onNewConversation() {}, onOpenSettings() {}, onOpenRemote() {}, onOpenBrowser() {},
     onOpenSkillsHub() {}, onOpenMcpHub() {},
@@ -94,7 +98,9 @@ function harness(overrides = {}, options = {}) {
     lastSurfaces = surfaces;
     registry.register("chat", surfaces[0].props.handlers);
     for (const surface of surfaces.slice(1)) {
-      registry.register(surface.props.document.mode === "sidebar" ? "sidebar" : "tools", surface.props.handlers);
+      const title = surface.props.document.title;
+      registry.register(surface.props.document.mode === "sidebar" ? "sidebar"
+        : title === "chat.conversationRename" || title === "chat.conversationDelete" ? "conversation-dialog" : "tools", surface.props.handlers);
     }
     return surfaces[0].props.document;
   };
@@ -461,7 +467,7 @@ test("native sidebar keeps root folders visible and nests grouped workspaces and
   assert.equal((await h.dispatch("project:a", null, "sidebar")).ok, true);
   nodes = rows();
   assert.equal(nodes.find((node) => node.id === "workspace-conversation:work-a").indent, 54);
-  assert.equal(nodes.find((node) => node.id === "workspace-conversation:work-a").variant, "sidebar-conversation");
+  assert.equal(nodes.find((node) => node.id === "workspace-conversation:work-a").variant, "sidebar-conversation-row");
   assert.equal(nodes.find((node) => node.id === "workspace-conversation:work-a").icon, undefined);
   assert.equal((await h.dispatch("group:travel", null, "sidebar")).ok, true);
   nodes = rows();
@@ -808,11 +814,56 @@ test("native sidebar keeps workspace conversations nested above ordinary recent 
   const list = h.documents().find((item) => item.mode === "sidebar")
     .nodes[0].children.find((node) => node.id === "sidebar-list").children;
   assert.ok(list.some((node) => node.id === "workspace-conversation:work" && node.indent === 36));
-  assert.ok(list.some((node) => node.id === "conversation:chat" && node.variant === "sidebar-conversation"));
+  assert.ok(list.some((node) => node.id === "conversation:chat" && node.variant === "sidebar-conversation-row"));
   assert.ok(!list.some((node) => node.id === "conversation:work"));
   assert.equal((await h.dispatch("workspace-conversation:work", null, "sidebar")).ok, true);
   assert.deepEqual(selected, ["project", "work"]);
   h.unmount();
+});
+
+test("native conversation dialogs persist rename/delete and update the active runtime only after success", async () => {
+  for (const mobile of [true, false]) {
+    const storeLoader = createTsModuleLoader();
+    const { createSidebarStore } = storeLoader.loadModule("src/lib/sidebar/store.ts");
+    let item = { id: "conversation", title: "Original", providerId: "p", model: "m", createdAt: 1, updatedAt: 1 };
+    let deleteFails = false;
+    const removed = [];
+    const store = createSidebarStore({
+      listConversations: async () => ({ items: [item], totalCount: 1 }), listWorkdirs: async () => [],
+      subscribeEvents: () => () => {},
+      renameConversation: async (_id, title) => item = { ...item, title, updatedAt: 2 },
+      deleteConversation: async () => { if (deleteFails) throw Error("offline"); },
+    });
+    store.upsertLocal(item);
+    const h = harness({ sidebarStore: store, onConversationDeleted: id => removed.push(id) }, { mobile });
+    if (!h.documents().some(doc => doc.mode === "sidebar")) await h.dispatch("sidebar");
+    h.render();
+    const opened = await h.dispatch("conversation-actions:conversation:rename", null, "sidebar");
+    assert.equal(opened.ok, true, `${opened.error}; mobile=${mobile}; documents=${h.documents().map(doc => doc.mode).join(",")}`);
+    h.render();
+    assert.ok(h.documents().some(doc => doc.title === "chat.conversationRename"), `rename dialog on mobile=${mobile}`);
+    const edited = await h.dispatch("conversation-title", "   Updated   title   ", "conversation-dialog");
+    assert.equal(edited.ok, true, edited.error);
+    h.render();
+    assert.equal((await h.dispatch("confirm", null, "conversation-dialog")).ok, true);
+    assert.equal(store.peek("conversation").title, "Updated title");
+    h.render();
+    assert.equal(h.documents().some(doc => doc.title === "chat.conversationRename"), false);
+    await h.dispatch("conversation-actions:conversation:delete", null, "sidebar");
+    h.render();
+    assert.equal(store.peek("conversation").title, "Updated title", "Opening confirmation must not delete");
+    deleteFails = true;
+    assert.equal((await h.dispatch("confirm", null, "conversation-dialog")).ok, false);
+    h.render();
+    assert.deepEqual(removed, []);
+    assert.ok(store.peek("conversation"));
+    assert.ok(h.documents().some(doc => doc.title === "chat.conversationDelete"), "Failure preserves retry/cancel");
+    deleteFails = false;
+    assert.equal((await h.dispatch("confirm", null, "conversation-dialog")).ok, true);
+    assert.deepEqual(removed, ["conversation"]);
+    assert.equal(store.peek("conversation"), undefined);
+    h.unmount();
+  }
 });
 
 test("composer activity strip keeps tool preview left and todo progress right", () => {

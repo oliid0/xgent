@@ -81,7 +81,9 @@ extension XgentNodeView {
         case .treeRow:
             nativeTreeRow
         case .navigationRow:
-            navigationRow
+            if node.variant == "sidebar-conversation-row" {
+                XgentSidebarConversationRow(node: node, document: document, model: model)
+            } else { navigationRow }
         case .chatLayout:
             chatLayout
         case .composer:

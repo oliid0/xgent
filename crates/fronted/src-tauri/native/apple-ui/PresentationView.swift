@@ -263,12 +263,19 @@ private struct XgentNodeControlModifier: ViewModifier {
     let controlSize: ControlSize
     let busy: Bool
 
-    func body(content: Content) -> some View {
-        content
-            .controlSize(controlSize)
-            .disabled(node.disabled == true || busy)
-            .accessibilityIdentifier(node.id)
-            .modifier(XgentAccessibilityModifier(node: node))
+    @ViewBuilder func body(content: Content) -> some View {
+        if node.variant == "sidebar-conversation-row" {
+            // Selection and the menu retain their own accessibility identities.
+            content.controlSize(controlSize)
+                .disabled(node.disabled == true || busy)
+                .accessibilityElement(children: .contain)
+        } else {
+            content
+                .controlSize(controlSize)
+                .disabled(node.disabled == true || busy)
+                .accessibilityIdentifier(node.id)
+                .modifier(XgentAccessibilityModifier(node: node))
+        }
     }
 }
 

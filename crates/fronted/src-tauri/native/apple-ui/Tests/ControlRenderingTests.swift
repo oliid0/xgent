@@ -140,14 +140,19 @@ final class ControlRenderingTests: XCTestCase {
         XCTAssertTrue(field.isSecureTextEntry)
         XCTAssertEqual(field.autocapitalizationType, .none)
         XCTAssertEqual(field.autocorrectionType, .no)
+        XCTAssertEqual(field.textContentType, .oneTimeCode)
         XCTAssertTrue(field.becomeFirstResponder())
+        // Allow SwiftUI to finish its focus update before delivering the edit.
+        try await Task.sleep(nanoseconds: 100_000_000)
         field.insertText("test-key")
+        field.sendActions(for: .editingChanged)
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertEqual(actions.last?.action, "key")
         XCTAssertEqual(actions.last?.value, .string("test-key"))
         let before = actions.count
         model.invalidate()
         field.insertText("stale-key")
+        field.sendActions(for: .editingChanged)
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertEqual(actions.count, before)
     }

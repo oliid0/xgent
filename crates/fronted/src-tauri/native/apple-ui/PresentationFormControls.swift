@@ -11,7 +11,15 @@ struct XgentTextInput: View {
     }
 
     @ViewBuilder private var entry: some View {
-        if node.secure == true { SecureField(node.text ?? "", text: value) }
+        if node.secure == true {
+            SecureField(node.text ?? "", text: value)
+                #if os(iOS)
+                // Configuration secrets are not a login form. Avoid pairing the
+                // preceding provider/name field with Password AutoFill (yy's
+                // provider form uses the same explicit content type).
+                .textContentType(.oneTimeCode)
+                #endif
+        }
         else { TextField(node.text ?? "", text: value) }
     }
 
@@ -21,6 +29,7 @@ struct XgentTextInput: View {
             entry
                 .textFieldStyle(.plain)
                 .modifier(XgentFieldSurface(node: node))
+                .accessibilityIdentifier(node.id)
                 .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
                 #if os(iOS)
                 .textInputAutocapitalization(.never)
@@ -28,6 +37,7 @@ struct XgentTextInput: View {
                 #endif
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
         .disabled(node.disabled == true)
     }
 }

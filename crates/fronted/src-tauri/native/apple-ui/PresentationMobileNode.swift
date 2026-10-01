@@ -249,6 +249,8 @@ struct XgentIOSNode: View {
 
     @ViewBuilder private var identified: some View {
         switch node.kind {
+        case .navigationRow where node.variant == "sidebar-conversation-row":
+            rendered.accessibilityElement(children: .contain)
         case .vStack, .hStack, .scrollView, .card, .section, .list,
              .settingsGroup, .settingsLayout, .composer, .chatLayout,
              .browserLayout, .chatMessage:
@@ -366,7 +368,9 @@ struct XgentIOSNode: View {
         case .list:
             list
         case .treeRow, .navigationRow:
-            navigationRow
+            if node.variant == "sidebar-conversation-row" {
+                XgentSidebarConversationRow(node: node, document: document, model: model)
+            } else { navigationRow }
         case .settingsGroup:
             settingsGroup
         case .settingsLayout:

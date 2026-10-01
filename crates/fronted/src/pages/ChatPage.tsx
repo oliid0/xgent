@@ -6381,6 +6381,8 @@ export function ChatPage(props: ChatPageProps) {
             setActiveView("chat");
             handleSelectConversation(id);
           }}
+          onConversationDeleted={handleConversationDeleted}
+          onConversationCwdChanged={handleConversationCwdChanged}
           onSelectProject={(project) => {
             setActiveView("chat");
             void handleSelectWorkspaceProject(project);

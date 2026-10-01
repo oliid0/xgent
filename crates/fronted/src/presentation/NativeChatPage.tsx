@@ -25,6 +25,7 @@ import {
 import { normalizeLogicalLineEndings } from "../lib/chat/messages/composerText";
 import { safeStringify, summarizeToolCall } from "../lib/chat/messages/uiMessages";
 import type { PendingUploadedFile } from "../lib/chat/messages/uploadedFiles";
+import { normalizeConversationTitle } from "../lib/chat/page/chatPageHelpers";
 import { isTaskToolBlock, selectLatestTaskProgress } from "../lib/chat/taskProgress";
 import {
   checkMobileAssistantPermissions,
@@ -55,6 +56,10 @@ import { NativeSurface } from "./NativeSurface";
 import { toolEvidenceNodes } from "./nativeChatEvidence";
 import { createNativeChatRuntimeControls } from "./nativeChatRuntimeControls";
 import { createNativeChatTranscript } from "./nativeChatTranscript";
+import {
+  createNativeConversationActions,
+  mutateNativeConversation,
+} from "./nativeConversationActions";
 import { decodeNativeFiles } from "./nativeFiles";
 import { createNativeTaskProgress } from "./nativeTaskProgress";
 import { createNativePresentationTheme } from "./nativeTheme";
@@ -117,6 +122,8 @@ export type NativeChatPageProps = {
   onRemoveQueuedTurn: (id: string) => void;
   onSelectModel: (selection: SelectedModel) => void;
   onSelectConversation: (id: string) => void;
+  onConversationDeleted: (id: string) => void;
+  onConversationCwdChanged: (id: string, cwd: string) => void;
   onSelectProject: (project: WorkspaceProject) => void;
   onNewConversation: () => void;
   onNewSideConversation?: () => void;
@@ -191,6 +198,11 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const [expandedProjectIds, setExpandedProjectIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  const [conversationDialog, setConversationDialog] = useState<{
+    id: string;
+    kind: "rename" | "delete";
+    title: string;
+  } | null>(null);
   useEffect(() => {
     if (!sidebarOpen) return;
     for (const project of props.projects) {
@@ -877,28 +889,30 @@ export function NativeChatPage(props: NativeChatPageProps) {
     row: PresentationNode,
     conversationId: string,
   ): PresentationNode => {
-    if (compact || !props.onOpenConversationInSplit || conversationId === props.conversationId)
-      return row;
-    const actionId = `split-conversation:${conversationId}`;
-    sidebarHandlers.set(actionId, {
-      enabled: true,
-      accepts: (value) => value === null,
-      run: () => props.onOpenConversationInSplit?.(conversationId),
-    });
+    const item = sidebar.byId.get(conversationId);
+    if (!item) return row;
+    const actions = createNativeConversationActions(
+      {
+        item,
+        store: props.sidebarStore,
+        projects: props.projects,
+        currentId: props.conversationId,
+        onRename: (current) =>
+          setConversationDialog({ id: current.id, kind: "rename", title: current.title }),
+        onDelete: (id) => setConversationDialog({ id, kind: "delete", title: item.title }),
+        onMoved: props.onConversationCwdChanged,
+        onOpenInSplit: compact ? undefined : props.onOpenConversationInSplit,
+      },
+      t,
+    );
+    for (const [id, handler] of actions.handlers) sidebarHandlers.set(id, handler);
     return {
-      id: `${row.id}:row`,
-      kind: "HStack",
-      spacing: 4,
-      children: [
-        { ...row, fill: true },
-        {
-          id: actionId,
-          kind: "IconButton",
-          label: `${t("chat.split.toolbar")}: ${row.label}`,
-          icon: "rectangle.split.2x1",
-          action: actionId,
-        },
-      ],
+      ...row,
+      variant: "sidebar-conversation-row",
+      icon: item.isPinned ? "pin.fill" : row.icon,
+      status: actions.running ? "running" : undefined,
+      accessibilityValue: actions.running ? t("chat.statusRunningReply") : undefined,
+      children: [actions.menu],
     };
   };
   const projectSidebarRows = (project: WorkspaceProject, indent = 0): PresentationNode[] => {
@@ -1103,6 +1117,71 @@ export function NativeChatPage(props: NativeChatPageProps) {
         setActivityOpen(false);
         props.onOpenBrowser();
       }),
+    );
+  }
+  const dialogControls = presentationControls();
+  const dialogBusy = conversationDialog
+    ? sidebar.mutations?.has(conversationDialog.id) === true
+    : false;
+  const dialogRunning = conversationDialog
+    ? sidebar.runningConversationIds?.has(conversationDialog.id) === true
+    : false;
+  const closeConversationDialog = () => setConversationDialog(null);
+  dialogControls.handlers.set("close", {
+    enabled: !dialogBusy,
+    accepts: (value) => value === null,
+    run: closeConversationDialog,
+  });
+  const dialogNodes: PresentationNode[] = [];
+  if (conversationDialog) {
+    const { id, kind, title } = conversationDialog;
+    dialogNodes.push(
+      kind === "rename"
+        ? dialogControls.input(
+            "conversation-title",
+            t("chat.conversationRename"),
+            title,
+            (value) =>
+              setConversationDialog((current) => (current ? { ...current, title: value } : null)),
+            false,
+            !dialogBusy,
+          )
+        : {
+            id: "delete-warning",
+            kind: "Text",
+            text: `${t("chat.conversationDeleteConfirm").replace("{title}", title)}\n\n${t("chat.conversationDeleteWarning")}`,
+          },
+    );
+    dialogNodes.push(
+      dialogControls.action("cancel", t("chat.cancel"), closeConversationDialog, !dialogBusy),
+      {
+        ...dialogControls.action(
+          "confirm",
+          t(kind === "rename" ? "settings.save" : "chat.conversationDelete"),
+          async () => {
+            const normalized = normalizeConversationTitle(title);
+            await mutateNativeConversation(
+              props.sidebarStore,
+              id,
+              kind,
+              () =>
+                kind === "rename"
+                  ? props.sidebarStore.rename(id, normalized)
+                  : props.sidebarStore.remove(id),
+              t,
+            );
+            if (kind === "delete") props.onConversationDeleted(id);
+            setConversationDialog((current) =>
+              current?.id === id && current.kind === kind ? null : current,
+            );
+          },
+          !dialogBusy &&
+            !dialogRunning &&
+            (kind === "delete" || !!normalizeConversationTitle(title)),
+        ),
+        destructive: kind === "delete",
+        prominent: kind === "rename",
+      },
     );
   }
   return (
@@ -1416,6 +1495,25 @@ export function NativeChatPage(props: NativeChatPageProps) {
             nodes: activityNodes,
           }}
           handlers={activityControls.handlers}
+          onError={setFailure}
+        />
+      ) : null}
+      {conversationDialog ? (
+        <NativeSurface
+          document={{
+            mode: "sheet",
+            title: t(
+              conversationDialog.kind === "rename"
+                ? "chat.conversationRename"
+                : "chat.conversationDelete",
+            ),
+            appearance: props.settings.theme,
+            formFactor: compact ? "mobile" : "desktop",
+            theme: createNativePresentationTheme(props.settings, compact, "sidebar"),
+            dismissAction: "close",
+            nodes: dialogNodes,
+          }}
+          handlers={dialogControls.handlers}
           onError={setFailure}
         />
       ) : null}

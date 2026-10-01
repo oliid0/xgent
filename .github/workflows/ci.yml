@@ -101,8 +101,14 @@ jobs:
 
       - name: Install Tauri Linux dependencies
         run: |
+          # The Azure mirror transferred WebKit slowly in run 230 and
+          # exhausted this job before Cargo started. Keep archive failover,
+          # but prefer the runner's official HTTPS archive.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            printf 'https://archive.ubuntu.com/ubuntu/\tpriority:1\nhttps://security.ubuntu.com/ubuntu/\tpriority:2\nhttp://azure.archive.ubuntu.com/ubuntu/\tpriority:3\n' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
+          fi
           sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get install -y --no-install-recommends \
             libwebkit2gtk-4.1-dev \
             libgtk-3-dev \
             libayatana-appindicator3-dev \
