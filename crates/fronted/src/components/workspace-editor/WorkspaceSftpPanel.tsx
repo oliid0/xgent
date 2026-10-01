@@ -7,7 +7,6 @@ import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Text as AstryxText } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput as AstryxInput, TextInput } from "@astryxdesign/core/TextInput";
-import { useToast } from "@astryxdesign/core/Toast";
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import type { SftpClient, SftpEntry, SftpSide, SftpTransfer } from "../../lib/sftp/types";
@@ -15,6 +14,7 @@ import { cn } from "../../lib/shared/utils";
 import { writeClipboardText } from "../../lib/system/clipboardText";
 import type { TerminalSession } from "../../lib/terminal/types";
 import { AdaptiveDialog } from "../astryx/AdaptiveDialog";
+import { useAppToast as useToast } from "../astryx/useAppToast";
 import { useConfirmDialog } from "../astryx/useConfirmDialog";
 import { getFileTypeIcon } from "../chat/fileTypeIcons";
 import {

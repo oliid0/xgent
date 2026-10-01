@@ -93,7 +93,7 @@ export type PresentationDocument = {
   version: 1;
   surface: string;
   revision: number;
-  mode: "root" | "sheet" | "alert" | "sidebar" | "panel";
+  mode: "root" | "sheet" | "alert" | "sidebar" | "panel" | "toast";
   workspacePanel?: {
     focusRequest: number;
     openLabel: string;
@@ -108,6 +108,8 @@ export type PresentationDocument = {
   theme?: PresentationTheme;
   nodes: PresentationNode[];
   dismissAction?: string;
+  /** Hover/VoiceOver focus pauses a toast's actual lifetime without opening a control. */
+  readingAction?: string;
   removed?: boolean;
 };
 

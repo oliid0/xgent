@@ -593,11 +593,16 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         defer { try? FileManager.default.removeItem(at: scriptURL) }
 
         ios_setDirectoryURL(cwd)
-        let liveInput = request.interactiveStdin == true ? try CommandInputStream(onClosed: { [weak self] error in
-            self?.trigger("inputState", data: [
-                "runId": request.runId, "ready": false, "error": (error as Any?) ?? NSNull()
-            ])
-        }) : nil
+        let liveInput: CommandInputStream?
+        if request.interactiveStdin == true {
+            liveInput = try CommandInputStream(onClosed: { [weak self] error in
+                var data: JSObject = ["runId": request.runId, "ready": false, "error": NSNull()]
+                if let error { data["error"] = error }
+                self?.trigger("inputState", data: data)
+            })
+        } else {
+            liveInput = nil
+        }
         let stdinFile: any CommandInputSource
         if let liveInput { stdinFile = liveInput }
         else { stdinFile = try TemporaryInput(data: stdin) }

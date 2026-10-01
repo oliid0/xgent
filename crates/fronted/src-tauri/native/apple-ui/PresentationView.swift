@@ -68,6 +68,7 @@ struct XgentPresentationThemeModifier: ViewModifier {
         let palette = theme.palette(for: scheme)
         content
             .environment(\.xgentPresentationTheme, theme)
+            .environment(\.colorScheme, scheme)
             .environment(\.font, .system(size: CGFloat(17 * theme.fontScale)))
             .tint(Color(xgentHex: palette.accent))
     }
@@ -462,6 +463,7 @@ struct XgentPresentationView: View {
             #endif
         }
         .modifier(XgentAlerts(model: model, enabled: sheet == nil))
+        .modifier(XgentNotificationOverlay(model: model, enabled: sheet == nil))
         .modifier(XgentPresentationThemeModifier(
             theme: root?.theme ?? .fallback,
             appearance: root?.appearance ?? .system
@@ -518,7 +520,7 @@ struct XgentAlerts: ViewModifier {
     }
 }
 
-private struct XgentSheetView: View {
+struct XgentSheetView: View {
     let initialDocument: XgentDocument
     @ObservedObject var model: XgentPresentationModel
 
@@ -600,6 +602,7 @@ private struct XgentSheetView: View {
             AnyView(XgentSheetView(document: next, model: model))
         }
         .modifier(XgentAlerts(model: model, enabled: nextSheet == nil))
+        .modifier(XgentNotificationOverlay(model: model, enabled: nextSheet == nil))
         .modifier(XgentPresentationThemeModifier(
             theme: document.theme ?? .fallback,
             appearance: document.appearance

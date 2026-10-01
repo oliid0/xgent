@@ -182,7 +182,7 @@ struct XgentNode: Decodable, Identifiable {
 }
 
 struct XgentDocument: Decodable, Identifiable {
-    enum Mode: String, Decodable { case root, sheet, alert, sidebar, panel }
+    enum Mode: String, Decodable { case root, sheet, alert, sidebar, panel, toast }
     enum Appearance: String, Decodable { case system, light, dark }
     enum FormFactor: String, Decodable { case mobile, desktop }
     let version: Int
@@ -196,6 +196,7 @@ struct XgentDocument: Decodable, Identifiable {
     let theme: XgentPresentationTheme?
     let nodes: [XgentNode]
     let dismissAction: String?
+    let readingAction: String?
     let removed: Bool?
     var id: String { surface }
 
@@ -220,6 +221,14 @@ struct XgentDocument: Decodable, Identifiable {
 
     func validate() throws {
         guard version == 1, !surface.isEmpty, revision > 0 else { throw XgentProtocolError.invalid }
+        if mode == .toast, removed != true {
+            guard dismissAction?.isEmpty == false, readingAction?.isEmpty == false,
+                  nodes.count == 1, let message = nodes.first, message.kind == .banner,
+                  message.variant == "toast", message.text != nil,
+                  message.children?.count == 1, let close = message.children?.first,
+                  close.kind == .button, close.action == dismissAction else { throw XgentProtocolError.invalid }
+        }
+        if readingAction != nil, mode != .toast { throw XgentProtocolError.invalid }
         if mode == .panel, removed != true {
             guard formFactor == .desktop, dismissAction?.isEmpty == false,
                   let workspacePanel, workspacePanel.isValid else { throw XgentProtocolError.invalid }
@@ -308,6 +317,7 @@ final class XgentPresentationModel: ObservableObject {
     private var acknowledgedEdits: Set<String> = []
     private var consumedFocusRequests: [String: Int] = [:]
     private var active = true
+    private var announcedNotifications = Set<String>()
 
     func invalidate() {
         active = false
@@ -322,6 +332,7 @@ final class XgentPresentationModel: ObservableObject {
         edits.removeAll()
         error = nil
         documents.removeAll()
+        announcedNotifications.removeAll()
     }
 
     func update(_ document: XgentDocument) {
@@ -329,6 +340,7 @@ final class XgentPresentationModel: ObservableObject {
         guard document.revision > (revisions[document.surface] ?? 0) else { return }
         revisions[document.surface] = document.revision
         if document.removed == true {
+            announcedNotifications.remove(document.surface)
             documents.removeAll { $0.surface == document.surface }
             for (request, item) in pending where item.surface == document.surface {
                 pending.removeValue(forKey: request)
@@ -417,14 +429,31 @@ final class XgentPresentationModel: ObservableObject {
 
     func isDismissing(_ document: XgentDocument) -> Bool { busy.contains(key(document.surface, "$dismiss")) }
 
+    func consumeNotificationAnnouncement(_ document: XgentDocument) -> Bool {
+        guard active, document.mode == .toast,
+              documents.contains(where: { $0.surface == document.surface && $0.mode == .toast }) else { return false }
+        return announcedNotifications.insert(document.surface).inserted
+    }
+
+    func setNotificationReading(_ reading: Bool, in document: XgentDocument) {
+        guard active, document.mode == .toast,
+              let current = documents.first(where: { $0.surface == document.surface }),
+              current.mode == .toast, let action = current.readingAction,
+              action == document.readingAction else { return }
+        let requestId = UUID().uuidString
+        pending[requestId] = (document.surface, key(document.surface, "$reading"), current.revision)
+        emit(XgentAction(surface: document.surface, action: action, requestId: requestId, value: .bool(reading)))
+    }
+
     func dismiss(_ document: XgentDocument) {
         guard active else { return }
-        guard let action = document.dismissAction else { return }
+        guard let current = documents.first(where: { $0.surface == document.surface }),
+              let action = current.dismissAction, action == document.dismissAction else { return }
         let nodeKey = key(document.surface, "$dismiss")
         guard !busy.contains(nodeKey) else { return }
         let requestId = UUID().uuidString
         busy.insert(nodeKey)
-        pending[requestId] = (document.surface, nodeKey, document.revision)
+        pending[requestId] = (document.surface, nodeKey, current.revision)
         emit(XgentAction(surface: document.surface, action: action, requestId: requestId, value: .null))
     }
 

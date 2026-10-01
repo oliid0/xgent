@@ -4,8 +4,8 @@ import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Text as AstryxText, Text } from "@astryxdesign/core/Text";
-import { useToast } from "@astryxdesign/core/Toast";
 import { ToggleButton, ToggleButtonGroup } from "@astryxdesign/core/ToggleButton";
+import { useAppToast as useToast } from "../../astryx/useAppToast";
 
 // GitReview toolbar: panel header (branch summary, remote actions, counters,
 // mode/pane switchers) plus the modal dialogs and the operation toast shared

@@ -709,6 +709,7 @@ struct XgentIOSSheetPresentation: View {
             AnyView(XgentIOSSheetPresentation(initialDocument: next, model: model))
         }
         .modifier(XgentAlerts(model: model, enabled: nextSheet == nil))
+        .modifier(XgentNotificationOverlay(model: model, enabled: nextSheet == nil))
         .modifier(XgentPresentationThemeModifier(theme: document.theme ?? .fallback,
                                                   appearance: document.appearance))
     }

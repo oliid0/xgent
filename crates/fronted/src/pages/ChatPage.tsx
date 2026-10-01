@@ -6337,6 +6337,7 @@ export function ChatPage(props: ChatPageProps) {
   if (isApplePresentationRuntime()) {
     return (
       <>
+        <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
         <NativeChatPage
           conversationId={currentConversationId}
           uploadWorkdir={workdir}

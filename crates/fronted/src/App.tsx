@@ -68,6 +68,7 @@ import { ChatPage } from "./pages/ChatPage";
 import { TranscriptPreferences } from "./pages/chat/transcript/TranscriptPreferences";
 import { SettingsPage } from "./pages/SettingsPage";
 import type { SectionId, SettingsOpenOptions } from "./pages/settings/types";
+import { NativeNotificationViewport } from "./presentation/NativeNotificationViewport";
 import { NativeSettingsPage } from "./presentation/NativeSettingsPage";
 import { isApplePresentationRuntime } from "./runtime/applePresentation";
 import { startLocalAccessHostBridge } from "./runtime/localAccessHostBridge";
@@ -786,6 +787,7 @@ export default function App() {
               <SoulProvider>
                 {appContentReady ? (
                   <>
+                    <NativeNotificationViewport settings={settings} nativeMobile={nativeMobile} />
                     {settingsHydratedRef.current ? <CronPromptRunner settings={settings} /> : null}
                     {settingsHydratedRef.current ? (
                       <MemoryOrganizerHost settings={settings} setSettings={setSettings} />

@@ -22,7 +22,34 @@ export function validatePresentationDocument(
   if (document.dismissAction && !handlers.has(document.dismissAction)) {
     throw new Error(`Missing native dismiss handler: ${document.dismissAction}`);
   }
-  if (!["root", "sheet", "alert", "sidebar", "panel"].includes(document.mode)) {
+  if (
+    document.readingAction &&
+    (document.mode !== "toast" || !handlers.has(document.readingAction))
+  ) {
+    throw new Error("Invalid native notification reading handler");
+  }
+  if (
+    document.mode === "toast" &&
+    !document.removed &&
+    (!document.dismissAction || !document.readingAction)
+  ) {
+    throw new Error("Native notifications require dismissal and reading handlers");
+  }
+  if (document.mode === "toast" && !document.removed) {
+    const message = document.nodes[0];
+    if (
+      document.nodes.length !== 1 ||
+      message?.kind !== "Banner" ||
+      message.variant !== "toast" ||
+      typeof message.text !== "string" ||
+      message.children?.length !== 1 ||
+      message.children[0].kind !== "Button" ||
+      message.children[0].action !== document.dismissAction
+    ) {
+      throw new Error("Invalid native notification content");
+    }
+  }
+  if (!["root", "sheet", "alert", "sidebar", "panel", "toast"].includes(document.mode)) {
     throw new Error("Invalid native presentation mode");
   }
   if (document.mode === "panel" && !document.removed) {

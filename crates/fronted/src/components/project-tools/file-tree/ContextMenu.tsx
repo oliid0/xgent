@@ -4,10 +4,10 @@
 // @xgent/runtime imports are allowed here.
 
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
-import { useToast } from "@astryxdesign/core/Toast";
 import { type ReactNode, useCallback } from "react";
 import { useLocale } from "../../../i18n";
 import { writeClipboardText } from "../../../lib/system/clipboardText";
+import { useAppToast as useToast } from "../../astryx/useAppToast";
 import {
   Copy,
   Edit3,
