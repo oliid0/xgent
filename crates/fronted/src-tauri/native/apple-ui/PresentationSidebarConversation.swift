@@ -13,28 +13,54 @@ struct XgentSidebarConversationRow: View {
     private var menu: XgentNode? { node.children?.first { $0.kind == .menu } }
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
 
-    var body: some View {
-        HStack(spacing: 4) {
-            Button { model.send(node, in: document) } label: {
-                HStack(spacing: 8) {
-                    if let icon = node.icon {
-                        Image(systemName: icon).font(.caption).accessibilityHidden(true)
-                    }
-                    Text(node.label ?? "")
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                    if node.status == "running" {
-                        ProgressView().controlSize(.small).accessibilityHidden(true)
-                    } else if node.selected == true {
-                        Circle().fill(Color(xgentHex: palette.accent)).frame(width: 6, height: 6)
-                            .accessibilityHidden(true)
+    private var title: some View {
+        Text(node.label ?? "")
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder private var stateIndicator: some View {
+        if node.status == "running" {
+            ProgressView().controlSize(.small).accessibilityHidden(true)
+        } else if node.selected == true {
+            Circle().fill(Color(xgentHex: palette.accent)).frame(width: 6, height: 6)
+                .accessibilityHidden(true)
+        }
+    }
+
+    @ViewBuilder private var selectionLabel: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) {
+                title.frame(maxWidth: .infinity, alignment: .leading)
+                if node.icon != nil || node.status == "running" || node.selected == true {
+                    HStack(spacing: 8) {
+                        if let icon = node.icon {
+                            Image(systemName: icon).font(.caption).accessibilityHidden(true)
+                        }
+                        stateIndicator
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .contentShape(Rectangle())
+            }
+        } else {
+            HStack(spacing: 8) {
+                if let icon = node.icon {
+                    Image(systemName: icon).font(.caption).accessibilityHidden(true)
+                }
+                title
+                Spacer(minLength: 0)
+                stateIndicator
+            }
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center, spacing: 4) {
+            Button { model.send(node, in: document) } label: {
+                selectionLabel
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(node.disabled == true || model.isBusy(node, in: document))

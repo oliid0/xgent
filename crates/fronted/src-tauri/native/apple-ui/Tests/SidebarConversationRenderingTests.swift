@@ -78,6 +78,8 @@ final class SidebarConversationRenderingTests: XCTestCase {
                     let selectionFrame = selection.shape.bezierPath.bounds
                     let menuFrame = menu.shape.bezierPath.bounds
                     XCTAssertGreaterThanOrEqual(selectionFrame.height, 43.5)
+                    XCTAssertLessThanOrEqual(selectionFrame.height, 720.0 / 3,
+                        "A long title must leave room for the other conversations at large text sizes")
                     XCTAssertGreaterThanOrEqual(menuFrame.height, 43.5)
                     XCTAssertLessThanOrEqual(selectionFrame.maxX, menuFrame.minX + 1)
                     XCTAssertLessThanOrEqual(menuFrame.maxX, width + 1)
