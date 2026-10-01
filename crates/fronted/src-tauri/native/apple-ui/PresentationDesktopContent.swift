@@ -13,8 +13,17 @@ extension XgentNodeView {
             ScrollView { LazyVStack(alignment: .leading, spacing: CGFloat(presentationTheme.spacing.md)) { children } }
         case .card:
             XgentDesktopSettingsCard(node: node, document: document, model: model)
-        case .section, .settingsGroup:
+        case .settingsGroup:
             XgentDesktopSettingsCard(node: node, document: document, model: model)
+        case .section:
+            VStack(alignment: .leading, spacing: CGFloat(presentationTheme.spacing.md)) {
+                if let label = node.label, !label.isEmpty {
+                    Text(label).modifier(XgentControlTypography(node: node)).fontWeight(.semibold)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                children
+            }
         case .settingsLayout:
             XgentDesktopSettingsLayout(node: node, document: document, model: model)
         case .text:

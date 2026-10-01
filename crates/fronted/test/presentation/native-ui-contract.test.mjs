@@ -9,6 +9,7 @@ const nativeMobileSource = readFileSync(new URL("../../src-tauri/native/apple-ui
 const nativeMobileNodeSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationMobileNode.swift", import.meta.url), "utf8");
 const nativeDesktopSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationDesktopContent.swift", import.meta.url), "utf8");
 const nativeSettingsSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationDesktopSettings.swift", import.meta.url), "utf8");
+const nativeMobileSettingsSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationMobileSettings.swift", import.meta.url), "utf8");
 
 function contracts() {
   const read = path => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -84,8 +85,9 @@ test("the complete iOS application surface is handwritten and bypasses generated
   assert.match(nativeMobileSource, /\.safeAreaBar\(edge: \.bottom/);
   assert.match(nativeMobileSource, /\.onScrollGeometryChange\(for: Bool\.self\)/);
   assert.match(nativeMobileSource, /\.onScrollPhaseChange/);
-  assert.match(nativeMobileSource, /if grouped \{\s*Form \{[\s\S]*?if node\.kind == \.settingsGroup \{\s*Section \{/);
-  assert.match(nativeMobileSource, /\.formStyle\(\.grouped\)/);
+  assert.match(nativeMobileSource, /if grouped \{\s*XgentIOSSettingsForm\(nodes: contentNodes/);
+  assert.match(nativeMobileSettingsSource, /Form \{[\s\S]*?ForEach\(sections\)[\s\S]*?Section \{/);
+  assert.match(nativeMobileSettingsSource, /\.formStyle\(\.grouped\)/);
   assert.match(nativeMobileNodeSource, /XgentSelector\(node: node, document: document, model: model\)/);
   assert.match(
     nativeMobileSource,

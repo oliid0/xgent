@@ -48,6 +48,25 @@ final class ControlRenderingTests: XCTestCase {
     }
 
     @MainActor
+    func testWorkActivityTitlesWrapInsteadOfShrinkingOrTruncating() async throws {
+        let model = XgentPresentationModel()
+        let short = try document(nodes: [node("tool", "ToolCall", [
+            "label": "Checking", "variant": "timeline", "status": "running",
+        ])])
+        model.update(short)
+        let shortSize = try await fitted(XgentToolCallHeader(node: short.nodes[0]).frame(width: 180), width: 180)
+        let long = try document(nodes: [node("tool", "ToolCall", [
+            "label": "Used the GitHub integration to edit multiple workspace files and run the relevant verification commands",
+            "variant": "timeline", "status": "running",
+        ])])
+        model.update(long)
+        let longSize = try await fitted(XgentToolCallHeader(node: long.nodes[0]).frame(width: 180), width: 180)
+        XCTAssertGreaterThan(longSize.height, shortSize.height + 20,
+            "Work activity titles must remain readable while evidence is streaming")
+        XCTAssertLessThanOrEqual(longSize.width, 181)
+    }
+
+    @MainActor
     func testActualControlFamiliesAtNarrowWideDarkAndLargeTextSizes() async throws {
         #if os(iOS)
         let widths: [CGFloat] = [320, 768]
@@ -62,7 +81,7 @@ final class ControlRenderingTests: XCTestCase {
                     model.update(document)
                     let view = ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
-                            ForEach(document.nodes) { render($0, document, model) }
+                            ForEach(document.nodes) { self.render($0, document, model) }
                         }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(width: width, height: 720)

@@ -670,26 +670,7 @@ struct XgentIOSSheetPresentation: View {
                 .accessibilityHidden(true)
             header
             if grouped {
-                Form {
-                    ForEach(contentNodes) { node in
-                        if node.kind == .settingsGroup {
-                            Section {
-                                XgentIOSNodes(nodes: node.children ?? [], document: document, model: model)
-                            } header: {
-                                if let label = node.label, !label.isEmpty {
-                                    Text(label)
-                                }
-                            }
-                        } else {
-                            XgentIOSNode(node: node, document: document, model: model)
-                        }
-                    }
-                }
-                .formStyle(.grouped)
-                .environment(\.xgentIOSFormRow, true)
-                .scrollContentBackground(.hidden)
-                .id(document.id)
-                .scrollDismissesKeyboard(.interactively)
+                XgentIOSSettingsForm(nodes: contentNodes, document: document, model: model)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {

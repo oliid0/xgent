@@ -53,6 +53,7 @@ struct XgentCodeBlock: View {
     @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .body) private var fontSize: CGFloat = 13
     @State private var copied = false
+    @State private var viewportWidth: CGFloat = 0
 
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
     private var diffRows: [XgentDiffRow] { XgentDiffRow.parse(text) }
@@ -122,6 +123,7 @@ struct XgentCodeBlock: View {
                     }
                     .font(.system(size: fontSize * CGFloat(theme.fontScale), design: .monospaced))
                     .textSelection(.enabled)
+                    .frame(minWidth: viewportWidth, alignment: .leading)
                     .padding(.vertical, 10)
                 } else {
                     XgentSwiftHighlighter(dark: colorScheme == .dark).highlightCode(text, language: language)
@@ -130,6 +132,7 @@ struct XgentCodeBlock: View {
                         .padding(12)
                 }
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { viewportWidth = $0 }
         }
         .foregroundStyle(Color(xgentHex: palette.text))
         .frame(maxWidth: .infinity, alignment: .leading)

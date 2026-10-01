@@ -135,7 +135,7 @@ extension XgentNodeView {
 
     var nativeText: some View {
         Text(node.text ?? "")
-            .font(.system(size: CGFloat(presentationTheme.typography.body * presentationTheme.fontScale)))
+            .modifier(XgentControlTypography(node: node))
             .foregroundStyle(Color(xgentHex: node.secondary == true ? palette.secondaryText : palette.text))
             .textSelection(.enabled)
             .fixedSize(horizontal: false, vertical: true)
@@ -143,9 +143,9 @@ extension XgentNodeView {
 
     var nativeHeading: some View {
         Text(node.text ?? "")
-            .font(.system(size: CGFloat(presentationTheme.typography.body * presentationTheme.fontScale),
-                          weight: .semibold))
+            .modifier(XgentControlTypography(node: node)).fontWeight(.semibold)
             .foregroundStyle(Color(xgentHex: palette.text))
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
     }
 
@@ -359,25 +359,7 @@ extension XgentNodeView {
     }
 
     private var nativeToolCallLabel: some View {
-        HStack(alignment: .top, spacing: 8) {
-            semanticStatusIcon
-            VStack(alignment: .leading, spacing: 4) {
-                Text(node.label ?? "Tool")
-                    .font(.system(.subheadline, design: .monospaced).weight(.medium))
-                    .foregroundStyle(Color(xgentHex: palette.text))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                if let text = node.text, !text.isEmpty {
-                    Text(text).font(.caption)
-                        .foregroundStyle(Color(xgentHex: palette.secondaryText))
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .fixedSize(horizontal: false, vertical: true)
-        }
+        XgentToolCallHeader(node: node)
     }
 
     var nativeActivityPreview: some View {

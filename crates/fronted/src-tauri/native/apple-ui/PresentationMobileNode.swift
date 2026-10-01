@@ -750,25 +750,7 @@ struct XgentIOSNode: View {
     }
 
     private var toolCallLabel: some View {
-        HStack(alignment: .top, spacing: 8) {
-            statusIcon
-            VStack(alignment: .leading, spacing: 4) {
-                Text(node.label ?? "Tool")
-                    .font(.system(.subheadline, design: .monospaced).weight(.medium))
-                    .foregroundStyle(Color(xgentHex: palette.text))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .minimumScaleFactor(0.85)
-                if let text = node.text, !text.isEmpty {
-                    Text(text).font(.caption)
-                        .foregroundStyle(Color(xgentHex: palette.secondaryText))
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        XgentToolCallHeader(node: node)
     }
 
     private var activityPreview: some View {

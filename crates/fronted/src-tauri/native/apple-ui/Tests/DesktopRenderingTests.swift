@@ -31,7 +31,7 @@ final class DesktopRenderingTests: XCTestCase {
             node("reply", "Text", ["text": "The settings change is complete."]),
         ]
         for (width, appearance) in [(CGFloat(640), XgentDocument.Appearance.light), (CGFloat(1040), .dark)] {
-            let live = try document(nodes: liveNodes, appearance: appearance)
+            let live = try document(nodes: [node("live:work", "Section", ["label": "Working", "children": liveNodes])], appearance: appearance)
             let completed = try document(nodes: completedNodes, appearance: appearance)
             let liveHeight = try await capture(live, name: "desktop-work-live-\(Int(width))",
                                                width: width, appearance: appearance)
