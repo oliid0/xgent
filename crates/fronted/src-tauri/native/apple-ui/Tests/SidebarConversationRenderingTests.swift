@@ -65,6 +65,8 @@ final class SidebarConversationRenderingTests: XCTestCase {
                 #if os(iOS)
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                encoder.nonConformingFloatEncodingStrategy = .convertToString(
+                    positiveInfinity: "Infinity", negativeInfinity: "-Infinity", nan: "NaN")
                 let diagnostic = XCTAttachment(string: String(decoding: try encoder.encode(hierarchy), as: UTF8.self))
                 diagnostic.name = "sidebar-AX-\(Int(width))-\(size == .large ? "standard" : "large-dark")"
                 diagnostic.lifetime = .keepAlways
@@ -79,6 +81,11 @@ final class SidebarConversationRenderingTests: XCTestCase {
                     XCTAssertGreaterThanOrEqual(menuFrame.height, 43.5)
                     XCTAssertLessThanOrEqual(selectionFrame.maxX, menuFrame.minX + 1)
                     XCTAssertLessThanOrEqual(menuFrame.maxX, width + 1)
+                    for element in [selection, menu] {
+                        let point = CGPoint(x: CGFloat(element.activationPoint.x), y: CGFloat(element.activationPoint.y))
+                        XCTAssertTrue(point.x.isFinite && point.y.isFinite, "Activation coordinates must be finite")
+                        XCTAssertTrue(element.shape.bezierPath.contains(point))
+                    }
                 }
                 #endif
             }

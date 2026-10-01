@@ -37,6 +37,8 @@ final class ControlAccessibilityTests: XCTestCase {
                 // Preserve the real AX tree even when an assertion fails.
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                encoder.nonConformingFloatEncodingStrategy = .convertToString(
+                    positiveInfinity: "Infinity", negativeInfinity: "-Infinity", nan: "NaN")
                 let attachment = XCTAttachment(string: String(decoding: try encoder.encode(hierarchy), as: UTF8.self))
                 attachment.name = "controls-accessibility-\(Int(width))-\(size == .large ? "standard" : "large-dark")"
                 attachment.lifetime = .keepAlways
@@ -63,6 +65,7 @@ final class ControlAccessibilityTests: XCTestCase {
                     XCTAssertGreaterThanOrEqual(rect.minX, -1)
                     XCTAssertLessThanOrEqual(rect.maxX, width + 1)
                     let point = CGPoint(x: CGFloat(element.activationPoint.x), y: CGFloat(element.activationPoint.y))
+                    XCTAssertTrue(point.x.isFinite && point.y.isFinite, "Activation coordinates must be finite")
                     XCTAssertTrue(path.contains(point))
                     for previous in bounds { XCTAssertFalse(previous.intersects(rect), "Independent controls must not overlap") }
                     bounds.append(rect)

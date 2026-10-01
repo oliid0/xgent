@@ -25,6 +25,7 @@ struct XgentNativeMenu: View {
         .buttonStyle(XgentActionButtonStyle(node: node, iconOnly: iconOnly))
         .disabled(node.disabled == true)
         .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
+        .accessibilityActivationPoint(.center)
     }
 }
 

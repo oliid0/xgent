@@ -92,6 +92,7 @@ struct XgentSelector: View {
             .buttonStyle(.plain)
             .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
             .accessibilityValue(selectedLabel)
+            .accessibilityActivationPoint(.center)
         }
         .disabled(node.disabled == true)
     }
