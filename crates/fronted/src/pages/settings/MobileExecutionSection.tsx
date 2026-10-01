@@ -316,53 +316,6 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
               />
             ) : null}
 
-            <Text type="supporting" color="secondary" wordBreak="break-word">
-              {t("settings.mobileWithoutShell")}
-            </Text>
-            <Text type="supporting" color="secondary" wordBreak="break-word">
-              {t(platform === "ios" ? "settings.mobileIosSource" : "settings.mobileAndroidSource")}
-            </Text>
-            <MetadataList>
-              <MetadataListItem label={t("settings.mobileBackend")}>
-                <Text type="body">{status?.backend ?? "—"}</Text>
-              </MetadataListItem>
-              <MetadataListItem label={t("settings.mobileEnvironment")}>
-                <Text type="body">
-                  {status?.environmentVersion ??
-                    (status?.installed
-                      ? t("settings.mobileReady")
-                      : t("settings.mobileNotInstalled"))}
-                </Text>
-              </MetadataListItem>
-              <MetadataListItem label={t("settings.mobileDiskUsage")}>
-                <Text type="body" hasTabularNumbers>
-                  {formatBytes(status?.diskUsageBytes)}
-                </Text>
-              </MetadataListItem>
-            </MetadataList>
-
-            {status?.detail ? (
-              <Text type="supporting" color="secondary">
-                {status.detail}
-              </Text>
-            ) : null}
-
-            {platform === "android" && status?.alpineMirrors?.length ? (
-              <Selector
-                label={t("settings.mobileAlpineMirror")}
-                description={t("settings.mobileAlpineMirrorHint")}
-                options={status.alpineMirrors.map((mirror) => ({
-                  value: mirror.id,
-                  label: mirror.name,
-                }))}
-                value={status.selectedAlpineMirror ?? "official"}
-                onChange={(id) => void chooseAlpineMirror(id)}
-                isDisabled={busy !== ""}
-                presentation="adaptive"
-                width="100%"
-              />
-            ) : null}
-
             {status?.installed && status.toolchains.length > 0 ? (
               <VStack gap={3}>
                 <Heading level={4}>{t("settings.mobileCapabilityPacks")}</Heading>
@@ -438,6 +391,53 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
                   })}
                 </Grid>
               </VStack>
+            ) : null}
+
+            {platform === "android" && status?.alpineMirrors?.length ? (
+              <Selector
+                label={t("settings.mobileAlpineMirror")}
+                description={t("settings.mobileAlpineMirrorHint")}
+                options={status.alpineMirrors.map((mirror) => ({
+                  value: mirror.id,
+                  label: mirror.name,
+                }))}
+                value={status.selectedAlpineMirror ?? "official"}
+                onChange={(id) => void chooseAlpineMirror(id)}
+                isDisabled={busy !== ""}
+                presentation="adaptive"
+                width="100%"
+              />
+            ) : null}
+
+            <Text type="supporting" color="secondary" wordBreak="break-word">
+              {t("settings.mobileWithoutShell")}
+            </Text>
+            <Text type="supporting" color="secondary" wordBreak="break-word">
+              {t(platform === "ios" ? "settings.mobileIosSource" : "settings.mobileAndroidSource")}
+            </Text>
+            <MetadataList>
+              <MetadataListItem label={t("settings.mobileBackend")}>
+                <Text type="body">{status?.backend ?? "—"}</Text>
+              </MetadataListItem>
+              <MetadataListItem label={t("settings.mobileEnvironment")}>
+                <Text type="body">
+                  {status?.environmentVersion ??
+                    (status?.installed
+                      ? t("settings.mobileReady")
+                      : t("settings.mobileNotInstalled"))}
+                </Text>
+              </MetadataListItem>
+              <MetadataListItem label={t("settings.mobileDiskUsage")}>
+                <Text type="body" hasTabularNumbers>
+                  {formatBytes(status?.diskUsageBytes)}
+                </Text>
+              </MetadataListItem>
+            </MetadataList>
+
+            {status?.detail ? (
+              <Text type="supporting" color="secondary">
+                {status.detail}
+              </Text>
             ) : null}
 
             {status?.capabilities.userSelectedWorkspaces ? (

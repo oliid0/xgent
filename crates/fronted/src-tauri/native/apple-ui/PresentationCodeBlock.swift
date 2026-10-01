@@ -1,5 +1,49 @@
 import SwiftUI
 
+struct XgentDiffRow {
+    enum Kind: Equatable { case header, context, addition, deletion }
+
+    let index: Int
+    let text: String
+    let oldLine: Int?
+    let newLine: Int?
+    let kind: Kind
+
+    static func parse(_ source: String) -> [Self] {
+        var oldLine: Int?
+        var newLine: Int?
+        return source.components(separatedBy: "\n").enumerated().map { index, text in
+            let row: Self
+            if text.hasPrefix("@@ ") {
+                let fields = text.split(separator: " ", maxSplits: 3)
+                oldLine = nil
+                newLine = nil
+                if fields.count >= 3 {
+                    oldLine = fields[1].dropFirst().split(separator: ",", maxSplits: 1).first.flatMap { Int($0) }
+                    newLine = fields[2].dropFirst().split(separator: ",", maxSplits: 1).first.flatMap { Int($0) }
+                }
+                row = Self(index: index, text: text, oldLine: nil, newLine: nil, kind: .header)
+            } else if text.hasPrefix("+++") || text.hasPrefix("---") || text.hasPrefix("diff ")
+                        || text.hasPrefix("index ") || text.hasPrefix("\\") {
+                row = Self(index: index, text: text, oldLine: nil, newLine: nil, kind: .header)
+            } else if text.hasPrefix("+") {
+                row = Self(index: index, text: text, oldLine: nil, newLine: newLine, kind: .addition)
+                newLine = newLine.map { $0 + 1 }
+            } else if text.hasPrefix("-") {
+                row = Self(index: index, text: text, oldLine: oldLine, newLine: nil, kind: .deletion)
+                oldLine = oldLine.map { $0 + 1 }
+            } else if text.hasPrefix(" ") {
+                row = Self(index: index, text: text, oldLine: oldLine, newLine: newLine, kind: .context)
+                oldLine = oldLine.map { $0 + 1 }
+                newLine = newLine.map { $0 + 1 }
+            } else {
+                row = Self(index: index, text: text, oldLine: nil, newLine: nil, kind: .header)
+            }
+            return row
+        }
+    }
+}
+
 // Tool evidence and Markdown fences use the same scrolling/copy surface.
 struct XgentCodeBlock: View {
     let text: String
@@ -11,22 +55,28 @@ struct XgentCodeBlock: View {
     @State private var copied = false
 
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
-    private var diffLines: [String] { text.components(separatedBy: "\n") }
+    private var diffRows: [XgentDiffRow] { XgentDiffRow.parse(text) }
+    private var gutterWidth: CGFloat { 28 * fontSize * CGFloat(theme.fontScale) / 13 }
 
-    private func diffForeground(_ line: String) -> Color {
-        if line.hasPrefix("+") && !line.hasPrefix("+++") {
+    private func diffForeground(_ row: XgentDiffRow) -> Color {
+        switch row.kind {
+        case .addition:
             return colorScheme == .dark ? .green : Color(red: 0.12, green: 0.42, blue: 0.18)
-        }
-        if line.hasPrefix("-") && !line.hasPrefix("---") {
+        case .deletion:
             return colorScheme == .dark ? .red : Color(red: 0.65, green: 0.13, blue: 0.13)
+        case .header:
+            return Color(xgentHex: palette.secondaryText)
+        case .context:
+            return Color(xgentHex: palette.text)
         }
-        return line.hasPrefix("@@") ? Color(xgentHex: palette.secondaryText) : Color(xgentHex: palette.text)
     }
 
-    private func diffBackground(_ line: String) -> Color {
-        if line.hasPrefix("+") && !line.hasPrefix("+++") { return .green.opacity(0.12) }
-        if line.hasPrefix("-") && !line.hasPrefix("---") { return .red.opacity(0.12) }
-        return .clear
+    private func diffBackground(_ row: XgentDiffRow) -> Color {
+        switch row.kind {
+        case .addition: return .green.opacity(0.12)
+        case .deletion: return .red.opacity(0.12)
+        case .header, .context: return .clear
+        }
     }
 
     var body: some View {
@@ -53,14 +103,21 @@ struct XgentCodeBlock: View {
             ScrollView(.horizontal) {
                 if language?.lowercased() == "diff" {
                     VStack(alignment: .leading, spacing: 0) {
-                        ForEach(diffLines.indices, id: \.self) { index in
-                            Text(diffLines[index].isEmpty ? " " : diffLines[index])
-                                .foregroundStyle(diffForeground(diffLines[index]))
-                                .fixedSize(horizontal: true, vertical: false)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 2)
-                                .background(diffBackground(diffLines[index]))
+                        ForEach(diffRows, id: \.index) { row in
+                            HStack(spacing: 0) {
+                                Text(row.oldLine.map { String($0) } ?? " ")
+                                    .frame(width: gutterWidth, alignment: .trailing)
+                                Text(row.newLine.map { String($0) } ?? " ")
+                                    .frame(width: gutterWidth, alignment: .trailing)
+                                Text(row.text.isEmpty ? " " : row.text)
+                                    .padding(.leading, 8)
+                                    .fixedSize(horizontal: true, vertical: false)
+                            }
+                            .foregroundStyle(diffForeground(row))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(diffBackground(row))
                         }
                     }
                     .font(.system(size: fontSize * CGFloat(theme.fontScale), design: .monospaced))

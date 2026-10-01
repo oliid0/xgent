@@ -1109,7 +1109,7 @@ jobs:
           esac
           # A cold simulator may finish WebKit navigation after the initial
           # launch succeeds. Wait for the SwiftUI root, not a fixed delay.
-          for attempt in {1..18}; do
+          for _ in {1..18}; do
             if ! kill -0 "$app_pid"; then break; fi
             xcrun simctl spawn "$simulator_udid" log show --last 3m --style compact \
               --predicate 'process == "Xgent" AND eventMessage CONTAINS "XgentNativeUI root rendered"' \

@@ -6,6 +6,14 @@ import XCTest
 @testable import XgentNativeUI
 
 final class MobileRenderingTests: XCTestCase {
+    func testDiffRowsTrackOldAndNewLineNumbersAcrossHunks() {
+        let rows = XgentDiffRow.parse("@@ -5,2 +8,3 @@\n context\n-old\n+new\n+extra\n@@ -20 +30 @@\n-again\n+replacement")
+        XCTAssertEqual(rows.map(\.oldLine), [nil, 5, 6, nil, nil, nil, 20, nil])
+        XCTAssertEqual(rows.map(\.newLine), [nil, 8, nil, 9, 10, nil, nil, 30])
+        XCTAssertEqual(rows.map(\.kind), [.header, .context, .deletion, .addition,
+                                          .addition, .header, .deletion, .addition])
+    }
+
     @MainActor
     func testChatAtNarrowWideAndAccessibleSizes() async throws {
         for (name, width, appearance, typeSize) in [
