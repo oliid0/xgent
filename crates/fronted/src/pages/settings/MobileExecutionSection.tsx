@@ -34,6 +34,7 @@ import {
   setMobileAlpineMirror,
 } from "../../lib/mobileExecution";
 import { normalizeRuntimePlatform, type RuntimePlatform } from "../../lib/runtimePlatform";
+import { MobileEnvironmentBrowser } from "./MobileEnvironmentBrowser";
 import type { SettingsSectionProps } from "./types";
 
 function formatBytes(value?: number | null) {
@@ -305,6 +306,12 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
                 isDisabled={busy !== ""}
                 onClick={() => void refresh()}
               />
+              {status?.installed && status.environmentRootPath ? (
+                <MobileEnvironmentBrowser
+                  rootPath={status.environmentRootPath}
+                  backend={status.backend}
+                />
+              ) : null}
             </HStack>
 
             {busy === "environment" ? (

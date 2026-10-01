@@ -124,6 +124,20 @@ if any(matches(node, {"安装基础环境", "Install base environment"}) for nod
 # Wait for the install/refresh action to finish, then install actual packages
 # through the Android settings controls. A ready rootfs only contains BusyBox.
 capture("shell-ready")
+tap({"浏览 Shell 文件", "Browse Shell files"}, timeout=300)
+tap({"etc"})
+tap({"alpine-release"})
+deadline = time.monotonic() + 30
+while time.monotonic() < deadline:
+    if any(re.search(r"\b3\.\d+\.\d+\b", node.get("text", "")) for node in snapshot().iter("node")):
+        break
+    time.sleep(1)
+else:
+    capture("shell-file-preview-failed")
+    raise AssertionError("The installed Alpine version file must be readable")
+capture("shell-file-preview")
+tap({"返回文件列表", "Back to files"})
+tap({"关闭文件浏览", "Close file browser"})
 tap({"刷新状态", "Refresh status"}, timeout=300, scroll=True)
 tap({"Linux essentials"}, scroll=True)
 tap({"Python and pip"}, scroll=True)

@@ -190,7 +190,7 @@ private func iosToolchainPayload(
 final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private let installationPreferenceKey = "xgent.mobileExecution.iosShellInstalled"
     private let installationVerificationKey = "xgent.mobileExecution.iosShellVerification"
-    private let installationVerificationVersion = "ios-a-shell-v3"
+    private let installationVerificationVersion = "ios-a-shell-v4"
     private let installationDirectoryName = "environment-v3"
     private let installationMarkerName = ".xgent-environment"
     private let installationProbeToken = "xgent-ios-shell-ready"
@@ -229,6 +229,9 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 "backend": "ios-a-shell",
                 "available": available,
                 "installed": installed,
+                "environmentRootPath": installed
+                    ? (self.installedEnvironmentRoot()?.path as Any? ?? NSNull())
+                    : NSNull(),
                 "detail": initializationError?.localizedDescription
                     ?? (!available
                         ? "This application package is missing a-Shell resources: \(self.missingBundledResources().joined(separator: ", ")). Install a package containing the native frameworks and resources; the device installer uses bundled files."
@@ -667,6 +670,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             throw MobileExecutionError.io("The bundled command registry is incomplete: \(missingCommands.joined(separator: ", "))")
         }
         replaceCommand("rehash", "xgent_rehash", true)
+        try AShellPythonRuntime.register()
         initialized = true
     }
 
@@ -812,6 +816,30 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 at: pythonSource,
                 to: staging.appendingPathComponent("home/Library", isDirectory: true)
             )
+            guard let frameworks = Bundle.main.privateFrameworksURL else {
+                throw MobileExecutionError.io("The signed Python frameworks are unavailable")
+            }
+            try fileManager.createSymbolicLink(
+                at: staging.appendingPathComponent("Frameworks"),
+                withDestinationURL: frameworks
+            )
+            let dynamicModules = staging.appendingPathComponent("home/Library/lib/python3.9/lib-dynload")
+            try fileManager.createDirectory(at: dynamicModules, withIntermediateDirectories: true)
+            for framework in try fileManager.contentsOfDirectory(at: frameworks, includingPropertiesForKeys: nil) {
+                let name = framework.deletingPathExtension().lastPathComponent
+                guard framework.pathExtension == "framework", name.hasPrefix("python3_ios-") else { continue }
+                let module = String(name.dropFirst("python3_ios-".count))
+                let binary = framework.appendingPathComponent(name)
+                guard fileManager.fileExists(atPath: binary.path) else {
+                    throw MobileExecutionError.io("The signed Python extension is missing: \(module)")
+                }
+                // Normal .so discovery also works on simulator CPUs and with
+                // python -S; Apple's signed framework binary remains in place.
+                try fileManager.createSymbolicLink(
+                    at: dynamicModules.appendingPathComponent("\(module).so"),
+                    withDestinationURL: binary
+                )
+            }
             try installationVerificationVersion.write(
                 to: staging.appendingPathComponent(installationMarkerName),
                 atomically: true,
@@ -970,6 +998,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         var missing = [
             "commandDictionary.plist", "extraCommandsDictionary.plist",
             "vim/syntax/syntax.vim", "terminfo", "python/lib/python3.9/os.py",
+            "python/lib/python3.9/sitecustomize.py",
         ].filter { !FileManager.default.fileExists(atPath: resources.appendingPathComponent($0).path) }
         if Bundle.main.url(forResource: "commandDictionary", withExtension: "plist") == nil {
             missing.append("commandDictionary.plist at the app bundle root")

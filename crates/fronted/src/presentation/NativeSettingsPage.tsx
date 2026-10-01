@@ -69,6 +69,7 @@ import { ComputerUseSection } from "../pages/settings/ComputerUseSection";
 import { CronSection } from "../pages/settings/CronSection";
 import { GlobalShortcutsSection } from "../pages/settings/GlobalShortcutsSection";
 import { HooksSection } from "../pages/settings/HooksSection";
+import { MobileEnvironmentBrowser } from "../pages/settings/MobileEnvironmentBrowser";
 import {
   createDraftModelConfig,
   fetchModelsFromApi,
@@ -135,6 +136,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [status, setStatus] = useState<MobileAssistantStatus>();
   const [permissions, setPermissions] = useState<MobilePermissionStates>({});
   const [shell, setShell] = useState<MobileExecutionStatus>();
+  const [shellFilesOpen, setShellFilesOpen] = useState(false);
   const [shellToolchains, setShellToolchains] = useState<string[]>([]);
   const [shellRunId, setShellRunId] = useState("");
   const [shellInstallOutput, setShellInstallOutput] = useState("");
@@ -403,6 +405,18 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     ssh: t("settings.navSsh"),
     about: t("settings.navAbout"),
   };
+  if (page === "mobileExecution" && shellFilesOpen && shell?.installed && shell.environmentRootPath)
+    return (
+      <MobileEnvironmentBrowser
+        open
+        rootPath={shell.environmentRootPath}
+        backend={shell.backend}
+        onClose={() => setShellFilesOpen(false)}
+        nativeSettingsSurfaceId={sessionSurface}
+        appearance={settings.theme}
+        theme={createNativePresentationTheme(settings, nativeMobile)}
+      />
+    );
   if (page === "ssh")
     return (
       <SshSettingsSection
@@ -1221,6 +1235,16 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           !busy && shell?.installed !== true,
         ),
         c.action("refresh-shell", t("settings.mobileRefresh"), () => work(refreshShell), !busy),
+        ...(shell?.installed && shell.environmentRootPath
+          ? [
+              c.action(
+                "browse-shell-files",
+                t("settings.mobileFilesBrowse"),
+                () => setShellFilesOpen(true),
+                !busy,
+              ),
+            ]
+          : []),
       ]),
       ...(shell?.backend === "android-proot" && shell.alpineMirrors?.length
         ? [

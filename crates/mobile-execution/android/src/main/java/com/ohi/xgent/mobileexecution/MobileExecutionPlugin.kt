@@ -387,6 +387,7 @@ class MobileExecutionPlugin(private val activity: Activity) : Plugin(activity) {
             put("backend", BACKEND)
             put("available", available)
             put("installed", installed)
+            put("environmentRootPath", rootfsDir.takeIf { installed }?.absolutePath)
             put("detail", detail)
             put(
                 "capabilities",

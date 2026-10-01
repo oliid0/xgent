@@ -40,6 +40,18 @@ final class ShellInstallationTests: XCTestCase {
         XCTAssertTrue(version.exists, "Installation failed: \(app.debugDescription)")
         XCTAssertTrue(version.label.contains("a-Shell"))
 
+        tap(app.buttons["browse-shell-files"], in: app)
+        tap(app.buttons["shell-files-entry:cacert.pem"], in: app)
+        let certificate = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "-----BEGIN CERTIFICATE-----")).firstMatch
+        XCTAssertTrue(certificate.waitForExistence(timeout: 30), "Read the actual installed CA bundle")
+        let filesScreenshot = XCTAttachment(screenshot: app.screenshot())
+        filesScreenshot.name = "ios-shell-file-preview"
+        filesScreenshot.lifetime = .keepAlways
+        add(filesScreenshot)
+        tap(app.buttons["shell-files-list"], in: app)
+        tap(app.buttons["back"], in: app)
+        XCTAssertTrue(version.waitForExistence(timeout: 30), "Return to the same Shell settings route")
+
         tap(app.buttons["back"], in: app)
         tap(app.buttons["Close"], in: app)
         tap(app.buttons["tools"], in: app)
@@ -54,6 +66,15 @@ final class ShellInstallationTests: XCTestCase {
         XCTAssertTrue(exit.waitForExistence(timeout: 45), "The installed a-Shell command must return")
         XCTAssertEqual(exit.label, "Exit: 0")
         XCTAssertTrue(output.label.contains("xgent-ios-shell-ok"), "Verify actual command output")
+
+        tap(app.buttons["clear"], in: app)
+        tap(command, in: app)
+        command.typeText("python3 -c 'import sqlite3, ssl, zlib; print(\"xgent-python-modules-ok\")'; python3.9 -m pip --version")
+        tap(app.buttons["run"], in: app)
+        XCTAssertTrue(exit.waitForExistence(timeout: 45), "Both Python invocations must finish")
+        XCTAssertEqual(exit.label, "Exit: 0")
+        XCTAssertTrue(output.label.contains("xgent-python-modules-ok"))
+        XCTAssertTrue(output.label.contains("pip 22."))
     }
 
     private func tap(_ element: XCUIElement, in app: XCUIApplication) {

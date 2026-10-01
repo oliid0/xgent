@@ -26,6 +26,7 @@ export type MobileExecutionStatus = {
   backend: MobileExecutionBackend;
   available: boolean;
   installed: boolean;
+  environmentRootPath?: string | null;
   detail?: string | null;
   capabilities: MobileExecutionCapabilities;
   toolchains: MobileToolchainStatus[];

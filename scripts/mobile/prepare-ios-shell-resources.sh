@@ -121,6 +121,7 @@ done
 rm -rf -- "$OUTPUT_ROOT/python" "$PYTHON_FRAMEWORK_OUTPUT_ROOT"
 mkdir -p "$OUTPUT_ROOT/python/lib" "$PYTHON_FRAMEWORK_OUTPUT_ROOT"
 cp -R "$python_extract/cpython/Library/lib/python3.9" "$OUTPUT_ROOT/python/lib/python3.9"
+cp "$(dirname "${BASH_SOURCE[0]}")/python-sitecustomize.py" "$OUTPUT_ROOT/python/lib/python3.9/sitecustomize.py"
 for framework in "${PYTHON_FRAMEWORKS[@]}"; do
   source_framework="$python_extract/cpython/XcFrameworks/$framework.xcframework"
   if [ ! -s "$source_framework/Info.plist" ]; then
