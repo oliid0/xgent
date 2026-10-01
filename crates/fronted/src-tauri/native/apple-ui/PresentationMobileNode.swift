@@ -898,7 +898,7 @@ struct XgentIOSNode: View {
 
     private var toolCall: some View {
         Group {
-            if node.status == "running" {
+            if node.variant == "timeline" || node.status == "running" {
                 VStack(alignment: .leading, spacing: 8) {
                     toolCallLabel
                     toolCallContent

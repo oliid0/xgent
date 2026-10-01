@@ -432,25 +432,58 @@ extension XgentNodeView {
     }
 
     var nativeToolCall: some View {
-        DisclosureGroup(isExpanded: $expanded) {
-            VStack(alignment: .leading, spacing: 8) { children }
-                .padding(.top, 8)
-        } label: {
-            HStack(spacing: 8) {
-                semanticStatusIcon
-                Text(node.label ?? "Tool").font(.system(.subheadline, design: .monospaced).weight(.medium))
-                if let text = node.text, !text.isEmpty {
-                    Text(text).font(.caption).foregroundStyle(Color(xgentHex: palette.secondaryText))
-                        .lineLimit(1).truncationMode(.middle)
+        Group {
+            if node.variant == "timeline" || node.status == "running" {
+                VStack(alignment: .leading, spacing: 8) {
+                    nativeToolCallLabel
+                    nativeToolCallContent
+                }
+            } else {
+                DisclosureGroup(isExpanded: $expanded) {
+                    nativeToolCallContent
+                } label: {
+                    nativeToolCallLabel
                 }
             }
         }
-        .padding(10)
-        .background(Color(xgentHex: palette.surface).opacity(0.72),
-                    in: RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element), style: .continuous))
+        .tint(Color(xgentHex: palette.secondaryText))
+        .padding(node.variant == "timeline" ? 2 : 10)
+        .background {
+            if node.variant != "timeline" {
+                RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element), style: .continuous)
+                    .fill(Color(xgentHex: palette.surface).opacity(0.72))
+            }
+        }
         .overlay {
-            RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element), style: .continuous)
-                .stroke(Color(xgentHex: palette.border), lineWidth: 1)
+            if node.variant != "timeline" {
+                RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element), style: .continuous)
+                    .stroke(Color(xgentHex: palette.border), lineWidth: 1)
+            }
+        }
+    }
+
+    private var nativeToolCallContent: some View {
+        VStack(alignment: .leading, spacing: 8) { children }.padding(.top, 8)
+    }
+
+    private var nativeToolCallLabel: some View {
+        HStack(alignment: .top, spacing: 8) {
+            semanticStatusIcon
+            VStack(alignment: .leading, spacing: 4) {
+                Text(node.label ?? "Tool")
+                    .font(.system(.subheadline, design: .monospaced).weight(.medium))
+                    .foregroundStyle(Color(xgentHex: palette.text))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if let text = node.text, !text.isEmpty {
+                    Text(text).font(.caption)
+                        .foregroundStyle(Color(xgentHex: palette.secondaryText))
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

@@ -235,6 +235,10 @@ jobs:
       - name: Export native screenshots
         if: ${{ always() }}
         run: |
+          if [ -d "$RUNNER_TEMP/native-macos.xcresult" ]; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/native-macos.xcresult" \
+              --output-path "$RUNNER_TEMP/native-desktop-screenshots"
+          fi
           if [ -d "$RUNNER_TEMP/native-ios.xcresult" ]; then
             xcrun xcresulttool export attachments --path "$RUNNER_TEMP/native-ios.xcresult" \
               --output-path "$RUNNER_TEMP/native-screenshots"
@@ -250,5 +254,6 @@ jobs:
             ${{ runner.temp }}/native-*.log
             ${{ runner.temp }}/native-symbols.txt
             ${{ runner.temp }}/native-screenshots
+            ${{ runner.temp }}/native-desktop-screenshots
           retention-days: 3
           if-no-files-found: error

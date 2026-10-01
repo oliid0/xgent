@@ -325,7 +325,15 @@ struct XgentNodeView: View {
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.xgentPresentationTheme) var presentationTheme
     @Environment(\.colorScheme) var colorScheme
-    @State var expanded = false
+    @State var expanded: Bool
+
+    init(node: XgentNode, document: XgentDocument, model: XgentPresentationModel) {
+        self.node = node
+        self.document = document
+        self.model = model
+        _expanded = State(initialValue: node.variant == "timeline" ||
+                          (node.kind == .thinking && node.status == "running"))
+    }
 
     var children: XgentNodeChildren {
         XgentNodeChildren(nodes: node.children ?? [], document: document, model: model)
