@@ -61,7 +61,8 @@ final class MobileRenderingTests: XCTestCase {
         try await capture(XgentIOSRootPresentation(document: live, sidebar: nil, model: model),
                           name: "work-timeline-live", width: 320)
         let completed = try chat(with: [
-            node("finished", "Collapsible", ["label": "Worked for 2m 38s", "children": [tool]]),
+            node("finished", "Collapsible", ["label": "Worked for 2m 38s", "variant": "work",
+                                             "children": [tool]]),
             node("reply", "Markdown", ["text": "The settings change is complete."]),
         ])
         try await capture(XgentIOSRootPresentation(document: completed, sidebar: nil, model: model),

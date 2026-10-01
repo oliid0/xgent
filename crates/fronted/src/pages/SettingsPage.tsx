@@ -344,6 +344,9 @@ export function SettingsPage(props: SettingsPageProps) {
 
   const saveIndicator = getSaveIndicator(saveState, t);
   const sectionManagesScroll = section === "providers" || section === "memory";
+  // Shell installation has a long, changing form. Let the tall BottomSheet
+  // own its scrollport so Android WebView can reach the package controls.
+  const sheetScrollsAccess = nativeMobile && mobileDetailOpen && section === "access";
   const sectionContent = (() => {
     // Resolve hidden destinations before mounting their effects, including deep links.
     if (!navItems.some((item) => item.id === section)) return null;
@@ -443,11 +446,16 @@ export function SettingsPage(props: SettingsPageProps) {
   if (compactSettings) {
     return (
       <SettingsDetailLayerProvider onLayerChange={handleDetailLayerChange}>
-        <Section ref={mobileBackRef} width="100%" height="100%" padding={0}>
+        <Section
+          ref={mobileBackRef}
+          width="100%"
+          height={sheetScrollsAccess ? undefined : "100%"}
+          padding={0}
+        >
           <Layout
-            height="fill"
+            height={sheetScrollsAccess ? "auto" : "fill"}
             padding={0}
-            className="settings-page settings-page-compact"
+            className={`settings-page settings-page-compact${sheetScrollsAccess ? " settings-page-sheet-scroll" : ""}`}
             data-edge-swipe-ignore
             header={
               detailLayerDepth > 0 ? undefined : (
@@ -491,7 +499,7 @@ export function SettingsPage(props: SettingsPageProps) {
                   key={section}
                   data-settings-section={section}
                   padding={4}
-                  isScrollable={!sectionManagesScroll}
+                  isScrollable={!sheetScrollsAccess && !sectionManagesScroll}
                   className="settings-section-enter"
                 >
                   <VStack

@@ -604,6 +604,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                   {
                     id: `${item.key}:work`,
                     kind: "Collapsible" as const,
+                    variant: "work",
                     label: duration
                       ? t("chat.activity.worked").replace("{duration}", duration)
                       : t("chat.activity.tools"),

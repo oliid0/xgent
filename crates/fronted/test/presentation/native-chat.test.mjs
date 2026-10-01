@@ -500,6 +500,7 @@ test("native work stays visible while running and folds only after completion", 
   transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
   const answer = transcript.children.find((node) => node.id === "answer");
   assert.equal(answer.children[0].kind, "Collapsible");
+  assert.equal(answer.children[0].variant, "work");
   assert.equal(answer.children[0].children[0].kind, "ToolCall");
   assert.equal(answer.children[0].children[0].variant, "timeline");
   assert.equal(answer.children[1].kind, "Markdown");

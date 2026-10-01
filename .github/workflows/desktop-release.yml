@@ -1107,7 +1107,16 @@ jobs:
           case "$app_pid" in
             ''|*[!0-9]*) echo "Could not parse simulator launch PID: $launch_result" >&2; exit 1 ;;
           esac
-          sleep 12
+          # A cold simulator may finish WebKit navigation after the initial
+          # launch succeeds. Wait for the SwiftUI root, not a fixed delay.
+          for attempt in {1..18}; do
+            if ! kill -0 "$app_pid"; then break; fi
+            xcrun simctl spawn "$simulator_udid" log show --last 3m --style compact \
+              --predicate 'process == "Xgent" AND eventMessage CONTAINS "XgentNativeUI root rendered"' \
+              > "$RUNNER_TEMP/xgent-ios-root.log" 2>&1 || true
+            if grep -q 'XgentNativeUI root rendered' "$RUNNER_TEMP/xgent-ios-root.log"; then break; fi
+            sleep 5
+          done
           xcrun simctl spawn "$simulator_udid" log show --last 5m --style compact \
             --predicate 'process == "Xgent" OR process == "xgent"' > "$RUNNER_TEMP/xgent-ios-launch.log" 2>&1 || true
           mkdir -p "$RUNNER_TEMP/xgent-ios-crashes"
@@ -1122,6 +1131,7 @@ jobs:
           fi
           if ! grep -q 'XgentNativeUI root rendered' "$RUNNER_TEMP/xgent-ios-launch.log" "$RUNNER_TEMP/xgent-ios-stderr.log"; then
             echo "SwiftUI did not render the application root" >&2
+            xcrun simctl io "$simulator_udid" screenshot "$RUNNER_TEMP/xgent-ios-unrendered-smoke.png" || true
             cat "$RUNNER_TEMP/xgent-ios-stderr.log" || true
             exit 1
           fi

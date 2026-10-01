@@ -310,8 +310,11 @@ struct XgentDisclosure: View {
                 #endif
             }.padding(.top, 8)
         } label: {
-            Text(node.label ?? "").font(.subheadline.weight(.medium))
+            Text(node.label ?? "")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(node.variant == "work" ? Color.secondary : Color.primary)
         }
+        .tint(node.variant == "work" ? Color.secondary : Color.accentColor)
     }
 }
 

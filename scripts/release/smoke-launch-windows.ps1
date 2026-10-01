@@ -23,9 +23,22 @@ try {
 finally {
   if ($null -ne $process -and -not $process.HasExited) {
     Stop-Process -Id $process.Id -Force
+    Wait-Process -Id $process.Id -Timeout 10 -ErrorAction SilentlyContinue
   }
   if (Test-Path -LiteralPath $diagnosticPath) {
     Get-Content -LiteralPath $diagnosticPath
-    Remove-Item -LiteralPath $diagnosticPath -Force
+    for ($attempt = 0; $attempt -lt 10; $attempt++) {
+      try {
+        Remove-Item -LiteralPath $diagnosticPath -Force -ErrorAction Stop
+        break
+      }
+      catch [System.IO.IOException] {
+        if ($attempt -eq 9) {
+          Write-Warning "Diagnostic log remains locked after process exit: $diagnosticPath"
+          break
+        }
+        Start-Sleep -Milliseconds 300
+      }
+    }
   }
 }

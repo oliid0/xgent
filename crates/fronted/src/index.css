@@ -3698,6 +3698,12 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   backdrop-filter: var(--xgent-material-filter, none);
 }
 
+.settings-page-sheet-scroll .mobile-panel-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
 .mobile-panel-safe-content {
   padding-block-end: env(safe-area-inset-bottom, 0px);
 }

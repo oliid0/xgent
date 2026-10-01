@@ -11,6 +11,23 @@ struct XgentCodeBlock: View {
     @State private var copied = false
 
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
+    private var diffLines: [String] { text.components(separatedBy: "\n") }
+
+    private func diffForeground(_ line: String) -> Color {
+        if line.hasPrefix("+") && !line.hasPrefix("+++") {
+            return colorScheme == .dark ? .green : Color(red: 0.12, green: 0.42, blue: 0.18)
+        }
+        if line.hasPrefix("-") && !line.hasPrefix("---") {
+            return colorScheme == .dark ? .red : Color(red: 0.65, green: 0.13, blue: 0.13)
+        }
+        return line.hasPrefix("@@") ? Color(xgentHex: palette.secondaryText) : Color(xgentHex: palette.text)
+    }
+
+    private func diffBackground(_ line: String) -> Color {
+        if line.hasPrefix("+") && !line.hasPrefix("+++") { return .green.opacity(0.12) }
+        if line.hasPrefix("-") && !line.hasPrefix("---") { return .red.opacity(0.12) }
+        return .clear
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -34,10 +51,27 @@ struct XgentCodeBlock: View {
             .padding(.horizontal, 12)
             Divider()
             ScrollView(.horizontal) {
-                XgentSwiftHighlighter(dark: colorScheme == .dark).highlightCode(text, language: language)
+                if language?.lowercased() == "diff" {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(diffLines.indices, id: \.self) { index in
+                            Text(diffLines[index].isEmpty ? " " : diffLines[index])
+                                .foregroundStyle(diffForeground(diffLines[index]))
+                                .fixedSize(horizontal: true, vertical: false)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 2)
+                                .background(diffBackground(diffLines[index]))
+                        }
+                    }
                     .font(.system(size: fontSize * CGFloat(theme.fontScale), design: .monospaced))
                     .textSelection(.enabled)
-                    .padding(12)
+                    .padding(.vertical, 10)
+                } else {
+                    XgentSwiftHighlighter(dark: colorScheme == .dark).highlightCode(text, language: language)
+                        .font(.system(size: fontSize * CGFloat(theme.fontScale), design: .monospaced))
+                        .textSelection(.enabled)
+                        .padding(12)
+                }
             }
         }
         .foregroundStyle(Color(xgentHex: palette.text))
