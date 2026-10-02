@@ -75,6 +75,7 @@ import {
   retainNativeSurfaceSession,
 } from "./NativeSurface";
 import { createNativeDesktopAppearance } from "./nativeDesktopAppearance";
+import { useNativeDesktopProxy } from "./nativeDesktopProxy";
 import { useNativeDesktopSystem } from "./nativeDesktopSystem";
 import { nativeOAuthAccounts } from "./nativeOAuthAccounts";
 import { createNativePresentationTheme } from "./nativeTheme";
@@ -124,6 +125,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         : (props.initialSection ?? (nativeMobile ? "" : "system"));
   const [page, setPage] = useState(initialPage);
   const desktopSystem = useNativeDesktopSystem(
+    { settings, setSettings },
+    !nativeMobile && page === "system",
+    t,
+  );
+  const desktopProxy = useNativeDesktopProxy(
     { settings, setSettings },
     !nativeMobile && page === "system",
     t,
@@ -897,6 +903,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       for (const [id, handler] of appearance.handlers) c.handlers.set(id, handler);
       nodes.push(...desktopSystem.nodes);
       for (const [id, handler] of desktopSystem.handlers) c.handlers.set(id, handler);
+      nodes.push(...desktopProxy.nodes);
+      for (const [id, handler] of desktopProxy.handlers) c.handlers.set(id, handler);
     }
   } else if (page === "providers") {
     nodes.push(

@@ -9,19 +9,20 @@ final class DesktopSettingsRenderingTests: XCTestCase {
     @MainActor
     func testHandwrittenSettingsFitNarrowWideAndAccessibilityWindows() async throws {
         let widths: [CGFloat] = [640, 1040]
-        for (width, systemTools) in widths.flatMap({ width in [false, true].map { (width, $0) } }) {
+        for (width, section) in widths.flatMap({ width in ["appearance", "system-tools", "proxy"].map { (width, $0) } }) {
             for typeSize in [DynamicTypeSize.large, .accessibility3] {
-                let document = try fixture(appearance: true, systemTools: systemTools)
+                let document = try fixture(appearance: true, systemTools: section == "system-tools", proxy: section == "proxy")
+                let height: CGFloat = section == "proxy" ? 1100 : 720
                 let model = XgentPresentationModel()
                 model.update(document)
                 let view = XgentDesktopSettingsLayout(node: document.nodes[0], document: document, model: model)
-                    .frame(width: width, height: 720)
+                    .frame(width: width, height: height)
                     .background { XgentThemeBackground() }
                     .dynamicTypeSize(typeSize)
                     .modifier(XgentPresentationThemeModifier(theme: .fallback,
                         appearance: typeSize == .large ? .light : .dark))
                 let host = NSHostingView(rootView: view)
-                let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: 720),
+                let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: height),
                                       styleMask: [.titled], backing: .buffered, defer: false)
                 window.contentView = host
                 window.orderFront(nil)
@@ -31,13 +32,13 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                 XCTAssertEqual(host.bounds.width, width, accuracy: 1,
                     "Settings must fit the actual window instead of forcing a 900-point minimum")
                 XCTAssertLessThanOrEqual(host.fittingSize.width, width + 1)
-                let strategy = Snapshotting<NSView, NSImage>.image(size: CGSize(width: width, height: 720))
+                let strategy = Snapshotting<NSView, NSImage>.image(size: CGSize(width: width, height: height))
                 let image = await withCheckedContinuation { continuation in
                     strategy.snapshot(host).run { continuation.resume(returning: $0) }
                 }
                 XCTAssertGreaterThan(try XCTUnwrap(image.tiffRepresentation).count, 2_000)
                 let attachment = XCTAttachment(image: image)
-                attachment.name = "settings-manual-\(systemTools ? "system-tools-" : "")\(Int(width))-\(typeSize == .large ? "standard" : "accessibility-dark")"
+                attachment.name = "settings-manual-\(section == "appearance" ? "" : "\(section)-")\(Int(width))-\(typeSize == .large ? "standard" : "accessibility-dark")"
                 attachment.lifetime = .keepAlways
                 add(attachment)
             }
@@ -70,7 +71,7 @@ final class DesktopSettingsRenderingTests: XCTestCase {
         XCTAssertEqual(actions.count, count)
     }
 
-    private func fixture(appearance: Bool = false, systemTools: Bool = false) throws -> XgentDocument {
+    private func fixture(appearance: Bool = false, systemTools: Bool = false, proxy: Bool = false) throws -> XgentDocument {
         func node(_ id: String, _ kind: String, _ fields: [String: Any] = [:]) -> [String: Any] {
             var value = fields
             value["id"] = id
@@ -111,6 +112,21 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                 node("tray-running-badge", "Switch", ["label": "Menu bar running badge", "text": "Show the running-chat count next to the macOS menu bar icon.", "value": true, "action": "tray-running-badge"]),
             ]]),
         ]
+        let proxyGroups = [
+            node("desktop-proxy", "SettingsGroup", ["label": "App Proxy", "children": [
+                node("proxy-enabled", "Switch", ["label": "Enable app proxy", "text": "The proxy applies to provider requests and shared network tools.", "value": true, "action": "proxy-enabled"]),
+                node("proxy-type", "Selector", ["label": "Proxy type", "value": "socks5", "action": "proxy-type", "options": [
+                    ["value": "http", "label": "HTTP"], ["value": "socks5", "label": "SOCKS5"],
+                ]]),
+                node("proxy-host", "TextInput", ["label": "Proxy host", "value": "127.0.0.1", "action": "proxy-host"]),
+                node("proxy-port", "TextInput", ["label": "Port", "value": "1080", "action": "proxy-port"]),
+                node("proxy-username", "TextInput", ["label": "Username (optional)", "value": "", "action": "proxy-username"]),
+                node("proxy-password", "TextInput", ["label": "Password (optional)", "value": "", "secure": true, "action": "proxy-password"]),
+                node("proxy-password-status", "Text", ["text": "Proxy password saved", "secondary": true]),
+                node("proxy-password-clear", "Button", ["label": "Clear", "action": "proxy-password-clear"]),
+                node("proxy-save", "Button", ["label": "Save", "action": "proxy-save", "disabled": true]),
+            ]]),
+        ]
         let json: [String: Any] = [
             "version": 1, "surface": "settings-manual", "revision": 1, "mode": "sheet",
             "title": "Settings", "appearance": "light", "formFactor": "desktop", "nodes": [
@@ -126,7 +142,7 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                     ]]),
                     node("settings-detail", "ScrollView", ["children": [
                         node("settings-detail-title", "Heading", ["text": appearance ? "General" : "Providers"]),
-                    ] + (appearance ? (systemTools ? systemGroups : appearanceGroups) : [
+                    ] + (appearance ? (proxy ? proxyGroups : systemTools ? systemGroups : appearanceGroups) : [
                         node("provider-settings", "SettingsGroup", ["label": "Connection", "children": [
                             node("provider-name", "TextInput", ["label": "Provider name", "value": "Example provider", "action": "name"]),
                             node("provider-key", "TextInput", ["label": "API key", "value": "", "secure": true, "action": "key"]),

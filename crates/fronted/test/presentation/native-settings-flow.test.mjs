@@ -233,7 +233,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(document.formFactor, "desktop");
   const flatten = nodes => nodes.flatMap(node => [node, ...flatten(node.children ?? [])]);
   assert.ok(flatten(document.nodes).some(node => node.id === "desktop-appearance"), "default macOS system route exposes appearance");
-  for (const id of ["terminal-shell", "tray-show-titles", "tray-running-badge"]) {
+  for (const id of ["terminal-shell", "tray-show-titles", "tray-running-badge", "proxy-host", "proxy-password", "proxy-enabled"]) {
     assert.ok(flatten(document.nodes).some(node => node.id === id), `default macOS system route exposes ${id}`);
   }
   assert.equal((await dispatch("appearance-customized", true)).ok, true);
