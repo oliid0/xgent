@@ -424,7 +424,11 @@ export function SettingsPage(props: SettingsPageProps) {
       case "usage":
         return null;
       case "about":
-        return <AboutSection settings={settings} setSettings={setSettings} appUpdate={appUpdate} />;
+        return (
+          <AboutSection
+            currentVersion={appUpdate.result?.currentVersion || __XGENT_APP_VERSION__}
+          />
+        );
       default: {
         const unreachable: never = section;
         return unreachable;

@@ -43,13 +43,11 @@ import {
 import { UI_THEME_PRESETS } from "../lib/settings/appearance";
 import { createUuid } from "../lib/shared/id";
 import { desktopSttSettingsService } from "../lib/stt/desktopSttSettingsService";
-import { BUILTIN_TOOL_CATALOG, BUILTIN_TOOL_CATEGORIES } from "../lib/tools/builtinToolCatalog";
 import {
   PERSONAL_CAPABILITIES,
   personalPolicy,
   personalPolicyKey,
 } from "../lib/tools/mobileAssistantPolicy";
-import { resolveRuntimeToolCapabilities } from "../lib/tools/runtimeToolCapabilities";
 import { BackupSyncSection } from "../pages/settings/BackupSyncSection";
 import { ComputerUseSection } from "../pages/settings/ComputerUseSection";
 import { CronSection } from "../pages/settings/CronSection";
@@ -79,6 +77,7 @@ import { useNativeDesktopProxy } from "./nativeDesktopProxy";
 import { useNativeDesktopSystem } from "./nativeDesktopSystem";
 import { nativeOAuthAccounts } from "./nativeOAuthAccounts";
 import { createNativePresentationTheme } from "./nativeTheme";
+import { createNativeToolPermissions } from "./nativeToolPermissions";
 import type { PresentationNode } from "./types";
 
 type LanPcClientStatus = {
@@ -504,43 +503,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       <ComputerUseSection settings={settings} setSettings={setSettings} onBack={returnToSettings} />
     );
   const nodes: PresentationNode[] = [];
-  function appendToolPolicyGroups() {
-    const capabilities = resolveRuntimeToolCapabilities(nativeMobile ? "native-mobile" : "desktop");
-    for (const category of BUILTIN_TOOL_CATEGORIES) {
-      const tools = BUILTIN_TOOL_CATALOG.filter(
-        (tool) =>
-          tool.categoryId === category.id &&
-          (tool.toolName !== "ManagedProcess" || capabilities.managedProcess) &&
-          (tool.toolName !== "ReadTerminal" || capabilities.terminal),
-      );
-      nodes.push(
-        c.group(
-          category.id,
-          t(category.labelKey),
-          tools.map((tool) =>
-            c.select(
-              `policy:${tool.toolName}`,
-              tool.toolName,
-              settings.system.toolPolicies?.[tool.toolName] ?? "allow",
-              ["allow", "ask", "deny"].map((value) => ({
-                value,
-                label: t(`settings.toolPolicy.${value}`),
-              })),
-              (value) =>
-                setSettings((previous) =>
-                  updateSystem(previous, {
-                    toolPolicies: {
-                      ...previous.system.toolPolicies,
-                      [tool.toolName]: value as "allow" | "ask" | "deny",
-                    },
-                  }),
-                ),
-            ),
-          ),
-        ),
-      );
-    }
-  }
   if (page && (nativeMobile || providerId))
     nodes.push({
       ...c.action("back", t("settings.native.back"), () => {
@@ -1527,7 +1489,9 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       ]),
     );
   } else if (page === "toolPermissions") {
-    appendToolPolicyGroups();
+    const permissions = createNativeToolPermissions({ settings, setSettings }, nativeMobile, t);
+    nodes.push(...permissions.nodes);
+    for (const [id, handler] of permissions.handlers) c.handlers.set(id, handler);
   } else if (page === "voice") {
     if (nativeMobile) {
       nodes.push(
@@ -1881,27 +1845,14 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     if (accessStatus)
       nodes.push({ id: "access-status", kind: "Banner", label: accessStatus, status: "completed" });
   } else if (page === "about") {
-    nodes.push({
-      id: "about",
-      kind: "EmptyState",
-      icon: "sparkles",
-      label: "Xgent",
-      text: props.appUpdate.result?.currentVersion ?? "",
-    });
-    if (props.appUpdate.message)
-      nodes.push({
-        id: "update-message",
-        kind: "Banner",
-        label: props.appUpdate.message,
-        status: props.appUpdate.status === "error" ? "error" : "completed",
-      });
     nodes.push(
-      c.action(
-        "check-updates",
-        t("settings.native.checkUpdates"),
-        () => props.appUpdate.runCheck(),
-        !nativeMobile,
-      ),
+      { id: "about-name", kind: "Heading", text: "XGent" },
+      {
+        id: "about-version",
+        kind: "Text",
+        secondary: true,
+        text: `v${props.appUpdate.result?.currentVersion || __XGENT_APP_VERSION__}`,
+      },
     );
   } else {
     // Deep links to sections outside this surface return to the functional navigation.

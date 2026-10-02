@@ -2481,8 +2481,7 @@
 .settings-page-desktop .settings-memory-status-group,
 .settings-page-desktop .settings-memory-layout,
 .settings-page-desktop .settings-cron-card,
-.settings-page-desktop .settings-ssh-host-card,
-.settings-page-desktop .settings-about-card {
+.settings-page-desktop .settings-ssh-host-card {
   border-color: color-mix(in srgb, var(--border) calc(0.42 * 100%), transparent);
   background: color-mix(in srgb, var(--card) calc(0.72 * 100%), transparent);
   box-shadow:
@@ -2645,8 +2644,7 @@
   }
 
   .settings-cron-section,
-  .settings-ssh-section,
-  .settings-about-section {
+  .settings-ssh-section {
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -2762,65 +2760,6 @@
     justify-content: flex-end;
     padding-top: 8px;
     border-top: 1px solid color-mix(in srgb, var(--border) calc(0.32 * 100%), transparent);
-  }
-
-  .settings-about-header {
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    padding: 12px 10px 4px;
-    text-align: center;
-  }
-
-  .settings-about-identity {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .settings-about-app-icon {
-    width: 76px;
-    height: 76px;
-    border-radius: 20px;
-  }
-
-  .settings-about-header-actions {
-    display: grid;
-    width: 100%;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .settings-about-header-actions button {
-    min-height: 44px;
-    justify-content: center;
-  }
-
-  .settings-about-header-actions button:only-child {
-    grid-column: 1 / -1;
-  }
-
-  .settings-about-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .settings-about-card {
-    border-color: var(--color-border);
-    border-radius: var(--radius-container);
-    padding: 14px;
-    background: var(--color-background-card);
-    box-shadow: none;
-  }
-
-  .settings-about-version-row {
-    display: none;
-  }
-
-  .settings-about-status-card,
-  .settings-about-release-notes {
-    border-width: 0;
-    border-radius: 13px;
-    background: var(--color-background-muted);
   }
 }
 
@@ -3778,10 +3717,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     .settings-memory-entry-list details,
     .settings-hooks-detail,
     .settings-cron-card,
-    .settings-ssh-host-card,
-    .settings-about-card,
-    .settings-about-status-card,
-    .settings-about-release-notes
+    .settings-ssh-host-card
   ) {
   background: transparent;
   border-radius: var(--radius-container);

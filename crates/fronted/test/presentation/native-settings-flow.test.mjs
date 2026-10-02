@@ -243,6 +243,14 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(settings.customSettings.fontScale.chat, 1.2);
   assert.equal((await dispatch("close-window-behavior", "exit")).ok, true);
   assert.equal(settings.closeWindowBehavior, "exit");
+  assert.equal((await dispatch("desktop-nav:toolPermissions")).ok, true);
+  assert.ok(flatten(document.nodes).some(node => node.id === "command-safety-mode"));
+  assert.ok(flatten(document.nodes).some(node => node.id === "category:fs:deny"));
+  assert.equal((await dispatch("command-safety-mode", "sandboxOffline")).ok, true);
+  assert.equal(settings.system.commandSafetyMode, "sandboxOffline");
+  assert.equal((await dispatch("category:fs:deny")).ok, true);
+  assert.equal(settings.system.toolPolicies.Read, "deny");
+  assert.equal(settings.system.toolPolicies["personal:clipboard"], "deny");
 });
 
 test("native Shell install reports progress, errors, and live and final package output", async () => {

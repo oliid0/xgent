@@ -6,13 +6,17 @@ import XCTest
 @testable import XgentNativeUI
 
 final class DesktopSettingsRenderingTests: XCTestCase {
+    private enum Section: String, CaseIterable {
+        case appearance, systemTools = "system-tools", proxy, about, permissions, providers
+    }
+
     @MainActor
     func testHandwrittenSettingsFitNarrowWideAndAccessibilityWindows() async throws {
         let widths: [CGFloat] = [640, 1040]
-        for (width, section) in widths.flatMap({ width in ["appearance", "system-tools", "proxy"].map { (width, $0) } }) {
+        for (width, section) in widths.flatMap({ width in Section.allCases.filter { $0 != .providers }.map { (width, $0) } }) {
             for typeSize in [DynamicTypeSize.large, .accessibility3] {
-                let document = try fixture(appearance: true, systemTools: section == "system-tools", proxy: section == "proxy")
-                let height: CGFloat = section == "proxy" ? 1100 : 720
+                let document = try fixture(section: section)
+                let height: CGFloat = section == .proxy || section == .permissions ? 1100 : 720
                 let model = XgentPresentationModel()
                 model.update(document)
                 let view = XgentDesktopSettingsLayout(node: document.nodes[0], document: document, model: model)
@@ -38,7 +42,7 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                 }
                 XCTAssertGreaterThan(try XCTUnwrap(image.tiffRepresentation).count, 2_000)
                 let attachment = XCTAttachment(image: image)
-                attachment.name = "settings-manual-\(section == "appearance" ? "" : "\(section)-")\(Int(width))-\(typeSize == .large ? "standard" : "accessibility-dark")"
+                attachment.name = "settings-manual-\(section == .appearance ? "" : "\(section.rawValue)-")\(Int(width))-\(typeSize == .large ? "standard" : "accessibility-dark")"
                 attachment.lifetime = .keepAlways
                 add(attachment)
             }
@@ -71,7 +75,7 @@ final class DesktopSettingsRenderingTests: XCTestCase {
         XCTAssertEqual(actions.count, count)
     }
 
-    private func fixture(appearance: Bool = false, systemTools: Bool = false, proxy: Bool = false) throws -> XgentDocument {
+    private func fixture(section: Section = .providers) throws -> XgentDocument {
         func node(_ id: String, _ kind: String, _ fields: [String: Any] = [:]) -> [String: Any] {
             var value = fields
             value["id"] = id
@@ -127,6 +131,53 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                 node("proxy-save", "Button", ["label": "Save", "action": "proxy-save", "disabled": true]),
             ]]),
         ]
+        let permissionGroups = [
+            node("tool-policy-summary", "SettingsGroup", ["label": "Tool permissions", "children": [
+                node("tool-policy-description", "Text", ["text": "Control which tools may run automatically, require confirmation, or remain blocked.", "secondary": true]),
+                node("tool-policy-reset", "Button", ["label": "Reset tool permissions", "action": "tool-policy-reset"]),
+            ]]),
+            node("command-safety", "SettingsGroup", ["label": "Command safety", "children": [
+                node("command-safety-mode", "Selector", ["label": "Command safety", "value": "sandboxOffline", "action": "command-safety-mode", "options": [
+                    ["value": "auto", "label": "Automatic"], ["value": "ask", "label": "Ask before running"],
+                    ["value": "sandbox", "label": "Sandbox"], ["value": "sandboxOffline", "label": "Sandbox without network"],
+                ]]),
+                node("command-safety-description", "Text", ["text": "The selected mode is used by the shared command executor.", "secondary": true]),
+            ]]),
+            node("fs", "SettingsGroup", ["label": "Files", "children": [
+                node("category:fs:actions", "HStack", ["wrap": true, "accessibilityLabel": "Apply to this category", "children": [
+                    node("category:fs:allow", "Button", ["label": "Allow", "action": "category:fs:allow"]),
+                    node("category:fs:ask", "Button", ["label": "Ask", "action": "category:fs:ask"]),
+                    node("category:fs:deny", "Button", ["label": "Deny", "action": "category:fs:deny"]),
+                ]]),
+                node("policy:Read", "Selector", ["label": "Read files", "value": "ask", "action": "policy:Read", "options": [
+                    ["value": "allow", "label": "Allow"], ["value": "ask", "label": "Ask"], ["value": "deny", "label": "Deny"],
+                ]]),
+                node("policy:Read:description", "Text", ["text": "Read files from the current workspace without changing their contents.", "secondary": true]),
+            ]]),
+        ]
+        let groups: [[String: Any]]
+        let title: String
+        switch section {
+        case .appearance: groups = appearanceGroups; title = "General"
+        case .systemTools: groups = systemGroups; title = "General"
+        case .proxy: groups = proxyGroups; title = "General"
+        case .about:
+            groups = [node("about-name", "Heading", ["text": "XGent"]),
+                      node("about-version", "Text", ["text": "v1.0.0", "secondary": true])]
+            title = "About"
+        case .permissions: groups = permissionGroups; title = "Tool permissions"
+        case .providers:
+            groups = [node("provider-settings", "SettingsGroup", ["label": "Connection", "children": [
+                node("provider-name", "TextInput", ["label": "Provider name", "value": "Example provider", "action": "name"]),
+                node("provider-key", "TextInput", ["label": "API key", "value": "", "secure": true, "action": "key"]),
+                node("provider-model", "Selector", ["label": "Default model", "value": "current", "action": "model", "options": [
+                    ["value": "current", "label": "Current model"],
+                    ["value": "alternative", "label": "Alternative model with a longer display name"],
+                ]]),
+                node("provider-test", "Button", ["label": "Test connection and fetch available models", "action": "test", "prominent": true]),
+            ]])]
+            title = "Providers"
+        }
         let json: [String: Any] = [
             "version": 1, "surface": "settings-manual", "revision": 1, "mode": "sheet",
             "title": "Settings", "appearance": "light", "formFactor": "desktop", "nodes": [
@@ -134,25 +185,17 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                     node("settings-sidebar", "VStack", ["children": [
                         node("settings-search", "TextInput", ["label": "Search settings", "value": "", "action": "search"]),
                         node("settings-navigation", "List", ["children": [
-                            node("desktop-nav:general", "NavigationRow", ["label": "General", "icon": "gearshape", "selected": appearance, "action": "general"]),
-                            node("desktop-nav:providers", "NavigationRow", ["label": "Providers", "icon": "network", "selected": !appearance, "action": "providers"]),
+                            node("desktop-nav:general", "NavigationRow", ["label": "General", "icon": "gearshape", "selected": title == "General", "action": "general"]),
+                            node("desktop-nav:providers", "NavigationRow", ["label": "Providers", "icon": "network", "selected": section == .providers, "action": "providers"]),
                             node("desktop-nav:backup", "NavigationRow", ["label": "Backup and synchronization", "icon": "icloud", "action": "backup"]),
+                            node("desktop-nav:permissions", "NavigationRow", ["label": "Tool permissions", "icon": "lock.shield", "selected": section == .permissions, "action": "permissions"]),
+                            node("desktop-nav:about", "NavigationRow", ["label": "About", "icon": "info.circle", "selected": section == .about, "action": "about"]),
                         ]]),
                         node("settings-close", "Button", ["label": "Back to Chat", "action": "close"]),
                     ]]),
                     node("settings-detail", "ScrollView", ["children": [
-                        node("settings-detail-title", "Heading", ["text": appearance ? "General" : "Providers"]),
-                    ] + (appearance ? (proxy ? proxyGroups : systemTools ? systemGroups : appearanceGroups) : [
-                        node("provider-settings", "SettingsGroup", ["label": "Connection", "children": [
-                            node("provider-name", "TextInput", ["label": "Provider name", "value": "Example provider", "action": "name"]),
-                            node("provider-key", "TextInput", ["label": "API key", "value": "", "secure": true, "action": "key"]),
-                            node("provider-model", "Selector", ["label": "Default model", "value": "current", "action": "model", "options": [
-                                ["value": "current", "label": "Current model"],
-                                ["value": "alternative", "label": "Alternative model with a longer display name"],
-                            ]]),
-                            node("provider-test", "Button", ["label": "Test connection and fetch available models", "action": "test", "prominent": true]),
-                        ]]),
-                    ])]),
+                        node("settings-detail-title", "Heading", ["text": title]),
+                    ] + groups]),
                 ]]),
             ],
         ]
