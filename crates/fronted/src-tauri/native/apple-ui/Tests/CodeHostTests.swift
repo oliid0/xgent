@@ -103,7 +103,10 @@ final class CodeHostTests: XCTestCase {
         #else
         let host = NSHostingView(rootView: AnyView(render(first, model)))
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 640, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
+        let contentRoot = NSView(frame: CGRect(x: 0, y: 0, width: 640, height: 400))
+        host.frame = contentRoot.bounds; host.autoresizingMask = [.width, .height]
+        contentRoot.addSubview(host)
+        window.isReleasedWhenClosed = false; window.contentView = contentRoot; window.makeKeyAndOrderFront(nil)
         defer { model.invalidate(); window.close() }
         let root = host
         #endif

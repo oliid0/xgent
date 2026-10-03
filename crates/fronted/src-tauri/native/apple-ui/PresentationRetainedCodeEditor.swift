@@ -34,7 +34,7 @@ struct XgentRetainedCodeEditor: UIViewControllerRepresentable {
         entry.update(lease: coordinator.lease, configuration: configuration, content: content, environment: environment, changed: changed)
         let host = entry.hosting
         if host.parent !== container {
-            if host.parent != nil { host.willMove(toParent: nil); host.removeFromParent() }
+            if host.parent != nil { host.willMove(toParent: nil); host.view.removeFromSuperview(); host.removeFromParent() }
             container.addChild(host)
             host.view.translatesAutoresizingMaskIntoConstraints = false
             host.view.backgroundColor = .clear

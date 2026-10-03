@@ -47,6 +47,7 @@ struct XgentQuestionOptionButton: View {
         .buttonStyle(.plain)
         .disabled(node.disabled == true || model.isBusy(node, in: document))
         .accessibilityElement(children: .ignore)
+        .accessibilityAction { model.send(node, in: document) }
         .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
         .accessibilityHint(node.text ?? "")
         .accessibilityAddTraits(.isButton)

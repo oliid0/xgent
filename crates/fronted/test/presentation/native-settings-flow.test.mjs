@@ -272,6 +272,13 @@ test("native settings mirrors compact navigation and persists shared system, pro
   render();
   assert.equal(document.formFactor, "desktop");
   const flatten = nodes => nodes.flatMap(node => [node, ...flatten(node.children ?? [])]);
+  const settingsNavIds = () => flatten(document.nodes).find(node => node.id === "settings-navigation").children.map(node => node.id);
+  assert.equal(settingsNavIds().length, 12, "desktop settings exposes all twelve primary sections");
+  await dispatch("settings-search", "no-matching-settings-section");
+  assert.deepEqual(settingsNavIds(), []);
+  assert.ok(flatten(document.nodes).some(node => node.id === "settings-search-empty"));
+  assert.equal((await dispatch("settings-search-clear")).ok, true);
+  assert.equal(settingsNavIds().length, 12, "clearing search restores every settings section");
   assert.deepEqual(flatten(document.nodes).filter(node =>
     ["execution-mode", "desktop-terminal", "general", "desktop-appearance"].includes(node.id)).map(node => node.id),
     ["execution-mode", "desktop-terminal", "general", "desktop-appearance"]);

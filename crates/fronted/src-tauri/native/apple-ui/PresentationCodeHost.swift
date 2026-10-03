@@ -35,6 +35,13 @@ final class XgentCodeHost {
         result["scope"] = identity.scope
         result["session"] = identity.key
         result["hosting"] = String(describing: ObjectIdentifier(hosting))
+        #if os(iOS)
+        result["hostingInWindow"] = String(hosting.viewIfLoaded?.window != nil)
+        result["hostingHidden"] = String(hosting.viewIfLoaded?.isHidden ?? true)
+        #else
+        result["hostingInWindow"] = String(hosting.window != nil)
+        result["hostingHidden"] = String(hosting.isHiddenOrHasHiddenAncestor)
+        #endif
         result["sourceUTF16Length"] = String(source.content.utf16.count)
         return result
     }

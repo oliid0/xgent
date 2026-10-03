@@ -4,7 +4,8 @@ import type { PresentationHandler, PresentationNode, PresentationValue } from ".
 /** Shared state/action contract; each client owns its control layout and styling. */
 export function presentationControls(actionScope?: string) {
   const handlers = new Map<string, PresentationHandler>();
-  const actionId = (id: string) => actionScope ? `${actionScope.length}:${actionScope}:${id}` : id;
+  const actionId = (id: string) =>
+    actionScope ? `${actionScope.length}:${actionScope}:${id}` : id;
   function bind(
     id: string,
     run: (value: PresentationValue) => unknown,

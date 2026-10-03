@@ -812,3 +812,29 @@ auth mode; a reused Swift field also retires its old draft and pending ACK.
 Behavioral regressions cover both transitions and continued editing of the new
 field. These changes await the next remote SDK run and do not establish complete
 platform parity or the requested visual similarity.
+
+[CI #252](https://github.com/oliid0/xgent/actions/runs/37137974254) compiled the
+device archive and passed Rust and repository guards. Frontend typechecking and
+building passed, then two formatter errors stopped its test step; the formatter
+has now corrected both files. macOS ran 160 tests with 22 failed assertions.
+Actual permission, sidebar and Git press/bounds checks passed; question option
+presses and retained editor lifetime/viewport assertions still failed. iOS again
+reported two controller-containment exceptions, so restarted test segments must
+not be described as a complete passing suite.
+
+This batch restores UIKit's required remove-view/remove-parent/add-child order,
+uses a transparent noninteractive parking container, and keeps macOS parking in
+the application's plain content root rather than NSThemeFrame. Both lifetime
+fixtures now use that production-style native root; all native-instance, undo,
+selection and scroll assertions remain. Hosting window/visibility evidence is
+also captured. Reference positioning saves its selection before native delegate
+updates and runs after the render transaction. Question options explicitly
+expose their default accessibility action; decorative child badges no longer
+turn buttons into accessibility containers.
+
+The handwritten desktop settings search now has its inline prompt, search icon,
+localized clear action and empty-result state. Clearing restores all 12 primary
+settings entries in the behavioral fixture. Native settings use the existing
+224-point sidebar and 640-point content width, center the content/header, and
+render close icons as icon buttons. These changes still await remote native
+rendering and do not prove full visual or task-completion parity.

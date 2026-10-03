@@ -210,9 +210,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   // Native controls can finish editing after a route changes. Reused field
   // IDs retain their layout identity; their actions belong to this provider
   // and authentication mode so a late credential cannot edit another account.
-  const c = presentationControls(page === "providers" && provider
-    ? JSON.stringify(["provider", provider.id, provider.type, provider.authMode ?? "api-key"])
-    : undefined);
+  const c = presentationControls(
+    page === "providers" && provider
+      ? JSON.stringify(["provider", provider.id, provider.type, provider.authMode ?? "api-key"])
+      : undefined,
+  );
   const oauth = useCodexOAuthAccounts(
     {
       value: provider?.oauthAccountId ?? "",
@@ -486,13 +488,44 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     padding: 16,
     children: [
       { id: "settings-title", kind: "Heading", text: t("settings.title") },
-      c.input("settings-search", t("settings.searchPlaceholder"), settingsQuery, setSettingsQuery),
+      {
+        ...c.input(
+          "settings-search",
+          t("settings.searchPlaceholder"),
+          settingsQuery,
+          setSettingsQuery,
+        ),
+        variant: "settings-search",
+        children: [
+          {
+            ...c.action(
+              "settings-search-clear",
+              t("chat.history.searchClear"),
+              () => setSettingsQuery(""),
+              !busy && !!settingsQuery,
+            ),
+            kind: "IconButton",
+            icon: "xmark.circle.fill",
+            variant: "ghost",
+          },
+        ],
+      },
       { id: "settings-navigation", kind: "List", children: desktopNavigation },
+      ...(!desktopNavigation.length
+        ? [
+            {
+              id: "settings-search-empty",
+              kind: "EmptyState" as const,
+              label: t("settings.searchEmpty"),
+            },
+          ]
+        : []),
       { id: "settings-sidebar-space", kind: "Spacer" },
       {
         ...c.action("settings-close", t("settings.backToChat"), props.onBack, !busy),
         kind: "IconButton",
         icon: "xmark",
+        variant: "ghost",
       },
     ],
   };

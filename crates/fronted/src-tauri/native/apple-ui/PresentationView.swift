@@ -263,8 +263,17 @@ private struct XgentNodeControlModifier: ViewModifier {
     let controlSize: ControlSize
     let busy: Bool
 
+    private var isContainer: Bool {
+        switch node.kind {
+        case .vStack, .hStack, .scrollView, .card, .section, .list,
+             .settingsGroup, .settingsLayout, .composer, .chatLayout,
+             .browserLayout, .chatMessage, .spreadsheetGrid, .terminalToolbar: return true
+        default: return false
+        }
+    }
+
     @ViewBuilder func body(content: Content) -> some View {
-        if node.children?.isEmpty == false || node.variant == "sidebar-conversation-row" || node.kind == .colorInput ||
+        if isContainer || node.variant == "sidebar-conversation-row" || node.kind == .colorInput ||
            node.kind == .spreadsheetGrid || node.variant == "workspace-file-layout" ||
            node.variant == "workspace-file-toolbar" || node.variant == "workspace-file-sheets" ||
            node.variant == "workspace-file-metadata" || node.variant == "workspace-file-annotations" ||

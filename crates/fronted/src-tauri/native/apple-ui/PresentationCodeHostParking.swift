@@ -3,6 +3,12 @@ import SwiftUI
 import UIKit
 #else
 import AppKit
+
+@MainActor
+private final class XgentCodeParkingContainer: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func accessibilityChildren() -> [Any]? { [] }
+}
 #endif
 
 // An open file keeps its native editor mounted in the application's window
@@ -55,7 +61,10 @@ final class XgentCodeHostParking {
         parks += 1
         input?.isEditable = false
         let size = host.view.bounds.size
-        container.isHidden = true
+        // Keep the hosting graph rendering while its file is inactive. Hiding
+        // a hosting ancestor can dismantle its native representables.
+        container.alpha = 0
+        container.isUserInteractionEnabled = false
         container.isAccessibilityElement = false
         container.accessibilityElementsHidden = true
         container.frame = CGRect(origin: .zero, size: size)
@@ -64,6 +73,7 @@ final class XgentCodeHostParking {
         if container.superview !== owner.view { owner.view.addSubview(container) }
         if host.parent !== owner {
             if host.parent != nil { host.willMove(toParent: nil) }
+            host.view.removeFromSuperview()
             host.removeFromParent()
             owner.addChild(host)
             host.view.translatesAutoresizingMaskIntoConstraints = true
@@ -79,13 +89,16 @@ final class XgentCodeHostParking {
     }
     #else
     private weak var owner: NSView?
-    private let container = NSView()
+    private let container = XgentCodeParkingContainer()
     private weak var input: NSTextView?
 
     func remember(_ input: NSView) {
         guard let content = input.window?.contentView else { return }
-        let root = content.superview ?? content
-        owner = root
+        // Tauri's content root is a plain native container. The system's
+        // NSThemeFrame and a SwiftUI-managed NSHostingView are not parking
+        // parents; both report unsupported subviews when mutated directly.
+        guard !String(reflecting: type(of: content)).contains("NSHostingView") else { return }
+        owner = content
         if let textView = input as? NSTextView { self.input = textView }
     }
     func park(_ host: XgentCodeHostingView) -> Bool {
@@ -94,8 +107,9 @@ final class XgentCodeHostParking {
         parks += 1
         input?.isEditable = false
         let size = host.bounds.size
-        container.isHidden = true
+        container.alphaValue = 0
         container.setAccessibilityElement(false)
+        container.setAccessibilityHidden(true)
         container.frame = CGRect(origin: .zero, size: size)
         if container.superview !== owner { owner.addSubview(container) }
         // Move directly between parents in the same window. Explicit removal

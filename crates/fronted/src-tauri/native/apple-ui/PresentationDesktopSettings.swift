@@ -15,6 +15,7 @@ struct XgentDesktopSettingsLayout: View {
         sidebar?.children?.first { $0.id == "settings-navigation" }?.children ?? []
     }
     private var search: XgentNode? { sidebar?.children?.first { $0.id == "settings-search" } }
+    private var searchEmpty: XgentNode? { sidebar?.children?.first { $0.id == "settings-search-empty" } }
     private var close: XgentNode? { sidebar?.children?.first { $0.id == "settings-close" } }
     private var saveStatus: XgentNode? { detail?.children?.first { $0.id == "save-status" } }
     private var titleNode: XgentNode? { detail?.children?.first { $0.id == "settings-detail-title" } }
@@ -24,14 +25,14 @@ struct XgentDesktopSettingsLayout: View {
         GeometryReader { geometry in
             if geometry.size.width >= 760 && !dynamicTypeSize.isAccessibilitySize {
                 HStack(alignment: .top, spacing: 0) {
-                    navigationColumn.frame(width: 240)
+                    navigationColumn.frame(width: 224)
                     Divider()
                     detailContent
                 }
             } else {
                 VStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 12) {
-                        if let search { XgentTextInput(node: search, document: document, model: model) }
+                        if let search { XgentSettingsSearchField(node: search, document: document, model: model) }
                         HStack {
                             Menu {
                                 XgentNativeMenuItems(nodes: navigation, document: document, model: model)
@@ -42,12 +43,14 @@ struct XgentDesktopSettingsLayout: View {
                             .menuStyle(.button)
                             .menuIndicator(.hidden)
                             .buttonStyle(.plain)
+                            .disabled(navigation.isEmpty)
                             .modifier(XgentControlTypography(node: node))
                             .accessibilityLabel(document.title)
                             .accessibilityValue(sectionTitle)
                             Spacer(minLength: 8)
-                            if let close { XgentActionButton(node: close, document: document, model: model) }
+                            closeControl
                         }
+                        if let searchEmpty { XgentNodeView(node: searchEmpty, document: document, model: model) }
                         if let saveStatus {
                             XgentNodeView(node: saveStatus, document: document, model: model)
                         }
@@ -61,13 +64,14 @@ struct XgentDesktopSettingsLayout: View {
 
     private var navigationColumn: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let close { XgentActionButton(node: close, document: document, model: model) }
-            if let search { XgentTextInput(node: search, document: document, model: model) }
+            closeControl
+            if let search { XgentSettingsSearchField(node: search, document: document, model: model) }
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(navigation) { item in
                         navigationItem(item)
                     }
+                    if let searchEmpty { XgentNodeView(node: searchEmpty, document: document, model: model) }
                 }
             }
             if let saveStatus {
@@ -78,11 +82,22 @@ struct XgentDesktopSettingsLayout: View {
         .frame(maxHeight: .infinity, alignment: .topLeading)
     }
 
+    @ViewBuilder private var closeControl: some View {
+        if let close {
+            if close.kind == .iconButton { XgentIconButton(node: close, document: document, model: model) }
+            else { XgentActionButton(node: close, document: document, model: model) }
+        }
+    }
+
     private func navigationItem(_ item: XgentNode) -> some View {
         let palette = theme.palette(for: colorScheme)
         return Button { model.send(item, in: document) } label: {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                if let icon = item.icon { Image(systemName: icon).frame(width: 20).accessibilityHidden(true) }
+                if let icon = item.icon {
+                    Image(systemName: icon).frame(width: 20)
+                        .foregroundStyle(Color(xgentHex: item.selected == true ? palette.accentText : palette.secondaryText))
+                        .accessibilityHidden(true)
+                }
                 Text(item.label ?? "").fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
@@ -108,6 +123,8 @@ struct XgentDesktopSettingsLayout: View {
                     .font(XgentFonts.body(theme.fontFamily, size: titleSize * CGFloat(theme.fontScale), weight: .bold))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
+                    .frame(maxWidth: 640, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .center)
                     .padding(20)
                 Divider()
                 ScrollView {
@@ -119,8 +136,8 @@ struct XgentDesktopSettingsLayout: View {
                         }
                     }
                     .padding(20)
-                    .frame(maxWidth: 820, alignment: .leading)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .frame(maxWidth: 640, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .top)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
