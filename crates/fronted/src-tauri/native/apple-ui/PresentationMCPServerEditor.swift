@@ -32,7 +32,7 @@ struct XgentMCPServerEditor: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(document.formFactor == "mobile" ? 16 : 24)
+        .padding(document.formFactor == .mobile ? 16 : 24)
         .environment(\.xgentSettingsRow, false)
     }
 }

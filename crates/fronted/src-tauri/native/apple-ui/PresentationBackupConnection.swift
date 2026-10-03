@@ -21,7 +21,7 @@ struct XgentBackupConnectionFields: View {
         VStack(alignment: .leading, spacing: 16) {
             field("backup-preset")
             field("backup-url")
-            XgentBackupFieldPair(mobile: document.formFactor == "mobile") {
+            XgentBackupFieldPair(mobile: document.formFactor == .mobile) {
                 field("backup-username")
             } second: {
                 VStack(alignment: .leading, spacing: 8) {
@@ -30,7 +30,7 @@ struct XgentBackupConnectionFields: View {
                     field("backup-clear-password")
                 }
             }
-            XgentBackupFieldPair(mobile: document.formFactor == "mobile") {
+            XgentBackupFieldPair(mobile: document.formFactor == .mobile) {
                 field("backup-directory")
             } second: {
                 field("backup-profile")

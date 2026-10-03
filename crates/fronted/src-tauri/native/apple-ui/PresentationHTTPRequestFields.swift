@@ -25,7 +25,7 @@ struct XgentHTTPRequestFields: View {
     }
 
     var body: some View {
-        if document.formFactor == "mobile" || textSize.isAccessibilitySize {
+        if document.formFactor == .mobile || textSize.isAccessibilitySize {
             vertical
         } else {
             ViewThatFits(in: .horizontal) {

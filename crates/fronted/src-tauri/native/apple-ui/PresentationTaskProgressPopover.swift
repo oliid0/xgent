@@ -22,11 +22,11 @@ struct XgentTaskProgressPopover: View {
                     }
                 }.padding(.vertical, 4)
             }
-            .frame(maxHeight: document.formFactor == "mobile" ? 320 : 384)
+            .frame(maxHeight: document.formFactor == .mobile ? 320 : 384)
         }
         .padding(CGFloat(theme.spacing.lg))
-        .frame(minWidth: 0, idealWidth: document.formFactor == "mobile" ? 260 : 360,
-               maxWidth: document.formFactor == "mobile" ? 280 : 480, alignment: .leading)
+        .frame(minWidth: 0, idealWidth: document.formFactor == .mobile ? 260 : 360,
+               maxWidth: document.formFactor == .mobile ? 280 : 480, alignment: .leading)
         .accessibilityElement(children: .contain)
     }
 }

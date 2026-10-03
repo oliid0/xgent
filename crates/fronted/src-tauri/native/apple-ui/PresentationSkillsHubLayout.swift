@@ -20,7 +20,7 @@ struct XgentSkillsHubLayout: View {
             let preview = node.children?.first { $0.variant == "skill-preview" }
             if let main {
                 if let preview {
-                    if document.formFactor == "desktop" && geometry.size.width >= 960 && !textSize.isAccessibilitySize {
+                    if document.formFactor == .desktop && geometry.size.width >= 960 && !textSize.isAccessibilitySize {
                         HStack(alignment: .top, spacing: 0) {
                             content(main).frame(maxWidth: .infinity, maxHeight: .infinity)
                             Divider()

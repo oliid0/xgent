@@ -26,7 +26,7 @@ struct XgentSkillHubControls: View {
                 HFlow(alignment: .top, spacing: 8) { ForEach(fields) { control($0) } }
                     .padding(.vertical, 12)
                     .overlay(alignment: .top) { Divider() }
-            } else if document.formFactor == "mobile" || textSize.isAccessibilitySize { vertical }
+            } else if document.formFactor == .mobile || textSize.isAccessibilitySize { vertical }
             else {
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .top, spacing: 12) {

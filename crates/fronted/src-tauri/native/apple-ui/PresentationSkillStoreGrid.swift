@@ -7,7 +7,7 @@ struct XgentSkillStoreGrid: View {
     @Environment(\.dynamicTypeSize) private var textSize
 
     private var columns: [GridItem] {
-        document.formFactor == "mobile" || textSize.isAccessibilitySize
+        document.formFactor == .mobile || textSize.isAccessibilitySize
             ? [GridItem(.flexible())] : [GridItem(.adaptive(minimum: 260), alignment: .top)]
     }
 

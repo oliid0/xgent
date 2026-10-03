@@ -29,7 +29,7 @@ struct XgentSkillsHubMain: View {
                 } else { content(item) }
             }
         }
-        .padding(document.formFactor == "mobile" ? 16 : 24)
+        .padding(document.formFactor == .mobile ? 16 : 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }

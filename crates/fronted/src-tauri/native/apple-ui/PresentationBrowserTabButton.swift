@@ -20,7 +20,7 @@ struct XgentBrowserTabButton: View {
                 Rectangle().fill(node.selected == true ? Color(xgentHex: theme.palette(for: scheme).accent) : .clear)
                     .frame(height: 2)
             }
-            .frame(minWidth: 80, maxWidth: 200, minHeight: document.formFactor == "mobile" ? 44 : 32)
+            .frame(minWidth: 80, maxWidth: 200, minHeight: document.formFactor == .mobile ? 44 : 32)
             .background(node.selected == true ? Color(xgentHex: theme.palette(for: scheme).muted) : .clear)
             .contentShape(Rectangle())
         }

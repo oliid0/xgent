@@ -35,7 +35,7 @@ struct XgentMCPServerActions: View {
 
     var body: some View {
         Group {
-            if document.formFactor == "mobile" || textSize.isAccessibilitySize { vertical }
+            if document.formFactor == .mobile || textSize.isAccessibilitySize { vertical }
             else {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) {

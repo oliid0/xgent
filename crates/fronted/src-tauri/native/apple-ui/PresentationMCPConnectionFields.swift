@@ -23,7 +23,7 @@ struct XgentMCPConnectionFields: View {
     }
 
     var body: some View {
-        if document.formFactor == "mobile" || textSize.isAccessibilitySize { vertical }
+        if document.formFactor == .mobile || textSize.isAccessibilitySize { vertical }
         else {
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 16) {

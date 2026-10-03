@@ -46,7 +46,7 @@ struct XgentToolPolicyRow: View {
 
     var body: some View {
         Group {
-            if document.formFactor == "mobile" || textSize.isAccessibilitySize { vertical }
+            if document.formFactor == .mobile || textSize.isAccessibilitySize { vertical }
             else {
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .center, spacing: 20) {

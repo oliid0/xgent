@@ -626,3 +626,19 @@ now implements that initializer and delegates its empty convenience initializer.
 No native test or screenshot result is claimed from this failed build. The runner's
 resolved Cargo.lock has been reviewed and incorporated for existing mobile git2
 dependencies and bridge test serialization. Native validation continues in Actions.
+
+The downloaded native verification artifact also supplies the complete Swift
+dependency lock for the package's existing test dependencies and SwiftTerm.
+Its KeyboardShortcuts 3.0.1 revision matches the upstream tag checked with GitHub
+MCP; the previously recorded revision was incorrect. No declared package version
+was upgraded. CI #242's exported screenshot manifest was empty because compilation
+stopped before tests, so it supplies no visual parity evidence.
+
+[CI #243](https://github.com/oliid0/xgent/actions/runs/37128424036) compiled beyond
+the host initializer and exposed a typed FormFactor/string comparison in Cron
+detail layout. Review found the same mistake across 18 native layout/control
+files. These now compare `.mobile`/`.desktop` enum cases consistently in backup,
+MCP, skills, speech/tool settings, browser/terminal/workspace tabs and task details.
+The shared serialized formFactor strings remain unchanged. This concentrated SDK
+repair and lockfile update require renewed Actions compilation; no native test
+execution or screenshot success is inferred from the previous failed runs.

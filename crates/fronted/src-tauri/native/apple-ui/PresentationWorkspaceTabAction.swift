@@ -28,7 +28,7 @@ struct XgentWorkspaceTabAction: View {
             .font(XgentFonts.body(theme.fontFamily, size: CGFloat(theme.typography.supporting * theme.fontScale) * scale))
             .padding(.horizontal, closing ? 8 : 10)
             .frame(minWidth: closing ? 32 : 72, maxWidth: closing ? 44 : 240,
-                   minHeight: document.formFactor == "mobile" ? 44 : 32)
+                   minHeight: document.formFactor == .mobile ? 44 : 32)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

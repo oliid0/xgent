@@ -44,7 +44,7 @@ struct XgentTerminalSessionTabs: View {
                 }.padding(.horizontal, 10).padding(.top, 6)
                 Rectangle().fill(option.value == selected ? Color(xgentHex: palette.accent) : .clear).frame(height: 2)
             }
-            .frame(minWidth: 80, maxWidth: 220, minHeight: document.formFactor == "mobile" ? 44 : 32)
+            .frame(minWidth: 80, maxWidth: 220, minHeight: document.formFactor == .mobile ? 44 : 32)
             .background(option.value == selected ? Color(xgentHex: palette.muted) : .clear)
             .contentShape(Rectangle())
         }

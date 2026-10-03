@@ -21,7 +21,7 @@ struct XgentCronDetailLayout: View {
     }
 
     var body: some View {
-        if document.formFactor == "mobile" || textSize.isAccessibilitySize { stacked }
+        if document.formFactor == .mobile || textSize.isAccessibilitySize { stacked }
         else {
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 20) {

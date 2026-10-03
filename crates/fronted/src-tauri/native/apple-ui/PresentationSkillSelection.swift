@@ -29,7 +29,7 @@ struct XgentSkillSelection: View {
                 else { Toggle(node.label ?? "", isOn: value).toggleStyle(.switch).labelsHidden() }
             }
         }
-        .frame(minHeight: document.formFactor == "mobile" ? 44 : 28)
+        .frame(minHeight: document.formFactor == .mobile ? 44 : 28)
         .disabled(node.disabled == true || model.isBusy(node, in: document))
         .accessibilityLabel(node.label ?? "")
         .accessibilityIdentifier(node.id)
