@@ -866,3 +866,22 @@ Computer-use integer arguments now use exact conversions and reject JSON
 booleans before numeric bridging. A model-generated number at the rounded
 64-bit upper bound must return an argument error instead of trapping the native
 process. CI runs boundary regressions against the same production helper.
+
+CI #255 passed frontend, Rust, device compilation and all 161 macOS native
+tests. iOS executed 165 tests with seven failures confined to the retained
+editor's undo assertions. UIKit's native input records must be read from its
+responder undo manager, whose per-file boundary is the retained hosting
+controller; returning an unrelated manager from the input concealed those
+records. Repeated native font/color assignments now avoid rewriting unchanged
+attributes. The existing identity, undo/redo, reload and separate-file tests
+remain required on both SDKs.
+
+The native memory library now shows unfiltered category counts, pending-review
+counts and full/near-limit/warning quota messages. Both renderers use the same
+project identity/group ordering helper. Handwritten SwiftUI memory rows provide
+one entry action with metadata and review state; project groups start expanded.
+Shared behavioral tests exercise search, project read identity and every quota
+threshold. Native fixtures check the entry's accessibility bounds at narrow and
+wide widths with large type, and macOS presses the actual native action.
+These checks do not establish 90% visual similarity or complete cross-platform
+execution of arbitrary browser, Office and animation tasks.

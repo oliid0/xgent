@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { MemoryMeta } from "../../../lib/memory/api";
 import { MEMORY_TYPES } from "../../../lib/memory/schema";
 import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
 import type { AppSettings } from "../../../lib/settings";
@@ -12,12 +13,13 @@ import {
   fallbackScopeQuotas,
   formatTime,
   matchesFilter,
+  memoryProjectGroups,
   memoryScopeLabel,
   memoryTypeLabel,
-  projectLabel,
   quotaLevel,
   quotaStatusLabelKey,
   selectedTitle,
+  strongestQuotaLevel,
 } from "./panelModel";
 import type { MemoryCreateDraft, useMemoryPanelData } from "./useMemoryPanelData";
 
@@ -279,11 +281,34 @@ export function NativeMemoryPanel(props: Props) {
         label: `${t("settings.memoryCloudWarningPrefix")} ${data.pathsInfo.cloudProvider ?? t("settings.memoryCloudSyncFolder")}`,
         status: "error",
       });
+    const quotas = fallbackScopeQuotas(data.entries, data.quota, !!workdir);
+    const quotaStatus = strongestQuotaLevel(quotas);
+    const unreviewedCount = data.entries.filter((entry) => entry.unreviewed).length;
+    if (unreviewedCount)
+      nodes.push({
+        id: "memory-review-warning",
+        kind: "Banner",
+        label: `${unreviewedCount} ${t("settings.memoryAwaitingReview")}`,
+        status: "pending",
+      });
+    if (quotaStatus !== "healthy")
+      nodes.push({
+        id: "memory-quota-warning",
+        kind: "Banner",
+        label: t(
+          quotaStatus === "full"
+            ? "settings.memoryQuotaFullMessage"
+            : quotaStatus === "danger"
+              ? "settings.memoryQuotaNearLimitMessage"
+              : "settings.memoryQuotaWarningMessage",
+        ),
+        status: quotaStatus === "warning" ? "pending" : "error",
+      });
     nodes.push(
       c.group(
         "memory-quota",
         t("settings.memoryQuotaGlobal"),
-        fallbackScopeQuotas(data.entries, data.quota, !!workdir).map((item, index) =>
+        quotas.map((item, index) =>
           text(
             `memory-quota:${index}`,
             `${memoryScopeLabel(item.scope, t)} · ${item.used} / ${item.limit} · ${t(quotaStatusLabelKey(quotaLevel(item)))}`,
@@ -291,15 +316,30 @@ export function NativeMemoryPanel(props: Props) {
         ),
       ),
     );
+    const categoryCount = (category: string) =>
+      data.entries.filter((entry) =>
+        category === "journal"
+          ? entry.memoryType === "daily"
+          : entry.memoryType !== "daily" && entry.scope === category,
+      ).length;
     nodes.push(
       c.select(
         "memory-category",
         t("settings.navMemory"),
         tab,
         [
-          { value: "global", label: t("settings.memoryCategoryGlobal") },
-          { value: "project", label: t("settings.memoryCategoryProject") },
-          { value: "journal", label: t("settings.memoryCategoryJournal") },
+          {
+            value: "global",
+            label: `${t("settings.memoryCategoryGlobal")} (${categoryCount("global")})`,
+          },
+          {
+            value: "project",
+            label: `${t("settings.memoryCategoryProject")} (${categoryCount("project")})`,
+          },
+          {
+            value: "journal",
+            label: `${t("settings.memoryCategoryJournal")} (${categoryCount("journal")})`,
+          },
         ],
         setTab,
         !busy,
@@ -313,32 +353,52 @@ export function NativeMemoryPanel(props: Props) {
           ? entry.memoryType === "daily"
           : entry.memoryType !== "daily" && entry.scope === tab),
     );
-    const items = entries.map((entry) =>
-      c.group(`memory-entry:${entryKey(entry)}`, entryTitle(entry), [
-        text(
-          `memory-entry-meta:${entryKey(entry)}`,
-          `${memoryTypeLabel(entry.memoryType, t)} · ${formatTime(entry.updatedAt)}${entry.unreviewed ? ` · ${t("settings.memoryAwaitingReview")}` : ""}${entry.scope === "project" ? ` · ${projectLabel(entry, t)}` : ""}`,
-        ),
-        c.action(
-          `memory-open:${entryKey(entry)}`,
-          entryTitle(entry),
-          async () => {
-            const revision = ++navigation.revision;
-            const opened = await data.openEntry(entry);
-            if (opened && navigation.active && navigation.revision === revision)
-              setScreen("detail");
-          },
-          !busy,
-        ),
-      ]),
-    );
+    const renderEntry = (entry: MemoryMeta): PresentationNode => ({
+      ...c.action(
+        `memory-open:${entryKey(entry)}`,
+        entryTitle(entry),
+        async () => {
+          const revision = ++navigation.revision;
+          const opened = await data.openEntry(entry);
+          if (opened && navigation.active && navigation.revision === revision) setScreen("detail");
+        },
+        !busy,
+      ),
+      kind: "NavigationRow",
+      variant: "memory-entry",
+      text: `${memoryTypeLabel(entry.memoryType, t)} · ${formatTime(entry.updatedAt)}`,
+      children: entry.unreviewed
+        ? [
+            {
+              id: `memory-review:${entryKey(entry)}`,
+              kind: "Badge",
+              label: t("settings.memoryAwaitingReview"),
+              status: "pending",
+            },
+          ]
+        : [],
+    });
+    const items: PresentationNode[] =
+      tab === "project"
+        ? memoryProjectGroups(data.entries, filter, t).map((group) => ({
+            id: `memory-project:${group.key}`,
+            kind: "Collapsible",
+            variant: "memory-project",
+            label: `${group.label} (${group.entries.length})`,
+            children: group.entries.map(renderEntry),
+          }))
+        : entries.map(renderEntry);
     nodes.push(...items);
     if (!items.length && !data.loading)
       nodes.push({
         id: "memory-empty",
         kind: "EmptyState",
         label: t(
-          tab === "journal" ? "settings.memoryNoJournalEntries" : "settings.memorySelectEntry",
+          tab === "journal"
+            ? "settings.memoryNoJournalEntries"
+            : tab === "project"
+              ? "settings.memoryNoProjectEntries"
+              : "settings.memoryNoGlobalEntries",
         ),
         icon: "brain",
       });

@@ -91,8 +91,10 @@ final class XgentCodeNativeInput: NSObject {
             view.text = text.wrappedValue
             view.lineIndex = XgentCodeLineIndex(text.wrappedValue)
         }
-        view.font = fontName.flatMap { UIFont(name: $0, size: fontSize) } ?? .monospacedSystemFont(ofSize: fontSize, weight: .regular)
-        view.textColor = UIColor(Color(xgentHex: palette.text))
+        let font = fontName.flatMap { UIFont(name: $0, size: fontSize) } ?? .monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        let color = UIColor(Color(xgentHex: palette.text))
+        if view.font != font { view.font = font }
+        if view.textColor != color { view.textColor = color }
         view.backgroundColor = UIColor(Color(xgentHex: palette.surface))
         view.accessibilityLabel = label
         view.textContainer.widthTracksTextView = wrap

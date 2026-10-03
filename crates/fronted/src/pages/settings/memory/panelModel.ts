@@ -342,6 +342,44 @@ export function matchesFilter(entry: MemoryMeta, filter: string) {
     .includes(q);
 }
 
+/** Project identity and ordering are the same in every memory library. */
+export function memoryProjectGroups(
+  entries: MemoryMeta[],
+  filter: string,
+  t: (key: string) => string,
+) {
+  const groups = new Map<
+    string,
+    { key: string; label: string; latestUpdatedAt: number; entries: MemoryMeta[] }
+  >();
+  for (const entry of entries) {
+    if (entry.scope !== "project" || entry.memoryType === "daily" || !matchesFilter(entry, filter))
+      continue;
+    const key = entry.workdirHash || entry.workdirPath || "unknown";
+    const group = groups.get(key) ?? {
+      key,
+      label: projectLabel(entry, t),
+      latestUpdatedAt: 0,
+      entries: [],
+    };
+    group.latestUpdatedAt = Math.max(group.latestUpdatedAt, entry.updatedAt);
+    group.entries.push(entry);
+    groups.set(key, group);
+  }
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      entries: group.entries.sort((a, b) =>
+        b.updatedAt === a.updatedAt ? a.slug.localeCompare(b.slug) : b.updatedAt - a.updatedAt,
+      ),
+    }))
+    .sort((a, b) =>
+      b.latestUpdatedAt === a.latestUpdatedAt
+        ? a.label.localeCompare(b.label)
+        : b.latestUpdatedAt - a.latestUpdatedAt,
+    );
+}
+
 export type MemoryQuota = MemoryListResponse["quota"];
 export type MemoryScopeQuota = NonNullable<MemoryQuota["scopeQuotas"]>[number];
 export type QuotaLevel = "healthy" | "warning" | "danger" | "full";

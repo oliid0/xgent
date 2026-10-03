@@ -69,6 +69,55 @@ test("native memory searches/categories and edits through the shared API, retain
   h.unmount();
 });
 
+test("native project memories preserve grouped ordering, counts and search across workspaces", async () => {
+  const h = harness({ entries: [
+    entry("old", { scope: "project", workdirHash: "a", workdirPath: "/a", updatedAt: 100 }),
+    entry("new", { scope: "project", workdirHash: "b", workdirPath: "/b", updatedAt: 300 }),
+    entry("recent", { scope: "project", workdirHash: "a", workdirPath: "/a", updatedAt: 200 }),
+    entry("global"), entry("daily", { memoryType: "daily" }),
+  ] });
+  h.render(); await tick();
+  try {
+    let surface = await h.dispatch("memory-category", "project");
+    assert.deepEqual(surface.document.nodes.find(n => n.id === "memory-category").options.map(o => o.label), [
+      "settings.memoryCategoryGlobal (1)", "settings.memoryCategoryProject (3)", "settings.memoryCategoryJournal (1)",
+    ]);
+    let groups = surface.document.nodes.filter(n => n.variant === "memory-project");
+    assert.deepEqual(groups.map(n => n.label), ["/b (1)", "/a (2)"]);
+    assert.deepEqual(groups[1].children.map(n => n.id), ["memory-open:project:a:recent", "memory-open:project:a:old"]);
+    assert.ok(groups.every(n => n.children.every(child => child.kind === "NavigationRow" && child.variant === "memory-entry")));
+    surface = await h.dispatch("memory-filter", "/a");
+    groups = surface.document.nodes.filter(n => n.variant === "memory-project");
+    assert.deepEqual(groups.map(n => n.label), ["/a (2)"]);
+    assert.ok(surface.document.nodes.find(n => n.id === "memory-category").options[1].label.endsWith("(3)"));
+    await h.dispatch("memory-open:project:a:recent");
+    assert.equal(h.calls.filter(([name]) => name === "read").at(-1)[1].workdir, "/a");
+    await h.dispatch("back");
+    surface = await h.dispatch("memory-filter", "missing");
+    assert.equal(surface.document.nodes.find(n => n.id === "memory-empty").label, "settings.memoryNoProjectEntries");
+  } finally { h.unmount(); }
+});
+
+test("native memory shows each shared quota threshold and pending review count", async () => {
+  for (const [used, label, status] of [
+    [80, "settings.memoryQuotaWarningMessage", "pending"],
+    [95, "settings.memoryQuotaNearLimitMessage", "error"],
+    [100, "settings.memoryQuotaFullMessage", "error"],
+  ]) {
+    const h = harness({ list: async () => ({
+      entries: [entry("review"), entry("accepted", { unreviewed: false })],
+      quota: { used, limit: 100, scopeQuotas: [{ scope: "global", workdirHash: "", used, limit: 100 }] },
+    }) });
+    h.render(); await tick();
+    try {
+      const nodes = h.render().document.nodes;
+      const warning = nodes.find(n => n.id === "memory-quota-warning");
+      assert.equal(warning.label, label); assert.equal(warning.status, status);
+      assert.equal(nodes.find(n => n.id === "memory-review-warning").label, "1 settings.memoryAwaitingReview");
+    } finally { h.unmount(); }
+  }
+});
+
 test("native memory create, daily append and destructive confirmation perform actual shared mutations", async () => {
   const h = harness({ mobile: false }); h.render(); await tick();
   await h.dispatch("memory-create");

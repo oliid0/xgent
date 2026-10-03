@@ -499,7 +499,9 @@ struct XgentIOSNode: View {
         case .providerList:
             XgentProviderListView(node: node, document: document, model: model)
         case .treeRow, .navigationRow:
-            if node.variant == "sidebar-conversation-row" {
+            if node.variant == "memory-entry" {
+                XgentMemoryEntry(node: node, document: document, model: model)
+            } else if node.variant == "sidebar-conversation-row" {
                 XgentSidebarConversationRow(node: node, document: document, model: model)
             } else { navigationRow }
         case .settingsGroup:

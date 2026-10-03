@@ -322,7 +322,7 @@ struct XgentDisclosure: View {
         self.node = node
         self.document = document
         self.model = model
-        _expanded = State(initialValue: node.id == "queued-turns")
+        _expanded = State(initialValue: node.id == "queued-turns" || node.variant == "memory-project")
     }
 
     var body: some View {

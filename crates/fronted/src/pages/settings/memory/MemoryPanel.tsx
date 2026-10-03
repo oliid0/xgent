@@ -39,9 +39,9 @@ import {
   type MemoryModelOption,
   type MemoryTab,
   matchesFilter,
+  memoryProjectGroups,
   memoryScopeLabel,
   memoryTypeLabel,
-  projectLabel,
   quotaLevel,
   quotaStatusLabelKey,
   selectedTitle,
@@ -122,39 +122,10 @@ export function MemoryPanel(props: {
       .filter((entry) => matchesFilter(entry, filter));
   }, [entries, filter]);
 
-  const projectGroups = useMemo(() => {
-    const groups = new Map<
-      string,
-      { key: string; label: string; latestUpdatedAt: number; entries: MemoryMeta[] }
-    >();
-    for (const entry of entries) {
-      if (entry.scope !== "project" || entry.memoryType === "daily") continue;
-      if (!matchesFilter(entry, filter)) continue;
-      const key = entry.workdirHash || entry.workdirPath || "unknown";
-      const label = projectLabel(entry, t);
-      const group = groups.get(key) ?? {
-        key,
-        label,
-        latestUpdatedAt: 0,
-        entries: [],
-      };
-      group.latestUpdatedAt = Math.max(group.latestUpdatedAt, entry.updatedAt);
-      group.entries.push(entry);
-      groups.set(key, group);
-    }
-    return Array.from(groups.values())
-      .map((group) => ({
-        ...group,
-        entries: group.entries.sort((a, b) =>
-          b.updatedAt === a.updatedAt ? a.slug.localeCompare(b.slug) : b.updatedAt - a.updatedAt,
-        ),
-      }))
-      .sort((a, b) =>
-        b.latestUpdatedAt === a.latestUpdatedAt
-          ? a.label.localeCompare(b.label)
-          : b.latestUpdatedAt - a.latestUpdatedAt,
-      );
-  }, [entries, filter, t]);
+  const projectGroups = useMemo(
+    () => memoryProjectGroups(entries, filter, t),
+    [entries, filter, t],
+  );
 
   const projectEntryCount = entries.filter(
     (entry) => entry.scope === "project" && entry.memoryType !== "daily",
