@@ -116,22 +116,29 @@ export function createNativeDesktopAppearance(
       }),
     ),
     c.group("desktop-window", t("settings.closeWindowBehavior"), [
-      c.select(
-        "close-window-behavior",
-        t("settings.closeWindowBehavior"),
-        settings.closeWindowBehavior,
-        CLOSE_WINDOW_BEHAVIOR_OPTIONS.map((value) => ({
-          value,
-          label: t(
-            value === "minimize" ? "settings.closeWindowMinimize" : "settings.closeWindowExit",
-          ),
-        })),
-        (value) =>
-          setSettings((previous) => ({
-            ...previous,
-            closeWindowBehavior: value as typeof previous.closeWindowBehavior,
+      {
+        ...c.select(
+          "close-window-behavior",
+          t("settings.closeWindowBehavior"),
+          settings.closeWindowBehavior,
+          CLOSE_WINDOW_BEHAVIOR_OPTIONS.map((value) => ({
+            value,
+            label: t(
+              value === "minimize" ? "settings.closeWindowMinimize" : "settings.closeWindowExit",
+            ),
           })),
-      ),
+          (value) =>
+            setSettings((previous) => ({
+              ...previous,
+              closeWindowBehavior: value as typeof previous.closeWindowBehavior,
+            })),
+        ),
+        text: t(
+          settings.closeWindowBehavior === "minimize"
+            ? "settings.closeWindowMinimizeDesc"
+            : "settings.closeWindowExitDesc",
+        ),
+      },
     ]),
   ];
   return { nodes, handlers: c.handlers };

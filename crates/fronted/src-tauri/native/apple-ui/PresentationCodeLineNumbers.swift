@@ -37,7 +37,12 @@ enum XgentCodeLineNumbers {
     static func draw(in view: XgentCodeNativeTextView, visible: CGRect, inset: CGPoint) {
         guard let manager = view.textLayoutManager, let storage = manager.textContentManager else { return }
         let font = CodeNumberFont.monospacedDigitSystemFont(ofSize: max(9, (view.font?.pointSize ?? 13) - 2), weight: .regular)
-        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: CodeNumberColor.secondaryLabelColor]
+        #if os(iOS)
+        let color = CodeNumberColor.secondaryLabel
+        #else
+        let color = CodeNumberColor.secondaryLabelColor
+        #endif
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
         func number(_ value: Int, y: CGFloat) {
             let text = NSAttributedString(string: String(value), attributes: attributes)
             text.draw(at: CGPoint(x: visible.minX + max(4, inset.x - text.size().width - 8), y: y))

@@ -18,6 +18,8 @@ final class XgentCodeNativeInput: NSObject {
     private var text: Binding<String>?
     private var position: Binding<CodeEditor.Position>?
     private var updating = false
+    private var storageObserver: NSObjectProtocol?
+    private var changeQueued = false
 
     init(content: String) {
         let storage = NSTextContentStorage()
@@ -61,9 +63,19 @@ final class XgentCodeNativeInput: NSObject {
             }
         #endif
         view.fileUndo.removeAllActions()
+        if let storage = (manager.textContentManager as? NSTextContentStorage)?.textStorage {
+            storageObserver = NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification,
+                object: storage, queue: .main) { [weak self, weak storage] _ in
+                    MainActor.assumeIsolated {
+                        guard storage?.editedMask.contains(.editedCharacters) == true else { return }
+                        self?.scheduleChange()
+                    }
+                }
+        }
     }
 
     deinit {
+        if let storageObserver { NotificationCenter.default.removeObserver(storageObserver) }
         #if os(macOS)
         if let scrollObserver { NotificationCenter.default.removeObserver(scrollObserver) }
         #endif
@@ -107,6 +119,19 @@ final class XgentCodeNativeInput: NSObject {
         text = nil; position = nil
         view.isEditable = false
         view.fileUndo.removeAllActions()
+    }
+
+    private func scheduleChange() {
+        guard !updating, !changeQueued else { return }
+        changeQueued = true
+        // Native undo edits TextKit storage without necessarily invoking the
+        // text-view delegate. Read the final input after the editing batch,
+        // through the current mount's binding, never a captured old surface.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.changeQueued = false
+            self.changed()
+        }
     }
 
     private func changed() {

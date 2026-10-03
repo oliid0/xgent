@@ -231,6 +231,17 @@ jobs:
             -resultBundlePath "$RUNNER_TEMP/native-macos.xcresult" \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/native-macos.log"
 
+      - name: Test macOS computer-use argument boundaries
+        if: ${{ !cancelled() && matrix.platform == 'macos' }}
+        run: |
+          set -o pipefail
+          xcrun swiftc -swift-version 5 -O -target arm64-apple-macosx15.0 \
+            -sdk "$(xcrun --sdk macosx --show-sdk-path)" \
+            ../computer-use/macos/Errors.swift ../computer-use/macos/ComputerUseArguments.swift \
+            ../../../../../scripts/release/tests/macos-computer-use-arguments.swift \
+            -o "$RUNNER_TEMP/native-cua-arguments" 2>&1 | tee "$RUNNER_TEMP/native-cua-arguments.log"
+          "$RUNNER_TEMP/native-cua-arguments" | tee -a "$RUNNER_TEMP/native-cua-arguments.log"
+
       - name: Select iPhone simulator
         if: ${{ matrix.platform == 'ios' }}
         run: |

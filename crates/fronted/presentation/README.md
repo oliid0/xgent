@@ -854,3 +854,15 @@ paragraphs and CRLF/UTF-16 offsets; the desktop overview supports drag navigatio
 Other code surfaces continue to use CodeEditorView. Real input identity, undo,
 redo, disk reload and independent-file history assertions remain mandatory.
 This change requires remote SDK execution and does not establish full parity.
+
+CI #254 verified macOS editor identity, undo-stack independence, reload and
+viewport restoration; 161 tests ran with three failures in action notification
+after direct undo/redo. TextKit character-editing notifications now commit the
+final text through the active mount, including edits that bypass text-view
+delegate callbacks. UIKit's line-number color uses its platform-specific name;
+the iOS/device compile failure in #254 is not reported as an executed test suite.
+
+Computer-use integer arguments now use exact conversions and reject JSON
+booleans before numeric bridging. A model-generated number at the rounded
+64-bit upper bound must return an argument error instead of trapping the native
+process. CI runs boundary regressions against the same production helper.
