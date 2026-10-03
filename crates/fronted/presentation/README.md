@@ -958,5 +958,21 @@ iOS app resource root before signing. The pinned KeyboardShortcuts localization
 lookup prefers the packaged resource directory, with its original SwiftPM
 fallback retained for SDK tests. SwiftTerm already searches these locations
 for its Metal shader resources. Package verification requires actual nonempty
-localization/shader files in the macOS app or IPA. This packaging repair awaits
-remote SDK/build verification; the earlier successful DMGs did not contain it.
+localization/shader files in the macOS app or IPA. CI #263 passed every job on
+`8cade9a225024d82f37f6ab01f56ae3c9d7bcc66`, including device resource staging
+and verification. Release #125 was dispatched from that exact revision; its
+actual installed applications remain under verification. The earlier successful
+DMGs did not contain the repair.
+
+Native Markdown reuses the shared LaTeX delimiter normalization before
+recognizing multi-dollar inline and fenced display math,
+using pinned SwaTex 0.5.0's native KaTeX engine and font resources. Handwritten
+Swift code retains code fences/spans, currency and link destinations, renders
+display equations with horizontal scrolling, and supplies native inline images
+to MarkdownUI. SDK fixtures require the actual KaTeX font, raster output and
+chat/table/code rendering at narrow/wide and accessibility text sizes. The
+production font lookup checks sealed app resources; IPA and macOS resource
+verification now require the actual font files. This batch still needs remote
+SDK and installation verification. Complete Markdown math nesting/streaming
+semantics and inline baselines remain under review; Mermaid
+rendering and the original complete functional/visual parity goal remain open.

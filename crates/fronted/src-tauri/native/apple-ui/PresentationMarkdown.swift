@@ -21,9 +21,16 @@ struct XgentMarkdown: View {
     @ScaledMetric(relativeTo: .body) private var bodySize: CGFloat = 15
 
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
+    private var mathProvider: XgentMathImageProvider {
+        let color = Color(xgentHex: secondary ? palette.secondaryText : palette.text)
+        let resolved = color.resolve(in: EnvironmentValues())
+        return XgentMathImageProvider(fontSize: bodySize * CGFloat(theme.fontScale * theme.typography.body / 15),
+            foreground: color, rgba: .init(r: resolved.red, g: resolved.green, b: resolved.blue, a: resolved.opacity))
+    }
 
     var body: some View {
-        Markdown(codeStore.prepare(text))
+        Markdown(codeStore.prepare(XgentMarkdownMath.prepare(text,
+            renderKey: "\(mathProvider.fontSize)-\(secondary ? palette.secondaryText : palette.text)")))
             .markdownTheme(.gitHub)
             .markdownTextStyle {
                 if let name = XgentFonts.name(for: theme.fontFamily) { FontFamily(.custom(name)) }
@@ -33,12 +40,16 @@ struct XgentMarkdown: View {
             }
             .markdownTextStyle(\.link) { ForegroundColor(Color(xgentHex: palette.accentText)) }
             .markdownBlockStyle(\.image) { configuration in
-                // Match the web transcript's alt-text policy; attachments have
-                // their own explicit native media preview and loading lifecycle.
-                Text(configuration.content.renderPlainText())
+                if let formula = XgentMathFormula.block(in: configuration.content.renderMarkdown()) {
+                    XgentMathView(formula: formula, fontSize: mathProvider.fontSize, foreground: mathProvider.foreground)
+                        .markdownMargin(top: 4, bottom: 12)
+                } else {
+                    // Attachments have their own native media loading lifecycle.
+                    Text(configuration.content.renderPlainText())
+                }
             }
-            .markdownImageProvider(XgentMarkdownImageFallback())
-            .markdownInlineImageProvider(XgentMarkdownImageFallback())
+            .markdownImageProvider(mathProvider)
+            .markdownInlineImageProvider(mathProvider)
             .markdownBlockStyle(\.codeBlock) { configuration in
                 let entry = codeStore.entry(content: configuration.content, language: configuration.language)
                 XgentCodeBlock(text: entry?.code.source ?? (configuration.content.isEmpty ? "" : configuration.content + "\n"),
@@ -71,13 +82,6 @@ enum XgentCodeClipboard {
         NSPasteboard.general.clearContents()
         return NSPasteboard.general.setString(text, forType: .string)
         #endif
-    }
-}
-
-private struct XgentMarkdownImageFallback: ImageProvider, InlineImageProvider {
-    func makeImage(url: URL?) -> some View { EmptyView() }
-    func image(with url: URL, label: String) async throws -> Image {
-        throw CocoaError(.featureUnsupported)
     }
 }
 

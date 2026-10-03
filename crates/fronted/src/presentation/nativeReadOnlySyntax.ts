@@ -1,6 +1,7 @@
 import { SYNC_TOKENIZE_THRESHOLD, tokenize, tokenizeAsync } from "@astryxdesign/core/CodeBlock";
 import { syntaxTokenDefaults } from "@astryxdesign/core/theme/syntax";
 import { resolveThemeTokens } from "@astryxdesign/core/theme/tokens";
+import { normalizeLatexDelimiters } from "../lib/normalizeLatexDelimiters";
 import type { AppSettings } from "../lib/settings";
 import { createAppearanceTheme } from "../theme/appearanceTheme";
 import { cssColor } from "./nativeColor";
@@ -107,6 +108,10 @@ export function attachReadOnlySyntax(
     });
     return {
       ...node,
+      text:
+        node.kind === "Markdown" && typeof node.text === "string"
+          ? normalizeLatexDelimiters(node.text)
+          : node.text,
       children,
       action,
       value: JSON.stringify({

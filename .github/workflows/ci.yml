@@ -278,6 +278,9 @@ jobs:
         if: ${{ matrix.platform == 'device' }}
         run: |
           set -o pipefail
+          xcrun swift package resolve --package-path . --scratch-path "$RUNNER_TEMP/native-device"
+          python3 ../../../../../scripts/release/prepare-apple-ui-resources.py patch-math \
+            "$RUNNER_TEMP/native-device/checkouts"
           xcrun swift build --package-path . --scratch-path "$RUNNER_TEMP/native-device" \
             --configuration release --product XgentNativeUI \
             --triple arm64-apple-ios26.0 --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \

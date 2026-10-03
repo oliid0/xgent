@@ -11,6 +11,19 @@ const { cssColor } = loader.loadModule("src/presentation/nativeColor.ts");
 const { createPresentationActionRegistry } = loader.loadModule("src/presentation/actionRegistry.ts");
 const settings = preset => ({ customSettings: { appearance: { preset, customized: false } } });
 
+test("native Markdown uses the shared LaTeX delimiter normalization without rewriting source code", () => {
+  const handlers = new Map(), palette = readOnlySyntaxPalette(settings("current"), false);
+  const source = String.raw`Euler $e^{i\pi}+1=0$, \(x_2\), \[a+b\], price $20 and $HOME.`;
+  const [markdown, code] = attachReadOnlySyntax([
+    { id: "math", kind: "Markdown", text: source },
+    { id: "source", kind: "CodeBlock", language: "text", text: source },
+  ], handlers, palette);
+  assert.equal(markdown.text, String.raw`Euler $$e^{i\pi}+1=0$$, $$x_2$$, $$a+b$$, price $20 and $HOME.`);
+  assert.equal(code.text, source);
+  const fenced = '```swift\nlet math = "$x$"\n```';
+  assert.equal(attachReadOnlySyntax([{ id: "fence", kind: "Markdown", text: fenced }], handlers, palette)[0].text, fenced);
+});
+
 test("native chat syntax uses the actual Astryx token ranges and UTF16 LF/CRLF offsets for every supported alias", async () => {
   const palette = readOnlySyntaxPalette(settings("current"), false);
   const languages = ["typescript", "javascript", "tsx", "jsx", "ts", "js", "json", "html", "xml", "svg", "css", "scss", "less", "python", "py", "bash", "sh", "zsh", "shell", "php", "hack", "yaml", "yml", "markdown", "md"];

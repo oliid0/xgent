@@ -23,7 +23,9 @@ test("static Apple UI copies complete localization and shader bundles, preservin
   const binary = path.join(directory, "swift-product"), resources = path.join(directory, "Xgent.app/Contents/Resources");
   const localization = "KeyboardShortcuts_KeyboardShortcuts.bundle/zh-Hans.lproj/Localizable.strings";
   const shader = "SwiftTerm_SwiftTerm.bundle/default.metallib";
-  for (const [name, content] of [[localization, '"space_key" = "空格";'], [shader, "shader"]]) {
+  const fonts = ["Main-Regular", "Math-Italic", "Size4-Regular"].map((name) =>
+    [`SwaTex_SwaTexRender.bundle/Fonts/KaTeX_${name}.ttf`, "font"]);
+  for (const [name, content] of [[localization, '"space_key" = "空格";'], [shader, "shader"], ...fonts]) {
     const file = path.join(binary, name);
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, content);
@@ -52,12 +54,29 @@ test("IPA resource checks accept only terminal shaders carried inside the instal
   const ipa = path.join(directory, "Xgent.ipa");
   for (const valid of [true, false]) {
     const result = spawnSync(python, ["-c",
-      "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1],'w'); z.writestr(sys.argv[2],'shader'); z.close()",
+      "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1],'w'); z.writestr(sys.argv[2],'shader'); " +
+      "[z.writestr('Payload/Xgent.app/SwaTex_SwaTexRender.bundle/Fonts/KaTeX_'+name+'.ttf','font') for name in ['Main-Regular','Math-Italic','Size4-Regular']]; z.close()",
       ipa, valid ? "Payload/Xgent.app/SwiftTerm_SwiftTerm.bundle/Shaders.metal" : "ci-build/SwiftTerm_SwiftTerm.bundle/Shaders.metal",
     ], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(run("verify-ios", ipa).status === 0, valid);
   }
+});
+
+test("math font lookup uses signed app resources and fails closed when its pinned source changes", (t) => {
+  const directory = fixture(t);
+  const source = path.join(directory, "SwaTex/Sources/SwaTexRender/KaTeXFontProvider.swift");
+  mkdirSync(path.dirname(source), { recursive: true });
+  writeFileSync(source, 'import Foundation\n            let url = Bundle.module.url(\n                forResource: name, withExtension: "ttf", subdirectory: "Fonts"),\n');
+  assert.equal(run("patch-math", directory).status, 0);
+  const patched = readFileSync(source, "utf8");
+  assert.match(patched, /Bundle\.main\.resourceURL/);
+  assert.match(patched, /SwaTex_SwaTexRender\.bundle/);
+  assert.doesNotMatch(patched, /Bundle\.module/);
+  assert.equal(run("patch-math", directory).status, 0);
+  assert.equal(readFileSync(source, "utf8"), patched);
+  writeFileSync(source, "import Foundation\n// Changed upstream loader\n");
+  assert.notEqual(run("patch-math", directory).status, 0);
 });
 
 test("pinned shortcut resource compatibility is idempotent and rejects upstream lookup drift", (t) => {

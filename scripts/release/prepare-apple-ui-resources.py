@@ -60,7 +60,48 @@ def copy_bundles(source, destination):
         print(f"Native UI resource: {bundle.name}")
 
 
+def patch_math_fonts(checkouts):
+    package = next((path for path in checkouts.iterdir() if path.name.lower() == "swatex"), None)
+    if package is None:
+        raise ValueError("The pinned SwaTex checkout is missing")
+    source = package / "Sources/SwaTexRender/KaTeXFontProvider.swift"
+    text = source.read_text(encoding="utf-8")
+    marker = "xgentMathFontURL"
+    if marker in text:
+        if text.count(marker) != 2 or "func xgentMathFontURL(_ name: String) -> URL?" not in text:
+            raise ValueError("The math font compatibility patch is incomplete")
+        return
+    original = '''            let url = Bundle.module.url(
+                forResource: name, withExtension: "ttf", subdirectory: "Fonts"),'''
+    if text.count(original) != 1:
+        raise ValueError("SwaTex font lookup changed; review its pinned source")
+    text = text.replace(original, "            let url = xgentMathFontURL(name),")
+    text += '''
+
+private final class XgentMathFontBundleFinder {}
+
+private func xgentMathFontURL(_ name: String) -> URL? {
+    let own = Bundle(for: XgentMathFontBundleFinder.self)
+    let roots = [Bundle.main.resourceURL, Bundle.main.bundleURL,
+                 own.resourceURL, own.bundleURL, own.bundleURL.deletingLastPathComponent()]
+    for root in roots.compactMap({ $0 }) {
+        if let bundle = Bundle(url: root.appendingPathComponent("SwaTex_SwaTexRender.bundle")),
+           let url = bundle.url(forResource: name, withExtension: "ttf", subdirectory: "Fonts") {
+            return url
+        }
+    }
+    return nil
+}
+'''
+    source.chmod(source.stat().st_mode | stat.S_IWUSR)
+    source.write_text(text, encoding="utf-8")
+
+
 def verify_files(files, keyboard):
+    fonts = "SwaTex_SwaTexRender.bundle/"
+    for name in ["KaTeX_Main-Regular.ttf", "KaTeX_Math-Italic.ttf", "KaTeX_Size4-Regular.ttf"]:
+        if not any(path.startswith(fonts) and path.endswith("/Fonts/" + name) for path in files):
+            raise ValueError(f"The packaged math font is missing: {name}")
     shader = "SwiftTerm_SwiftTerm.bundle/"
     if not any(name.startswith(shader) and name.endswith((".metal", ".metallib")) for name in files):
         raise ValueError("The packaged terminal shader resource is missing")
@@ -91,12 +132,14 @@ def verify(source, ios):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=["patch-keyboard", "copy", "verify-macos", "verify-ios"])
+    parser.add_argument("operation", choices=["patch-keyboard", "patch-math", "copy", "verify-macos", "verify-ios"])
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", nargs="?", type=Path)
     args = parser.parse_args()
     if args.operation == "patch-keyboard":
         patch_keyboard_shortcuts(args.source)
+    elif args.operation == "patch-math":
+        patch_math_fonts(args.source)
     elif args.operation == "copy":
         if args.destination is None:
             parser.error("copy requires the destination resource directory")

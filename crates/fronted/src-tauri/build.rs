@@ -99,17 +99,19 @@ fn link_native_ui(manifest_dir: &std::path::Path) {
     let scratch = output.join("native-ui");
     let resource_helper = manifest_dir.join("../../../scripts/release/prepare-apple-ui-resources.py");
     println!("cargo:rerun-if-changed={}", resource_helper.display());
-    if !ios {
+    {
         let status = Command::new("xcrun").args(["swift", "package", "resolve"])
             .arg("--package-path").arg(&sources)
             .arg("--scratch-path").arg(&scratch)
             .env_remove("SDKROOT")
             .status().expect("resolve pinned native UI packages");
         assert!(status.success(), "native UI dependency resolution failed");
-        let status = Command::new("python3").arg(&resource_helper)
-            .arg("patch-keyboard").arg(scratch.join("checkouts"))
-            .status().expect("prepare native shortcut resource lookup");
-        assert!(status.success(), "native shortcut resource lookup preparation failed");
+        for operation in if ios { vec!["patch-math"] } else { vec!["patch-keyboard", "patch-math"] } {
+            let status = Command::new("python3").arg(&resource_helper)
+                .arg(operation).arg(scratch.join("checkouts"))
+                .status().expect("prepare native UI resource lookup");
+            assert!(status.success(), "native UI resource lookup preparation failed");
+        }
     }
     let swift_args = ["swift", "build", "--configuration", "release",
         "--product", "XgentNativeUI", "--triple", &swift_target, "--sdk", sdk.trim()];
