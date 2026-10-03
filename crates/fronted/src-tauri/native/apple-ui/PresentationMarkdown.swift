@@ -32,13 +32,12 @@ struct XgentMarkdown: View {
     var body: some View {
         Markdown(codeStore.prepare(XgentMarkdownMath.prepare(text,
             renderKey: "\(mathProvider.fontSize)-\(secondary ? palette.secondaryText : palette.text)")))
-            .markdownTheme(.gitHub)
-            .markdownTextStyle {
+            .markdownTheme(MarkdownUI.Theme.gitHub.text {
                 if let name = XgentFonts.name(for: theme.fontFamily) { FontFamily(.custom(name)) }
                 FontSize(bodySize * CGFloat(theme.fontScale * theme.typography.body / 15))
                 ForegroundColor(Color(xgentHex: secondary ? palette.secondaryText : palette.text))
                 BackgroundColor(nil)
-            }
+            })
             .markdownTextStyle(\.link) { ForegroundColor(Color(xgentHex: palette.accentText)) }
             .markdownBlockStyle(\.image) { configuration in
                 if let formula = XgentMathFormula.block(in: configuration.content.renderMarkdown()) {

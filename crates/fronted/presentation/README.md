@@ -1002,3 +1002,10 @@ now waits within a bounded deadline for that formula's real accessibility label
 and attaches the labels before taking screenshots. This gap remains under
 investigation until the stronger test and actual images pass; #264 alone does
 not prove that every paragraph displayed its math.
+
+The same screenshots exposed the package GitHub theme's white background and
+16-point default overriding the app's prose style. The handwritten renderer now
+replaces the theme's default text style directly, using the app's font/scale and
+transparent background; setting only an outer text modifier had not cleared the
+theme background. Existing mounted math/diagram screenshots verify this change
+in remote CI.
