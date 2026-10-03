@@ -12,17 +12,21 @@ import AppKit
 
 final class MemoryRenderingTests: XCTestCase {
     @MainActor func testProjectMemoriesStartExpandedAndExposeUsableNativeEntryButtons() async throws {
-        let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: [
+        let review: [String: Any] = ["id": "review", "kind": "Badge", "label": "Awaiting review", "status": "pending"]
+        let entry: [String: Any] = [
+            "id": "memory-open", "kind": "NavigationRow", "variant": "memory-entry",
+            "label": "Keep generated presentations and spreadsheets in the selected project workspace",
+            "text": "Project · 2026-10-03", "action": "open", "children": [review],
+        ]
+        let project: [String: Any] = [
+            "id": "project", "kind": "Collapsible", "variant": "memory-project", "label": "/Workspace (1)",
+            "children": [entry],
+        ]
+        let payload: [String: Any] = [
             "version": 1, "surface": "memory-library", "revision": 1, "mode": "sheet",
-            "title": "Memory", "appearance": "light", "nodes": [[
-                "id": "project", "kind": "Collapsible", "variant": "memory-project", "label": "/Workspace (1)",
-                "children": [["id": "memory-open", "kind": "NavigationRow", "variant": "memory-entry",
-                    "label": "Keep generated presentations and spreadsheets in the selected project workspace",
-                    "text": "Project · 2026-10-03", "action": "open", "children": [[
-                        "id": "review", "kind": "Badge", "label": "Awaiting review", "status": "pending",
-                    ]]]],
-            ]],
-        ]))
+            "title": "Memory", "appearance": "light", "nodes": [project],
+        ]
+        let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
         try document.validate()
         let model = XgentPresentationModel()
         model.update(document)
@@ -79,7 +83,11 @@ final class MemoryRenderingTests: XCTestCase {
                 host.layoutSubtreeIfNeeded()
                 try await Task.sleep(nanoseconds: 150_000_000)
                 XCTAssertLessThanOrEqual(host.fittingSize.width, width + 1)
-                let entry = try XCTUnwrap(nativeMacAccessibilityTree(host).first {
+                let elements = nativeMacAccessibilityTree(host)
+                try attachNativeAccessibilityEvidence(elements.map { [
+                    "id": $0.accessibilityIdentifier() ?? "", "label": $0.accessibilityLabel() ?? "",
+                ] }, name: "memory-library-accessibility-\(Int(width))-\(size)")
+                let entry = try XCTUnwrap(elements.first {
                     $0.accessibilityIdentifier() == "memory-open"
                 })
                 XCTAssertGreaterThanOrEqual(entry.accessibilityFrame().height, 43.5)

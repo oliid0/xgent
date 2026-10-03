@@ -50,6 +50,7 @@ struct XgentMemoryEntry: View {
         .disabled(node.disabled == true || model.isBusy(node, in: document))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(node.id)
+        .accessibilityAction(.default) { model.send(node, in: document) }
         .overlay(alignment: .bottom) {
             Rectangle().fill(Color(xgentHex: palette.border)).frame(height: 0.5)
                 .accessibilityHidden(true)

@@ -9,9 +9,9 @@ struct XgentBrowserNavigation: View {
 
     @ViewBuilder private func content(_ item: XgentNode) -> some View {
         #if os(iOS)
-        XgentIOSNode(node: item, document: document, model: model)
+        XgentIOSNode(node: item, document: document, model: model, parentAxis: .horizontal)
         #else
-        XgentNodeView(node: item, document: document, model: model)
+        XgentNodeView(node: item, document: document, model: model, parentAxis: .horizontal)
         #endif
     }
 
@@ -43,5 +43,6 @@ struct XgentBrowserNavigation: View {
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }

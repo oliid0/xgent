@@ -7,9 +7,9 @@ struct XgentBrowserTabs: View {
 
     @ViewBuilder private func content(_ item: XgentNode) -> some View {
         #if os(iOS)
-        XgentIOSNode(node: item, document: document, model: model)
+        XgentIOSNode(node: item, document: document, model: model, parentAxis: .horizontal)
         #else
-        XgentNodeView(node: item, document: document, model: model)
+        XgentNodeView(node: item, document: document, model: model, parentAxis: .horizontal)
         #endif
     }
 
@@ -28,6 +28,7 @@ struct XgentBrowserTabs: View {
                     }
                 }
                 .scrollIndicators(.hidden)
+                .fixedSize(horizontal: false, vertical: true)
                 .focusable()
                 .onAppear { if let selected { proxy.scrollTo(selected) } }
                 .onChange(of: selected) { _, id in if let id { proxy.scrollTo(id) } }

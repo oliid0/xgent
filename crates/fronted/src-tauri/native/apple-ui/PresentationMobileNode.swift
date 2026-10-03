@@ -253,6 +253,8 @@ struct XgentIOSNode: View {
             rendered
         case .navigationRow where node.variant == "sidebar-conversation-row":
             rendered
+        case .collapsible where node.variant == "memory-project":
+            rendered.accessibilityElement(children: .contain)
         case .selector where node.variant == "workspace-file-sheets":
             rendered.accessibilityElement(children: .contain)
         case .numberInput where node.variant == "document-annotation-page":

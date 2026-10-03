@@ -45,6 +45,13 @@ final class BrowserControlsRenderingTests: XCTestCase {
                     XCTAssertGreaterThanOrEqual(element.shape.bezierPath.bounds.minX, -1, id)
                     XCTAssertLessThanOrEqual(element.shape.bezierPath.bounds.maxX, width + 1, id)
                 }
+                if textSize == .large {
+                    for id in ["browser-address:one", "browser-back", "browser-close-tab"] {
+                        let element = try XCTUnwrap(elements.first { $0.identifier == id }, id)
+                        XCTAssertLessThanOrEqual(element.shape.bezierPath.bounds.maxY, 180,
+                            "Browser controls must leave the remaining height to the webpage: \(id)")
+                    }
+                }
                 let strategy = Snapshotting<UIView, UIImage>.image(size: CGSize(width: width, height: 780))
                 let image = await withCheckedContinuation { continuation in
                     strategy.snapshot(host.view).run { continuation.resume(returning: $0) }

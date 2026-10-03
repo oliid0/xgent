@@ -885,3 +885,17 @@ threshold. Native fixtures check the entry's accessibility bounds at narrow and
 wide widths with large type, and macOS presses the actual native action.
 These checks do not establish 90% visual similarity or complete cross-platform
 execution of arbitrary browser, Office and animation tasks.
+
+CI #256 passed shared frontend/Rust checks and device compilation. macOS ran
+162 tests with one failure: the new project-memory container propagated its
+accessibility identifier over the entry button. iOS ran 166 tests with the same
+memory failure and a next-file mounting failure on its slower simulator; its
+initial native typing undo check passed. Memory groups now keep child identities
+and entries expose their native press action. Editor tests wait up to two seconds
+for the actual next editable input, retaining every identity/history assertion.
+
+Rendered iOS browser evidence revealed chrome growing into the webpage height.
+Browser address content now receives its horizontal parent axis, and navigation
+and horizontal tab scrolling use their intrinsic height. Native bounds checks
+also require ordinary mobile chrome to finish within 180 points; large text
+continues to wrap. Shared browser draft/tab/error behavior tests remain passing.

@@ -119,7 +119,7 @@ final class CodeHostTests: XCTestCase {
         let root = host
         #endif
         try await settle()
-        let a = try XCTUnwrap(editor(in: root))
+        let a = try await mountedEditor(in: root)
         XCTAssertNotNil(a.textLayoutManager, "Workspace editors must keep TextKit 2 syntax and find rendering")
         #if os(iOS)
         a.becomeFirstResponder(); a.selectedRange = NSRange(location: a.text.utf16.count, length: 0); a.insertText(" // A")
@@ -129,7 +129,7 @@ final class CodeHostTests: XCTestCase {
         try await settle(); XCTAssertTrue(try XCTUnwrap(a.undoManager).canUndo)
         let second = try fixture(surface: "second", key: "b:2", content: "let count = 2")
         model.update(second); host.rootView = AnyView(render(second, model)); try await settle()
-        let b = try XCTUnwrap(editor(in: root)); XCTAssertFalse(b === a); XCTAssertFalse(b.undoManager === a.undoManager)
+        let b = try await mountedEditor(in: root, excluding: a); XCTAssertFalse(b === a); XCTAssertFalse(b.undoManager === a.undoManager)
         #if os(iOS)
         b.becomeFirstResponder(); b.selectedRange = NSRange(location: b.text.utf16.count, length: 0); b.insertText(" // B")
         #else
@@ -142,7 +142,7 @@ final class CodeHostTests: XCTestCase {
         XCTAssertEqual(source(a), "let count = 1 // A", "Removed surfaces must not reset cached native storage")
         let returned = try fixture(surface: "returned", key: "a:1", content: "let count = 1 // A")
         model.update(returned); host.rootView = AnyView(render(returned, model)); try await settle()
-        let resumed = try XCTUnwrap(editor(in: root))
+        let resumed = try await mountedEditor(in: root)
         try attachNativeAccessibilityEvidence(model.codeHosts.nativeEvidence() + [[
             "original": String(describing: ObjectIdentifier(a)), "resumed": String(describing: ObjectIdentifier(resumed)),
             "originalInWindow": String(a.window != nil), "resumedInWindow": String(resumed.window != nil),
@@ -161,12 +161,13 @@ final class CodeHostTests: XCTestCase {
         XCTAssertEqual(actions.last?.surface, "returned")
         host.rootView = AnyView(EmptyView()); try await settle()
         host.rootView = AnyView(render(returned, model)); try await settle()
-        XCTAssertTrue(editor(in: root) === a)
+        let remounted = try await mountedEditor(in: root)
+        XCTAssertTrue(remounted === a)
         XCTAssertTrue(try XCTUnwrap(a.undoManager).canUndo)
 
         let reloaded = try fixture(surface: "reloaded", key: "a:1", content: "let count = 99")
         model.update(reloaded); host.rootView = AnyView(render(reloaded, model)); try await settle()
-        let reloadInput = try XCTUnwrap(editor(in: root))
+        let reloadInput = try await mountedEditor(in: root)
         XCTAssertTrue(reloadInput === a, "Disk reload keeps the existing native editor")
         XCTAssertEqual(source(reloadInput), "let count = 99")
         XCTAssertFalse(try XCTUnwrap(reloadInput.undoManager).canUndo, "Undo cannot restore the pre-reload file")
@@ -174,6 +175,23 @@ final class CodeHostTests: XCTestCase {
     }
 
     @MainActor private func settle() async throws { try await Task.sleep(nanoseconds: 350_000_000) }
+    @MainActor private func mountedEditor(in root: CodeHostTestView,
+                                         excluding old: CodeHostTestEditor? = nil) async throws -> CodeHostTestEditor {
+        // SwiftUI mounts after publishing the retained host's configuration.
+        // Wait for that observable condition rather than assuming a busy CI
+        // simulator finishes controller containment in a fixed 350 ms.
+        for _ in 0..<40 {
+            #if os(iOS)
+            root.layoutIfNeeded()
+            #else
+            root.layoutSubtreeIfNeeded()
+            #endif
+            if let input = editor(in: root), input.window != nil, input !== old { return input }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return try XCTUnwrap(editor(in: root).flatMap { $0 !== old && $0.window != nil ? $0 : nil },
+                            "The next file must mount an editable native input within two seconds")
+    }
     private func session(_ key: String, open: [String] = ["a:1", "b:2"]) -> XgentCodeSessionIdentity {
         .init(scope: "project", key: key, open: open)
     }
