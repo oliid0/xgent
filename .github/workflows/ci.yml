@@ -242,6 +242,20 @@ jobs:
             -o "$RUNNER_TEMP/native-cua-arguments" 2>&1 | tee "$RUNNER_TEMP/native-cua-arguments.log"
           "$RUNNER_TEMP/native-cua-arguments" | tee -a "$RUNNER_TEMP/native-cua-arguments.log"
 
+      - name: Compile packaged macOS application UI tests
+        if: ${{ !cancelled() && matrix.platform == 'macos' }}
+        run: |
+          set -euo pipefail
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          export XGENT_MACOS_SMOKE_APP="$RUNNER_TEMP/Xgent.app"
+          smoke_project="$RUNNER_TEMP/xgent-macos-ui-smoke"
+          mkdir -p "$smoke_project"
+          cp -R "$GITHUB_WORKSPACE/scripts/release/macos-ui-smoke/." "$smoke_project/"
+          xcodegen generate --spec "$smoke_project/project.yml" --project "$smoke_project"
+          xcodebuild build-for-testing -project "$smoke_project/XgentMacOSSmoke.xcodeproj" \
+            -scheme XgentMacOSSmoke -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/native-macos-smoke-harness.log"
+
       - name: Select iPhone simulator
         if: ${{ matrix.platform == 'ios' }}
         run: |

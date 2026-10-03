@@ -1,5 +1,6 @@
 import Foundation
 import SnapshotTesting
+import SwiftDraw
 import SwiftUI
 import XCTest
 #if os(iOS)
@@ -29,7 +30,7 @@ final class MermaidDiagramTests: XCTestCase {
             guard let image = fixture.image(source: fixture.source, dark: fixture.dark) else {
                 // SVG(data:) intentionally swallows its parser error. The file
                 // initializer emits that actual SDK error for fixture diagnosis.
-                let url = FileManager.default.temporaryDirectory.appendingPathComponent("xgent-diagram-\(UUID.uuidString).svg")
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("xgent-diagram-\(UUID().uuidString).svg")
                 try fixture.svg?.data(using: .utf8)?.write(to: url)
                 _ = SVG(fileURL: url)
                 try FileManager.default.removeItem(at: url)
