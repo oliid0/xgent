@@ -67,22 +67,8 @@ final class DesktopSidebarTests: XCTestCase {
         }
     }
 
-    @MainActor private func accessibilityElements(_ root: Any) -> [any NSAccessibilityProtocol] {
-        var result: [any NSAccessibilityProtocol] = []
-        var seen = Set<ObjectIdentifier>()
-        func visit(_ item: Any, depth: Int) {
-            guard depth < 100, let object = item as? NSObject,
-                  seen.insert(ObjectIdentifier(object)).inserted else { return }
-            if let element = item as? any NSAccessibilityProtocol {
-                result.append(element)
-                for child in element.accessibilityChildren() ?? [] { visit(child, depth: depth + 1) }
-            }
-            if let view = item as? NSView {
-                for child in view.subviews { visit(child, depth: depth + 1) }
-            }
-        }
-        visit(root, depth: 0)
-        return result
+    @MainActor private func accessibilityElements(_ root: Any) -> [NativeMacAccessibilityElement] {
+        nativeMacAccessibilityTree(root)
     }
 
     private func fixture() throws -> XgentDocument {

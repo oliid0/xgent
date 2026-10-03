@@ -23,6 +23,7 @@ private final class XgentCodeSessionViewportState: ObservableObject {
         guard let session, let store else { return }
         if self.view === view, self.session == session { restore(); return }
         self.view = view; self.session = session; self.store = store; self.owner = owner; restored = false
+        store.viewportAvailability(session, owner: owner) { [weak view] in view?.window != nil && view?.isEditable == true }
         #if os(iOS)
         saved = store.position(session, text: view.text ?? "")
         #else
@@ -82,6 +83,7 @@ private final class XgentCodeSessionViewportState: ObservableObject {
     func resume() {
         guard let session, let store, let owner else { return }
         store.prepare(session, owner: owner, restoring: true)
+        store.viewportAvailability(session, owner: owner) { [weak view] in view?.window != nil && view?.isEditable == true }
         restored = false
         Task { @MainActor [weak self] in await Task.yield(); self?.restore() }
     }

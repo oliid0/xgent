@@ -30,6 +30,14 @@ final class XgentCodeHost {
     let identity: XgentCodeSessionIdentity
     private let state = XgentCodeHostState()
     private let parking = XgentCodeHostParking()
+    var evidence: [String: String] {
+        var result = parking.evidence
+        result["scope"] = identity.scope
+        result["session"] = identity.key
+        result["hosting"] = String(describing: ObjectIdentifier(hosting))
+        result["sourceUTF16Length"] = String(source.content.utf16.count)
+        return result
+    }
     #if os(iOS)
     let hosting = XgentCodeHostingController()
     var undo: UndoManager { hosting.sessionUndo }
@@ -41,6 +49,11 @@ final class XgentCodeHost {
         identity = session; source = XgentCodeHostSource(content)
         hosting.rootView = AnyView(XgentCodeHostRoot(source: source, state: state, parking: parking).id(identity.cacheKey))
     }
+    #if os(iOS)
+    func rememberWindow(_ mount: UIView) { parking.remember(mount) }
+    #else
+    func rememberWindow(_ mount: NSView) { parking.remember(mount) }
+    #endif
     func update(lease: UUID, configuration: XgentCodeEditor, content: String, environment: XgentCodeHostEnvironment,
                 changed: @escaping (String) -> Void) {
         // An explicit disk reload replaces the model, like Monaco setValue.

@@ -13,6 +13,19 @@ final class XgentCodeHostParking {
     private(set) var isParked = false
     private var suspendViewport: (() -> Void)?
     private var resumeViewport: (() -> Void)?
+    private var parks = 0
+    var evidence: [String: String] {
+        ["parked": String(isParked), "parks": String(parks), "ownerExists": String(owner != nil),
+         "ownerInWindow": String(ownerInWindow), "nativeInput": input.map { String(describing: ObjectIdentifier($0)) } ?? "nil",
+         "inputInWindow": String(input?.window != nil)]
+    }
+    private var ownerInWindow: Bool {
+        #if os(iOS)
+        owner?.viewIfLoaded?.window != nil
+        #else
+        owner?.window != nil
+        #endif
+    }
 
     func viewport(suspend: @escaping () -> Void, resume: @escaping () -> Void) {
         suspendViewport = suspend
@@ -28,22 +41,27 @@ final class XgentCodeHostParking {
     private weak var owner: UIViewController?
     private let container = UIView()
     private weak var input: UITextView?
+    private weak var window: UIWindow?
 
     func remember(_ input: UIView) {
         guard let root = input.window?.rootViewController else { return }
         owner = root
-        self.input = input as? UITextView
+        window = input.window
+        if let textView = input as? UITextView { self.input = textView }
     }
     func park(_ host: XgentCodeHostingController) -> Bool {
-        guard let owner, owner.view.window != nil, owner !== host else { return false }
+        guard let owner, let window, owner !== host else { return false }
         isParked = true
+        parks += 1
         input?.isEditable = false
         let size = host.view.bounds.size
         container.isHidden = true
         container.isAccessibilityElement = false
         container.accessibilityElementsHidden = true
         container.frame = CGRect(origin: .zero, size: size)
-        if container.superview !== owner.view { owner.view.addSubview(container) }
+        // The hosting root can rebuild its own subviews during route changes.
+        // Its UIWindow is stable for the lifetime of the native surface.
+        if container.superview !== window { window.addSubview(container) }
         if host.parent !== owner {
             if host.parent != nil { host.willMove(toParent: nil) }
             host.view.removeFromSuperview()
@@ -66,13 +84,15 @@ final class XgentCodeHostParking {
     private weak var input: NSTextView?
 
     func remember(_ input: NSView) {
-        guard let root = input.window?.contentView else { return }
+        guard let content = input.window?.contentView else { return }
+        let root = content.superview ?? content
         owner = root
-        self.input = input as? NSTextView
+        if let textView = input as? NSTextView { self.input = textView }
     }
     func park(_ host: XgentCodeHostingView) -> Bool {
         guard let owner, owner.window != nil, owner !== host else { return false }
         isParked = true
+        parks += 1
         input?.isEditable = false
         let size = host.bounds.size
         container.isHidden = true
@@ -91,6 +111,9 @@ final class XgentCodeHostParking {
         container.removeFromSuperview()
         owner = nil
         input = nil
+        #if os(iOS)
+        window = nil
+        #endif
         suspendViewport = nil
         resumeViewport = nil
         isParked = false

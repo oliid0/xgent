@@ -16,6 +16,21 @@ private final class XgentCodeFindTargetState: ObservableObject {
     var session: XgentCodeSessionIdentity?
     var store: XgentCodeSessionStore?
     var owner: UUID?
+    private var generation = 0
+
+    func schedule(_ config: XgentCodeFindConfiguration?, to view: XgentFindTextView,
+                  acknowledge: ((XgentCodeFindAction) -> Void)?) {
+        generation += 1
+        let revision = generation
+        // Introspection can run during updateNSView/updateUIView. Exact edits
+        // and their model acknowledgements must occur after that transaction.
+        Task { @MainActor [weak self, weak view] in
+            await Task.yield()
+            guard let self, let view, self.generation == revision else { return }
+            self.apply(config, to: view, acknowledge: acknowledge)
+        }
+    }
+    func cancel() { generation += 1 }
 
     func apply(_ config: XgentCodeFindConfiguration?, to view: XgentFindTextView,
                acknowledge: ((XgentCodeFindAction) -> Void)?) {
@@ -83,10 +98,11 @@ struct XgentCodeFindTarget: ViewModifier {
     func body(content: Content) -> some View {
         content
             #if os(iOS)
-            .introspect(.xgentCodeEditor, on: .iOS(.v26)) { view in configure(); state.apply(configuration, to: view, acknowledge: acknowledge) }
+            .introspect(.xgentCodeEditor, on: .iOS(.v26)) { view in configure(); state.schedule(configuration, to: view, acknowledge: acknowledge) }
             #else
-            .introspect(.xgentCodeEditor, on: .macOS(.v15, .v26)) { view in configure(); state.apply(configuration, to: view, acknowledge: acknowledge) }
+            .introspect(.xgentCodeEditor, on: .macOS(.v15, .v26)) { view in configure(); state.schedule(configuration, to: view, acknowledge: acknowledge) }
             #endif
+            .onDisappear { state.cancel() }
     }
     private func configure() { state.session = session; state.store = store; state.owner = owner }
 }

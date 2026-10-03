@@ -130,7 +130,12 @@ final class CodeHostTests: XCTestCase {
         XCTAssertEqual(source(a), "let count = 1 // A", "Removed surfaces must not reset cached native storage")
         let returned = try fixture(surface: "returned", key: "a:1", content: "let count = 1 // A")
         model.update(returned); host.rootView = AnyView(render(returned, model)); try await settle()
-        let resumed = try XCTUnwrap(editor(in: root)); XCTAssertTrue(resumed === a)
+        let resumed = try XCTUnwrap(editor(in: root))
+        try attachNativeAccessibilityEvidence(model.codeHosts.nativeEvidence() + [[
+            "original": String(describing: ObjectIdentifier(a)), "resumed": String(describing: ObjectIdentifier(resumed)),
+            "originalInWindow": String(a.window != nil), "resumedInWindow": String(resumed.window != nil),
+        ]], name: "code-host-returned-native-lifetime")
+        XCTAssertTrue(resumed === a)
         #if os(iOS)
         resumed.becomeFirstResponder()
         #else

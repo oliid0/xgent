@@ -78,19 +78,8 @@ final class ComputerUsePermissionTests: XCTestCase {
         }
     }
 
-    @MainActor private func accessibility(_ root: Any) -> [any NSAccessibilityProtocol] {
-        var result: [any NSAccessibilityProtocol] = []
-        var seen = Set<ObjectIdentifier>()
-        func visit(_ value: Any) {
-            guard let object = value as? NSObject, seen.insert(ObjectIdentifier(object)).inserted else { return }
-            if let element = value as? any NSAccessibilityProtocol {
-                result.append(element)
-                for child in element.accessibilityChildren() ?? [] { visit(child) }
-            }
-            if let view = value as? NSView { for child in view.subviews { visit(child) } }
-        }
-        visit(root)
-        return result
+    @MainActor private func accessibility(_ root: Any) -> [NativeMacAccessibilityElement] {
+        nativeMacAccessibilityTree(root)
     }
 
     private func fixture() throws -> XgentDocument {

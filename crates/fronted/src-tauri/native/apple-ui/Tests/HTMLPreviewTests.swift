@@ -63,7 +63,10 @@ final class HTMLPreviewTests: XCTestCase {
             <script>window.artifactLoaded = true;</script></body></html>
             """
             coordinator.update(view, source: html, attempt: 0)
-            await fulfillment(of: [loaded], timeout: 20)
+            // On the hosted simulator the first WebContent/AX process took
+            // over 50 seconds in CI #250; later previews loaded normally.
+            // Wait for actual navigation completion before inspecting scripts.
+            await fulfillment(of: [loaded], timeout: 90)
             XCTAssertNil(loadError)
             XCTAssertFalse(view.configuration.websiteDataStore.isPersistent)
             let bridge = try await view.evaluateJavaScript("typeof window.__TAURI_INTERNALS__") as? String

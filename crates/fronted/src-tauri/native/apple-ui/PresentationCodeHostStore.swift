@@ -6,6 +6,9 @@ final class XgentCodeHostStore {
     private var scopes: [String: Scope] = [:]
     private var entries: [String: XgentCodeHost] = [:]
     private var active = true
+    func nativeEvidence() -> [[String: String]] {
+        entries.keys.sorted().compactMap { entries[$0]?.evidence }
+    }
 
     func acquire(_ session: XgentCodeSessionIdentity, content: String) -> XgentCodeHost? {
         guard active, session.open.contains(session.key),

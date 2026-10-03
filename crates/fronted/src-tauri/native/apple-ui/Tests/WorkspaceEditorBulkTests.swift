@@ -53,11 +53,17 @@ final class WorkspaceEditorBulkTests: XCTestCase {
                     .frame(width: width, height: 640).dynamicTypeSize(size)
                 #if os(iOS)
                 let host = UIHostingController(rootView: content)
+                // This fixture already fixes its complete viewport at 640 pt.
+                // Do not add the simulator window's safe-area insets twice.
+                host.safeAreaRegions = []
                 let window = UIWindow(frame: CGRect(x: 0, y: 0, width: width, height: 640))
                 window.rootViewController = host; window.makeKeyAndVisible(); host.view.layoutIfNeeded()
                 defer { window.isHidden = true; window.rootViewController = nil; model.invalidate() }
                 try await Task.sleep(nanoseconds: 200_000_000)
                 let fitted = host.sizeThatFits(in: CGSize(width: width, height: 640))
+                try attachNativeAccessibilityEvidence(["height": fitted.height,
+                    "safeAreaTop": host.view.safeAreaInsets.top, "safeAreaBottom": host.view.safeAreaInsets.bottom],
+                    name: "close-all-measured-viewport-\(Int(width))-\(size)")
                 #else
                 let host = NSHostingView(rootView: content)
                 host.frame = CGRect(x: 0, y: 0, width: width, height: 640); host.layoutSubtreeIfNeeded()

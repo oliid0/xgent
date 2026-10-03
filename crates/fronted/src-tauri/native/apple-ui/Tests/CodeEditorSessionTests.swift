@@ -105,6 +105,9 @@ final class CodeEditorSessionTests: XCTestCase {
         model.update(returned); host.rootView = AnyView(render(returned, model))
         try await Task.sleep(nanoseconds: 600_000_000)
         let restored = try XCTUnwrap(editor(in: host))
+        try attachNativeAccessibilityEvidence(model.codeHosts.nativeEvidence() + [[
+            "original": String(describing: ObjectIdentifier(original)), "restored": String(describing: ObjectIdentifier(restored)),
+        ]], name: "code-session-restored-native-lifetime")
         #if os(iOS)
         XCTAssertEqual(restored.selectedRange, NSRange(location: 120, length: 0))
         XCTAssertEqual(restored.contentOffset.y, 240, accuracy: 3)

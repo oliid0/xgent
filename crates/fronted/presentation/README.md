@@ -763,3 +763,27 @@ All press, bounds and enabled-state assertions remain. Closing source draft
 tests compare complete decoded JSON payloads, since dictionary key order is not
 a contract. These repairs still require the next remote SDK run; passing static
 checks cannot establish full functional or visual parity.
+
+[CI #250](https://github.com/oliid0/xgent/actions/runs/37135102814) passed the
+device archive, frontend, Rust, architecture, workflow and hygiene jobs. The
+macOS suite ran 159 tests with 17 failed assertions; iOS ran 163 tests with 15.
+The mounted macOS find/replace test now passes. Editor identity/viewport tests
+and the four macOS accessibility interaction fixtures still fail; they remain
+mandatory assertions. The AppKit log explicitly reports adding a child directly
+to NSHostingView as unsupported. Parking now uses the stable window hierarchy
+outside that hosting root, and mount callbacks also capture the window before
+superview removal. Native identity/window/parking evidence is attached to both
+editor lifetime tests. Viewport callbacks from detached or parked text views are
+rejected, and native find mutations are deferred beyond introspection's render
+transaction.
+
+The macOS tree walker now retains SwiftUI NSObject accessibility proxies and
+reads both public modern getters and advertised legacy attributes, rather than
+discarding nodes without formal NSAccessibilityProtocol conformance. Presses
+still invoke real accessibility actions and verify the shared action result.
+The iOS close-all fixture fixes its entire viewport at 640 points, so its host
+must not add safe-area regions again; #250's 62/96-point overhead was invariant
+across font sizes. Height assertions remain 641 points. The real HTML preview
+test now allows 90 seconds for cold simulator WebContent/AX process startup,
+observed above 50 seconds in #250; JavaScript loading, interaction, isolation,
+screenshots and delegate retirement are still checked after actual completion.
