@@ -87,6 +87,8 @@ final class MermaidDiagramTests: XCTestCase {
                 }
                 .frame(width: width, height: 620)
                 .environment(\.accessibilityEnabled, true)
+                .environment(\.colorScheme, dark ? .dark : .light)
+                .preferredColorScheme(dark ? .dark : .light)
                 .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: dark ? .dark : .light))
                 .background { XgentThemeBackground() }
                 #if os(iOS)
