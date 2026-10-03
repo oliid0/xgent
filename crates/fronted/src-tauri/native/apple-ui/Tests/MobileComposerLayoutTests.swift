@@ -16,6 +16,7 @@ final class MobileComposerLayoutTests: XCTestCase {
                 wire("activity", "Badge", ["label": "Reading workspace", "fill": true]),
             ]]),
             wire("draft", "ComposerInput", ["label": "Message Xgent", "value": "Draft", "action": "draft"]),
+            wire("voice-error", "Banner", ["status": "error", "text": "Microphone permission is required. Enable it in Settings to use voice input."]),
             wire("selected-skill", "Button", ["label": "Selected documentation skill", "action": "skill", "fill": true]),
             wire("selected-file", "Button", ["label": "Spreadsheet.xlsx", "action": "file"]),
             wire("composer-actions", "HStack", ["children": [
@@ -52,18 +53,18 @@ final class MobileComposerLayoutTests: XCTestCase {
                 let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
                 try attachNativeAccessibilityEvidence(hierarchy, name: "composer-chips-\(Int(width))-\(size)")
                 let elements = hierarchy.flattenToElements()
-                for id in ["selected-skill", "attach", "send"] {
+                for id in ["voice-error", "selected-skill", "attach", "send"] {
                     let element = try XCTUnwrap(elements.first { $0.identifier == id })
                     let bounds = element.shape.bezierPath.bounds
                     XCTAssertGreaterThan(bounds.height, 0)
                     XCTAssertLessThanOrEqual(bounds.maxY, 721, "\(id) must remain reachable")
-                    if ["attach", "send"].contains(id) {
+                    if ["voice-error", "attach", "send"].contains(id) {
                         XCTAssertGreaterThanOrEqual(bounds.minX, -1)
                         XCTAssertLessThanOrEqual(bounds.maxX, width + 1)
                     }
                 }
                 let skill = try XCTUnwrap(elements.first { $0.identifier == "selected-skill" })
-                XCTAssertGreaterThan(skill.shape.bezierPath.bounds.minY, size == .large ? 370 : 120,
+                XCTAssertGreaterThan(skill.shape.bezierPath.bounds.minY, size == .large ? 350 : 120,
                     "Supporting chips must not consume the transcript's height")
                 let input = try XCTUnwrap(textView(in: host.view))
                 XCTAssertGreaterThan(input.bounds.height, 0)

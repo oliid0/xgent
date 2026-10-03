@@ -915,3 +915,12 @@ and the composer's controls and horizontal scrolling at narrow/wide widths
 with accessibility text sizes. Updated memory snapshots use an opaque themed
 background and the production iOS Form. These changes require remote CI and
 still do not establish complete functional or measured visual parity.
+
+iOS voice errors and partial transcriptions now occupy their own full-width
+feedback rows below the draft, instead of joining horizontally scrolling file
+actions. The composer SDK fixture includes a microphone error and requires it
+to fit the available width. The shared Rust CUA entry already limits scrolling
+to 20 pages; the Swift driver now enforces that same boundary before native
+events and uses exact conversion for repeated AX page actions. CI exercises
+fractional/maximum scroll counts and rejects nonfinite/out-of-range values
+against the production helper without calling desktop input APIs.

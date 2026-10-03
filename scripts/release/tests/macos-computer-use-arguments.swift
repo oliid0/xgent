@@ -25,6 +25,17 @@ struct ComputerUseArgumentRegression {
         let count = try computerUsePositiveInteger(decoded["index"]!, key: "click_count")
         let maximum = try computerUsePositiveInteger(Int.max, key: "max_tree_nodes")
         precondition(count == 7 && maximum == Int.max)
-        print("Computer-use integer/JSON boundary regressions passed")
+        for pages in [0.1, 0.5, 1, 2, 20] { try validateComputerUseScrollPages(pages) }
+        for pages in [0, -1, 20.0001, 1e300, Double(Int.max), Double.infinity, Double.nan] {
+            do {
+                try validateComputerUseScrollPages(pages)
+                preconditionFailure("Invalid scroll page count was accepted: \(pages)")
+            } catch ComputerUseError.invalidArguments(_) { }
+            precondition(computerUseIntegralScrollPageCount(pages) == nil)
+        }
+        precondition(computerUseIntegralScrollPageCount(1) == 1)
+        precondition(computerUseIntegralScrollPageCount(20) == 20)
+        precondition(computerUseIntegralScrollPageCount(1.5) == nil)
+        print("Computer-use integer/JSON and scroll boundary regressions passed")
     }
 }

@@ -29,3 +29,16 @@ func computerUsePositiveInteger(_ value: Any, key: String, expectedDescription: 
     }
     return integer
 }
+
+func validateComputerUseScrollPages(_ pages: Double) throws {
+    guard pages.isFinite, pages > 0, pages <= 20 else {
+        throw ComputerUseError.invalidArguments("pages must be greater than zero and at most 20")
+    }
+}
+
+func computerUseIntegralScrollPageCount(_ pages: Double) -> Int? {
+    guard pages.isFinite, pages > 0, pages <= 20 else { return nil }
+    let rounded = pages.rounded(.toNearestOrAwayFromZero)
+    guard abs(pages - rounded) < 0.000001, let count = Int(exactly: rounded) else { return nil }
+    return max(count, 1)
+}

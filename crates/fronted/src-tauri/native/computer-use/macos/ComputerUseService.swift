@@ -690,9 +690,7 @@ public final class ComputerUseService {
         guard ["up", "down", "left", "right"].contains(normalized) else {
             throw ComputerUseError.message("Invalid scroll direction: \(direction)")
         }
-        guard pages.isFinite, pages > 0 else {
-            throw ComputerUseError.message("pages must be > 0")
-        }
+        try validateComputerUseScrollPages(pages)
 
         let snapshot = try currentSnapshot(for: query)
         guard let elementIndex else {
@@ -718,7 +716,7 @@ public final class ComputerUseService {
             return snapshotResult(for: try refreshSnapshot(for: query), style: .actionResult)
         }
 
-        if InputSimulation.actionFlags.isEmpty, let repeatCount = integralScrollPageCount(pages),
+        if InputSimulation.actionFlags.isEmpty, let repeatCount = computerUseIntegralScrollPageCount(pages),
            let rawAction = record.rawActions.first(where: { $0.caseInsensitiveCompare("AXScroll\(normalized.capitalized)ByPage") == .orderedSame }),
            let element = record.element {
             for _ in 0..<repeatCount {
@@ -1803,14 +1801,6 @@ public final class ComputerUseService {
         let actions = record.rawActions.joined(separator: ",")
         let frame = record.localFrame.map { "x=\(Int($0.minX)) y=\(Int($0.minY)) w=\(Int($0.width)) h=\(Int($0.height))" } ?? "nil"
         return "index=\(record.index) role=\(role) synthetic=\(record.isSyntheticText) actions=[\(actions)] frame=\(frame)"
-    }
-
-    private func integralScrollPageCount(_ pages: Double) -> Int? {
-        let rounded = pages.rounded(.toNearestOrAwayFromZero)
-        guard abs(pages - rounded) < 0.000001 else {
-            return nil
-        }
-        return max(Int(rounded), 1)
     }
 
     private func performScrollEvent(
