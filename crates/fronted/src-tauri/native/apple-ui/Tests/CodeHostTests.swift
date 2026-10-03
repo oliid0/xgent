@@ -148,6 +148,9 @@ final class CodeHostTests: XCTestCase {
             "originalInWindow": String(a.window != nil), "resumedInWindow": String(resumed.window != nil),
         ]], name: "code-host-returned-native-lifetime")
         XCTAssertTrue(resumed === a)
+        XCTAssertTrue(try XCTUnwrap(resumed.undoManager).canUndo,
+                      "Typing history must survive switching the file's responder and hosting parent")
+        XCTAssertFalse(resumed.undoManager === b.undoManager)
         #if os(iOS)
         resumed.becomeFirstResponder()
         #else
@@ -155,9 +158,15 @@ final class CodeHostTests: XCTestCase {
         #endif
         resumed.undoManager?.undo(); try await settle()
         XCTAssertEqual(source(resumed), "let count = 1"); XCTAssertEqual(source(b), "let count = 2 // B")
+        #if os(iOS)
+        XCTAssertEqual(resumed.selectedRange, NSRange(location: "let count = 1".utf16.count, length: 0))
+        #endif
         XCTAssertEqual(actions.last?.surface, "returned"); XCTAssertEqual(actions.last?.value, .string("let count = 1"))
         resumed.undoManager?.redo(); try await settle()
         XCTAssertEqual(source(resumed), "let count = 1 // A")
+        #if os(iOS)
+        XCTAssertEqual(resumed.selectedRange, NSRange(location: "let count = 1 // A".utf16.count, length: 0))
+        #endif
         XCTAssertEqual(actions.last?.surface, "returned")
         host.rootView = AnyView(EmptyView()); try await settle()
         host.rootView = AnyView(render(returned, model)); try await settle()

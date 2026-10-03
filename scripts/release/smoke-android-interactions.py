@@ -205,10 +205,15 @@ def run_terminal(command, expected_output=None, expected_exit=0, clear=True, exa
                     for node in nodes for key in ("text", "content-desc")
                     if (match := re.fullmatch(r"stdout:\s*(.*)", node.get(key, "").strip(), re.DOTALL))
                 ]
-                assert any(
-                    output == expected_output if exact else expected_output in output
-                    for output in outputs
-                ), f"The native Shell must expose actual stdout for {command!r}"
+                if expected_output == "":
+                    # Empty stdout intentionally has no rendered CodeBlock.
+                    # EOF must finish successfully without any visible output.
+                    assert not any(outputs), f"Unexpected stdout for {command!r}: {outputs!r}"
+                else:
+                    assert any(
+                        output == expected_output if exact else expected_output in output
+                        for output in outputs
+                    ), f"The native Shell must expose actual stdout for {command!r}"
             return
         time.sleep(1)
     capture("shell-failure")

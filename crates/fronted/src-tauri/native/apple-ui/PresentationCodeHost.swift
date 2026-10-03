@@ -72,6 +72,7 @@ final class XgentCodeHost {
             undo.removeAllActions()
             source.clearInputUndo()
         }
+        nativeInput.rebind(text: source.binding(lease))
         state.schedule(.init(lease: lease, configuration: configuration, environment: environment), source: source)
         parking.resume()
         nativeInput.view.isEditable = configuration.enabled && environment.enabled

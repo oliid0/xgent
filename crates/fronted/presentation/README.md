@@ -930,3 +930,17 @@ Two newly added fixtures omitted the required appearance field and failed
 decoding before their new UI assertions; the other 166 tests passed. Both
 fixtures now declare light appearance explicitly. These initial failures do
 not count as successful execution of the new editing/composer tests.
+
+CI #259 passed the new memory editing and composer layout SDK tests, all 162
+macOS tests, device compilation and shared frontend/Rust/guard checks. iOS
+executed 168 tests with five assertions failing in the existing retained-file
+undo test after the same input returned to its file. Typing now records an
+explicit inverse on a file-owned manager, including committed IME input; a
+returning native editor refreshes its source binding before the asynchronous
+hosting snapshot. The existing undo/redo/reload checks remain required.
+
+Release #124's Android interactions reached live stdin and successful EOF.
+The final smoke assertion incorrectly required an empty stdout accessibility
+node even though both mobile UIs omit empty output blocks. It now requires
+successful completion and no nonempty stdout; all nonempty-output checks stay
+strict. This is a smoke assertion correction, not proof of a new Shell feature.

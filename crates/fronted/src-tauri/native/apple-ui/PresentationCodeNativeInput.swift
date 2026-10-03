@@ -11,6 +11,9 @@ import AppKit
 @MainActor
 final class XgentCodeNativeInput: NSObject {
     let view: XgentCodeNativeTextView
+    #if os(iOS)
+    private let history: XgentCodeUndoHistory
+    #endif
     #if os(macOS)
     let scroll = NSScrollView()
     private var scrollObserver: NSObjectProtocol?
@@ -22,6 +25,9 @@ final class XgentCodeNativeInput: NSObject {
     private var changeQueued = false
 
     init(content: String) {
+        #if os(iOS)
+        history = XgentCodeUndoHistory(content)
+        #endif
         let storage = NSTextContentStorage()
         let manager = NSTextLayoutManager()
         let container = NSTextContainer(size: CGSize(width: 640, height: CGFloat.greatestFiniteMagnitude))
@@ -63,6 +69,7 @@ final class XgentCodeNativeInput: NSObject {
             }
         #endif
         view.fileUndo.removeAllActions()
+        view.fileUndo.levelsOfUndo = 100
         if let storage = (manager.textContentManager as? NSTextContentStorage)?.textStorage {
             storageObserver = NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification,
                 object: storage, queue: .main) { [weak self, weak storage] _ in
@@ -89,6 +96,7 @@ final class XgentCodeNativeInput: NSObject {
         #if os(iOS)
         if view.text != text.wrappedValue {
             view.text = text.wrappedValue
+            history.reset(text.wrappedValue, selection: view.selectedRange)
             view.lineIndex = XgentCodeLineIndex(text.wrappedValue)
         }
         let font = fontName.flatMap { UIFont(name: $0, size: fontSize) } ?? .monospacedSystemFont(ofSize: fontSize, weight: .regular)
@@ -117,6 +125,12 @@ final class XgentCodeNativeInput: NSObject {
         #endif
     }
 
+    func rebind(text: Binding<String>) {
+        // A returning input must route edits through its new surface lease
+        // immediately, before the hosting graph publishes its next snapshot.
+        self.text = text
+    }
+
     func retire() {
         text = nil; position = nil
         view.isEditable = false
@@ -139,6 +153,7 @@ final class XgentCodeNativeInput: NSObject {
     private func changed() {
         guard !updating, view.isEditable, view.window != nil else { return }
         #if os(iOS)
+        history.changed(view)
         text?.wrappedValue = view.text ?? ""
         view.lineIndex = XgentCodeLineIndex(view.text ?? "")
         view.setNeedsDisplay()
@@ -164,7 +179,7 @@ final class XgentCodeNativeInput: NSObject {
 #if os(iOS)
 extension XgentCodeNativeInput: UITextViewDelegate {
     func textViewDidChange(_ textView: UITextView) { changed() }
-    func textViewDidChangeSelection(_ textView: UITextView) { savePosition() }
+    func textViewDidChangeSelection(_ textView: UITextView) { history.selected(view); savePosition() }
     func scrollViewDidScroll(_ scrollView: UIScrollView) { savePosition() }
 }
 #else
