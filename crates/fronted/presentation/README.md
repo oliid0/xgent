@@ -976,3 +976,29 @@ verification now require the actual font files. This batch still needs remote
 SDK and installation verification. Complete Markdown math nesting/streaming
 semantics and inline baselines remain under review; Mermaid
 rendering and the original complete functional/visual parity goal remain open.
+
+CI #264 passed every job on `fbd0b70db3990c135a1fe7ac21eca0e03df8140d`:
+165 macOS and 171 iOS tests, zero failures, plus the patched device archive and
+actual font/shader resource verification. Release #126 was dispatched from that
+revision. Packaged-app font loading and complete math parity remain unproven.
+
+The native Markdown Mermaid path uses the same installed Streamdown/Mermaid
+engine for layout through a separate read-only action. SVG labels remain text;
+computed paint and arrowheads become native SVG geometry, rendered by the
+existing pinned SwiftDraw package in SwiftUI. The handwritten viewport supports
+scrolling, pinch/button/accessibility zoom, fit, copy and full-window viewing.
+Streamed blocks retain their diagram state; failed syntax shows its original
+source and local retry. Diagram requests retire on cancellation, action changes
+and removed surfaces without creating edits or a chat error. Browser tests run
+the actual shared engine across flowchart, sequence, class, state and pie diagrams
+in light/dark, checking arrows, labels and cleanup. Corresponding native SVG and
+mounted Markdown SDK cases await CI. Embedded HTML/images and intermediate
+marker arrows currently report a local error rather than drawing incomplete
+content; these are remaining Mermaid parity gaps, not completed features.
+
+Review of CI #264's narrow standard-size math screenshot found a missing first
+inline formula, although its isolated raster test passed. The mounted SDK test
+now waits within a bounded deadline for that formula's real accessibility label
+and attaches the labels before taking screenshots. This gap remains under
+investigation until the stronger test and actual images pass; #264 alone does
+not prove that every paragraph displayed its math.

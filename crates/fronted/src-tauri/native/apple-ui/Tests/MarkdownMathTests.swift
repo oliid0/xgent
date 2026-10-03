@@ -6,6 +6,7 @@ import SwaTexRender
 import SwiftUI
 import XCTest
 #if os(iOS)
+import AccessibilitySnapshotParser
 import UIKit
 #else
 import AppKit
@@ -63,6 +64,7 @@ final class MarkdownMathTests: XCTestCase {
             for size in [DynamicTypeSize.large, .accessibility3] {
                 let view = ScrollView { XgentMarkdown(text: text).padding(16) }
                     .frame(width: width, height: 720).dynamicTypeSize(size)
+                    .environment(\.accessibilityEnabled, true)
                     .background { XgentThemeBackground() }
                     .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: .light))
                 #if os(iOS)
@@ -83,7 +85,19 @@ final class MarkdownMathTests: XCTestCase {
                 let strategy = Snapshotting<NSView, NSImage>.image(size: CGSize(width: width, height: 720))
                 let native = host
                 #endif
-                try await Task.sleep(nanoseconds: 200_000_000)
+                var labels: [String] = []
+                let deadline = ContinuousClock.now + .seconds(3)
+                repeat {
+                    try await Task.sleep(for: .milliseconds(60))
+                    #if os(iOS)
+                    let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: native)
+                    labels = hierarchy.flattenToElements().compactMap(\.label)
+                    #else
+                    labels = nativeMacAccessibilityTree(native).compactMap { $0.accessibilityLabel() }
+                    #endif
+                } while !labels.contains(where: { $0.contains("y^2") }) && ContinuousClock.now < deadline
+                try attachNativeAccessibilityEvidence(labels, name: "native-math-labels-\(Int(width))-\(size)")
+                XCTAssertTrue(labels.contains(where: { $0.contains("y^2") }), "A ready formula must appear in the real first paragraph, not only in a separate raster test")
                 let snapshot = await withCheckedContinuation { continuation in
                     strategy.snapshot(native).run { continuation.resume(returning: $0) }
                 }

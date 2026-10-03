@@ -51,6 +51,7 @@ export type PresentationNode = {
   text?: string;
   value?: PresentationValue;
   action?: string;
+  diagramAction?: string;
   focusRequest?: number;
   disabled?: boolean;
   destructive?: boolean;

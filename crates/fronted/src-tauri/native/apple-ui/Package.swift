@@ -42,6 +42,7 @@ let package = Package(
             "XgentNativeUI", .product(name: "MarkdownUI", package: "swift-markdown-ui"),
             .product(name: "SwaTexRender", package: "SwaTex"),
             .product(name: "Nuke", package: "Nuke"),
+            .product(name: "SwiftDraw", package: "SwiftDraw"),
             .product(name: "LanguageSupport", package: "CodeEditorView"),
             .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
             .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts", condition: .when(platforms: [.macOS])),

@@ -8,11 +8,13 @@ final class XgentCodeHighlightQuery {
     let node: String
     let action: String
     let kind: String
+    let diagram: Bool
     private var continuation: CheckedContinuation<String?, Never>?
     var timeout: Task<Void, Never>?
 
-    init(surface: String, node: String, action: String, kind: String, continuation: CheckedContinuation<String?, Never>) {
+    init(surface: String, node: String, action: String, kind: String, continuation: CheckedContinuation<String?, Never>, diagram: Bool = false) {
         self.surface = surface; self.node = node; self.action = action; self.kind = kind; self.continuation = continuation
+        self.diagram = diagram
     }
 
     func finish(_ value: String?) {

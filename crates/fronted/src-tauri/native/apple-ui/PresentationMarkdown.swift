@@ -15,6 +15,7 @@ struct XgentMarkdown: View {
     var secondary = false
     var codeConfiguration = XgentCodeBlockConfiguration.markdown
     var highlightCode: ((String, String) async -> String?)? = nil
+    var renderDiagram: ((String, Bool) async -> String?)? = nil
     @StateObject private var codeStore = XgentMarkdownCodeStore()
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
@@ -52,10 +53,16 @@ struct XgentMarkdown: View {
             .markdownInlineImageProvider(mathProvider)
             .markdownBlockStyle(\.codeBlock) { configuration in
                 let entry = codeStore.entry(content: configuration.content, language: configuration.language)
-                XgentCodeBlock(text: entry?.code.source ?? (configuration.content.isEmpty ? "" : configuration.content + "\n"),
+                if ["mermaid", "mmd"].contains(XgentMarkdownCodeEntry.languageName(configuration.language)?.lowercased() ?? "") {
+                    XgentMermaidDiagram(source: entry?.code.source ?? configuration.content, configuration: codeConfiguration,
+                                        retainedState: entry?.diagram, renderDiagram: renderDiagram)
+                        .markdownMargin(top: 0, bottom: 12)
+                } else {
+                    XgentCodeBlock(text: entry?.code.source ?? (configuration.content.isEmpty ? "" : configuration.content + "\n"),
                                language: XgentMarkdownCodeEntry.languageName(configuration.language) ?? "markdown",
                                configuration: codeConfiguration, retainedState: entry?.state, highlightCode: highlightCode)
                     .markdownMargin(top: 0, bottom: 12)
+                }
             }
             .markdownBlockStyle(\.table) { configuration in
                 ScrollView(.horizontal) {

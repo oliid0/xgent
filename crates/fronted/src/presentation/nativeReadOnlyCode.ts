@@ -25,6 +25,17 @@ export function nativeReadOnlyCodeNodes(
     hasLanguageLabel: true,
     container: "card",
     labels,
+    diagram: {
+      copy: t("chat.markdown.copyDiagram"),
+      fullscreen: t("chat.markdown.fullscreenDiagram"),
+      close: t("workspaceFilePreview.close"),
+      zoomIn: t("workspaceFilePreview.zoomIn"),
+      zoomOut: t("workspaceFilePreview.zoomOut"),
+      fit: t("workspaceFilePreview.fitImage"),
+      loading: t("chat.markdown.renderingDiagram"),
+      failed: t("chat.markdown.diagramFailed"),
+      retry: t("chat.markdown.retryDiagram"),
+    },
   });
   const visit = (node: PresentationNode): PresentationNode => {
     const children = node.children?.map(visit);

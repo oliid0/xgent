@@ -493,7 +493,8 @@ struct XgentIOSNode: View {
                 .id(node.value?.text ?? node.id)
         case .markdown:
             XgentMarkdown(text: node.text ?? "", codeConfiguration: .decode(node.value?.text, fallback: .markdown),
-                          highlightCode: { source, language in await model.highlightCode(node, in: document, source: source, language: language) })
+                          highlightCode: { source, language in await model.highlightCode(node, in: document, source: source, language: language) },
+                          renderDiagram: { source, dark in await model.renderDiagram(node, in: document, source: source, dark: dark) })
         case .codeBlock:
             codeBlock
         case .list:

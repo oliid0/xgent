@@ -105,6 +105,12 @@ export function validatePresentationDocument(
           throw new Error(`Missing native action handler: ${node.action}`);
       }
       if (
+        node.diagramAction !== undefined &&
+        (node.kind !== "Markdown" || !node.diagramAction || !handlers.has(node.diagramAction))
+      ) {
+        throw new Error(`Invalid native diagram action: ${node.id}`);
+      }
+      if (
         node.focusRequest !== undefined &&
         (node.kind !== "ComposerInput" ||
           !Number.isSafeInteger(node.focusRequest) ||

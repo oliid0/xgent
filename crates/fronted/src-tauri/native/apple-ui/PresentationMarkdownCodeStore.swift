@@ -8,6 +8,7 @@ final class XgentMarkdownCodeStore: ObservableObject {
     struct Entry {
         let code: XgentMarkdownCodeEntry
         let state: XgentCodeBlockState
+        let diagram: XgentDiagramState
     }
 
     private var source: String?
@@ -24,7 +25,8 @@ final class XgentMarkdownCodeStore: ObservableObject {
                 previous.code.language == code.language &&
                     (code.content.utf16.starts(with: previous.code.content.utf16) || previous.code.content.utf16.starts(with: code.content.utf16))
             } ?? false
-            return Entry(code: code, state: keepsState ? old?.state ?? XgentCodeBlockState() : XgentCodeBlockState())
+            return Entry(code: code, state: keepsState ? old?.state ?? XgentCodeBlockState() : XgentCodeBlockState(),
+                         diagram: keepsState ? old?.diagram ?? XgentDiagramState() : XgentDiagramState())
         }
         self.source = source; self.content = content
         return content

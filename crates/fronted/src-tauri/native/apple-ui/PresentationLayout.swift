@@ -177,7 +177,8 @@ extension XgentNodeView {
 
     var nativeMarkdown: some View {
         XgentMarkdown(text: node.text ?? "", codeConfiguration: .decode(node.value?.text, fallback: .markdown),
-                      highlightCode: { source, language in await model.highlightCode(node, in: document, source: source, language: language) })
+                      highlightCode: { source, language in await model.highlightCode(node, in: document, source: source, language: language) },
+                      renderDiagram: { source, dark in await model.renderDiagram(node, in: document, source: source, dark: dark) })
     }
 
     var nativeCodeBlock: some View {

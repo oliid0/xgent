@@ -5,6 +5,7 @@ import { normalizeLatexDelimiters } from "../lib/normalizeLatexDelimiters";
 import type { AppSettings } from "../lib/settings";
 import { createAppearanceTheme } from "../theme/appearanceTheme";
 import { cssColor } from "./nativeColor";
+import { nativeDiagramRequest, renderNativeDiagram } from "./nativeMermaid";
 import type { PresentationHandler, PresentationNode, PresentationValue } from "./types";
 
 type ColorPair = { light: string; dark: string };
@@ -93,6 +94,21 @@ export function attachReadOnlySyntax(
       return children ? { ...node, children } : node;
     const action = `${node.id}:highlight-code`;
     const policy = typeof node.value === "string" ? JSON.parse(node.value) : {};
+    const diagramAction = node.kind === "Markdown" ? `${node.id}:render-diagram` : undefined;
+    if (diagramAction)
+      handlers.set(diagramAction, {
+        enabled: true,
+        accepts: (value) => nativeDiagramRequest(value) !== undefined,
+        run: async (value) => {
+          const input = nativeDiagramRequest(value);
+          if (!input) throw new Error("Invalid diagram request.");
+          return renderNativeDiagram(input.source, input.dark);
+        },
+        resultValue: (value) => {
+          if (typeof value !== "string") throw new Error("Invalid diagram reply.");
+          return value;
+        },
+      });
     handlers.set(action, {
       enabled: true,
       accepts: (value) => request(value) !== undefined,
@@ -114,6 +130,7 @@ export function attachReadOnlySyntax(
           : node.text,
       children,
       action,
+      diagramAction,
       value: JSON.stringify({
         ...policy,
         syntaxTheme: palette.signature,

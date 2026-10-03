@@ -20,6 +20,7 @@ struct XgentCodeBlockConfiguration: Decodable, Equatable {
     var hasLanguageLabel = true
     var container = "card"
     var labels = Labels.fallback
+    var diagram = XgentDiagramLabels.fallback
     var syntaxTheme: String? = nil
     var syntaxBackground: XgentReadOnlySyntax.Style? = nil
     var syntaxComment: XgentReadOnlySyntax.Style? = nil
@@ -40,7 +41,7 @@ struct XgentCodeBlockConfiguration: Decodable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case maxHeight, viewportFraction, collapseLines, hasLanguageLabel, container, labels, syntaxTheme, syntaxBackground, syntaxComment, syntaxForeground
+        case maxHeight, viewportFraction, collapseLines, hasLanguageLabel, container, labels, diagram, syntaxTheme, syntaxBackground, syntaxComment, syntaxForeground
     }
 
     init(maxHeight: Double? = nil, viewportFraction: Double? = nil, collapseLines: Int? = nil,
@@ -57,6 +58,7 @@ struct XgentCodeBlockConfiguration: Decodable, Equatable {
         hasLanguageLabel = try values.decodeIfPresent(Bool.self, forKey: .hasLanguageLabel) ?? true
         container = try values.decodeIfPresent(String.self, forKey: .container) ?? "card"
         labels = try values.decodeIfPresent(Labels.self, forKey: .labels) ?? .fallback
+        diagram = try values.decodeIfPresent(XgentDiagramLabels.self, forKey: .diagram) ?? .fallback
         syntaxTheme = try values.decodeIfPresent(String.self, forKey: .syntaxTheme)
         syntaxBackground = try values.decodeIfPresent(XgentReadOnlySyntax.Style.self, forKey: .syntaxBackground)
         syntaxComment = try values.decodeIfPresent(XgentReadOnlySyntax.Style.self, forKey: .syntaxComment)

@@ -152,6 +152,7 @@ struct XgentNode: Decodable, Identifiable {
     let text: String?
     let value: XgentValue?
     let action: String?
+    let diagramAction: String?
     let focusRequest: Int?
     let disabled: Bool?
     let destructive: Bool?
@@ -270,6 +271,9 @@ struct XgentDocument: Decodable, Identifiable {
                       node.focusRequest.map({ node.kind == .composerInput && (0...9_007_199_254_740_991).contains($0) }) ?? true,
                       node.action == nil || !node.kind.eventSemantics.isEmpty else {
                     throw XgentProtocolError.invalid
+                }
+                if let diagramAction = node.diagramAction {
+                    guard node.kind == .markdown, !diagramAction.isEmpty else { throw XgentProtocolError.invalid }
                 }
                 let measures = [node.minimum, node.maximum, node.step, node.current, node.total].compactMap { $0 }
                 // Business ranges are finite, not screen dimensions. In particular,
@@ -413,7 +417,8 @@ final class XgentPresentationModel: ObservableObject {
         }
         for (id, query) in codeHighlightQueries where query.surface == document.surface {
             let current = document.node(id: query.node)
-            if current?.action != query.action || current?.kind.rawValue != query.kind || current?.disabled == true {
+            let action = query.diagram ? current?.diagramAction : current?.action
+            if action != query.action || current?.kind.rawValue != query.kind || current?.disabled == true {
                 codeHighlightQueries.removeValue(forKey: id)?.finish(nil)
             }
         }
@@ -552,18 +557,27 @@ final class XgentPresentationModel: ObservableObject {
     func isDismissing(_ document: XgentDocument) -> Bool { busy.contains(key(document.surface, "$dismiss")) }
 
     func highlightCode(_ node: XgentNode, in document: XgentDocument, source: String, language: String) async -> String? {
+        await queryReadOnlyContent(node, in: document, input: ["source": source, "language": language], diagram: false)
+    }
+
+    func renderDiagram(_ node: XgentNode, in document: XgentDocument, source: String, dark: Bool) async -> String? {
+        await queryReadOnlyContent(node, in: document, input: ["source": source, "dark": dark], diagram: true)
+    }
+
+    private func queryReadOnlyContent(_ node: XgentNode, in document: XgentDocument, input: [String: Any], diagram: Bool) async -> String? {
         let id = UUID().uuidString
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                guard active, !Task.isCancelled, node.kind == .markdown || node.kind == .codeBlock,
+                let expected = diagram ? node.diagramAction : node.action
+                guard active, !Task.isCancelled, node.kind == .markdown || (!diagram && node.kind == .codeBlock),
                       let current = documents.first(where: { $0.surface == document.surface })?.node(id: node.id),
-                      current.kind == node.kind, current.action == node.action, current.disabled != true,
-                      let action = current.action,
-                      let data = try? JSONSerialization.data(withJSONObject: ["source": source, "language": language]),
+                      current.kind == node.kind, current.disabled != true,
+                      let action = diagram ? current.diagramAction : current.action, action == expected,
+                      let data = try? JSONSerialization.data(withJSONObject: input),
                       let value = String(data: data, encoding: .utf8) else {
                     continuation.resume(returning: nil); return
                 }
-                let query = XgentCodeHighlightQuery(surface: document.surface, node: node.id, action: action, kind: node.kind.rawValue, continuation: continuation)
+                let query = XgentCodeHighlightQuery(surface: document.surface, node: node.id, action: action, kind: node.kind.rawValue, continuation: continuation, diagram: diagram)
                 codeHighlightQueries[id] = query
                 query.timeout = Task { [weak self] in
                     try? await Task.sleep(for: .seconds(10))

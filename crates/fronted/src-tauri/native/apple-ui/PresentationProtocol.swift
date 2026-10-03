@@ -85,7 +85,9 @@ enum XgentNodeKind: String, Decodable, CaseIterable {
             return ["recordShortcut"]
         case .spreadsheetGrid:
             return ["changeCell"]
-        case .markdown, .codeBlock:
+        case .markdown:
+            return ["highlightCode", "renderDiagram"]
+        case .codeBlock:
             return ["highlightCode"]
         default:
             return []
