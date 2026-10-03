@@ -707,3 +707,31 @@ Swift MCP and the Swift standard-library source. The remaining lazy lookups were
 reviewed: local recursive functions need no instance capture, and other instance
 helpers already use explicit self. Assertions and production views are unchanged
 by this test compilation repair; actual SDK test execution remains pending.
+
+[CI #248](https://github.com/oliid0/xgent/actions/runs/37131298736) reached real
+test execution: macOS ran 158 tests with 23 failed assertions, and hosted iOS ran
+162 tests with 20 failed assertions. The frontend, Rust check/history migrations,
+mobile status serialization, architecture, workflow, and production iOS archive
+jobs passed. Downloaded device evidence contains four defined Rust-facing exports;
+both native rendering artifacts now contain actual screenshots. These results
+are a failure baseline, not a claim of complete interaction or visual parity.
+
+The next handwritten repair batch aligns finite business numeric ranges with
+the shared validator, enabling the Int32 PDF/Office annotation page contract;
+out-of-range numeric values and screen dimension limits remain rejected. Native
+editor hosting now installs its root once and publishes configuration changes
+through retained state, addressing text view/undo replacement on remount. Common
+buttons expose their own identifiers, question options explicitly retain button
+traits, desktop switches fill their row, and the close-all file list can shrink
+inside its fixed presentation height. Save tests now return the same numeric
+commit acknowledgements as the real bridge. Find tests exclude AppKit field
+editors, and syntax tests inspect stored attributes beneath rendering overrides.
+
+macOS in-process accessibility tests explicitly enable the documented SwiftUI
+accessibility environment, matching the hosted test pattern researched through
+GitHub MCP. Button press, size, ordering and enabled-state assertions remain in
+place. Accessibility trees are attached before assertions for subsequent diagnosis.
+Editor selection/scroll restoration and the iOS HTML preview cold-load timeout
+remain under investigation; this batch requires SDK execution before its effect
+on the #248 failure baseline can be established. No local build/install/dev or
+Cargo/Swift compile command was run.

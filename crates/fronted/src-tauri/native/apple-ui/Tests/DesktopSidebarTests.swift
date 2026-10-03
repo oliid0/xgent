@@ -16,6 +16,7 @@ final class DesktopSidebarTests: XCTestCase {
                 model.actionSink = { actions.append($0) }
                 model.update(document)
                 let host = NSHostingView(rootView: XgentDesktopSidebar(document: document, model: model)
+                    .environment(\.accessibilityEnabled, true)
                     .dynamicTypeSize(size)
                     .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: .light)))
                 let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: 760),
@@ -27,6 +28,8 @@ final class DesktopSidebarTests: XCTestCase {
                 try await Task.sleep(nanoseconds: 200_000_000)
                 host.layoutSubtreeIfNeeded()
                 var elements = accessibilityElements(host)
+                try attachNativeAccessibilityEvidence(elements.map { ["id": $0.accessibilityIdentifier() ?? "", "label": $0.accessibilityLabel() ?? ""] },
+                    name: "sidebar-accessibility-\(Int(width))-\(size)")
                 let newChat = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "new-chat" })
                 let skills = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "skills" })
                 let settings = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "settings" })

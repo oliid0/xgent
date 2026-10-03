@@ -30,6 +30,7 @@ final class QuestionCardRenderingTests: XCTestCase {
                 let content = ScrollView {
                     XgentQuestionCard(node: document.nodes[0], document: document, model: model).padding(16)
                 }.frame(width: width, height: 1000).dynamicTypeSize(size)
+                    .environment(\.accessibilityEnabled, true)
                     .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: .light))
                 #if os(iOS)
                 let host = UIHostingController(rootView: content)
@@ -40,7 +41,9 @@ final class QuestionCardRenderingTests: XCTestCase {
                 defer { window.isHidden = true; window.rootViewController = nil }
                 host.view.layoutIfNeeded()
                 try await Task.sleep(nanoseconds: 150_000_000)
-                let elements = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view).flattenToElements()
+                let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
+                try attachNativeAccessibilityEvidence(hierarchy, name: "question-accessibility-\(Int(width))-\(size)")
+                let elements = hierarchy.flattenToElements()
                 for id in ["question:option", "question:other", "question:tabs:0", "question:submit"] {
                     let element = try XCTUnwrap(elements.first { $0.identifier == id && $0.traits.contains(.button) })
                     let rect = element.shape.bezierPath.bounds
@@ -65,7 +68,10 @@ final class QuestionCardRenderingTests: XCTestCase {
                 host.layoutSubtreeIfNeeded()
                 try await Task.sleep(nanoseconds: 150_000_000)
                 XCTAssertLessThanOrEqual(host.fittingSize.width, width + 1)
-                let button = try XCTUnwrap(accessibility(host).first { $0.accessibilityIdentifier() == "question:option" })
+                let elements = accessibility(host)
+                try attachNativeAccessibilityEvidence(elements.map { ["id": $0.accessibilityIdentifier() ?? "", "label": $0.accessibilityLabel() ?? ""] },
+                    name: "question-accessibility-\(Int(width))-\(size)")
+                let button = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "question:option" })
                 XCTAssertTrue(button.accessibilityPerformPress())
                 try await Task.sleep(nanoseconds: 30_000_000)
                 XCTAssertEqual(actions.last?.action, "option")

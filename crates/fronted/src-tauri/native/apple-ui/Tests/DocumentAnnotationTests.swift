@@ -27,7 +27,10 @@ final class DocumentAnnotationTests: XCTestCase {
         let model = XgentPresentationModel()
         model.update(document)
         var actions: [XgentAction] = []
-        model.actionSink = { actions.append($0) }
+        model.actionSink = { action in
+            actions.append(action)
+            model.complete(.init(surface: action.surface, requestId: action.requestId, ok: true, error: nil))
+        }
         model.send(try XCTUnwrap(document.node(id: "workspace-file-annotation-text")), in: document, value: .string("New note 😀"), editing: true)
         model.send(try XCTUnwrap(document.node(id: "workspace-file-annotation-page")), in: document, value: .number(2), editing: true)
         let draft = try XCTUnwrap(XgentDocumentAnnotationDraft.current(in: document, model: model))

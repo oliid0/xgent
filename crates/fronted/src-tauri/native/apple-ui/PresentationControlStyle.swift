@@ -101,6 +101,7 @@ struct XgentIconButton: View {
         }
         .buttonStyle(XgentActionButtonStyle(node: node, iconOnly: true))
         .disabled(node.disabled == true || model.isBusy(node, in: document))
+        .accessibilityIdentifier(node.id)
         .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
     }
 }
@@ -122,6 +123,7 @@ struct XgentActionButton: View {
         }
         .buttonStyle(XgentActionButtonStyle(node: node))
         .disabled(node.disabled == true || model.isBusy(node, in: document))
+        .accessibilityIdentifier(node.id)
         .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
     }
 }

@@ -272,8 +272,9 @@ struct XgentDocument: Decodable, Identifiable {
                     throw XgentProtocolError.invalid
                 }
                 let measures = [node.minimum, node.maximum, node.step, node.current, node.total].compactMap { $0 }
-                guard measures.allSatisfy({ $0.isFinite }),
-                      measures.allSatisfy({ abs($0) <= 1_000_000 }) else { throw XgentProtocolError.invalid }
+                // Business ranges are finite, not screen dimensions. In particular,
+                // PDF/Office annotation pages use the shared Int32 maximum.
+                guard measures.allSatisfy({ $0.isFinite }) else { throw XgentProtocolError.invalid }
                 if let minimum = node.minimum, let maximum = node.maximum {
                     guard minimum <= maximum else { throw XgentProtocolError.invalid }
                 }

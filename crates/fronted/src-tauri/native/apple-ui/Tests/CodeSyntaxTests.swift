@@ -126,7 +126,11 @@ final class CodeSyntaxTests: XCTestCase {
             if let native = XgentCodeTextKitRange.utf16(range, in: storage), NSLocationInRange(offset, native) { result = attributes }
             return false
         }
-        return result
+        // AppKit's editor also carries its base syntax colors in text storage;
+        // rendering attributes override those rather than replacing them.
+        let stored = offset < (storage.textStorage?.length ?? 0)
+            ? storage.textStorage?.attributes(at: offset, effectiveRange: nil) ?? [:] : [:]
+        return stored.merging(result) { _, rendered in rendered }
     }
     private func fixture(_ content: String) throws -> XgentDocument {
         let payload: [String: Any] = ["version": 1, "surface": "syntax", "revision": 1, "mode": "root", "title": "Source", "appearance": "system",

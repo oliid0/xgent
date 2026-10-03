@@ -30,6 +30,9 @@ final class NumberInputTests: XCTestCase {
             XCTAssertThrowsError(try document.validate())
         }
         try decode().validate()
+        // Shared PDF/Office pages are Int32 values, not layout dimensions.
+        try decode(extra: ["minimum": 1, "maximum": 2147483647, "value": 2147483647]).validate()
+        XCTAssertThrowsError(try decode(extra: ["minimum": 1, "maximum": 2147483647, "value": 2147483648]).validate())
     }
 
     @MainActor

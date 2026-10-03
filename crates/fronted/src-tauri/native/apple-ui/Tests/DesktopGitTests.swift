@@ -15,6 +15,7 @@ final class DesktopGitTests: XCTestCase {
             model.actionSink = { actions.append($0) }
             model.update(document)
             let host = NSHostingView(rootView: XgentNodeView(node: try XCTUnwrap(document.nodes.first), document: document, model: model)
+                .environment(\.accessibilityEnabled, true)
                 .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: .light)))
             let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: 720),
                                   styleMask: [.borderless], backing: .buffered, defer: false)
@@ -25,6 +26,8 @@ final class DesktopGitTests: XCTestCase {
             try await Task.sleep(nanoseconds: 250_000_000)
             host.layoutSubtreeIfNeeded()
             var elements = accessibilityElements(host)
+            try attachNativeAccessibilityEvidence(elements.map { ["id": $0.accessibilityIdentifier() ?? "", "label": $0.accessibilityLabel() ?? ""] },
+                name: "git-accessibility-\(Int(width))")
             let commit = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "git-commit" })
             let bounds = window.convertToScreen(host.convert(host.bounds, to: nil))
             let frame = commit.accessibilityFrame()

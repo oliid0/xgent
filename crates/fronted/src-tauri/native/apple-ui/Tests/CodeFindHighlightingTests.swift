@@ -99,7 +99,9 @@ final class CodeFindHighlightingTests: XCTestCase {
             if let native = XgentCodeTextKitRange.utf16(range, in: storage), NSLocationInRange(offset, native) { result = attributes }
             return false
         }
-        return result
+        let stored = offset < (storage.textStorage?.length ?? 0)
+            ? storage.textStorage?.attributes(at: offset, effectiveRange: nil) ?? [:] : [:]
+        return stored.merging(result) { _, rendered in rendered }
     }
     @MainActor private func editor(in view: HighlightTestView) -> XgentFindHighlightTextView? {
         if let input = view as? XgentFindHighlightTextView, input.isEditable { return input }

@@ -12,18 +12,18 @@ struct XgentCodeHostEnvironment {
 @MainActor
 struct XgentCodeHostRoot: View {
     @ObservedObject var source: XgentCodeHostSource
-    let lease: UUID
-    let configuration: XgentCodeEditor
-    let environment: XgentCodeHostEnvironment
+    @ObservedObject var state: XgentCodeHostState
 
     var body: some View {
-        configuration.retained(binding: source.binding(lease))
-            .modifier(XgentCodeHostAvailability(enabled: configuration.enabled && environment.enabled, source: source))
-            .disabled(!configuration.enabled || !environment.enabled)
-            .environment(\.xgentPresentationTheme, environment.theme)
-            .environment(\.colorScheme, environment.colorScheme)
-            .environment(\.locale, environment.locale)
-            .environment(\.layoutDirection, environment.layoutDirection)
-            .dynamicTypeSize(environment.dynamicTypeSize)
+        if let snapshot = state.snapshot {
+            snapshot.configuration.retained(binding: source.binding(snapshot.lease))
+                .modifier(XgentCodeHostAvailability(enabled: snapshot.configuration.enabled && snapshot.environment.enabled, source: source))
+                .disabled(!snapshot.configuration.enabled || !snapshot.environment.enabled)
+                .environment(\.xgentPresentationTheme, snapshot.environment.theme)
+                .environment(\.colorScheme, snapshot.environment.colorScheme)
+                .environment(\.locale, snapshot.environment.locale)
+                .environment(\.layoutDirection, snapshot.environment.layoutDirection)
+                .dynamicTypeSize(snapshot.environment.dynamicTypeSize)
+        }
     }
 }

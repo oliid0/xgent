@@ -119,7 +119,13 @@ final class CodeFindReplacementTests: XCTestCase {
     }
 
     @MainActor private func editor(in view: FindTestView) -> FindTestEditor? {
-        if let input = view as? FindTestEditor, input.isEditable { return input }
+        if let input = view as? FindTestEditor, input.isEditable {
+            #if os(macOS)
+            if !input.isFieldEditor { return input }
+            #else
+            return input
+            #endif
+        }
         return view.subviews.lazy.compactMap { self.editor(in: $0) }.first
     }
     @MainActor private func source(_ view: FindTestEditor) -> String {

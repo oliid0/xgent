@@ -26,6 +26,8 @@ struct XgentWorkspaceCloseAllContent: View {
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(minHeight: 0, maxHeight: .infinity)
+            .layoutPriority(-1)
             HFlow(itemSpacing: 8, rowSpacing: 8) {
                 ForEach((node.children ?? []).filter { $0.kind == .button }) { action in
                     if action.id.hasPrefix("workspace-editor-bulk-cancel:") {

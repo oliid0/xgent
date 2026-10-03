@@ -154,11 +154,12 @@ struct XgentSwitch: View {
                             .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                Spacer(minLength: 12)
             }
         }
         .toggleStyle(.switch)
         .modifier(XgentControlTypography(node: node))
-        .frame(minHeight: 44)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .disabled(node.disabled == true)
     }
 }

@@ -49,6 +49,7 @@ struct XgentQuestionOptionButton: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
         .accessibilityHint(node.text ?? "")
+        .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(node.selected == true ? .isSelected : [])
         .accessibilityIdentifier(node.id)
     }

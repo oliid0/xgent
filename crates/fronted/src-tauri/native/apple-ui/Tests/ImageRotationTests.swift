@@ -17,7 +17,11 @@ final class ImageRotationTests: XCTestCase {
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
         try document.validate()
         let model = XgentPresentationModel(); model.update(document)
-        var actions: [XgentAction] = []; model.actionSink = { actions.append($0) }
+        var actions: [XgentAction] = []
+        model.actionSink = { action in
+            actions.append(action)
+            model.complete(.init(surface: action.surface, requestId: action.requestId, ok: true, error: nil))
+        }
         let rotate = try XCTUnwrap(document.node(id: "workspace-file-image-rotation"))
         model.send(rotate, in: document, value: .number(180), editing: true)
         model.send(rotate, in: document, value: .number(270), editing: true)

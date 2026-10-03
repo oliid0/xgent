@@ -17,6 +17,7 @@ final class ComputerUsePermissionTests: XCTestCase {
         }
         let card = try XCTUnwrap(document.node(id: "computer-use-permissions"))
         let host = NSHostingView(rootView: XgentNodeView(node: card, document: document, model: model)
+            .environment(\.accessibilityEnabled, true)
             .padding(20).frame(width: 640)
             .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: .light)))
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 640, height: 600),
@@ -31,6 +32,8 @@ final class ComputerUsePermissionTests: XCTestCase {
         try await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertTrue(actions.contains { $0.action == "refresh" })
         let elements = accessibility(host)
+        try attachNativeAccessibilityEvidence(elements.map { ["id": $0.accessibilityIdentifier() ?? "", "label": $0.accessibilityLabel() ?? ""] },
+            name: "computer-permissions-accessibility")
         let accessibilityRequest = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "accessibility-request" })
         XCTAssertTrue(accessibilityRequest.accessibilityPerformPress())
         try await Task.sleep(nanoseconds: 50_000_000)

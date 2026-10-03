@@ -42,7 +42,9 @@ final class AutomationSettingsRenderingTests: XCTestCase {
                     defer { window.isHidden = true; window.rootViewController = nil }
                     host.view.layoutIfNeeded()
                     try await Task.sleep(nanoseconds: 200_000_000)
-                    let elements = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view).flattenToElements()
+                    let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
+                    try attachNativeAccessibilityEvidence(hierarchy, name: "automation-accessibility-\(Int(width))-\(size)-\(expanded)")
+                    let elements = hierarchy.flattenToElements()
                     for id in ["http:expand", "http:remove"] {
                         let element = try XCTUnwrap(elements.first { $0.identifier == id && $0.traits.contains(.button) })
                         let rect = element.shape.bezierPath.bounds

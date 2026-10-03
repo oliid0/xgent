@@ -28,6 +28,7 @@ final class XgentCodeHostingView: NSHostingView<AnyView> {
 final class XgentCodeHost {
     let source: XgentCodeHostSource
     let identity: XgentCodeSessionIdentity
+    private let state = XgentCodeHostState()
     #if os(iOS)
     let hosting = XgentCodeHostingController()
     var undo: UndoManager { hosting.sessionUndo }
@@ -37,6 +38,7 @@ final class XgentCodeHost {
     #endif
     init(session: XgentCodeSessionIdentity, content: String) {
         identity = session; source = XgentCodeHostSource(content)
+        hosting.rootView = AnyView(XgentCodeHostRoot(source: source, state: state).id(identity.cacheKey))
     }
     func update(lease: UUID, configuration: XgentCodeEditor, content: String, environment: XgentCodeHostEnvironment,
                 changed: @escaping (String) -> Void) {
@@ -47,9 +49,7 @@ final class XgentCodeHost {
             undo.removeAllActions()
             source.clearInputUndo()
         }
-        let root = XgentCodeHostRoot(source: source, lease: lease, configuration: configuration,
-                                     environment: environment)
-        hosting.rootView = AnyView(root.id(identity.cacheKey))
+        state.snapshot = .init(lease: lease, configuration: configuration, environment: environment)
     }
     func detach(_ lease: UUID) {
         guard source.owns(lease) else { return }
@@ -68,6 +68,7 @@ final class XgentCodeHost {
     }
     func retire() {
         source.retire(); undo.removeAllActions()
+        state.snapshot = nil
         #if os(iOS)
         hosting.view.endEditing(true)
         if hosting.parent != nil { hosting.willMove(toParent: nil) }
