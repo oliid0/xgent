@@ -37,7 +37,9 @@ final class PackagedApplicationTests: XCTestCase {
                 app.scrollViews.containing(.button, identifier: "desktop-nav:" + section).firstMatch.scroll(byDeltaX: 0, deltaY: -200)
             }
             click(navigation)
-            let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", navigation.label), object: title)
+            // The actual shared page may expand a short navigation label,
+            // for example Shortcuts -> Global shortcuts in both frontends.
+            let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS[c] %@", navigation.label), object: title)
             XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 15), .completed, "The shared settings action must change the visible section")
             XCTAssertGreaterThan(title.frame.width, 0)
             XCTAssertGreaterThan(title.frame.minX, navigation.frame.maxX, "Settings content must not overlap navigation")
