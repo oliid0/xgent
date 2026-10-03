@@ -1106,7 +1106,16 @@ jobs:
           raise SystemExit("No available iOS 26 iPhone simulator was found")
           PY
           )"
-          trap 'xcrun simctl shutdown "$simulator_udid" >/dev/null 2>&1 || true' EXIT
+          collect_ios_diagnostics() {
+            xcrun simctl spawn "$simulator_udid" log show --last 15m --style compact \
+              --predicate 'process == "Xgent" OR process == "xgent" OR eventMessage CONTAINS "com.ohi.xgent"' \
+              > "$RUNNER_TEMP/xgent-ios-interaction-system.log" 2>&1 || true
+            mkdir -p "$RUNNER_TEMP/xgent-ios-crashes"
+            find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -iname '*xgent*' \
+              -exec cp {} "$RUNNER_TEMP/xgent-ios-crashes/" \; || true
+            xcrun simctl shutdown "$simulator_udid" >/dev/null 2>&1 || true
+          }
+          trap collect_ios_diagnostics EXIT
           xcrun simctl boot "$simulator_udid" >/dev/null 2>&1 || true
           xcrun simctl bootstatus "$simulator_udid" -b
           xcrun simctl install "$simulator_udid" "$sim_app"

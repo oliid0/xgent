@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import OSLog
 import SwiftRs
 import Tauri
 import UIKit
@@ -981,6 +982,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     }
 
     private func runInstallationProbes(workspace: URL) throws {
+        let diagnostics = Logger(subsystem: "com.ohi.xgent", category: "shell-installation")
         let token = installationProbeToken
         let probes: [(name: String, command: String, expected: String)] = [
             ("shell", "printf '\(token)'", token),
@@ -1018,6 +1020,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             )
         }
         for (index, probe) in probes.enumerated() {
+            diagnostics.info("Starting bundled shell verification: \(probe.name, privacy: .public)")
             let request = RunArgs(
                 runId: "install-probe-\(index)",
                 workdir: workspace.path,
@@ -1034,6 +1037,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 cwd: workspace,
                 stdin: nil
             )
+            diagnostics.info("Finished bundled shell verification: \(probe.name, privacy: .public), exit=\(result.exitCode), timeout=\(result.timedOut), cancelled=\(result.cancelled)")
             guard result.exitCode == 0,
                   !result.timedOut,
                   !result.cancelled,
