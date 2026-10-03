@@ -10,6 +10,28 @@ private final class ActionRecorder {
 
 final class PresentationModelTests: XCTestCase {
     @MainActor
+    func testReusedProviderFieldDropsItsDraftAndRejectsThePreviousAcknowledgement() throws {
+        let model = XgentPresentationModel(), recorder = ActionRecorder()
+        model.actionSink = recorder.record
+        let first = try document(1, value: "First credential", action: "provider-a:key")
+        model.update(first)
+        model.send(try XCTUnwrap(first.node(id: "input")), in: first,
+                   value: .string("First draft"), editing: true)
+        let second = try document(2, value: "Second credential", action: "provider-b:key")
+        model.update(second)
+        let current = try XCTUnwrap(second.node(id: "input"))
+        XCTAssertTrue(model.edits.isEmpty)
+        model.complete(try acknowledgement(recorder, index: 0, value: "First normalized credential"))
+        XCTAssertEqual(model.value(current, in: second), .string("Second credential"))
+        model.send(try XCTUnwrap(first.node(id: "input")), in: first,
+                   value: .string("Late first field"), editing: true)
+        XCTAssertEqual(recorder.actions.count, 1)
+        model.send(current, in: second, value: .string("Second draft"), editing: true)
+        XCTAssertEqual(recorder.actions.last?.action, "provider-b:key")
+        XCTAssertEqual(model.value(current, in: second), .string("Second draft"))
+    }
+
+    @MainActor
     func testStaleControlsCannotEmitEditsAfterTheyAreDisabledOrReplaced() throws {
         for current in [try document(2, value: "Current", disabled: true),
                         try document(2, value: "Current", focusRequest: 0),

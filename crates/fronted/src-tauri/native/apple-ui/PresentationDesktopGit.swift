@@ -33,6 +33,7 @@ struct XgentDesktopGitLayout: View {
                         pane(list).frame(minWidth: 200, idealWidth: 280, maxWidth: geometry.size.width * 0.6)
                         pane(detail).frame(minWidth: 240, maxWidth: .infinity)
                     }
+                    .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("xgent-git-split")
                 } else {
                     HStack {
@@ -57,6 +58,7 @@ struct XgentDesktopGitLayout: View {
         }
         .onChange(of: selection) { _, value in if !value.isEmpty { detailVisible = true } }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("xgent-desktop-git")
     }
 
@@ -85,6 +87,7 @@ struct XgentDesktopGitLayout: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(node?.id ?? "xgent-git-empty-pane")
     }
 }

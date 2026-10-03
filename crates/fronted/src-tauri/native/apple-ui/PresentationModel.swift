@@ -402,10 +402,11 @@ final class XgentPresentationModel: ObservableObject {
                 codeSessions.reconcile(scope: sessions.scope, open: sessions.open)
             }
         }
+        let previous = documents.first { $0.surface == document.surface }
         if let index = documents.firstIndex(where: { $0.surface == document.surface }) {
             documents[index] = document
         } else { documents.append(document) }
-        reconcileEdits(document)
+        reconcileEdits(document, previous: previous)
         for batch in Array(numberCommitBatches.values) where batch.surface == document.surface {
             let current = document.node(id: batch.node)
             if current?.action != batch.action.action || current?.kind != batch.kind || current?.disabled == true { batch.finish(false) }
@@ -418,12 +419,21 @@ final class XgentPresentationModel: ObservableObject {
         }
     }
 
-    private func reconcileEdits(_ document: XgentDocument) {
+    private func reconcileEdits(_ document: XgentDocument, previous: XgentDocument? = nil) {
         var visibleNodes = Set<String>()
         func visit(_ nodes: [XgentNode]) {
             for node in nodes {
                 let nodeKey = key(document.surface, node.id)
                 visibleNodes.insert(nodeKey)
+                if let old = previous?.node(id: node.id), old.action != node.action || old.kind != node.kind {
+                    // Stable field IDs can represent a different provider or
+                    // route. Its draft and pending ACK belong to the old action.
+                    edits.removeValue(forKey: nodeKey)
+                    editRequests.removeValue(forKey: nodeKey)
+                    acknowledgedEdits.remove(nodeKey)
+                    busy.remove(nodeKey)
+                    for (id, request) in pending where request.node == nodeKey { pending.removeValue(forKey: id) }
+                }
                 if acknowledgedEdits.contains(nodeKey), edits[nodeKey] == node.value {
                     edits.removeValue(forKey: nodeKey)
                     editRequests.removeValue(forKey: nodeKey)

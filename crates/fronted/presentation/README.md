@@ -787,3 +787,28 @@ across font sizes. Height assertions remain 641 points. The real HTML preview
 test now allows 90 seconds for cold simulator WebContent/AX process startup,
 observed above 50 seconds in #250; JavaScript loading, interaction, isolation,
 screenshots and delegate retirement are still checked after actual completion.
+
+[CI #251](https://github.com/oliid0/xgent/actions/runs/37136848375) passed the
+device archive, frontend, Rust and repository guards. macOS ran 159 tests with
+53 failed assertions: the viewport and mounted find tests passed; retained
+editor identity/undo and accessibility interactions still failed. The new
+lifetime attachments show the same cached hosting object with a replacement
+native input after parking. Moves now add the hosting view directly to its new
+parent, without explicitly removing it from its window first. iOS reported two
+controller-containment exceptions: parking a root-owned child on UIWindow was
+invalid. Its container now remains under the owning controller's view. The
+interactive HTML preview passed, but exceptions restarted the iOS runner, so
+the surviving 128-test segment is not a complete passing suite.
+
+macOS container identifiers were overwriting permission and Git child IDs.
+Containers now retain their own accessibility group while preserving child
+identities. The test walker also boxes native CGRect/Bool getters using KVC and
+invokes the actual informal accessibility press selector with its Boolean
+signature. All click and bounds assertions remain mandatory.
+
+Provider detail actions now include the provider identity and authentication
+mode. A delayed native credential callback cannot target the next provider or
+auth mode; a reused Swift field also retires its old draft and pending ACK.
+Behavioral regressions cover both transitions and continued editing of the new
+field. These changes await the next remote SDK run and do not establish complete
+platform parity or the requested visual similarity.

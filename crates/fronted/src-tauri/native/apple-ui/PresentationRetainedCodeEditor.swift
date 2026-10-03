@@ -34,7 +34,7 @@ struct XgentRetainedCodeEditor: UIViewControllerRepresentable {
         entry.update(lease: coordinator.lease, configuration: configuration, content: content, environment: environment, changed: changed)
         let host = entry.hosting
         if host.parent !== container {
-            if host.parent != nil { host.willMove(toParent: nil); host.view.removeFromSuperview(); host.removeFromParent() }
+            if host.parent != nil { host.willMove(toParent: nil); host.removeFromParent() }
             container.addChild(host)
             host.view.translatesAutoresizingMaskIntoConstraints = false
             host.view.backgroundColor = .clear
@@ -83,7 +83,7 @@ struct XgentRetainedCodeEditor: NSViewRepresentable {
         entry.update(lease: coordinator.lease, configuration: configuration, content: content, environment: environment, changed: changed)
         let host = entry.hosting
         if host.superview !== container {
-            host.removeFromSuperview(); host.translatesAutoresizingMaskIntoConstraints = false
+            host.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(host)
             NSLayoutConstraint.activate([
                 host.leadingAnchor.constraint(equalTo: container.leadingAnchor), host.trailingAnchor.constraint(equalTo: container.trailingAnchor),

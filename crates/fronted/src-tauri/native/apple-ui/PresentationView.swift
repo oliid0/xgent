@@ -264,7 +264,7 @@ private struct XgentNodeControlModifier: ViewModifier {
     let busy: Bool
 
     @ViewBuilder func body(content: Content) -> some View {
-        if node.variant == "sidebar-conversation-row" || node.kind == .colorInput ||
+        if node.children?.isEmpty == false || node.variant == "sidebar-conversation-row" || node.kind == .colorInput ||
            node.kind == .spreadsheetGrid || node.variant == "workspace-file-layout" ||
            node.variant == "workspace-file-toolbar" || node.variant == "workspace-file-sheets" ||
            node.variant == "workspace-file-metadata" || node.variant == "workspace-file-annotations" ||

@@ -50,7 +50,7 @@ final class XgentCodeHostParking {
         if let textView = input as? UITextView { self.input = textView }
     }
     func park(_ host: XgentCodeHostingController) -> Bool {
-        guard let owner, let window, owner !== host else { return false }
+        guard let owner, let window, owner.viewIfLoaded?.window === window, owner !== host else { return false }
         isParked = true
         parks += 1
         input?.isEditable = false
@@ -59,12 +59,11 @@ final class XgentCodeHostParking {
         container.isAccessibilityElement = false
         container.accessibilityElementsHidden = true
         container.frame = CGRect(origin: .zero, size: size)
-        // The hosting root can rebuild its own subviews during route changes.
-        // Its UIWindow is stable for the lifetime of the native surface.
-        if container.superview !== window { window.addSubview(container) }
+        // Keep the child controller's view under its parent's view. Mounting
+        // it directly on UIWindow violates UIKit controller containment.
+        if container.superview !== owner.view { owner.view.addSubview(container) }
         if host.parent !== owner {
             if host.parent != nil { host.willMove(toParent: nil) }
-            host.view.removeFromSuperview()
             host.removeFromParent()
             owner.addChild(host)
             host.view.translatesAutoresizingMaskIntoConstraints = true
@@ -99,7 +98,8 @@ final class XgentCodeHostParking {
         container.setAccessibilityElement(false)
         container.frame = CGRect(origin: .zero, size: size)
         if container.superview !== owner { owner.addSubview(container) }
-        host.removeFromSuperview()
+        // Move directly between parents in the same window. Explicit removal
+        // sends a nil window to NSHostingView and destroys its representables.
         host.translatesAutoresizingMaskIntoConstraints = true
         host.frame = container.bounds
         container.addSubview(host)

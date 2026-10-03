@@ -2,8 +2,9 @@ import { flushSync } from "react-dom";
 import type { PresentationHandler, PresentationNode, PresentationValue } from "./types";
 
 /** Shared state/action contract; each client owns its control layout and styling. */
-export function presentationControls() {
+export function presentationControls(actionScope?: string) {
   const handlers = new Map<string, PresentationHandler>();
+  const actionId = (id: string) => actionScope ? `${actionScope.length}:${actionScope}:${id}` : id;
   function bind(
     id: string,
     run: (value: PresentationValue) => unknown,
@@ -11,11 +12,13 @@ export function presentationControls() {
     enabled = true,
     normalize?: PresentationHandler["normalize"],
   ) {
-    handlers.set(id, { run, accepts, enabled, normalize });
-    return { action: id, disabled: !enabled };
+    const action = actionId(id);
+    handlers.set(action, { run, accepts, enabled, normalize });
+    return { action, disabled: !enabled };
   }
   return {
     handlers,
+    actionId,
     action(id: string, label: string, run: () => unknown, enabled = true): PresentationNode {
       return { id, kind: "Button", label, ...bind(id, run, (value) => value === null, enabled) };
     },

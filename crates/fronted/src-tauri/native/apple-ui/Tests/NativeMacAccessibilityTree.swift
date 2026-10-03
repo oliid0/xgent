@@ -16,15 +16,26 @@ struct NativeMacAccessibilityElement {
     }
     func accessibilityFrame() -> CGRect {
         if let modern = object as? any NSAccessibilityProtocol { return modern.accessibilityFrame() }
+        // KVC boxes a struct return; perform(_:), which expects an object,
+        // cannot be used for a CGRect or a Boolean selector.
+        if object.responds(to: NSSelectorFromString("accessibilityFrame")),
+           let value = object.value(forKey: "accessibilityFrame") as? NSValue { return value.rectValue }
         guard let position = legacy(.position) as? NSValue, let size = legacy(.size) as? NSValue else { return .zero }
         return CGRect(origin: position.pointValue, size: size.sizeValue)
     }
     func isAccessibilityEnabled() -> Bool {
         if let modern = object as? any NSAccessibilityProtocol { return modern.isAccessibilityEnabled() }
+        if object.responds(to: NSSelectorFromString("isAccessibilityEnabled")),
+           let value = object.value(forKey: "accessibilityEnabled") as? NSNumber { return value.boolValue }
         return (legacy(.enabled) as? NSNumber)?.boolValue ?? false
     }
     func accessibilityPerformPress() -> Bool {
         if let modern = object as? any NSAccessibilityProtocol { return modern.accessibilityPerformPress() }
+        let selector = NSSelectorFromString("accessibilityPerformPress")
+        if object.responds(to: selector), let implementation = object.method(for: selector) {
+            typealias Press = @convention(c) (AnyObject, Selector) -> Bool
+            return unsafeBitCast(implementation, to: Press.self)(object, selector)
+        }
         guard object.accessibilityActionNames().contains(.press) else { return false }
         object.accessibilityPerformAction(.press)
         return true

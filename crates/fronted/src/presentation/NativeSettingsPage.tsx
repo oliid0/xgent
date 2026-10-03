@@ -206,8 +206,13 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     setError("");
     operations.revision++;
   }, [props.initialSection, nativeMobile]);
-  const c = presentationControls();
   const provider = settings.customProviders.find((item) => item.id === providerId);
+  // Native controls can finish editing after a route changes. Reused field
+  // IDs retain their layout identity; their actions belong to this provider
+  // and authentication mode so a late credential cannot edit another account.
+  const c = presentationControls(page === "providers" && provider
+    ? JSON.stringify(["provider", provider.id, provider.type, provider.authMode ?? "api-key"])
+    : undefined);
   const oauth = useCodexOAuthAccounts(
     {
       value: provider?.oauthAccountId ?? "",
@@ -1731,7 +1736,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     // Deep links to sections outside this surface return to the functional navigation.
     nodes.push(c.action("home", t("settings.title"), () => setPage("")));
   }
-  c.handlers.set("close", {
+  c.handlers.set(c.actionId("close"), {
     enabled: !busy,
     accepts: (value) => value === null,
     run: props.onBack,
@@ -1783,7 +1788,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         formFactor: nativeMobile ? "mobile" : "desktop",
         theme: createNativePresentationTheme(settings, nativeMobile),
         nodes: renderedNodes,
-        dismissAction: busy ? undefined : "close",
+        dismissAction: busy ? undefined : c.actionId("close"),
       }}
       handlers={c.handlers}
       onError={setFailure}

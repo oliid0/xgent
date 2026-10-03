@@ -67,7 +67,18 @@ test("native settings mirrors compact navigation and persists shared system, pro
     rendered = result;
     if (result.props.handlers) registry.register("settings", result.props.handlers);
   };
-  const dispatch = async (action, value = null) => {
+  const actionFor = (id) => {
+    const find = (nodes) => {
+      for (const node of nodes ?? []) {
+        if (node.id === id && node.action) return node.action;
+        const nested = find(node.children);
+        if (nested) return nested;
+      }
+    };
+    return find(document.nodes) ?? id;
+  };
+  const dispatch = async (id, value = null) => {
+    const action = actionFor(id);
     const result = await registry.dispatch({ surface: "settings", action, value, requestId: String(++request) });
     render();
     return result;
@@ -150,7 +161,12 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(discoveryOptions.modelsUrl, "https://catalog.example.test/v1/models");
   const authField = document.nodes.flatMap(node => node.children ?? []).find(node => node.id === "provider-auth");
   assert.deepEqual(authField.options.map(option => option.value), ["api-key", "oauth-managed", "oauth-token"]);
+  const retiredApiKeyAction = actionFor("provider-key");
   await dispatch("provider-auth", "oauth-token");
+  const staleAuthEdit = await registry.dispatch({ surface: "settings", action: retiredApiKeyAction,
+    value: "retired-api-key-mode", requestId: String(++request) });
+  assert.equal(staleAuthEdit.ok, false, "changing auth mode retires its previous credential action");
+  assert.equal(settings.customProviders.at(-1).apiKey, "test-catalogue-key");
   await dispatch("provider-key", "manual-access-token");
   const accountEdit = await dispatch("provider-oauth-account-id", " account-routing-id ");
   assert.equal(accountEdit.acceptedValue, "account-routing-id");
@@ -172,6 +188,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
     model: "fetched-model",
   });
   const fetchingProviderId = settings.customProviders.at(-1).id;
+  const retiredCredentialAction = actionFor("provider-key");
   let releaseDiscovery;
   discoveryPause = new Promise(resolve => { releaseDiscovery = resolve; });
   const pendingDiscovery = registry.dispatch({ surface: "settings", action: "fetch-models", value: null, requestId: String(++request) });
@@ -183,6 +200,10 @@ test("native settings mirrors compact navigation and persists shared system, pro
   const otherProvider = settings.customProviders.find(item => item.id !== fetchingProviderId);
   await dispatch("provider-vendor", otherProvider.type);
   await dispatch(`provider:${otherProvider.id}`);
+  const staleCredential = await registry.dispatch({ surface: "settings", action: retiredCredentialAction,
+    value: "retired-provider-credential", requestId: String(++request) });
+  assert.equal(staleCredential.ok, false, "a retired provider field cannot target the replacement provider");
+  assert.notEqual(settings.customProviders.find(item => item.id === otherProvider.id).apiKey, "retired-provider-credential");
   await dispatch("provider-key", "other-provider-credential");
   assert.ok(rendered.props.handlers.get("fetch-models").enabled, "one provider request must not disable another provider");
   releaseDiscovery();
@@ -218,7 +239,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(rendered.props.providerId, provider.id);
   assert.equal(rendered.props.nativeSettingsSurfaceId, settingsSurface);
   rendered.props.onBack(); render();
-  assert.ok(rendered.props.handlers.has("provider-request-settings"));
+  assert.ok(rendered.props.handlers.has(actionFor("provider-request-settings")));
   await dispatch("back");
   await dispatch("back");
   await dispatch("nav:mobileAssistant");
