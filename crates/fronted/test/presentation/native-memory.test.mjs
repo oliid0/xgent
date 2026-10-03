@@ -59,6 +59,8 @@ test("native memory searches/categories and edits through the shared API, retain
   await h.dispatch("memory-category", "project");
   await h.dispatch("memory-filter", "project");
   await h.dispatch("memory-open:project:hash:project");
+  const fields = h.render().document.nodes.flatMap(n => n.children ?? []);
+  assert.equal(fields.find(n => n.id === "memory-edit-body").language, undefined);
   assert.deepEqual(h.calls.filter(([name]) => name === "read").at(-1)[1], { slug: "project", scope: "project", workdir: "/other-project", workdirHash: "hash" });
   await h.dispatch("memory-edit-description", "new description");
   await h.dispatch("memory-edit-body", "new body");
@@ -121,6 +123,8 @@ test("native memory shows each shared quota threshold and pending review count",
 test("native memory create, daily append and destructive confirmation perform actual shared mutations", async () => {
   const h = harness({ mobile: false }); h.render(); await tick();
   await h.dispatch("memory-create");
+  const fields = h.render().document.nodes.flatMap(n => n.children ?? []);
+  assert.equal(fields.find(n => n.id === "memory-body").language, undefined);
   await h.dispatch("memory-slug", "created"); await h.dispatch("memory-description", "description");
   await h.dispatch("memory-body", "persisted body"); await h.dispatch("memory-create-save");
   assert.equal(h.records.get("created").body, "persisted body");

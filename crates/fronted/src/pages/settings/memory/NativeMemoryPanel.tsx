@@ -81,7 +81,6 @@ export function NativeMemoryPanel(props: Props) {
   ): PresentationNode => ({
     ...c.input(id, label, value, run, false, !busy),
     kind: "TextArea",
-    language: "markdown",
   });
   const back = () => {
     navigation.revision += 1;

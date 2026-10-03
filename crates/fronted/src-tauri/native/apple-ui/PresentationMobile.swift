@@ -305,7 +305,7 @@ private struct XgentIOSTranscript: View {
     }
 }
 
-private struct XgentIOSComposer: View {
+struct XgentIOSComposer: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
@@ -327,16 +327,17 @@ private struct XgentIOSComposer: View {
             }
             if let activity {
                 HFlow(itemSpacing: 8, rowSpacing: 8) {
-                    XgentIOSNodes(nodes: activity.children ?? [], document: document, model: model)
+                    XgentIOSNodes(nodes: activity.children ?? [], document: document, model: model, parentAxis: .horizontal)
                 }
             }
             if let input { XgentIOSNode(node: input, document: document, model: model) }
             if !supporting.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
-                        XgentIOSNodes(nodes: supporting, document: document, model: model)
+                        XgentIOSNodes(nodes: supporting, document: document, model: model, parentAxis: .horizontal)
                     }
                 }
+                .fixedSize(horizontal: false, vertical: true)
             }
             if let actions {
                 ViewThatFits(in: .horizontal) {

@@ -899,3 +899,19 @@ Browser address content now receives its horizontal parent axis, and navigation
 and horizontal tab scrolling use their intrinsic height. Native bounds checks
 also require ordinary mobile chrome to finish within 180 points; large text
 continues to wrap. Shared browser draft/tab/error behavior tests remain passing.
+
+CI #257 passed every job on `5a6cbcfe1d0a297b247e8d23631078971936ed71`:
+162 macOS and 166 iOS native tests, device compilation, shared frontend/Rust
+checks and architecture guards. Package-only release #124 was dispatched from
+that verified revision; packaging is separate from these SDK test results.
+
+Memory create/edit/journal fields now use the same prose input semantics as the
+shared TextArea instead of a source-code editor with a gutter. Native memory
+entry typography follows Dynamic Type. The iOS composer gives its horizontal
+skill/file strip intrinsic height and passes its layout axis to supporting and
+activity controls, preserving transcript space. SDK fixtures exercise the real
+memory Form's proportional font, scaled text and final Unicode edit event,
+and the composer's controls and horizontal scrolling at narrow/wide widths
+with accessibility text sizes. Updated memory snapshots use an opaque themed
+background and the production iOS Form. These changes require remote CI and
+still do not establish complete functional or measured visual parity.

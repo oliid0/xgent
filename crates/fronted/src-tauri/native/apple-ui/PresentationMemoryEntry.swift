@@ -9,6 +9,8 @@ struct XgentMemoryEntry: View {
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .body) private var bodyScale = 1.0
+    @ScaledMetric(relativeTo: .subheadline) private var supportingScale = 1.0
 
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
     private var review: String? { node.children?.first { $0.kind == .badge }?.label }
@@ -19,13 +21,13 @@ struct XgentMemoryEntry: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(node.label ?? "")
                         .font(XgentFonts.body(theme.fontFamily,
-                            size: CGFloat(theme.typography.body * theme.fontScale), weight: .medium))
+                            size: CGFloat(theme.typography.body * theme.fontScale) * bodyScale, weight: .medium))
                         .foregroundStyle(Color(xgentHex: palette.text))
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     if let text = node.text, !text.isEmpty {
                         Text(text)
                             .font(XgentFonts.body(theme.fontFamily,
-                                size: CGFloat(theme.typography.supporting * theme.fontScale)))
+                                size: CGFloat(theme.typography.supporting * theme.fontScale) * supportingScale))
                             .foregroundStyle(Color(xgentHex: palette.secondaryText))
                     }
                     if let review {

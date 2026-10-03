@@ -48,6 +48,8 @@ final class MemoryRenderingTests: XCTestCase {
                 let content = ScrollView {
                     XgentNodeChildren(nodes: document.nodes, document: document, model: model).padding(16)
                 }.frame(width: width, height: 720).dynamicTypeSize(size)
+                    .background { XgentThemeBackground() }
+                    .preferredColorScheme(.light)
                     .environment(\.accessibilityEnabled, true)
                     .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: .light))
                 #if os(iOS)
@@ -122,7 +124,7 @@ final class MemoryRenderingTests: XCTestCase {
         ], [
             "id": "entry", "kind": "SettingsGroup", "label": "Project preference", "children": [
                 ["id": "description", "kind": "TextInput", "label": "Description", "value": "Keep task results in the selected workspace", "action": "description"],
-                ["id": "body", "kind": "TextArea", "label": "Memory body", "value": "Use the project's established output folder.\nConfirm the generated document exists.", "language": "markdown", "action": "body"],
+                ["id": "body", "kind": "TextArea", "label": "Memory body", "value": "Use the project's established output folder.\nConfirm the generated document exists.", "action": "body"],
                 ["id": "save", "kind": "Button", "label": "Save memory", "action": "save"],
             ],
         ]]
@@ -139,11 +141,20 @@ final class MemoryRenderingTests: XCTestCase {
                 ]))
                 let model = XgentPresentationModel()
                 model.update(document)
+                #if os(iOS)
+                let content = XgentIOSSettingsForm(nodes: document.nodes, document: document, model: model)
+                    .frame(width: width, height: 720)
+                    .background { XgentThemeBackground() }
+                    .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: appearance))
+                    .preferredColorScheme(appearance == .dark ? .dark : .light)
+                #else
                 let content = ScrollView {
                     XgentNodeChildren(nodes: document.nodes, document: document, model: model).padding(16)
                 }.frame(width: width, height: 720)
+                    .background { XgentThemeBackground() }
                     .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: appearance))
                     .preferredColorScheme(appearance == .dark ? .dark : .light)
+                #endif
                 #if os(iOS)
                 let hosting = UIHostingController(rootView: content)
                 hosting.view.frame = CGRect(x: 0, y: 0, width: width, height: 720)
