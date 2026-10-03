@@ -102,7 +102,7 @@ final class SkillsHubRenderingTests: XCTestCase {
         let factor = "desktop"
         #endif
         let layout: [String: Any] = ["id": "layout", "kind": "VStack", "variant": "skills-hub-layout", "fill": true, "children": preview ? [main, detail] : [main]]
-        let payload: [String: Any] = ["version": 1, "surface": "skills", "revision": 1, "mode": "root", "title": "Skills", "formFactor": factor, "nodes": [layout]]
+        let payload: [String: Any] = ["version": 1, "surface": "skills", "revision": 1, "mode": "root", "title": "Skills", "appearance": "light", "formFactor": factor, "nodes": [layout]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
         try document.validate()
         return document

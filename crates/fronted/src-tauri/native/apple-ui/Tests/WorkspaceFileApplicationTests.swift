@@ -9,7 +9,7 @@ import XCTest
 final class WorkspaceFileApplicationTests: XCTestCase {
     @MainActor func testNativeMenuPreloadsAgainWhenWorkspaceSurfaceChangesWithTheSameFilename() async throws {
         func fixture(_ surface: String) throws -> XgentDocument {
-            let payload: [String: Any] = ["version": 1, "surface": surface, "revision": 1, "mode": "root", "title": "File", "nodes": [
+            let payload: [String: Any] = ["version": 1, "surface": surface, "revision": 1, "mode": "root", "title": "File", "appearance": "system", "nodes": [
                 ["id": "workspace-file-open", "kind": "Menu", "variant": "workspace-file-open", "label": "使用其他应用打开", "text": "a.txt", "action": "open", "options": [
                     ["value": "open", "label": "Default application"], ["value": "$refresh", "label": "Refresh available applications"]]]]]
             let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))

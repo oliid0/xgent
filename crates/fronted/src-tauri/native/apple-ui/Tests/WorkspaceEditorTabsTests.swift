@@ -69,7 +69,7 @@ final class WorkspaceEditorTabsTests: XCTestCase {
                 ["id": "select:\(index)", "kind": "Button", "label": "Source\(index).swift", "action": "select:\(index)"],
                 ["id": "close:\(index)", "kind": "Button", "label": "Close tab", "action": "close:\(index)"]]]
         }
-        let payload: [String: Any] = ["version": 1, "surface": "tabs", "revision": revision, "mode": "root", "title": "Source", "nodes": [
+        let payload: [String: Any] = ["version": 1, "surface": "tabs", "revision": revision, "mode": "root", "title": "Source", "appearance": "system", "nodes": [
             ["id": "workspace-editor-tabs", "kind": "VStack", "variant": "workspace-editor-tabs", "label": "Code editor", "children": tabs],
             ["id": "workspace-file-editor", "kind": "TextArea", "language": "swift", "action": "edit", "value": "Original"]]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))

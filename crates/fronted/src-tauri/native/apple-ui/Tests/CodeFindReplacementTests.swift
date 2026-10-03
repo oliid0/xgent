@@ -130,7 +130,7 @@ final class CodeFindReplacementTests: XCTestCase {
         #endif
     }
     private func fixture(_ content: String) throws -> XgentDocument {
-        let value: [String: Any] = ["version": 1, "surface": "find-edit", "revision": 1, "mode": "root", "title": "Find",
+        let value: [String: Any] = ["version": 1, "surface": "find-edit", "revision": 1, "mode": "root", "title": "Find", "appearance": "system",
             "formFactor": "desktop", "nodes": [["id": "file", "kind": "BrowserLayout", "fill": true, "children": [
                 ["id": "code", "kind": "TextArea", "language": "swift", "label": "Example.swift", "value": content, "action": "edit", "fill": true]]]]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: value))
@@ -147,7 +147,7 @@ final class CodeFindReplacementTests: XCTestCase {
             "labels": labels]
         if edit { find["edit"] = ["location": 12, "length": 3, "text": "dog", "before": expected, "request": request] }
         let metadata = try JSONSerialization.data(withJSONObject: ["find": find, "session": ["scope": "find-test", "key": "file:1", "open": ["file:1"]]])
-        let value: [String: Any] = ["version": 1, "surface": "find-edit", "revision": revision, "mode": "root", "title": "Find",
+        let value: [String: Any] = ["version": 1, "surface": "find-edit", "revision": revision, "mode": "root", "title": "Find", "appearance": "system",
             "formFactor": "mobile", "nodes": [["id": "file", "kind": "VStack", "variant": "workspace-file-layout", "fill": true, "children": [
                 ["id": "workspace-file-find-action", "kind": "Button", "variant": "workspace-code-find-action", "action": "find"],
                 ["id": "workspace-file-editor", "kind": "TextArea", "variant": "workspace-code-editor", "language": "swift", "label": "Example.swift",

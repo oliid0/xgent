@@ -20,7 +20,7 @@ final class WorkspaceExecutionActionTests: XCTestCase {
     }
 
     private func fixture(run: String, revision: Int) throws -> XgentDocument {
-        let payload: [String: Any] = ["version": 1, "surface": "execution", "revision": revision, "mode": "root", "title": "Output", "nodes": [
+        let payload: [String: Any] = ["version": 1, "surface": "execution", "revision": revision, "mode": "root", "title": "Output", "appearance": "system", "nodes": [
             ["id": "workspace-file-stop", "kind": "Button", "label": "Stop", "action": "stop:\(run)"],
             ["id": "workspace-file-run-output", "kind": "VStack", "variant": "workspace-editor-run-output", "value": run, "children": [
                 ["id": "workspace-file-run-result-action", "kind": "Button", "label": "Stop", "action": "result:\(run)"],

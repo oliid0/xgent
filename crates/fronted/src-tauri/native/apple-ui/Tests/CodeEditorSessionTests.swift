@@ -128,7 +128,7 @@ final class CodeEditorSessionTests: XCTestCase {
         var metadata: [String: Any] = ["session": ["scope": "test-workspace", "key": key, "open": ["a:1", "b:2"]]]
         if let request { metadata["request"] = request; metadata["line"] = line }
         let text = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: metadata), encoding: .utf8))
-        let payload: [String: Any] = ["version": 1, "surface": surface, "revision": revision, "mode": "root", "title": key, "nodes": [
+        let payload: [String: Any] = ["version": 1, "surface": surface, "revision": revision, "mode": "root", "title": key, "appearance": "system", "nodes": [
             ["id": "workspace-file-editor", "kind": "TextArea", "variant": "workspace-code-editor", "label": key, "language": "swift", "value": content, "text": text, "action": "edit", "fill": true]]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
         try document.validate(); return document

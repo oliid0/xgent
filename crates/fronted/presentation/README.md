@@ -663,3 +663,19 @@ failed checks into successes. The workflow change follows GitHub's documented
 matrix failure handling. Local release checks pass 33/33, native contract remains
 55 kinds/42 properties, and architecture/whitespace checks pass. No local Apple,
 Cargo, install, dev or build command was executed. Overall parity remains active.
+
+[CI #245](https://github.com/oliid0/xgent/actions/runs/37129570454) ran all three
+Apple jobs independently and preserved separate failures. macOS, hosted iOS and
+the production device archive reported the same two remaining enum/string
+comparisons in SkillRow and SkillsHubLayout; both now use their actual enum cases.
+The previous undo environment compilation error did not recur. No native test
+execution or visual result is claimed from these failed builds.
+
+Source review also corrected 23 SDK test files whose document fixtures omitted
+the required appearance field, including editor/find/undo, browser, MCP/skills,
+question/progress, spreadsheet, image, annotation and workspace action tests.
+The removed-surface editor fixture additionally supplies its required title.
+Fixtures now follow the real strict document contract; production decoding and
+test assertions were not relaxed. These repairs allow the existing SDK tests to
+reach their actual controls after compilation succeeds. Shared frontend sources
+are unchanged in this batch, so unchanged full Node suites were not rerun.

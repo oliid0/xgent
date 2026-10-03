@@ -85,7 +85,7 @@ final class WorkspaceEditorBulkTests: XCTestCase {
             ["id": "workspace-editor-close-all:\(dialogID)", "kind": "VStack", "variant": "workspace-editor-close-all",
              "label": "Save changes before closing the editor?", "text": "Save modified files or discard changes before closing all tabs.", "children": children]]
         if editor { nodes.append(["id": "workspace-file-editor", "kind": "TextArea", "value": "Original", "action": "edit"]) }
-        let payload: [String: Any] = ["version": 1, "surface": "bulk", "revision": revision, "mode": "root", "title": "Editor", "nodes": nodes]
+        let payload: [String: Any] = ["version": 1, "surface": "bulk", "revision": revision, "mode": "root", "title": "Editor", "appearance": "system", "nodes": nodes]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
         try document.validate(); return document
     }

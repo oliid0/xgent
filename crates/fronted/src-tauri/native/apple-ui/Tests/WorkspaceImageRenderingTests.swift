@@ -61,7 +61,7 @@ final class WorkspaceImageRenderingTests: XCTestCase {
                 button("zoom-out", "缩小", "minus"), button("zoom-in", "放大", "plus"), button("fit", "适合窗口", "arrow.up.left.and.arrow.down.right"),
                 ["id": "workspace-file-image-rotation", "kind": "NumberInput", "variant": "workspace-image-rotation", "label": "旋转图片", "value": 90, "action": "rotate", "minimum": 0, "maximum": 270, "step": 90],
                 button("save", "保存", "square.and.arrow.down")]]
-        let payload: [String: Any] = ["version": 1, "surface": "image", "revision": 1, "mode": "root", "title": "Image", "nodes": [media]]
+        let payload: [String: Any] = ["version": 1, "surface": "image", "revision": 1, "mode": "root", "title": "Image", "appearance": "light", "nodes": [media]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload)); try document.validate()
         return document
     }

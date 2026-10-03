@@ -117,7 +117,7 @@ final class BrowserControlsRenderingTests: XCTestCase {
         #else
         let factor = "desktop"
         #endif
-        let payload: [String: Any] = ["version": 1, "surface": "browser", "revision": revision, "mode": "root", "title": "Browser", "formFactor": factor, "nodes": [layout]]
+        let payload: [String: Any] = ["version": 1, "surface": "browser", "revision": revision, "mode": "root", "title": "Browser", "appearance": "light", "formFactor": factor, "nodes": [layout]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
         try document.validate()
         return document

@@ -4,7 +4,7 @@ import XCTest
 
 final class WorkspaceSourceDraftTests: XCTestCase {
     @MainActor func testSourceSaveIncludesImmediateNativeInputAndRejectsRetiredDocuments() throws {
-        let payload: [String: Any] = ["version": 1, "surface": "source", "revision": 1, "mode": "root", "title": "Source", "dismissAction": "close", "nodes": [
+        let payload: [String: Any] = ["version": 1, "surface": "source", "revision": 1, "mode": "root", "title": "Source", "appearance": "system", "dismissAction": "close", "nodes": [
             ["id": "workspace-file-editor", "kind": "TextArea", "language": "python", "value": "Original", "action": "edit"],
             ["id": "workspace-file-save", "kind": "Button", "variant": "workspace-source-action", "current": 0, "action": "save"],
             ["id": "close", "kind": "Button", "variant": "workspace-source-action", "current": 0, "action": "close"]]]

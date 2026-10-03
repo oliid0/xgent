@@ -129,7 +129,7 @@ final class CodeSyntaxTests: XCTestCase {
         return result
     }
     private func fixture(_ content: String) throws -> XgentDocument {
-        let payload: [String: Any] = ["version": 1, "surface": "syntax", "revision": 1, "mode": "root", "title": "Source",
+        let payload: [String: Any] = ["version": 1, "surface": "syntax", "revision": 1, "mode": "root", "title": "Source", "appearance": "system",
             "nodes": [["id": "file", "kind": "BrowserLayout", "fill": true, "children": [["id": "code", "kind": "TextArea", "label": "Example.js",
                 "language": "javascript", "value": content, "action": "edit", "fill": true]]]]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))

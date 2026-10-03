@@ -82,7 +82,7 @@ final class DocumentAnnotationRenderingTests: XCTestCase {
         #else
         let factor = "desktop"
         #endif
-        let payload: [String: Any] = ["version": 1, "surface": "annotation", "revision": 1, "mode": "root", "title": "Annotations", "formFactor": factor, "nodes": [layout]]
+        let payload: [String: Any] = ["version": 1, "surface": "annotation", "revision": 1, "mode": "root", "title": "Annotations", "appearance": "light", "formFactor": factor, "nodes": [layout]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
         try document.validate()
         return document

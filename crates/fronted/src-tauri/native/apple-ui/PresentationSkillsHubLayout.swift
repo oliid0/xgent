@@ -30,7 +30,7 @@ struct XgentSkillsHubLayout: View {
                 } else { content(main) }
             }
         }
-        .frame(minHeight: document.mode == "sheet" ? 600 : nil)
+        .frame(minHeight: document.mode == .sheet ? 600 : nil)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .environment(\.xgentSettingsRow, false)
     }

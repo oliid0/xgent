@@ -37,7 +37,7 @@ final class SpreadsheetGridTests: XCTestCase {
     }
 
     @MainActor func testRapidCellEditsAreContinuousAndRetiredActionsCannotWrite() throws {
-        let payload: [String: Any] = ["version": 1, "surface": "sheet", "revision": 1, "mode": "root", "title": "Sheet", "nodes": [
+        let payload: [String: Any] = ["version": 1, "surface": "sheet", "revision": 1, "mode": "root", "title": "Sheet", "appearance": "system", "nodes": [
             ["id": "grid", "kind": "SpreadsheetGrid", "value": "{\"sheet\":\"Report\",\"editable\":true,\"rows\":[]}", "action": "edit"]]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
         try document.validate()

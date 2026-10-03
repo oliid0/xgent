@@ -74,7 +74,7 @@ final class CodeEditorNavigationTests: XCTestCase {
     }
 
     private func fixture(_ content: String, revision: Int = 1, location: String) throws -> XgentDocument {
-        let payload: [String: Any] = ["version": 1, "surface": "code-navigation", "revision": revision, "mode": "root", "title": "Example.swift", "formFactor": "desktop", "nodes": [
+        let payload: [String: Any] = ["version": 1, "surface": "code-navigation", "revision": revision, "mode": "root", "title": "Example.swift", "appearance": "system", "formFactor": "desktop", "nodes": [
             ["id": "file", "kind": "BrowserLayout", "fill": true, "children": [
                 ["id": "code", "kind": "TextArea", "variant": "workspace-code-editor", "label": "Example.swift", "language": "swift", "value": content,
                  "text": location, "action": "edit", "fill": true]]]]]

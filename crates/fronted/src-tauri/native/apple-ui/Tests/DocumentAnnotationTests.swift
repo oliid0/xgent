@@ -18,7 +18,7 @@ final class DocumentAnnotationTests: XCTestCase {
     }
 
     @MainActor func testSavePayloadUsesCurrentNativeTextAndPageBeforeSharedDocumentUpdate() throws {
-        let payload: [String: Any] = ["version": 1, "surface": "annotation", "revision": 1, "mode": "root", "title": "PDF", "nodes": [
+        let payload: [String: Any] = ["version": 1, "surface": "annotation", "revision": 1, "mode": "root", "title": "PDF", "appearance": "system", "nodes": [
             ["id": "workspace-file-annotation-text", "kind": "TextArea", "value": "Old", "action": "text"],
             ["id": "workspace-file-annotation-page", "kind": "NumberInput", "value": 1, "minimum": 1, "maximum": 2147483647, "step": 1, "action": "page"],
             ["id": "workspace-file-save", "kind": "Button", "variant": "workspace-file-save", "action": "save"]]]

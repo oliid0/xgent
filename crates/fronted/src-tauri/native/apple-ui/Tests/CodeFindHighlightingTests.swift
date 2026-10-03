@@ -117,7 +117,7 @@ final class CodeFindHighlightingTests: XCTestCase {
         return try XCTUnwrap(XgentCodeFindConfiguration.decode(String(decoding: data, as: UTF8.self)))
     }
     private func fixture(_ content: String) throws -> XgentDocument {
-        let payload: [String: Any] = ["version": 1, "surface": "find-highlights", "revision": 1, "mode": "root", "title": "Find",
+        let payload: [String: Any] = ["version": 1, "surface": "find-highlights", "revision": 1, "mode": "root", "title": "Find", "appearance": "system",
             "nodes": [["id": "file", "kind": "BrowserLayout", "fill": true, "children": [["id": "code", "kind": "TextArea", "label": "Example.swift",
                 "language": "swift", "value": content, "action": "edit", "fill": true]]]]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))

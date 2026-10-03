@@ -124,7 +124,7 @@ final class CodeHostTests: XCTestCase {
         window.makeFirstResponder(b); b.setSelectedRange(NSRange(location: b.string.utf16.count, length: 0)); b.insertText(" // B", replacementRange: b.selectedRange())
         #endif
         try await settle()
-        let removal: [String: Any] = ["version": 1, "surface": "first", "revision": 2, "mode": "root", "removed": true, "nodes": []]
+        let removal: [String: Any] = ["version": 1, "surface": "first", "revision": 2, "mode": "root", "title": "", "appearance": "system", "removed": true, "nodes": []]
         let removed = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: removal))
         model.update(removed)
         XCTAssertEqual(source(a), "let count = 1 // A", "Removed surfaces must not reset cached native storage")
@@ -176,7 +176,7 @@ final class CodeHostTests: XCTestCase {
     }
     private func fixture(surface: String, key: String, content: String) throws -> XgentDocument {
         let metadata: [String: Any] = ["session": ["scope": "project", "key": key, "open": ["a:1", "b:2"]]]
-        let value: [String: Any] = ["version": 1, "surface": surface, "revision": 1, "mode": "root", "title": key, "nodes": [
+        let value: [String: Any] = ["version": 1, "surface": surface, "revision": 1, "mode": "root", "title": key, "appearance": "system", "nodes": [
             ["id": "workspace-file-editor", "kind": "TextArea", "variant": "workspace-code-editor", "label": "Example.swift", "language": "swift", "value": content,
              "text": String(decoding: try JSONSerialization.data(withJSONObject: metadata), as: UTF8.self), "action": "edit", "fill": true]]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: value))

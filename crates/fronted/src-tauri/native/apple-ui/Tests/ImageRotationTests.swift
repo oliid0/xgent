@@ -10,7 +10,7 @@ final class ImageRotationTests: XCTestCase {
     }
 
     @MainActor func testSaveReadsLatestNativeAngleBeforeSharedDocumentUpdate() throws {
-        let payload: [String: Any] = ["version": 1, "surface": "image", "revision": 1, "mode": "root", "title": "Image", "nodes": [
+        let payload: [String: Any] = ["version": 1, "surface": "image", "revision": 1, "mode": "root", "title": "Image", "appearance": "system", "nodes": [
             ["id": "workspace-file-media", "kind": "MediaPreview", "variant": "workspace-image-preview", "current": 90, "children": [
                 ["id": "workspace-file-image-rotation", "kind": "NumberInput", "value": 90, "action": "rotate", "minimum": 0, "maximum": 270, "step": 90],
                 ["id": "workspace-file-image-save", "kind": "Button", "variant": "workspace-image-save", "action": "save"]]]]]

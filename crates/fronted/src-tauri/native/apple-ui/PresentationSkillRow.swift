@@ -32,7 +32,7 @@ struct XgentSkillRow: View {
 
     var body: some View {
         Group {
-            if node.variant == "skill-store-card" || document.formFactor == "mobile" || textSize.isAccessibilitySize { vertical }
+            if node.variant == "skill-store-card" || document.formFactor == .mobile || textSize.isAccessibilitySize { vertical }
             else {
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .center, spacing: 20) {

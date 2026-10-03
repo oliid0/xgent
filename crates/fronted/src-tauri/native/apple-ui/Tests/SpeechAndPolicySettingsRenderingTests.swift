@@ -97,7 +97,7 @@ final class SpeechAndPolicySettingsRenderingTests: XCTestCase {
         let factor = "desktop"
         #endif
         let payload: [String: Any] = ["version": 1, "surface": "settings", "revision": 1, "mode": "sheet",
-            "title": voice ? "语音输入" : "工具权限", "formFactor": factor, "nodes": voice ? [credentials] : [actions, policy]]
+            "title": voice ? "语音输入" : "工具权限", "appearance": "light", "formFactor": factor, "nodes": voice ? [credentials] : [actions, policy]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
         try document.validate()
         return document

@@ -66,7 +66,7 @@ final class TaskProgressRenderingTests: XCTestCase {
         #else
         let factor = "desktop"
         #endif
-        let payload: [String: Any] = ["version": 1, "surface": "chat", "revision": 1, "mode": "root", "title": "对话", "formFactor": factor, "nodes": [node]]
+        let payload: [String: Any] = ["version": 1, "surface": "chat", "revision": 1, "mode": "root", "title": "对话", "appearance": "light", "formFactor": factor, "nodes": [node]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
         try document.validate()
         return document
