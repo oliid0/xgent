@@ -944,3 +944,19 @@ The final smoke assertion incorrectly required an empty stdout accessibility
 node even though both mobile UIs omit empty output blocks. It now requires
 successful completion and no nonempty stdout; all nonempty-output checks stay
 strict. This is a smoke assertion correction, not proof of a new Shell feature.
+
+CI #260 passed every job on `c3a27dbd9c3170210e5dcf75ba8db89aac639f0b`:
+162 macOS and 168 iOS tests with zero failures, including retained-file typing
+undo/redo, restored carets, reload and separate-file history, plus device
+compilation and shared frontend/Rust checks.
+
+Inspection of release #124's Apple Silicon DMG found only the icon in the
+application resource directory: SwiftPM resources were not packaged with the
+static archive. Production compilation now stages complete resource bundles;
+Tauri places them inside macOS Contents/Resources and Xcode copies them to the
+iOS app resource root before signing. The pinned KeyboardShortcuts localization
+lookup prefers the packaged resource directory, with its original SwiftPM
+fallback retained for SDK tests. SwiftTerm already searches these locations
+for its Metal shader resources. Package verification requires actual nonempty
+localization/shader files in the macOS app or IPA. This packaging repair awaits
+remote SDK/build verification; the earlier successful DMGs did not contain it.

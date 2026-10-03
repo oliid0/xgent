@@ -97,6 +97,20 @@ fn link_native_ui(manifest_dir: &std::path::Path) {
     // SwiftPM's static product includes the UI and its package dependencies.
     // A target-specific scratch path keeps device/simulator objects isolated.
     let scratch = output.join("native-ui");
+    let resource_helper = manifest_dir.join("../../../scripts/release/prepare-apple-ui-resources.py");
+    println!("cargo:rerun-if-changed={}", resource_helper.display());
+    if !ios {
+        let status = Command::new("xcrun").args(["swift", "package", "resolve"])
+            .arg("--package-path").arg(&sources)
+            .arg("--scratch-path").arg(&scratch)
+            .env_remove("SDKROOT")
+            .status().expect("resolve pinned native UI packages");
+        assert!(status.success(), "native UI dependency resolution failed");
+        let status = Command::new("python3").arg(&resource_helper)
+            .arg("patch-keyboard").arg(scratch.join("checkouts"))
+            .status().expect("prepare native shortcut resource lookup");
+        assert!(status.success(), "native shortcut resource lookup preparation failed");
+    }
     let swift_args = ["swift", "build", "--configuration", "release",
         "--product", "XgentNativeUI", "--triple", &swift_target, "--sdk", sdk.trim()];
     let status = Command::new("xcrun").args(swift_args)
@@ -116,6 +130,10 @@ fn link_native_ui(manifest_dir: &std::path::Path) {
     let binary_path = String::from_utf8(binary_path.stdout).expect("SwiftPM binary path");
     assert!(std::path::Path::new(binary_path.trim()).join("libXgentNativeUI.a").is_file(),
         "SwiftPM did not produce the native UI static archive");
+    let status = Command::new("python3").arg(&resource_helper)
+        .arg("copy").arg(binary_path.trim()).arg(manifest_dir.join("native/apple-ui-bundles"))
+        .status().expect("stage native UI resource bundles");
+    assert!(status.success(), "native UI resource staging failed");
     println!("cargo:rustc-link-search=native={}", binary_path.trim());
     println!("cargo:rustc-link-search=native={}/usr/lib/swift", sdk.trim());
     // Rust/cc performs the final link, so SwiftPM cannot add the toolchain's

@@ -17,6 +17,9 @@
     ]
   },
   "bundle": {
+    "resources": {
+      "native/apple-ui-bundles/": ""
+    },
     "targets": [
       "app",
       "dmg"

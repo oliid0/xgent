@@ -22,3 +22,5 @@ cc/
 
 crates/fronted/src-tauri/native/apple-ui/.build/
 crates/fronted/src-tauri/native/apple-ui/.swiftpm/
+crates/fronted/src-tauri/native/apple-ui-bundles/*
+!crates/fronted/src-tauri/native/apple-ui-bundles/.gitkeep

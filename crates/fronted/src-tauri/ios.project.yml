@@ -174,9 +174,16 @@ targets:
         discoveredDependencyFile: {{this.discovered-dependency-file}}{{/if}}
       {{~/each~}}
     {{~/if~}}
-    {{~#if ios-post-build-scripts}}
     postBuildScripts:
-      {{~#each ios-post-build-scripts}}{{#if this.path}}
+      - name: Embed native SwiftPM resources
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          python3 "$PROJECT_DIR/../../../../../scripts/release/prepare-apple-ui-resources.py" copy \
+            "$PROJECT_DIR/../../native/apple-ui-bundles" \
+            "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+    {{#if ios-post-build-scripts}}
+      {{#each ios-post-build-scripts}}{{#if this.path}}
       - path {{this.path}}{{/if}}{{#if this.script}}
       - script: {{this.script}}{{/if}}{{#if this.name}}
         name: {{this.name}}{{/if}}{{#if this.input-files}}

@@ -237,6 +237,13 @@ jobs:
           DESKTOP_MACOS_TARGET: ${{ matrix.target }}
         run: pnpm tauri build --config src-tauri/tauri.macos.conf.json --config "$XGENT_TAURI_VERSION_CONFIG" --target "$DESKTOP_MACOS_TARGET"
 
+      - name: Verify packaged native UI resources
+        run: |
+          set -euo pipefail
+          app_path="$(find "target/${{ matrix.target }}/release/bundle/macos" -maxdepth 1 -name '*.app' -print -quit)"
+          test -n "$app_path"
+          python3 scripts/release/prepare-apple-ui-resources.py verify-macos "$app_path/Contents/Resources"
+
       - name: Stage macOS artifact
         run: |
           set -euo pipefail
@@ -938,6 +945,7 @@ jobs:
           cp "${ipa_candidates[0]}" "$release_ipa"
           unzip -t "$release_ipa"
           python3 scripts/release/inspect-ios-dependencies.py "$release_ipa"
+          python3 scripts/release/prepare-apple-ui-resources.py verify-ios "$release_ipa"
           python3 - "$release_ipa" <<'PY'
           import plistlib
           import sys
