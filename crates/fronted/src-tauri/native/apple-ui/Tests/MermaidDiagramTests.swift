@@ -137,6 +137,14 @@ final class MermaidDiagramTests: XCTestCase {
                     }
                     #endif
                 } while !ready && ContinuousClock.now < deadline
+                #if os(iOS)
+                let evidence = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: native).flattenToElements()
+                    .map { "\($0.identifier ?? "_"): \($0.label ?? "")" }
+                #else
+                let evidence = nativeMacAccessibilityTree(native)
+                    .map { "\($0.accessibilityIdentifier() ?? "_"): \($0.accessibilityText() ?? "")" }
+                #endif
+                try attachNativeAccessibilityEvidence(evidence, name: "native-mermaid-controls-\(Int(width))-\(dark ? "dark" : "light")")
                 XCTAssertTrue(ready, "The actual native SVG must finish rendering before appearance evidence is captured")
                 let snapshot = await withCheckedContinuation { continuation in
                     strategy.snapshot(native).run { continuation.resume(returning: $0) }

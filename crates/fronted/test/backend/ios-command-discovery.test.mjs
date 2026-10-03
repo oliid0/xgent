@@ -63,3 +63,12 @@ test("native iOS execution does not search the simulator host for shell commands
   assert.match(prepare, /prepare-ios-command-markers\.py/);
   assert.match(prepare, /\$OUTPUT_ROOT\/commandDictionary\.plist.*\$OUTPUT_ROOT\/extraCommandsDictionary\.plist/);
 });
+
+test("native iOS command cancellation cannot send process-fatal signals to its embedded interpreter", () => {
+  const plugin = readFileSync(new URL("../../../mobile-execution/ios/Sources/MobileExecutionPlugin.swift", import.meta.url), "utf8");
+  assert.doesNotMatch(plugin, /ios_killpid\s*\(/, "ios_killpid uses pthread_kill, which must not receive an application-fatal signal");
+  assert.doesNotMatch(plugin, /pthread_kill\s*\(/);
+  const smoke = readFileSync(new URL("../../../../scripts/release/ios-ui-smoke/Tests/ShellInstallationTests.swift", import.meta.url), "utf8");
+  assert.match(smoke, /xgent-ios-after-cancel-ok/);
+  assert.match(smoke, /identifier ENDSWITH ':cancelled'/);
+});

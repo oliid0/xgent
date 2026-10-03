@@ -15,7 +15,7 @@ import AppKit
 
 final class MarkdownMathTests: XCTestCase {
     @MainActor func testAccessibleParagraphKeepsProseAndOnlyUsesActuallyRasterizedFormulas() async throws {
-        let formula = XgentMathFormula(source: #"x^2 + \text{a_b}"#, display: false)
+        let formula = XgentMathFormula(source: #"x^2 + \frac{a_b}{2}"#, display: false)
         let content = XgentMathAccessibilityText(markdown: "**Answer** \(formula.markdown). [Details](https://example.com)")
         XCTAssertEqual(content.urls, [formula.url])
         XCTAssertTrue(content.label.contains(formula.source))

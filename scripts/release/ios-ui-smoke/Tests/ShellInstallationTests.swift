@@ -95,6 +95,22 @@ final class ShellInstallationTests: XCTestCase {
         tap(app.buttons["input-eof"], in: app)
         XCTAssertTrue(exit.waitForExistence(timeout: 45), "EOF must finish a command waiting on stdin")
         XCTAssertEqual(exit.label, "Exit: 0")
+
+        tap(app.buttons["clear"], in: app)
+        tap(command, in: app)
+        command.typeText("cat")
+        tap(app.buttons["run"], in: app)
+        XCTAssertTrue(programInput.waitForExistence(timeout: 30), "The cancellable native command must start")
+        tap(app.buttons["cancel"], in: app)
+        let cancelled = app.descendants(matching: .any).matching(NSPredicate(format: "identifier ENDSWITH ':cancelled'")).firstMatch
+        XCTAssertTrue(cancelled.waitForExistence(timeout: 45), "Cancelling a native thread must finish without terminating the app")
+        tap(app.buttons["clear"], in: app)
+        tap(command, in: app)
+        command.typeText("printf xgent-ios-after-cancel-ok")
+        tap(app.buttons["run"], in: app)
+        XCTAssertTrue(exit.waitForExistence(timeout: 45))
+        XCTAssertEqual(exit.label, "Exit: 0")
+        XCTAssertTrue(output.label.contains("xgent-ios-after-cancel-ok"))
     }
 
     private func tap(_ element: XCUIElement, in app: XCUIApplication) {

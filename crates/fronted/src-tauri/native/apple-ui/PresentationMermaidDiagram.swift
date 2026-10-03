@@ -110,6 +110,7 @@ private struct XgentMermaidSurface: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("xgent-mermaid-diagram")
         .task(id: "\(scheme == .dark):\(retry):\(source)") {
             try? await Task.sleep(for: .milliseconds(120))

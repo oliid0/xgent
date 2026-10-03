@@ -38,7 +38,16 @@ load("./nativeMermaid", ${JSON.stringify(module("nativeMermaid.ts"))});
 (async () => { let result; try {
   const input = ${input};
   const diagrams = await Promise.all(input.requests.map(request => modules["./nativeMermaid"].renderNativeDiagram(request.source, request.dark).then(JSON.parse)));
-  const converted = input.svgFixtures.map(source => { try { return { svg: modules["./nativeDiagramSvg"].nativeDiagramSvg(source) }; } catch(error) { return { error: error.message }; } });
+  const bounds = source => {
+    const host = document.createElement("div"); host.style.cssText = "position:fixed;left:-9999px;opacity:0";
+    host.innerHTML = source; document.body.append(host);
+    try { const box = host.querySelector("svg").getBBox(); return { x: box.x, y: box.y, width: box.width, height: box.height }; }
+    finally { host.remove(); }
+  };
+  const converted = input.svgFixtures.map(source => { try {
+    const svg = modules["./nativeDiagramSvg"].nativeDiagramSvg(source);
+    return { svg, bounds: { source: bounds(source), native: bounds(svg) } };
+  } catch(error) { return { error: error.message }; } });
   result = { diagrams, converted, remaining: document.querySelectorAll("div[style*='-100000px']").length };
 } catch(error) { result = { error: String(error?.stack ?? error) }; }
 const bytes = new TextEncoder().encode(JSON.stringify(result)); let encoded = "";

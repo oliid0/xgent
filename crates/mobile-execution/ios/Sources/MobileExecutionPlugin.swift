@@ -69,6 +69,7 @@ enum MobileExecutionError: LocalizedError {
 private struct ActiveCommand {
     let runId: String
     let pid: Int32
+    let generation = UUID()
     var cancelled: Bool
     var timedOut: Bool
 }
@@ -465,8 +466,8 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         if activeCommand?.runId == request.runId, var command = activeCommand {
             command.cancelled = true
             activeCommand = command
-            ios_killpid(command.pid, SIGINT)
-            scheduleForcedTermination(runId: request.runId, pid: command.pid)
+            interruptCommand(command)
+            scheduleCancellationRetry(command)
         }
         stateLock.unlock()
         invoke.resolve(["cancelled": scheduled])
@@ -652,15 +653,19 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         let pid = ios_fork()
         stateLock.lock()
         let wasCancelled = cancelledRuns.contains(request.runId)
-        activeCommand = ActiveCommand(
+        let command = ActiveCommand(
             runId: request.runId,
             pid: pid,
             cancelled: wasCancelled,
             timedOut: false
         )
+        activeCommand = command
+        if wasCancelled {
+            interruptCommand(command)
+            scheduleCancellationRetry(command)
+        }
         stateLock.unlock()
-        if wasCancelled { ios_killpid(pid, SIGINT) }
-        scheduleTimeout(runId: request.runId, pid: pid, timeoutMs: request.timeoutMs)
+        scheduleTimeout(command, timeoutMs: request.timeoutMs)
 
         // The staged script is inside the installed resource tree, which is
         // explicitly allowed above even when cwd is an external workspace.
@@ -1086,20 +1091,19 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         return missing
     }
 
-    private func scheduleTimeout(runId: String, pid: Int32, timeoutMs: UInt64) {
+    private func scheduleTimeout(_ scheduled: ActiveCommand, timeoutMs: UInt64) {
         DispatchQueue.global(qos: .utility).asyncAfter(
             deadline: .now() + .milliseconds(Int(min(timeoutMs, UInt64(Int.max))))
         ) { [weak self] in
             guard let self else { return }
             self.stateLock.lock()
             if var command = self.activeCommand,
-               command.runId == runId,
-               command.pid == pid,
+               command.generation == scheduled.generation,
                !command.cancelled {
                 command.timedOut = true
                 self.activeCommand = command
-                ios_killpid(pid, SIGINT)
-                self.scheduleForcedTermination(runId: runId, pid: pid)
+                self.interruptCommand(command)
+                self.scheduleCancellationRetry(command)
             }
             self.stateLock.unlock()
         }
@@ -1124,15 +1128,30 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         }
     }
 
-    private func scheduleForcedTermination(runId: String, pid: Int32) {
+    // Called with stateLock held. ios_system 3.0.4 implements ios_killpid
+    // using pthread_kill: SIGKILL and default SIGINT terminate the entire app,
+    // not a sandbox subprocess. Its native command threads install cleanup
+    // handlers for pthread_cancel. Never cancel the Swift execution queue.
+    private func interruptCommand(_ command: ActiveCommand) {
+        activeInputs[command.runId]?.close()
+        guard let thread = ios_getThreadId(command.pid), Int(bitPattern: thread) > 0 else { return }
+        _ = pthread_cancel(thread)
+    }
+
+    private func scheduleCancellationRetry(_ scheduled: ActiveCommand) {
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .milliseconds(500)) {
             [weak self] in
             guard let self else { return }
             self.stateLock.lock()
-            let shouldTerminate = self.activeCommand?.runId == runId
-                && self.activeCommand?.pid == pid
+            // A command may not yet have registered its native thread when
+            // early cancellation arrives. A generation also keeps an old
+            // timer from cancelling a later run with a recycled ID or PID.
+            if let command = self.activeCommand,
+               command.generation == scheduled.generation,
+               command.cancelled || command.timedOut {
+                self.interruptCommand(command)
+            }
             self.stateLock.unlock()
-            if shouldTerminate { ios_killpid(pid, SIGKILL) }
         }
     }
 

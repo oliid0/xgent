@@ -1042,3 +1042,22 @@ rasterizes those formulas. Markdown prose uses an unscaled base font because
 MarkdownUI already applies Dynamic Type, and desktop sheets receive their
 own theme background. These changes await fresh native CI; mobile installation
 and complete platform parity are still unverified.
+
+CI #271 confirmed that all ten shared graph SVGs rasterize, and mounted math
+paragraph descriptions now pass on macOS. Its screenshots exposed blank graph
+labels: SwiftDraw does not traverse Mermaid's nested tspans. Native SVG now
+uses browser-measured leaf text baselines and separate text elements, preserving
+the actual CJK labels, styles and wrapping. Graph controls receive a containing
+accessibility group; the copy/fullscreen SDK checks remain required. A new math
+unit fixture also used an invalid underscore inside TeX text; it now uses a
+valid math subscript while preserving the escaping check.
+
+The iOS embedded-shell cancellation path no longer sends signals through
+ios_killpid, whose pinned upstream implementation calls pthread_kill. SIGKILL
+would terminate the app, and a default SIGINT can do the same. Cancellation
+closes live stdin and cancels only the runtime's registered native command
+thread, with a generation guard preventing stale timers from affecting later
+runs. Release interaction tests must cancel a real command and successfully
+run another command afterward. This repair is pending actual installed-app
+verification; the cause of Release #124's installation termination remains
+unproven. CI now compiles both Apple packaged-app interaction harnesses.

@@ -32,7 +32,7 @@ test("diagrams have their own validated read-only action without changing code r
 
 test("the actual shared Mermaid engine preserves labels, paths and arrows across native light/dark diagrams", { skip: !diagramBrowser }, async () => {
   const samples = [
-    "flowchart LR\n A[搜索资料] --> B{审核}\n B -->|通过| C[完成]\n B -.重试.-> A",
+    'flowchart LR\n A["搜索资料<br/>输入"] --> B{审核}\n B -->|通过| C[完成]\n B -.重试.-> A',
     "sequenceDiagram\n participant A as App\n participant B as Rust\n A->>B: Request\n B-->>A: Result",
     "classDiagram\n class App\n class Backend\n App --> Backend : calls",
     "stateDiagram-v2\n [*] --> Running\n Running --> Done\n Done --> [*]",
@@ -43,7 +43,8 @@ test("the actual shared Mermaid engine preserves labels, paths and arrows across
   const fixture = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50"><defs><marker id="arrow" viewBox="0 0 10 10" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0 0 L10 5 L0 10 z" fill="#123456"/></marker></defs><path d="M10 25 L90 25" stroke="#654321" marker-start="url(#arrow)" marker-end="url(#arrow)"/></svg>';
   const result = await diagramsInBrowser(requests, [fixture,
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><foreignObject/></svg>',
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 0 1"/>']);
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 0 1"/>',
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 70"><text x="50" y="20" text-anchor="middle" font-size="12"><tspan x="50" dy="0"><tspan>First line</tspan></tspan><tspan x="50" dy="18"><tspan>第二行</tspan></tspan></text></svg>']);
   assert.equal(result.remaining, 0, "Every temporary SVG layout surface must be retired");
   for (let i = 0; i < samples.length * 2; i++) {
     const diagram = result.diagrams[i];
@@ -53,6 +54,9 @@ test("the actual shared Mermaid engine preserves labels, paths and arrows across
     assert.match(diagram.svg, /<svg[^>]+width="[\d.]+"[^>]+height="[\d.]+"/);
     assert.doesNotMatch(diagram.svg, /<foreignObject|<marker|<style|marker-(?:start|end)=/);
     assert.doesNotMatch(diagram.svg, /stroke-dasharray="[^"]*px/, "Native number lists must not retain CSS units");
+    assert.doesNotMatch(diagram.svg, /<tspan\b/, "Nested labels must become independent positioned native text runs");
+    if (i < 2) for (const label of ["搜索资料", "输入", "审核", "完成", "通过", "重试"])
+      assert.ok(diagram.svg.includes(label), `Missing diagram label: ${label}`);
     for (const rectangle of diagram.svg.matchAll(/<rect\b([^>]*)>/g)) {
       assert.match(rectangle[1], /\bwidth="[^"]+"/);
       assert.match(rectangle[1], /\bheight="[^"]+"/);
@@ -66,6 +70,11 @@ test("the actual shared Mermaid engine preserves labels, paths and arrows across
   assert.match(result.converted[0].svg, /data-xgent-arrow="start"[^>]+rotate\(180\)/);
   assert.match(result.converted[0].svg, /data-xgent-arrow="end"/);
   assert.ok(result.converted[1].error); assert.ok(result.converted[2].error);
+  assert.match(result.converted[3].svg, />First line<\/text>/);
+  assert.match(result.converted[3].svg, />第二行<\/text>/);
+  for (const dimension of ["x", "y", "width", "height"])
+    assert.ok(Math.abs(result.converted[3].bounds.source[dimension] - result.converted[3].bounds.native[dimension]) < 0.5,
+      `Native text must preserve browser ${dimension}, including multiline baselines and anchoring`);
   if (process.env.XGENT_DIAGRAM_FIXTURE) writeFileSync(process.env.XGENT_DIAGRAM_FIXTURE,
     JSON.stringify(result.diagrams.slice(0, 10), null, 2));
 });

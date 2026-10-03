@@ -56,6 +56,17 @@ export function nativeDiagramSvg(source: string): string {
     const resolved = styles.map((style) =>
       Object.fromEntries(paint.map((name) => [name, style.getPropertyValue(name)])),
     );
+    // SwiftDraw reads only a direct text value or the first tspan, whereas
+    // Mermaid nests and wraps its labels. Measure each leaf's real browser
+    // baseline before removing CSS, then emit independent native text runs.
+    const textRuns = [...live.querySelectorAll<SVGTextElement>("text")]
+      .filter((text) => text.querySelector("tspan"))
+      .map((text) => ({
+        text,
+        runs: [...text.querySelectorAll<SVGTSpanElement>("tspan")]
+          .filter((span) => !span.querySelector("tspan") && span.getNumberOfChars() > 0)
+          .map((span) => ({ span, position: span.getStartPositionOfChar(0) })),
+      }));
     const arrows = elements.flatMap((element, index) => {
       const style = styles[index];
       if (style.getPropertyValue("marker-mid") !== "none" && style.getPropertyValue("marker-mid")) {
@@ -108,6 +119,29 @@ export function nativeDiagramSvg(source: string): string {
         arrow.position,
         arrow.strokeWidth,
       );
+    for (const { text, runs } of textRuns) {
+      const group = document.createElementNS(namespace, "g");
+      for (const attribute of ["transform", "opacity", "clip-path", "filter"]) {
+        const value = text.getAttribute(attribute);
+        if (value !== null) group.setAttribute(attribute, value);
+      }
+      for (const { span, position } of runs) {
+        if (![position.x, position.y].every(Number.isFinite))
+          throw new Error("Diagram text has invalid geometry");
+        const label = document.createElementNS(namespace, "text");
+        for (const attribute of [...span.attributes])
+          label.setAttribute(attribute.name, attribute.value);
+        for (const attribute of ["dx", "dy", "rotate", "transform"])
+          label.removeAttribute(attribute);
+        label.setAttribute("x", String(position.x));
+        label.setAttribute("y", String(position.y));
+        label.setAttribute("text-anchor", "start");
+        label.setAttribute("dominant-baseline", "auto");
+        label.textContent = span.textContent;
+        group.append(label);
+      }
+      text.replaceWith(group);
+    }
     for (const element of live.querySelectorAll("style,marker")) element.remove();
     const result = new XMLSerializer().serializeToString(live);
     if (result.length > 4 * 1024 * 1024) throw new Error("Native diagram SVG is too large");
