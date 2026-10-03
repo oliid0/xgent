@@ -14,6 +14,11 @@ struct NativeMacAccessibilityElement {
         attribute(.description, getter: "accessibilityLabel") as? String
             ?? attribute(.title, getter: "accessibilityTitle") as? String
     }
+    func accessibilityText() -> String? {
+        if let label = accessibilityLabel(), !label.isEmpty { return label }
+        let value = attribute(.value, getter: "accessibilityValue")
+        return (value as? String) ?? (value as? NSAttributedString)?.string
+    }
     func accessibilityFrame() -> CGRect {
         if let modern = object as? any NSAccessibilityProtocol { return modern.accessibilityFrame() }
         // KVC boxes a struct return; perform(_:), which expects an object,

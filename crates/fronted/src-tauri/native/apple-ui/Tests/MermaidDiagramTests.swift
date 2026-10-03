@@ -26,7 +26,16 @@ final class MermaidDiagramTests: XCTestCase {
         let fixtures = try fixtures()
         XCTAssertEqual(fixtures.count, 10)
         for fixture in fixtures {
-            let image = try XCTUnwrap(fixture.image(source: fixture.source, dark: fixture.dark), fixture.source)
+            guard let image = fixture.image(source: fixture.source, dark: fixture.dark) else {
+                // SVG(data:) intentionally swallows its parser error. The file
+                // initializer emits that actual SDK error for fixture diagnosis.
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("xgent-diagram-\(UUID.uuidString).svg")
+                try fixture.svg?.data(using: .utf8)?.write(to: url)
+                _ = SVG(fileURL: url)
+                try FileManager.default.removeItem(at: url)
+                XCTFail("The real shared SVG must parse: \(fixture.source), dark=\(fixture.dark)")
+                continue
+            }
             XCTAssertGreaterThan(image.size.width, 20); XCTAssertGreaterThan(image.size.height, 20)
             let data = try XCTUnwrap(fixture.svg?.data(using: .utf8))
             let decoder = try XCTUnwrap(XgentSVGImageDecoder(data: data, maximumPixelSize: 512))

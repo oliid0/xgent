@@ -97,7 +97,7 @@ final class MarkdownMathTests: XCTestCase {
                     let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: native)
                     labels = hierarchy.flattenToElements().compactMap(\.label)
                     #else
-                    labels = nativeMacAccessibilityTree(native).compactMap { $0.accessibilityLabel() }
+                    labels = nativeMacAccessibilityTree(native).compactMap { $0.accessibilityText() }
                     #endif
                 } while !labels.contains(where: { $0.contains("y^2") }) && ContinuousClock.now < deadline
                 try attachNativeAccessibilityEvidence(labels, name: "native-math-labels-\(Int(width))-\(size)")

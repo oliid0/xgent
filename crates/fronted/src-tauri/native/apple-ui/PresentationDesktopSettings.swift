@@ -47,6 +47,7 @@ struct XgentDesktopSettingsLayout: View {
                             .modifier(XgentControlTypography(node: node))
                             .accessibilityLabel(document.title)
                             .accessibilityValue(sectionTitle)
+                            .accessibilityIdentifier("settings-navigation-menu")
                             Spacer(minLength: 8)
                             closeControl
                         }
@@ -120,6 +121,7 @@ struct XgentDesktopSettingsLayout: View {
         if let detail {
             VStack(alignment: .leading, spacing: 0) {
                 Text(titleNode?.text ?? sectionTitle)
+                    .accessibilityIdentifier(titleNode?.id ?? "settings-detail-title")
                     .font(XgentFonts.body(theme.fontFamily, size: titleSize * CGFloat(theme.fontScale), weight: .bold))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)

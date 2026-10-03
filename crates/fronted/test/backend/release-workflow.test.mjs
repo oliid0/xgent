@@ -364,9 +364,17 @@ test("mobile health steps use platform authorization contracts and least privile
 });
 
 test("release jobs smoke launch every newly repaired application target", () => {
+  const macos = jobSource("macos", "windows");
   const windows = jobSource("windows", "linux");
   const android = jobSource("android", "ios");
   const ios = jobSource("ios", "publish");
+
+  const macosSmoke = macos.slice(macos.indexOf("- name: Smoke launch actual macOS app"), macos.indexOf("- name: Stage macOS artifact"));
+  assert.match(macosSmoke, /scripts\/release\/macos-ui-smoke/);
+  assert.match(macosSmoke, /xcodebuild test -project/);
+  assert.match(macosSmoke, /xcresulttool export attachments/);
+  assert.match(macosSmoke, /xgent-macos-\$\{\{ matrix\.suffix \}\}-launch-evidence/);
+  assert.doesNotMatch(macosSmoke, /continue-on-error/);
 
   assert.match(windows, /scripts\/release\/smoke-launch-windows\.ps1/);
   assert.match(windowsLaunchSmoke, /Start-Process[\s\S]*-WindowStyle Hidden/);

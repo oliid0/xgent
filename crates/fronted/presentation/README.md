@@ -1021,3 +1021,12 @@ also require unitless numbers for SwiftDraw; the converter normalizes their
 pixel units and real shared-engine fixtures are refreshed. Native graph and
 math tests retain their actual-display assertions, with macOS enhanced
 accessibility initialized before traversal. These corrections await remote CI.
+
+Release verification now launches the actual packaged macOS app with
+XCUIAutomation, recording the chat, all twelve desktop settings routes and
+narrow-window navigation. Each image includes the real accessibility tree;
+failed smoke tests still export their final state and system logs. This is
+separate from SDK component fixtures and has not yet run in release CI.
+Geometry-backed desktop settings now receive a fitted presentation size based
+on the actual parent window. A hosted SDK case presents the real sheet at
+640/1040 points and checks both its bounds and adaptive navigation.

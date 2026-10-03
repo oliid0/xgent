@@ -406,6 +406,9 @@ struct XgentNodeView: View {
 
 struct XgentPresentationView: View {
     @ObservedObject var model: XgentPresentationModel
+    #if os(macOS)
+    @State private var availableSize = CGSize(width: 1156, height: 700)
+    #endif
 
     private var root: XgentDocument? { model.documents.last { $0.mode == .root } }
     private var sheet: XgentDocument? { model.documents.first { $0.mode == .sheet } }
@@ -431,6 +434,9 @@ struct XgentPresentationView: View {
 
     var body: some View {
         groupedRoot
+        #if os(macOS)
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { availableSize = $0 }
+        #endif
         .background { XgentThemeBackground().ignoresSafeArea() }
         .preferredColorScheme(root?.colorScheme)
         .sheet(item: Binding(get: { sheet }, set: { if $0 == nil, let sheet { model.dismiss(sheet) } })) { document in
@@ -438,6 +444,7 @@ struct XgentPresentationView: View {
             XgentIOSSheetPresentation(initialDocument: document, model: model)
             #else
             XgentSheetView(document: document, model: model)
+                .modifier(XgentDesktopSheetSizing(document: document, availableSize: availableSize))
             #endif
         }
         .modifier(XgentAlerts(model: model, enabled: sheet == nil))

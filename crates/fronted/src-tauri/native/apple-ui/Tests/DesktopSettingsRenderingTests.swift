@@ -6,6 +6,36 @@ import XCTest
 @testable import XgentNativeUI
 
 final class DesktopSettingsRenderingTests: XCTestCase {
+    @MainActor
+    func testActualSettingsPresentationFitsItsParentWindow() async throws {
+        let accessibility = try NativeMacAccessibilitySession()
+        defer { accessibility.restore() }
+        for width: CGFloat in [640, 1040] {
+            let model = XgentPresentationModel()
+            let root = try JSONDecoder().decode(XgentDocument.self, from: Data(#"{"version":1,"surface":"root","revision":1,"mode":"root","title":"Chat","appearance":"light","formFactor":"desktop","nodes":[{"id":"welcome","kind":"Text","text":"Chat"}]}"#.utf8))
+            model.update(root)
+            let host = NSHostingView(rootView: XgentPresentationView(model: model))
+            let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: 720), styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
+            defer { model.invalidate(); window.close() }
+            host.layoutSubtreeIfNeeded()
+            try await Task.sleep(for: .milliseconds(120))
+            model.update(try fixture(section: .appearance))
+            let deadline = ContinuousClock.now + .seconds(3)
+            while window.sheets.isEmpty && ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(60)) }
+            let sheet = try XCTUnwrap(window.sheets.first)
+            try await Task.sleep(for: .milliseconds(120))
+            XCTAssertLessThanOrEqual(sheet.frame.width, width + 1, "The actual presented settings must fit the parent window")
+            XCTAssertGreaterThan(sheet.frame.width, min(width - 64, 900), "Settings must not collapse to the generic minimum sheet width")
+            let expected = width < 760 ? "settings-navigation-menu" : "desktop-nav:general"
+            XCTAssertTrue(nativeMacAccessibilityTree(sheet).contains { $0.accessibilityIdentifier() == expected })
+            let image = try XCTUnwrap(sheet.contentView?.bitmapImageRepForCachingDisplay(in: sheet.contentView!.bounds))
+            sheet.contentView!.cacheDisplay(in: sheet.contentView!.bounds, to: image)
+            let attachment = XCTAttachment(image: NSImage(cgImage: try XCTUnwrap(image.cgImage), size: sheet.contentView!.bounds.size))
+            attachment.name = "settings-actual-presentation-\(Int(width))"; attachment.lifetime = .keepAlways; add(attachment)
+        }
+    }
+
     private enum Section: String, CaseIterable {
         case appearance, systemTools = "system-tools", proxy, about, permissions, providers
     }

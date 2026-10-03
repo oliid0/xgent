@@ -1,0 +1,25 @@
+name: XgentMacOSSmoke
+options:
+  deploymentTarget:
+    macOS: "15.0"
+targets:
+  XgentMacOSSmoke:
+    type: bundle.ui-testing
+    platform: macOS
+    sources: [Tests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.ohi.xgent.macos-smoke
+        SWIFT_VERSION: "5.0"
+schemes:
+  XgentMacOSSmoke:
+    build:
+      targets:
+        XgentMacOSSmoke: [test]
+    test:
+      environmentVariables:
+        XGENT_MACOS_SMOKE_APP: ${XGENT_MACOS_SMOKE_APP}
+      targets:
+        - name: XgentMacOSSmoke
+          parallelizable: false

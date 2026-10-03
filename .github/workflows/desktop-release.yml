@@ -244,6 +244,42 @@ jobs:
           test -n "$app_path"
           python3 scripts/release/prepare-apple-ui-resources.py verify-macos "$app_path/Contents/Resources"
 
+      - name: Smoke launch actual macOS app and capture settings
+        if: github.event_name == 'push' || inputs.publish == true || inputs.smoke == true
+        run: |
+          set -euo pipefail
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          app_path="$(find "$GITHUB_WORKSPACE/target/${{ matrix.target }}/release/bundle/macos" -maxdepth 1 -name '*.app' -print -quit)"
+          test -n "$app_path"
+          export XGENT_MACOS_SMOKE_APP="$app_path"
+          smoke_project="$RUNNER_TEMP/xgent-macos-ui-smoke"
+          mkdir -p "$smoke_project"
+          cp -R scripts/release/macos-ui-smoke/. "$smoke_project/"
+          xcodegen generate --spec "$smoke_project/project.yml" --project "$smoke_project"
+          xcodebuild test -project "$smoke_project/XgentMacOSSmoke.xcodeproj" \
+            -scheme XgentMacOSSmoke -destination 'platform=macOS' \
+            -resultBundlePath "$RUNNER_TEMP/xgent-macos-interactions.xcresult" \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/xgent-macos-interactions.log"
+
+      - name: Export actual macOS application screenshots
+        if: always() && (github.event_name == 'push' || inputs.publish == true || inputs.smoke == true)
+        run: |
+          if [ -d "$RUNNER_TEMP/xgent-macos-interactions.xcresult" ]; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/xgent-macos-interactions.xcresult" \
+              --output-path "$RUNNER_TEMP/xgent-macos-interactions"
+          fi
+          log show --last 15m --style compact --predicate 'process == "Xgent" OR process == "xgent"' \
+            > "$RUNNER_TEMP/xgent-macos-launch.log" 2>&1 || true
+
+      - uses: actions/upload-artifact@v7
+        if: always() && (github.event_name == 'push' || inputs.publish == true || inputs.smoke == true)
+        with:
+          name: xgent-macos-${{ matrix.suffix }}-launch-evidence
+          path: |
+            ${{ runner.temp }}/xgent-macos-*.log
+            ${{ runner.temp }}/xgent-macos-interactions
+          if-no-files-found: error
+
       - name: Stage macOS artifact
         run: |
           set -euo pipefail
