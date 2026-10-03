@@ -53,6 +53,10 @@ test("the actual shared Mermaid engine preserves labels, paths and arrows across
     assert.match(diagram.svg, /<svg[^>]+width="[\d.]+"[^>]+height="[\d.]+"/);
     assert.doesNotMatch(diagram.svg, /<foreignObject|<marker|<style|marker-(?:start|end)=/);
     assert.doesNotMatch(diagram.svg, /stroke-dasharray="[^"]*px/, "Native number lists must not retain CSS units");
+    for (const rectangle of diagram.svg.matchAll(/<rect\b([^>]*)>/g)) {
+      assert.match(rectangle[1], /\bwidth="[^"]+"/);
+      assert.match(rectangle[1], /\bheight="[^"]+"/);
+    }
     assert.match(diagram.svg, /<(?:path|rect|circle)/);
     if (i < 8) assert.match(diagram.svg, /data-xgent-arrow="end"/, "Native rendering cannot drop arrowheads");
     assert.notEqual(result.diagrams[0].svg, result.diagrams[1].svg);

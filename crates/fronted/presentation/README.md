@@ -1030,3 +1030,15 @@ separate from SDK component fixtures and has not yet run in release CI.
 Geometry-backed desktop settings now receive a fitted presentation size based
 on the actual parent window. A hosted SDK case presents the real sheet at
 640/1040 points and checks both its bounds and adaptive navigation.
+
+CI #270 passed the actual presented-sheet bounds and remote macOS UI-harness
+compilation. The installed macOS application harness still awaits a release
+run. Its native graph diagnostic identified missing dimensions on empty
+Mermaid label rectangles; the converter now preserves their browser-default
+zero dimensions explicitly. Mounted math images were visible on macOS but
+inline Text(Image) lost their accessibility descriptions. Paragraph labels
+now retain prose and formula source only after the native provider actually
+rasterizes those formulas. Markdown prose uses an unscaled base font because
+MarkdownUI already applies Dynamic Type, and desktop sheets receive their
+own theme background. These changes await fresh native CI; mobile installation
+and complete platform parity are still unverified.

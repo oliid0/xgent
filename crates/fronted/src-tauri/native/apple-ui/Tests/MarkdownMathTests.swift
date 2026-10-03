@@ -14,6 +14,22 @@ import AppKit
 @testable import XgentNativeUI
 
 final class MarkdownMathTests: XCTestCase {
+    @MainActor func testAccessibleParagraphKeepsProseAndOnlyUsesActuallyRasterizedFormulas() async throws {
+        let formula = XgentMathFormula(source: #"x^2 + \text{a_b}"#, display: false)
+        let content = XgentMathAccessibilityText(markdown: "**Answer** \(formula.markdown). [Details](https://example.com)")
+        XCTAssertEqual(content.urls, [formula.url])
+        XCTAssertTrue(content.label.contains(formula.source))
+        XCTAssertTrue(content.label.contains("Answer"))
+        XCTAssertTrue(content.label.contains("Details"))
+        XCTAssertFalse(content.label.contains("xgent-math"))
+        let store = XgentMathAccessibilityStore()
+        XCTAssertTrue(store.rendered.isEmpty)
+        let provider = XgentMathImageProvider(fontSize: 15, foreground: .black, rgba: .black,
+            didRender: { url in await store.register(url) })
+        _ = try await provider.image(with: formula.url, label: "formula")
+        XCTAssertEqual(store.rendered, [formula.url])
+    }
+
     func testCurrencyCodeAndLinkTargetsKeepTheirExactSource() {
         let unchanged = #"Price $20, $x$, `$$x^2$$`, [link](https://example.com/$$path$$), \$$escaped$$"#
         XCTAssertEqual(XgentMarkdownMath.prepare(unchanged), unchanged)

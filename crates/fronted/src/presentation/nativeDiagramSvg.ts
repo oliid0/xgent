@@ -72,6 +72,13 @@ export function nativeDiagramSvg(source: string): string {
       });
     });
     elements.forEach((element, index) => {
+      // SVG defaults an omitted rectangle dimension to zero. Mermaid leaves
+      // empty label backgrounds in its output; native parsers require the
+      // attributes even though these rectangles paint nothing in the browser.
+      if (element.localName === "rect") {
+        for (const dimension of ["width", "height"])
+          if (!element.hasAttribute(dimension)) element.setAttribute(dimension, "0");
+      }
       for (const attribute of [...element.attributes]) {
         if (
           /^on/i.test(attribute.name) ||

@@ -28,6 +28,7 @@ struct XgentMathImageProvider: ImageProvider, InlineImageProvider {
     let fontSize: CGFloat
     let foreground: SwiftUI.Color
     let rgba: SwaTex.Color
+    var didRender: (@Sendable (URL) async -> Void)? = nil
 
     @ViewBuilder func makeImage(url: URL?) -> some View {
         if let url, let formula = XgentMathFormula(url: url) {
@@ -46,6 +47,8 @@ struct XgentMathImageProvider: ImageProvider, InlineImageProvider {
               let image = SwaTexRender.ImageRenderer.image(for: list, options: options, displayScale: 2) else {
             throw CocoaError(.featureUnsupported)
         }
-        return Image(image, scale: 2, orientation: .up, label: Text(formula.source))
+        let result = Image(image, scale: 2, orientation: .up, label: Text(formula.source))
+        await didRender?(url)
+        return result
     }
 }

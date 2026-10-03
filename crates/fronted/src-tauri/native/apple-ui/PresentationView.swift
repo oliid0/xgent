@@ -590,6 +590,7 @@ struct XgentSheetView: View {
         .presentationDragIndicator(.visible)
         #endif
         .frame(minWidth: 300, minHeight: 360)
+        .background { XgentThemeBackground().ignoresSafeArea() }
         .preferredColorScheme(document.colorScheme)
         .interactiveDismissDisabled(document.dismissAction == nil)
         .sheet(item: Binding(get: { nextSheet }, set: { if $0 == nil, let nextSheet { model.dismiss(nextSheet) } })) { next in

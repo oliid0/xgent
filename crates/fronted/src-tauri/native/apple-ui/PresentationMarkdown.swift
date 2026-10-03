@@ -17,6 +17,7 @@ struct XgentMarkdown: View {
     var highlightCode: ((String, String) async -> String?)? = nil
     var renderDiagram: ((String, Bool) async -> String?)? = nil
     @StateObject private var codeStore = XgentMarkdownCodeStore()
+    @StateObject private var mathAccessibility = XgentMathAccessibilityStore()
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .body) private var bodySize: CGFloat = 15
@@ -25,8 +26,10 @@ struct XgentMarkdown: View {
     private var mathProvider: XgentMathImageProvider {
         let color = Color(xgentHex: secondary ? palette.secondaryText : palette.text)
         let resolved = color.resolve(in: EnvironmentValues())
+        let store = mathAccessibility
         return XgentMathImageProvider(fontSize: bodySize * CGFloat(theme.fontScale * theme.typography.body / 15),
-            foreground: color, rgba: .init(r: resolved.red, g: resolved.green, b: resolved.blue, a: resolved.opacity))
+            foreground: color, rgba: .init(r: resolved.red, g: resolved.green, b: resolved.blue, a: resolved.opacity),
+            didRender: { url in await store.register(url) })
     }
 
     var body: some View {
@@ -44,6 +47,14 @@ struct XgentMarkdown: View {
             }
             .markdownImageProvider(mathProvider)
             .markdownInlineImageProvider(mathProvider)
+            .markdownBlockStyle(\.paragraph) { configuration in
+                configuration.label
+                    .fixedSize(horizontal: false, vertical: true)
+                    .relativeLineSpacing(.em(0.25))
+                    .markdownMargin(top: 0, bottom: 16)
+                    .modifier(XgentMathParagraphAccessibility(store: mathAccessibility,
+                        text: XgentMathAccessibilityText(markdown: configuration.content.renderMarkdown())))
+            }
             .markdownBlockStyle(\.codeBlock) { configuration in
                 let entry = codeStore.entry(content: configuration.content, language: configuration.language)
                 if ["mermaid", "mmd"].contains(XgentMarkdownCodeEntry.languageName(configuration.language)?.lowercased() ?? "") {
@@ -72,7 +83,9 @@ struct XgentMarkdown: View {
             // restores the package's code/table/image renderers.
             .markdownTheme(MarkdownUI.Theme.gitHub.text {
                 if let name = XgentFonts.name(for: theme.fontFamily) { FontFamily(.custom(name)) }
-                FontSize(bodySize * CGFloat(theme.fontScale * theme.typography.body / 15))
+                // MarkdownUI applies its own body-relative ScaledMetric to this
+                // base value. Passing bodySize here would scale prose twice.
+                FontSize(CGFloat(theme.fontScale * theme.typography.body))
                 ForegroundColor(Color(xgentHex: secondary ? palette.secondaryText : palette.text))
                 BackgroundColor(nil)
             })
