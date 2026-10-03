@@ -924,3 +924,9 @@ to 20 pages; the Swift driver now enforces that same boundary before native
 events and uses exact conversion for repeated AX page actions. CI exercises
 fractional/maximum scroll counts and rejects nonfinite/out-of-range values
 against the production helper without calling desktop input APIs.
+
+CI #258 passed frontend/Rust/device/guard jobs and executed 168 iOS tests.
+Two newly added fixtures omitted the required appearance field and failed
+decoding before their new UI assertions; the other 166 tests passed. Both
+fixtures now declare light appearance explicitly. These initial failures do
+not count as successful execution of the new editing/composer tests.

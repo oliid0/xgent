@@ -12,7 +12,7 @@ final class MemoryFormEditingTests: XCTestCase {
             "children": [body, ["id": "save", "kind": "Button", "label": "Save memory", "action": "save"]]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: [
             "version": 1, "surface": "memory", "revision": 1, "mode": "sheet", "title": "Memory",
-            "formFactor": "mobile", "nodes": [group],
+            "appearance": "light", "formFactor": "mobile", "nodes": [group],
         ]))
         try document.validate()
         var standardSize: CGFloat = 0

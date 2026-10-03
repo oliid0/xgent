@@ -27,7 +27,7 @@ final class MobileComposerLayoutTests: XCTestCase {
         ]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: [
             "version": 1, "surface": "chat", "revision": 1, "mode": "root", "title": "Chat",
-            "formFactor": "mobile", "nodes": [wire("composer", "Composer", ["children": children])],
+            "appearance": "light", "formFactor": "mobile", "nodes": [wire("composer", "Composer", ["children": children])],
         ]))
         try document.validate()
         let model = XgentPresentationModel()
