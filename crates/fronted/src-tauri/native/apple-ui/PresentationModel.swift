@@ -112,8 +112,12 @@ struct XgentPresentationTheme: Decodable {
     let motion: XgentMotion
     let material: XgentMaterial
     let fontScale: Double
+    let fontFamily: String?
+    let codeFontFamily: String?
 
     func validate() throws {
+        guard (fontFamily?.utf8.count ?? 0) <= 800,
+              (codeFontFamily?.utf8.count ?? 0) <= 800 else { throw XgentProtocolError.invalid }
         try light.validate()
         try dark.validate()
         let dimensions = [radius.inner, radius.element, radius.container, radius.overlay, radius.chat,
@@ -177,6 +181,8 @@ struct XgentNode: Decodable, Identifiable {
     let minimum: Double?
     let maximum: Double?
     let step: Double?
+    let integerOnly: Bool?
+    let clearable: Bool?
     let current: Double?
     let total: Double?
     let options: [XgentOption]?
@@ -272,11 +278,17 @@ struct XgentDocument: Decodable, Identifiable {
                     guard minimum <= maximum else { throw XgentProtocolError.invalid }
                 }
                 if let step = node.step { guard step > 0 else { throw XgentProtocolError.invalid } }
+                if node.integerOnly != nil || node.clearable != nil {
+                    guard node.kind == .numberInput else { throw XgentProtocolError.invalid }
+                }
                 if node.kind == .numberInput {
-                    guard let limits = XgentNumberInputConstraints(minimum: node.minimum, maximum: node.maximum, step: node.step),
-                          let storedValue = node.value, case .number(let value) = storedValue,
-                          limits.range.contains(value) else {
-                        throw XgentProtocolError.invalid
+                    guard let limits = XgentNumberInputConstraints(minimum: node.minimum, maximum: node.maximum, step: node.step,
+                                                                  allowsUnboundedMaximum: node.clearable == true),
+                          let storedValue = node.value else { throw XgentProtocolError.invalid }
+                    switch storedValue {
+                    case .null where node.clearable == true: break
+                    case .number(let value) where limits.range.contains(value) && (node.integerOnly != true || value.rounded() == value): break
+                    default: throw XgentProtocolError.invalid
                     }
                 }
                 if let total = node.total { guard total >= 0 else { throw XgentProtocolError.invalid } }
@@ -316,6 +328,8 @@ struct XgentActionResult: Decodable {
 
 @MainActor
 final class XgentPresentationModel: ObservableObject {
+    let codeSessions = XgentCodeSessionStore()
+    let codeHosts = XgentCodeHostStore()
     @Published private(set) var documents: [XgentDocument] = []
     @Published private(set) var edits: [String: XgentValue] = [:]
     @Published private(set) var busy: Set<String> = []
@@ -328,9 +342,19 @@ final class XgentPresentationModel: ObservableObject {
     private var acknowledgedEdits: Set<String> = []
     private var consumedFocusRequests: [String: Int] = [:]
     private var active = true
+    private var codeHighlightQueries: [String: XgentCodeHighlightQuery] = [:]
+    let numberDrafts = XgentNumberDraftStore()
+    private var numberCommitBatches: [String: XgentNumberCommitBatch] = [:]
+    @Published private var numberCommitCount = 0
     private var announcedNotifications = Set<String>()
 
     func invalidate() {
+        for batch in Array(numberCommitBatches.values) { batch.finish(false) }
+        numberDrafts.clear()
+        for query in codeHighlightQueries.values { query.finish(nil) }
+        codeHighlightQueries.removeAll()
+        codeHosts.clear()
+        codeSessions.clear()
         active = false
         webview = nil
         actionSink = nil
@@ -351,6 +375,12 @@ final class XgentPresentationModel: ObservableObject {
         guard document.revision > (revisions[document.surface] ?? 0) else { return }
         revisions[document.surface] = document.revision
         if document.removed == true {
+            for batch in Array(numberCommitBatches.values) where batch.surface == document.surface { batch.finish(false) }
+            numberDrafts.clear(surface: document.surface)
+            for (id, query) in codeHighlightQueries where query.surface == document.surface {
+                codeHighlightQueries.removeValue(forKey: id)?.finish(nil)
+            }
+            for scope in codeHosts.remove(surface: document.surface) { codeSessions.reconcile(scope: scope, open: []) }
             announcedNotifications.remove(document.surface)
             documents.removeAll { $0.surface == document.surface }
             for (request, item) in pending where item.surface == document.surface {
@@ -364,10 +394,27 @@ final class XgentPresentationModel: ObservableObject {
             consumedFocusRequests = consumedFocusRequests.filter { !$0.key.hasPrefix(prefix) }
             return
         }
+        for node in document.nodes {
+            let previousScopes = codeHosts.scopes(on: document.surface)
+            if let sessions = XgentCodeHostSessions.decode(node), codeHosts.reconcile(sessions, surface: document.surface) {
+                for scope in previousScopes where scope != sessions.scope { codeSessions.reconcile(scope: scope, open: []) }
+                codeSessions.reconcile(scope: sessions.scope, open: sessions.open)
+            }
+        }
         if let index = documents.firstIndex(where: { $0.surface == document.surface }) {
             documents[index] = document
         } else { documents.append(document) }
         reconcileEdits(document)
+        for batch in Array(numberCommitBatches.values) where batch.surface == document.surface {
+            let current = document.node(id: batch.node)
+            if current?.action != batch.action.action || current?.kind != batch.kind || current?.disabled == true { batch.finish(false) }
+        }
+        for (id, query) in codeHighlightQueries where query.surface == document.surface {
+            let current = document.node(id: query.node)
+            if current?.action != query.action || current?.kind.rawValue != query.kind || current?.disabled == true {
+                codeHighlightQueries.removeValue(forKey: id)?.finish(nil)
+            }
+        }
     }
 
     private func reconcileEdits(_ document: XgentDocument) {
@@ -421,7 +468,7 @@ final class XgentPresentationModel: ObservableObject {
     func send(_ node: XgentNode, in document: XgentDocument, value: XgentValue = .null,
               editing: Bool = false, continuous: Bool = false) {
         guard active else { return }
-        guard !continuous || (node.kind == .terminalViewport && !editing) else { return }
+        guard !continuous || ((node.kind == .terminalViewport || node.kind == .shortcutRecorder || node.kind == .spreadsheetGrid) && !editing) else { return }
         guard node.disabled != true,
               let current = documents.first(where: { $0.surface == document.surface })?.node(id: node.id),
               current.kind == node.kind, current.action == node.action,
@@ -435,10 +482,89 @@ final class XgentPresentationModel: ObservableObject {
             acknowledgedEdits.remove(nodeKey)
         } else if !continuous { busy.insert(nodeKey) }
         pending[requestId] = (document.surface, nodeKey, document.revision)
-        emit(XgentAction(surface: document.surface, action: action, requestId: requestId, value: value))
+        let event = XgentAction(surface: document.surface, action: action, requestId: requestId, value: value)
+        if !editing && !continuous, deferForNumberCommits(event, node: current) { return }
+        emit(event)
+    }
+
+    func hasNumberCommitBatch(in document: XgentDocument) -> Bool {
+        numberCommitBatches.values.contains { $0.surface == document.surface }
+    }
+
+    private func deferForNumberCommits(_ event: XgentAction, node: XgentNode) -> Bool {
+        guard let document = documents.first(where: { $0.surface == event.surface }) else { return false }
+        var numbers: [XgentNode] = []
+        func visit(_ nodes: [XgentNode]) {
+            for node in nodes {
+                if node.kind == .numberInput { numbers.append(node) }
+                visit(node.children ?? [])
+            }
+        }
+        visit(document.nodes)
+        var waits: [String] = [], updates: [XgentAction] = []
+        for number in numbers {
+            let numberKey = key(document.surface, number.id)
+            if let next = numberDrafts.commit(number, surface: document.surface), next != value(number, in: document), let action = number.action {
+                let id = UUID().uuidString
+                edits[numberKey] = next; editRequests[numberKey] = id; acknowledgedEdits.remove(numberKey)
+                pending[id] = (document.surface, numberKey, document.revision)
+                waits.append(id)
+                updates.append(.init(surface: document.surface, action: action, requestId: id, value: next))
+            } else if let id = editRequests[numberKey], pending[id] != nil { waits.append(id) }
+        }
+        guard !waits.isEmpty else { return false }
+        let batch = XgentNumberCommitBatch(surface: document.surface, node: node.id, kind: node.kind, action: event, requests: waits) { [weak self] success in
+            guard let self else { return }
+            self.numberCommitBatches.removeValue(forKey: event.requestId)
+            self.numberCommitCount = self.numberCommitBatches.count
+            let current = self.documents.first { $0.surface == event.surface }?.node(id: node.id)
+            if success, self.active, current?.kind == node.kind, current?.action == event.action, current?.disabled != true {
+                self.emit(event)
+            } else {
+                self.pending.removeValue(forKey: event.requestId)
+                self.busy.remove(self.key(event.surface, node.id))
+            }
+        }
+        numberCommitBatches[event.requestId] = batch
+        numberCommitCount = numberCommitBatches.count
+        batch.timeout = Task { [weak self, weak batch] in
+            try? await Task.sleep(for: .seconds(10))
+            guard !Task.isCancelled else { return }
+            batch?.finish(false)
+            self?.error = "The numeric field could not finish committing."
+        }
+        // All waits exist before any emission, including synchronous test sinks.
+        for update in updates { emit(update) }
+        return true
     }
 
     func isDismissing(_ document: XgentDocument) -> Bool { busy.contains(key(document.surface, "$dismiss")) }
+
+    func highlightCode(_ node: XgentNode, in document: XgentDocument, source: String, language: String) async -> String? {
+        let id = UUID().uuidString
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                guard active, !Task.isCancelled, node.kind == .markdown || node.kind == .codeBlock,
+                      let current = documents.first(where: { $0.surface == document.surface })?.node(id: node.id),
+                      current.kind == node.kind, current.action == node.action, current.disabled != true,
+                      let action = current.action,
+                      let data = try? JSONSerialization.data(withJSONObject: ["source": source, "language": language]),
+                      let value = String(data: data, encoding: .utf8) else {
+                    continuation.resume(returning: nil); return
+                }
+                let query = XgentCodeHighlightQuery(surface: document.surface, node: node.id, action: action, kind: node.kind.rawValue, continuation: continuation)
+                codeHighlightQueries[id] = query
+                query.timeout = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(10))
+                    guard !Task.isCancelled else { return }
+                    self?.codeHighlightQueries.removeValue(forKey: id)?.finish(nil)
+                }
+                emit(XgentAction(surface: document.surface, action: action, requestId: id, value: .string(value)))
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.codeHighlightQueries.removeValue(forKey: id)?.finish(nil) }
+        }
+    }
 
     func consumeNotificationAnnouncement(_ document: XgentDocument) -> Bool {
         guard active, document.mode == .toast,
@@ -462,10 +588,15 @@ final class XgentPresentationModel: ObservableObject {
               let action = current.dismissAction, action == document.dismissAction else { return }
         let nodeKey = key(document.surface, "$dismiss")
         guard !busy.contains(nodeKey) else { return }
+        codeHosts.commit(in: current)
         let requestId = UUID().uuidString
         busy.insert(nodeKey)
         pending[requestId] = (document.surface, nodeKey, current.revision)
-        emit(XgentAction(surface: document.surface, action: action, requestId: requestId, value: .null))
+        let sourceAction = current.node(id: action)
+        let sourceDraft = sourceAction?.variant == "workspace-source-action"
+            ? sourceAction.flatMap { XgentWorkspaceSourceDraft.current(for: $0, in: current, model: self)?.encoded } : nil
+        emit(XgentAction(surface: document.surface, action: action, requestId: requestId,
+                         value: sourceDraft.map(XgentValue.string) ?? .null))
     }
 
     private func emit(_ action: XgentAction) {
@@ -504,6 +635,15 @@ final class XgentPresentationModel: ObservableObject {
     }
 
     func complete(_ result: XgentActionResult) {
+        defer {
+            for batch in Array(numberCommitBatches.values) { batch.settle(result) }
+        }
+        if let query = codeHighlightQueries[result.requestId] {
+            guard query.surface == result.surface else { return }
+            codeHighlightQueries.removeValue(forKey: result.requestId)
+            query.finish(result.ok ? result.acceptedValue?.text : nil)
+            return
+        }
         guard let request = pending[result.requestId], request.surface == result.surface else { return }
         pending.removeValue(forKey: result.requestId)
         busy.remove(request.node)

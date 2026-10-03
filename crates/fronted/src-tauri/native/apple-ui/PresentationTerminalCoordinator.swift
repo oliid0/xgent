@@ -16,8 +16,15 @@ final class XgentTerminalCoordinator: NSObject, @preconcurrency TerminalViewDele
     private var size: (cols: Int, rows: Int)?
     private var sentSize: (cols: Int, rows: Int)?
     private var retired = false
+    private var darkPalette: Bool?
 
     init(emit: @escaping (String) -> Void) { self.emit = emit }
+
+    func updateColors(_ colors: XgentTerminalColors, view: TerminalView) {
+        guard !retired, darkPalette != colors.dark else { return }
+        darkPalette = colors.dark
+        colors.apply(to: view)
+    }
 
     func update(value: String, view: TerminalView) {
         guard !retired else { return }

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 // needs (transpileModule/ModuleKind), so the transpile step stays on the
 // aliased typescript 6 package.
 import ts from "typescript-transpile";
+import "./monaco-grammar-node.mjs";
 
 const DEFAULT_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json"];
 

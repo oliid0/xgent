@@ -73,7 +73,7 @@ final class ControlRenderingTests: XCTestCase {
         #else
         let widths: [CGFloat] = [640, 1040]
         #endif
-        for family in ["actions", "fields", "choices"] {
+        for family in ["actions", "fields", "choices", "provider-models"] {
             for width in widths {
                 for size in [DynamicTypeSize.large, .accessibility3] {
                     let document = try document(nodes: fixtures(family))
@@ -208,6 +208,26 @@ final class ControlRenderingTests: XCTestCase {
     }
 
     private func fixtures(_ family: String) -> [[String: Any]] {
+        if family == "provider-models" {
+            return [false, true].map { selecting in
+                let suffix = selecting ? "selection" : "enabled"
+                let label = "relay/大上下文模型-with-a-long-provider-and-model-identifier"
+                let control = selecting
+                    ? node("model-select:\(suffix)", "Button", ["label": label, "selected": true,
+                        "variant": "model-selection", "action": "select-model"])
+                    : node("model:\(suffix)", "Switch", ["label": label, "value": true, "action": "enable-model"])
+                return node("model-row:\(suffix)", "VStack", ["variant": "provider-model-row", "children": [
+                    control,
+                    node("model-limits:\(suffix)", "Text", ["text": "1000K ctx · 64K out", "size": "small",
+                        "accessibilityLabel": "Context Window: 1000000. Max Output Token: 64000"]),
+                    node("model-actions:\(suffix)", "Menu", ["label": "Model settings", "icon": "ellipsis",
+                        "variant": "compact", "children": [
+                            node("model-edit:\(suffix)", "Button", ["label": "Edit model settings", "action": "edit-model"]),
+                            node("model-delete:\(suffix)", "Button", ["label": "Delete model", "destructive": true, "action": "delete-model"]),
+                        ]]),
+                ]])
+            }
+        }
         if family == "actions" {
             return [node("actions", "HStack", ["wrap": true, "spacing": 8, "children": [
                 node("primary", "Button", ["label": "Save", "variant": "primary", "action": "save"]),
@@ -234,6 +254,8 @@ final class ControlRenderingTests: XCTestCase {
             node("limit", "NumberInput", ["label": "Maximum retry attempts", "value": 3, "minimum": 0, "maximum": 10, "step": 1, "action": "limit"]),
             node("time", "TimeInput", ["label": "Scheduled backup time", "value": "09:30", "action": "time"]),
             node("font", "Slider", ["label": "Font scale", "value": 1, "minimum": 0.8, "maximum": 1.4, "step": 0.1, "action": "font"]),
+            node("accent", "ColorInput", ["label": "Light appearance accent", "value": "#abcdef", "action": "accent",
+                "accessibilityHint": "Enter a color in #RRGGBB format."]),
         ]
     }
 

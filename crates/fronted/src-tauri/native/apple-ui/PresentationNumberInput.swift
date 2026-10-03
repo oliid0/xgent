@@ -1,11 +1,13 @@
 import SwiftUI
 
-struct XgentNumberInputConstraints {
+struct XgentNumberInputConstraints: Equatable {
     let range: ClosedRange<Double>
     let step: Double
+    let maximum: Double?
 
-    init?(minimum: Double?, maximum: Double?, step: Double?) {
-        guard let minimum, let maximum, let step,
+    init?(minimum: Double?, maximum: Double?, step: Double?, allowsUnboundedMaximum: Bool = false) {
+        self.maximum = maximum
+        guard let minimum, let maximum = maximum ?? (allowsUnboundedMaximum ? Double.greatestFiniteMagnitude : nil), let step,
               minimum.isFinite, maximum.isFinite, step.isFinite,
               minimum <= maximum, step > 0 else { return nil }
         self.range = minimum...maximum
@@ -18,53 +20,35 @@ struct XgentNumberInputConstraints {
     }
 }
 
-/** Native typed numeric entry plus step controls, matching Astryx NumberInput. */
+/** Native whole-draft numeric entry; scrolling never changes a settings value. */
 struct XgentNumberInput: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    @Environment(\.xgentSettingsRow) private var isSettingsRow
 
     var body: some View {
-        if let limits = XgentNumberInputConstraints(minimum: node.minimum, maximum: node.maximum, step: node.step) {
-            let value = Binding<Double>(
-                get: {
-                    if case .number(let number) = model.value(node, in: document) {
-                        return limits.bounded(number) ?? limits.range.lowerBound
+        if let limits = XgentNumberInputConstraints(minimum: node.minimum, maximum: node.maximum, step: node.step,
+                                                   allowsUnboundedMaximum: node.clearable == true) {
+            Group {
+                if isSettingsRow {
+                    XgentSettingsValueRow(node: node) { editor(limits, inline: true) }
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        XgentFieldLabel(node: node)
+                        editor(limits, inline: false)
                     }
-                    return limits.range.lowerBound
-                },
-                set: { number in
-                    guard let bounded = limits.bounded(number) else { return }
-                    model.send(node, in: document, value: .number(bounded), editing: true)
-                }
-            )
-            VStack(alignment: .leading, spacing: 8) {
-                XgentFieldLabel(node: node)
-                HStack(spacing: 12) {
-                    numberField(value)
-                        .textFieldStyle(.plain)
-                        .modifier(XgentFieldSurface(node: node))
-                        .labelsHidden()
-                        .accessibilityLabel(node.label ?? "")
-                        .frame(minWidth: 60, maxWidth: .infinity)
-                    Stepper(node.label ?? "", value: value, in: limits.range, step: limits.step)
-                        .labelsHidden()
-                        .accessibilityLabel(node.label ?? "")
-                        .fixedSize()
-                        .frame(minHeight: 44)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .disabled(node.disabled == true)
+            .disabled(node.disabled == true || model.hasNumberCommitBatch(in: document))
         }
     }
 
-    @ViewBuilder private func numberField(_ value: Binding<Double>) -> some View {
-        #if os(iOS)
-        TextField(node.label ?? "", value: value, format: .number)
-            .keyboardType((node.step ?? 1) < 1 ? .decimalPad : .numbersAndPunctuation)
-        #else
-        TextField(node.label ?? "", value: value, format: .number)
-        #endif
+    private func editor(_ limits: XgentNumberInputConstraints, inline: Bool) -> some View {
+        XgentNumberInputEditor(node: node, document: document, model: model, limits: limits)
+            .id([document.surface, node.id, node.action ?? ""])
+            .frame(width: inline ? 160 : nil)
+            .frame(minWidth: 60, maxWidth: inline ? nil : .infinity)
     }
 }

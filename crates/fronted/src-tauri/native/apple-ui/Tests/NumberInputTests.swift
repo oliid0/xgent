@@ -46,12 +46,14 @@ final class NumberInputTests: XCTestCase {
             for size in [DynamicTypeSize.large, .accessibility3] {
                 let content = XgentNumberInput(node: document.nodes[0], document: document, model: model)
                     .environment(\.dynamicTypeSize, size)
+                    .environment(\.xgentSettingsRow, true)
                     .padding(16)
                     .frame(width: width, height: 260)
                 #if os(iOS)
                 let hosting = UIHostingController(rootView: content)
                 hosting.view.frame = CGRect(x: 0, y: 0, width: width, height: 260)
                 hosting.view.layoutIfNeeded()
+                XCTAssertLessThanOrEqual(hosting.sizeThatFits(in: CGSize(width: width, height: 260)).width, width + 1)
                 let strategy = Snapshotting<UIView, UIImage>.image(size: CGSize(width: width, height: 260))
                 let image = await withCheckedContinuation { continuation in
                     strategy.snapshot(hosting.view).run { continuation.resume(returning: $0) }
@@ -61,6 +63,7 @@ final class NumberInputTests: XCTestCase {
                 let hosting = NSHostingView(rootView: content)
                 hosting.frame = CGRect(x: 0, y: 0, width: width, height: 260)
                 hosting.layoutSubtreeIfNeeded()
+                XCTAssertLessThanOrEqual(hosting.fittingSize.width, width + 1)
                 let strategy = Snapshotting<NSView, NSImage>.image(size: CGSize(width: width, height: 260))
                 let image = await withCheckedContinuation { continuation in
                     strategy.snapshot(hosting).run { continuation.resume(returning: $0) }

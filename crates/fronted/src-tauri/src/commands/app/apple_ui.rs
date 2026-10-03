@@ -6,12 +6,45 @@ static NAVIGATION_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 extern "C" {
     fn xgent_native_ui_reset(webview: *mut std::ffi::c_void);
+    fn xgent_native_ui_font_families() -> *mut std::ffi::c_char;
+    fn xgent_native_ui_font_families_free(pointer: *mut std::ffi::c_char);
     fn xgent_native_ui_update(
         webview: *mut std::ffi::c_void,
         controller: *mut std::ffi::c_void,
         payload: *const std::ffi::c_char,
         action_result: bool,
     ) -> i32;
+}
+
+#[tauri::command]
+pub async fn apple_ui_font_families(window: tauri::Webview) -> Result<Vec<String>, String> {
+    if window.label() != "main" {
+        return Err("Native fonts are restricted to the main application window".into());
+    }
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        window
+            .with_webview(move |_| {
+                let result = unsafe {
+                    let pointer = xgent_native_ui_font_families();
+                    if pointer.is_null() {
+                        Err("Native font inventory is unavailable".into())
+                    } else {
+                        let data = std::ffi::CStr::from_ptr(pointer).to_bytes();
+                        let result = serde_json::from_slice::<Vec<String>>(data)
+                            .map_err(|error| error.to_string());
+                        xgent_native_ui_font_families_free(pointer);
+                        result
+                    }
+                };
+                let _ = sender.send(result);
+            })
+            .map_err(|error| error.to_string())?;
+        receiver.await.map_err(|error| error.to_string())?
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    Err("Native fonts require an Apple application target".into())
 }
 
 // A document reload destroys the JS action registry. Retiring the native host

@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 import type { PresentationHandler, PresentationNode, PresentationValue } from "./types";
 
 /** Shared state/action contract; each client owns its control layout and styling. */
@@ -72,6 +73,7 @@ export function presentationControls() {
       run: (value: number) => unknown,
       enabled = true,
       normalize?: (value: number) => number,
+      integerOnly = false,
     ): PresentationNode {
       return {
         id,
@@ -81,15 +83,68 @@ export function presentationControls() {
         minimum,
         maximum,
         step,
+        integerOnly,
         ...bind(
           id,
-          (next) => run(next as number),
-          (next) => typeof next === "number" && Number.isFinite(next),
+          (next) => {
+            let result: unknown;
+            flushSync(() => {
+              result = run(next as number);
+            });
+            return result;
+          },
+          (next) =>
+            typeof next === "number" &&
+            Number.isFinite(next) &&
+            (!integerOnly || Number.isInteger(next)),
           enabled,
           (next) => {
             const number = normalize ? normalize(next as number) : (next as number);
             return Math.min(maximum, Math.max(minimum, number));
           },
+        ),
+      };
+    },
+    optionalNumber(
+      id: string,
+      label: string,
+      value: number | null,
+      minimum: number,
+      maximum: number | undefined,
+      step: number,
+      run: (value: number | null) => unknown,
+      enabled = true,
+      integerOnly = false,
+    ): PresentationNode {
+      return {
+        id,
+        kind: "NumberInput",
+        label,
+        value,
+        minimum,
+        maximum,
+        step,
+        integerOnly,
+        clearable: true,
+        ...bind(
+          id,
+          (next) => {
+            let result: unknown;
+            flushSync(() => {
+              result = run(next as number | null);
+            });
+            return result;
+          },
+          (next) =>
+            next === null ||
+            (typeof next === "number" &&
+              Number.isFinite(next) &&
+              (!integerOnly || Number.isInteger(next))),
+          enabled,
+          (next) =>
+            next === null
+              ? null
+              : Math.min(maximum ?? Number.MAX_VALUE, Math.max(minimum, next as number)),
         ),
       };
     },

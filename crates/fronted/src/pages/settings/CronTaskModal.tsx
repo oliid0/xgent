@@ -37,9 +37,13 @@ import {
   validateCronExpression,
 } from "../../lib/automation";
 import { parseModelValue, toModelValue } from "../../lib/providers/llm";
+import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
+import type { AppSettings } from "../../lib/settings";
 import { type ExecutionMode, isAgentExecutionMode } from "../../lib/settings";
 import { presentationControls } from "../../presentation/controls";
 import { NativeSurface } from "../../presentation/NativeSurface";
+import { nativeHttpRequestEditor } from "../../presentation/nativeHttpRequestEditor";
+import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import {
@@ -51,6 +55,7 @@ import {
 } from "./httpRequestEditor";
 import { ModelPicker, type ModelPickerOption } from "./modelPicker";
 import { SettingsModalShell } from "./SettingsModalShell";
+import { useAutomationFormOperation } from "./useAutomationFormOperation";
 
 export type CronPromptModelOption = ModelPickerOption;
 
@@ -121,6 +126,7 @@ function isCronReasoningLevel(value: string): value is CronReasoningLevel {
 export type CronTaskFormData = Omit<CronTask, "id" | "enabled" | "lastError">;
 
 type CronTaskModalProps = {
+  settings?: AppSettings;
   mode: "add" | "edit";
   nativeSettingsSurfaceId?: string;
   nativePresentationMode?: "root" | "sheet";
@@ -139,6 +145,7 @@ type CronTaskModalProps = {
 };
 
 export function CronTaskModal({
+  settings,
   mode,
   nativeSettingsSurfaceId,
   nativePresentationMode,
@@ -200,7 +207,7 @@ export function CronTaskModal({
   );
   const [formError, setFormError] = useState<string | null>(null);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const { isSaving, begin, finish } = useAutomationFormOperation();
 
   const promptModelOptions =
     selectedModelValue &&
@@ -223,8 +230,10 @@ export function CronTaskModal({
     (type !== "prompt" || Boolean(prompt.trim() && parseModelValue(selectedModelValue)));
 
   async function handleSave() {
+    const current = begin();
+    if (!current) return;
     try {
-      setIsSaving(true);
+      setFormError(null);
       const trimmedName = name.trim();
       if (!trimmedName) throw new Error(`${t("settings.cronTaskName")} is required`);
       if (!cron.trim()) throw new Error(`${t("settings.cronExpression")} is required`);
@@ -245,6 +254,7 @@ export function CronTaskModal({
       }
 
       await validateCronExpression(cron.trim());
+      if (!current()) return;
 
       const trimmedPrompt = prompt.trim();
       const trimmedScript = scriptText.trim();
@@ -289,11 +299,11 @@ export function CronTaskModal({
       };
 
       await onSave(data);
-      onClose();
+      if (current()) onClose();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : String(err));
+      if (current()) setFormError(err instanceof Error ? err.message : String(err));
     } finally {
-      setIsSaving(false);
+      finish(current);
     }
   }
 
@@ -313,20 +323,32 @@ export function CronTaskModal({
         c.input("name", t("settings.cronTaskName"), name, setName),
         c.input("description", t("settings.cronDescription"), description, setDescription),
         c.input("cron", t("settings.cronExpression"), cron, setCron),
-        c.input(
-          "remaining",
-          t("settings.cronRemainingExecutions"),
-          remainingExecutions == null ? "" : String(remainingExecutions),
-          (value) => {
-            if (value && !/^\d+$/.test(value))
-              throw new Error(t("settings.cronRemainingExecutionsInvalid"));
-            setRemainingExecutions(value ? Number(value) : null);
-          },
+        {
+          ...c.optionalNumber(
+            "remaining",
+            t("settings.cronRemainingExecutions"),
+            remainingExecutions,
+            0,
+            undefined,
+            1,
+            setRemainingExecutions,
+            !isSaving,
+            true,
+          ),
+          text: t("settings.cronRemainingExecutionsPlaceholder"),
+        },
+        c.number(
+          "timeout",
+          t("settings.cronTimeoutSeconds"),
+          timeoutSeconds,
+          MIN_CRON_TIMEOUT_SECONDS,
+          MAX_CRON_TIMEOUT_SECONDS,
+          1,
+          setTimeoutSeconds,
+          !isSaving,
+          undefined,
+          true,
         ),
-        c.input("timeout", t("settings.cronTimeoutSeconds"), String(timeoutSeconds), (value) => {
-          if (!/^\d+$/.test(value)) throw new Error(t("settings.cronTimeoutSecondsInvalid"));
-          setTimeoutSeconds(Number(value));
-        }),
         c.select(
           "type",
           t("settings.cronTaskType"),
@@ -346,6 +368,8 @@ export function CronTaskModal({
             {
               ...c.input("script", t("settings.cronCommand"), scriptText, setScriptText),
               kind: "TextArea" as const,
+              language: "bash",
+              minHeight: 200,
             },
           ]
         : []),
@@ -376,12 +400,55 @@ export function CronTaskModal({
         : []),
       ...(type !== "http"
         ? [
-            c.input("workdir", t("settings.cronWorkdir"), workdir, setWorkdir),
+            c.select(
+              "workdir-mode",
+              t("settings.cronWorkdir"),
+              customWorkdir ? CUSTOM_WORKDIR_VALUE : workdir || FOLLOW_ACTIVE_WORKSPACE_VALUE,
+              [
+                {
+                  value: FOLLOW_ACTIVE_WORKSPACE_VALUE,
+                  label: t("settings.cronWorkdirFollowActive"),
+                },
+                ...workspaceOptions.map((option) => ({ value: option.path, label: option.name })),
+                { value: CUSTOM_WORKDIR_VALUE, label: t("settings.cronWorkdirCustom") },
+              ],
+              (value) => {
+                setFormError(null);
+                if (value === CUSTOM_WORKDIR_VALUE) {
+                  setCustomWorkdir(true);
+                  return;
+                }
+                setCustomWorkdir(false);
+                setWorkdir(value === FOLLOW_ACTIVE_WORKSPACE_VALUE ? "" : value);
+              },
+              !isSaving,
+            ),
+            ...(customWorkdir
+              ? [
+                  c.input(
+                    "workdir",
+                    t("settings.cronWorkdir"),
+                    workdir,
+                    setWorkdir,
+                    false,
+                    !isSaving,
+                  ),
+                ]
+              : []),
+            {
+              id: "workdir-hint",
+              kind: "Text" as const,
+              text: t("settings.cronWorkdirHint"),
+              secondary: true,
+            },
             ...(onPickWorkdir
               ? [
                   c.action("pick-workdir", t("chat.mobileWorkspace.chooseFolder"), async () => {
                     const selected = await onPickWorkdir(workdir);
-                    if (selected) setWorkdir(selected);
+                    if (selected) {
+                      setWorkdir(selected);
+                      setCustomWorkdir(!findWorkspaceOptionByPath(workspaceOptions, selected));
+                    }
                   }),
                 ]
               : []),
@@ -389,52 +456,18 @@ export function CronTaskModal({
         : []),
     ];
     if (type === "http") {
-      for (const request of requests) {
-        const patch = (next: Partial<HttpRequestDraft>) =>
-          setRequests((current) =>
-            current.map((item) => (item.id === request.id ? { ...item, ...next } : item)),
-          );
-        nodes.push(
-          c.group(request.id, "HTTP", [
-            c.input(`${request.id}:url`, "URL", request.url, (url) => patch({ url })),
-            c.select(
-              `${request.id}:method`,
-              "Method",
-              request.method,
-              ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"].map((value) => ({
-                value,
-                label: value,
-              })),
-              (method) => patch({ method: method as HttpRequestDraft["method"] }),
-            ),
-            {
-              ...c.input(
-                `${request.id}:headers`,
-                "Headers (JSON)",
-                request.headersText,
-                (headersText) => patch({ headersText }),
-              ),
-              kind: "TextArea",
-            },
-            {
-              ...c.input(`${request.id}:body`, "Body (JSON)", request.bodyText, (bodyText) =>
-                patch({ bodyText }),
-              ),
-              kind: "TextArea",
-            },
-            {
-              ...c.action(`${request.id}:remove`, t("settings.delete"), () =>
-                setRequests((current) => current.filter((item) => item.id !== request.id)),
-              ),
-              destructive: true,
-            },
-          ]),
-        );
-      }
       nodes.push(
-        c.action("add-request", t("settings.add"), () =>
-          setRequests((current) => [...current, createEmptyRequestDraft()]),
-        ),
+        ...nativeHttpRequestEditor({
+          controls: c,
+          requests,
+          expanded: expandedRequest,
+          setExpanded: setExpandedRequest,
+          setRequests,
+          clearError: () => setFormError(null),
+          t,
+          enabled: !isSaving,
+          idPrefix: "cron-http",
+        }),
       );
     }
     if (formError) nodes.push({ id: "error", kind: "Text", text: formError });
@@ -448,7 +481,17 @@ export function CronTaskModal({
         document={{
           mode: nativePresentationMode ?? "sheet",
           title: modalTitle,
-          appearance: "system",
+          appearance: settings?.theme ?? "system",
+          formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
+          ...(settings
+            ? {
+                theme: createNativePresentationTheme(
+                  settings,
+                  isNativeMobileRuntime(),
+                  "workspaceTools",
+                ),
+              }
+            : {}),
           nodes,
           dismissAction: isSaving ? undefined : "close",
         }}

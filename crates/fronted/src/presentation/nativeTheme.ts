@@ -1,6 +1,7 @@
 import { resolveThemeTokens } from "@astryxdesign/core/theme/tokens";
 import type { AppSettings } from "../lib/settings";
 import { createAppearanceTheme } from "../theme/appearanceTheme";
+import { cssColor } from "./nativeColor";
 import { type PresentationTokenName, presentationThemeTokens } from "./themeTokens";
 import type { PresentationPalette, PresentationTheme } from "./types";
 
@@ -53,44 +54,6 @@ function fraction(value: string | number, fallbackValue: number) {
   if (trimmed.endsWith("%")) return Number(trimmed.slice(0, -1)) / 100;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : fallbackValue;
-}
-
-function byte(value: string) {
-  const parsed = value.trim().endsWith("%")
-    ? (Number(value.trim().slice(0, -1)) / 100) * 255
-    : Number(value);
-  return Math.max(0, Math.min(255, Math.round(parsed)));
-}
-
-/** Swift validates hexadecimal colors, so normalize Astryx's resolved CSS colors at the boundary. */
-function cssColor(value: string | number, fallbackValue: string) {
-  if (typeof value !== "string") return fallbackValue;
-  const normalized = value.trim();
-  if (/^#[\da-f]{6}([\da-f]{2})?$/i.test(normalized)) return normalized.toLowerCase();
-  if (/^#[\da-f]{3,4}$/i.test(normalized)) {
-    const parts = normalized
-      .slice(1)
-      .split("")
-      .map((part) => `${part}${part}`);
-    return `#${parts.join("")}`.toLowerCase();
-  }
-  const rgb = /^rgba?\((.+)\)$/i.exec(normalized);
-  if (!rgb) return fallbackValue;
-  const [channelsText, alphaText] = rgb[1]
-    .replaceAll(",", " ")
-    .split("/")
-    .map((part) => part.trim());
-  const channels = channelsText.split(/\s+/).filter(Boolean);
-  if (channels.length !== 3) return fallbackValue;
-  const channelsHex = channels.map((channel) => byte(channel).toString(16).padStart(2, "0"));
-  const alpha = alphaText ? Math.max(0, Math.min(1, fraction(alphaText, 1))) : 1;
-  return `#${channelsHex.join("")}${
-    alpha < 1
-      ? Math.round(alpha * 255)
-          .toString(16)
-          .padStart(2, "0")
-      : ""
-  }`;
 }
 
 function cubicCurve(value: string | number): [number, number, number, number] {
@@ -207,5 +170,10 @@ export function createNativePresentationTheme(
       ),
     },
     fontScale: settings.customSettings.fontScale[fontZone],
+    fontFamily:
+      fontZone === "chat"
+        ? settings.customSettings.chatFontFamily
+        : settings.customSettings.interfaceFontFamily,
+    codeFontFamily: settings.customSettings.codeFontFamily,
   };
 }

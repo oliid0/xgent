@@ -5,175 +5,61 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { invoke, isBrowserRuntime, listen } from "@xgent/runtime";
-import { useEffect, useState } from "react";
 import { useConfirmDialog } from "../../components/astryx/useConfirmDialog";
 import { useLocale } from "../../i18n";
+import type { ComputerUsePermission } from "../../lib/computerUseSettings";
 import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
-import { updateMcp } from "../../lib/settings";
-import { createMcpTools } from "../../lib/tools/mcpTools";
 import { presentationControls } from "../../presentation/controls";
 import { NativeSurface } from "../../presentation/NativeSurface";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import type { SettingsSectionProps } from "./types";
-
-type Status = {
-  enabled: boolean;
-  installed: boolean;
-  target: string;
-  version: string | null;
-  permissionsRequired: boolean;
-};
-
-type DriverInstallPreview = {
-  display: string;
-  sourceUrl: string;
-};
-
-type DriverProbe = {
-  installed: boolean;
-  path: string | null;
-  version: string | null;
-  mcpCommand: string | null;
-  mcpArgs: string[];
-  error: string | null;
-};
-
-type DriverInstallProgress = { stream: string; line: string };
+import { useComputerUseSettings } from "./useComputerUseSettings";
 
 export function ComputerUseSection({
   settings,
   setSettings,
   onBack,
+  nativeSettingsSurfaceId,
 }: SettingsSectionProps & { onBack?: () => void }) {
   const { t } = useLocale();
   const { confirm, dialog } = useConfirmDialog();
-  const [status, setStatus] = useState<Status>();
-  const [supported, setSupported] = useState<boolean | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [driverPath, setDriverPath] = useState("cua-driver");
-  const [driverResult, setDriverResult] = useState("");
-  const [installProgress, setInstallProgress] = useState("");
-  const selectedDriver = settings.mcp.computerUseDriverId;
-  const driver = settings.mcp.servers.find((server) => server.id === selectedDriver);
-
-  async function checkDriver() {
-    if (!driver) return;
-    setBusy(true);
-    setError("");
-    setDriverResult("");
-    try {
-      const bundle = await createMcpTools({ servers: [driver], loadFailureMode: "throw" });
-      if (!bundle.tools.length) throw new Error(t("settings.cua.driverEmpty"));
-      setDriverResult(bundle.tools.map((tool) => tool.name).join(", "));
-    } catch (cause) {
-      setError(String(cause));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function installDriver() {
-    if (busy || supported !== true) return;
-    setError("");
-    let preview: DriverInstallPreview;
-    try {
-      preview = await invoke<DriverInstallPreview>("cua_driver_install_command");
-    } catch (cause) {
-      setError(String(cause));
-      return;
-    }
-    const approved = await confirm({
-      title: t("settings.cua.installConfirmTitle"),
-      description: t("settings.cua.installConfirmDescription"),
-      detail: `${preview.display}\n${preview.sourceUrl}`,
-      confirmLabel: t("settings.cua.installDriver"),
-      cancelLabel: t("settings.cancel"),
-      tone: "warning",
-    });
-    if (!approved) return;
-
-    setBusy(true);
-    setInstallProgress("");
-    let unlisten: (() => void) | undefined;
-    try {
-      unlisten = await listen<DriverInstallProgress>(
-        "cua_driver_install_progress",
-        ({ payload }) => {
-          setInstallProgress(payload.line);
-        },
-      );
-      const probe = await invoke<DriverProbe>("cua_driver_install");
-      if (!probe.installed || !probe.path || !probe.mcpCommand || probe.error) {
-        throw new Error(probe.error || t("settings.cua.installProbeFailed"));
-      }
-      setDriverPath(probe.path);
-      setSettings((previous) =>
-        updateMcp(previous, {
-          computerUseDriverId: "cua-driver",
-          servers: [
-            ...previous.mcp.servers.filter((server) => server.id !== "cua-driver"),
-            {
-              id: "cua-driver",
-              description: "CUA driver",
-              enabled: true,
-              transport: "stdio",
-              command: probe.mcpCommand!,
-              args: probe.mcpArgs,
-              url: "",
-              timeoutMs: 60_000,
-            },
-          ],
-        }),
-      );
-      setDriverResult(`${t("settings.cua.installComplete")} ${probe.version ?? ""}`.trim());
-    } catch (cause) {
-      setError(String(cause));
-    } finally {
-      unlisten?.();
-      setBusy(false);
-    }
-  }
-
-  useEffect(() => {
-    let disposed = false;
-    if (isBrowserRuntime()) {
-      setSupported(false);
-      return;
-    }
-    void invoke<{ platform: string }>("app_runtime_platform")
-      .then(async ({ platform }) => {
-        if (disposed) return;
-        if (!["windows", "linux", "macos"].includes(platform)) {
-          setSupported(false);
-          return;
-        }
-        setSupported(true);
-        const next = await invoke<Status>("cua_status");
-        if (!disposed) setStatus(next);
-      })
-      .catch((cause) => {
-        if (!disposed) setError(String(cause));
-      });
-    return () => {
-      disposed = true;
-    };
-  }, []);
-
-  async function run(command: "cua_status" | "cua_set_enabled", enabled?: boolean) {
-    setBusy(true);
-    setError("");
-    try {
-      setStatus(await invoke<Status>(command, enabled === undefined ? {} : { enabled }));
-    } catch (cause) {
-      setError(String(cause));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const {
+    status,
+    supported,
+    busy,
+    error,
+    setError,
+    driverPath,
+    setDriverPath,
+    driverResult,
+    installProgress,
+    selectedDriver,
+    driver,
+    run,
+    requestPermission,
+    checkDriver,
+    installDriver,
+    selectDriver,
+    addDriver,
+  } = useComputerUseSettings({ settings, setSettings }, confirm, t);
+  const permissionEntries: Array<{
+    id: ComputerUsePermission;
+    label: string;
+    description: string;
+  }> = [
+    {
+      id: "accessibility",
+      label: t("settings.cua.accessibility"),
+      description: t("settings.cua.accessibilityDescription"),
+    },
+    {
+      id: "screenCapture",
+      label: t("settings.cua.screenCapture"),
+      description: t("settings.cua.screenCaptureDescription"),
+    },
+  ];
 
   if (isApplePresentationRuntime()) {
     const compact = isNativeMobileRuntime();
@@ -202,14 +88,8 @@ export function ComputerUseSection({
               label: server.description || server.id,
             })),
           ],
-          (value) => {
-            setDriverResult("");
-            setSettings((previous) =>
-              updateMcp(previous, {
-                computerUseDriverId: value === "native" ? undefined : value,
-              }),
-            );
-          },
+          selectDriver,
+          !busy,
         ),
         c.input(
           "computer-use-driver-path",
@@ -217,28 +97,16 @@ export function ComputerUseSection({
           driverPath,
           setDriverPath,
         ),
+        {
+          id: "computer-use-driver-description",
+          kind: "Text",
+          text: t("settings.cua.driverDescription"),
+          secondary: true,
+        },
         c.action(
           "computer-use-add-driver",
           t("settings.cua.addDriver"),
-          () =>
-            setSettings((previous) =>
-              updateMcp(previous, {
-                computerUseDriverId: "cua-driver",
-                servers: [
-                  ...previous.mcp.servers.filter((server) => server.id !== "cua-driver"),
-                  {
-                    id: "cua-driver",
-                    description: "CUA driver",
-                    enabled: true,
-                    transport: "stdio",
-                    command: driverPath.trim(),
-                    args: ["mcp"],
-                    url: "",
-                    timeoutMs: 60_000,
-                  },
-                ],
-              }),
-            ),
+          addDriver,
           !!driverPath.trim() && !busy && supported === true,
         ),
         c.action(
@@ -263,6 +131,16 @@ export function ComputerUseSection({
                 checkDriver,
                 !busy && Boolean(driver?.enabled),
               ),
+              ...(driver && !driver.enabled
+                ? [
+                    {
+                      id: "computer-use-driver-disabled",
+                      kind: "Banner" as const,
+                      label: t("settings.cua.driverDisabled"),
+                      status: "error" as const,
+                    },
+                  ]
+                : []),
             ]
           : []),
         ...(driverResult
@@ -297,6 +175,52 @@ export function ComputerUseSection({
                 !busy && supported === true,
               ),
             ]),
+            ...(status?.enabled && status.permissionsRequired
+              ? [
+                  {
+                    id: "computer-use-permission-hint",
+                    kind: "Text" as const,
+                    text: t("settings.cua.permissions"),
+                    secondary: true,
+                  },
+                ]
+              : []),
+            ...(status?.permissions
+              ? [
+                  c.group(
+                    "computer-use-permissions",
+                    t("settings.cua.permissionsTitle"),
+                    permissionEntries.map(({ id, label, description }) => ({
+                      id: `computer-use-permission:${id}`,
+                      kind: "VStack" as const,
+                      variant: "computer-use-permission",
+                      label,
+                      text: description,
+                      spacing: 8,
+                      children: [
+                        {
+                          id: `computer-use-permission:${id}:status`,
+                          kind: "Badge" as const,
+                          label: t(
+                            status.permissions?.[id]
+                              ? "settings.cua.granted"
+                              : "settings.cua.notGranted",
+                          ),
+                          status: status.permissions?.[id]
+                            ? ("completed" as const)
+                            : ("pending" as const),
+                        },
+                        c.action(
+                          `computer-use-permission:${id}:request`,
+                          t("settings.cua.requestPermission"),
+                          () => requestPermission(id),
+                          !busy && supported === true && !status.permissions?.[id],
+                        ),
+                      ],
+                    })),
+                  ),
+                ]
+              : []),
           ]
         : []),
       ...(busy
@@ -326,6 +250,7 @@ export function ComputerUseSection({
     return (
       <>
         <NativeSurface
+          sessionSurface={nativeSettingsSurfaceId}
           document={{
             mode: "sheet",
             title: t("settings.cua.title"),
@@ -363,12 +288,7 @@ export function ComputerUseSection({
                 label: server.description || server.id,
               })),
             ]}
-            onChange={(value) => {
-              setDriverResult("");
-              setSettings((prev) =>
-                updateMcp(prev, { computerUseDriverId: value === "native" ? undefined : value }),
-              );
-            }}
+            onChange={selectDriver}
           />
           <Text type="supporting">{t("settings.cua.driverDescription")}</Text>
           <TextInput
@@ -381,32 +301,13 @@ export function ComputerUseSection({
             isDisabled={
               !driverPath.trim() || busy || supported !== true || status?.target === "android"
             }
-            onClick={() =>
-              setSettings((prev) =>
-                updateMcp(prev, {
-                  computerUseDriverId: "cua-driver",
-                  servers: [
-                    ...prev.mcp.servers.filter((server) => server.id !== "cua-driver"),
-                    {
-                      id: "cua-driver",
-                      description: "CUA driver",
-                      enabled: true,
-                      transport: "stdio",
-                      command: driverPath.trim(),
-                      args: ["mcp"],
-                      url: "",
-                      timeoutMs: 60_000,
-                    },
-                  ],
-                }),
-              )
-            }
+            onClick={addDriver}
           />
           <Button
             label={t("settings.cua.installDriver")}
             variant="ghost"
             isDisabled={busy || supported !== true}
-            onClick={() => void installDriver()}
+            onClick={() => void installDriver().catch(() => undefined)}
           />
           {selectedDriver ? (
             <VStack gap={2}>
@@ -421,7 +322,7 @@ export function ComputerUseSection({
               <Button
                 label={t("settings.cua.checkDriver")}
                 isDisabled={busy || !driver?.enabled}
-                onClick={() => void checkDriver()}
+                onClick={() => void checkDriver().catch(() => undefined)}
               />
               {driverResult ? (
                 <Text role="status" style={{ overflowWrap: "anywhere" }}>
@@ -437,13 +338,38 @@ export function ComputerUseSection({
                 label={t("settings.cua.enable")}
                 value={status?.enabled ?? false}
                 isDisabled={busy || !status}
-                onChange={(enabled) => void run("cua_set_enabled", enabled)}
+                onChange={(enabled) => void run("cua_set_enabled", enabled).catch(() => undefined)}
               />
               <Text type="supporting">
                 {status
                   ? `${t("settings.cua.installed")} · ${status.target} · ${status.version}`
                   : t("settings.cua.loading")}
               </Text>
+              {status?.permissions ? (
+                <VStack gap={3}>
+                  <Heading level={4}>{t("settings.cua.permissionsTitle")}</Heading>
+                  {permissionEntries.map(({ id, label, description }) => (
+                    <VStack key={id} gap={1}>
+                      <Text>
+                        {label}:{" "}
+                        {t(
+                          status.permissions?.[id]
+                            ? "settings.cua.granted"
+                            : "settings.cua.notGranted",
+                        )}
+                      </Text>
+                      <Text type="supporting" color="secondary">
+                        {description}
+                      </Text>
+                      <Button
+                        label={t("settings.cua.requestPermission")}
+                        isDisabled={busy || Boolean(status.permissions?.[id])}
+                        onClick={() => void requestPermission(id).catch(() => undefined)}
+                      />
+                    </VStack>
+                  ))}
+                </VStack>
+              ) : null}
               {status?.permissionsRequired && status.enabled ? (
                 <VStack gap={2}>
                   <Text type="supporting">
@@ -457,13 +383,13 @@ export function ComputerUseSection({
                     <Button
                       label={t("settings.cua.openPermissions")}
                       isDisabled={busy}
-                      onClick={() => void run("cua_set_enabled", true)}
+                      onClick={() => void run("cua_set_enabled", true).catch(() => undefined)}
                     />
                   ) : null}
                   <Button
                     label={t("settings.cua.refresh")}
                     isDisabled={busy}
-                    onClick={() => void run("cua_status")}
+                    onClick={() => void run("cua_status").catch(() => undefined)}
                   />
                 </VStack>
               ) : null}
@@ -477,7 +403,7 @@ export function ComputerUseSection({
               <Button
                 label={t("settings.cua.refresh")}
                 isDisabled={busy}
-                onClick={() => void run("cua_status")}
+                onClick={() => void run("cua_status").catch(() => undefined)}
               />
             </VStack>
           ) : null}

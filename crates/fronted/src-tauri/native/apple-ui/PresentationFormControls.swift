@@ -60,15 +60,14 @@ struct XgentSelector: View {
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
     var showsLabel = true
+    @Environment(\.xgentSettingsRow) private var isSettingsRow
 
     private var selectedLabel: String {
         node.options?.first { $0.value == model.value(node, in: document).text }?.label ?? node.text ?? ""
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if showsLabel { XgentFieldLabel(node: node) }
-            Menu {
+    private var menu: some View {
+        Menu {
                 ForEach(node.options ?? []) { option in
                     Button {
                         model.send(node, in: document, value: .string(option.value), editing: true)
@@ -82,19 +81,51 @@ struct XgentSelector: View {
             } label: {
                 HStack(spacing: 8) {
                     Text(selectedLabel).fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 8)
+                    if !isSettingsRow { Spacer(minLength: 8) }
                     Image(systemName: "chevron.up.chevron.down").font(.caption).accessibilityHidden(true)
                 }
-                .modifier(XgentFieldSurface(node: node))
+                .modifier(XgentSelectorSurface(node: node, isSettingsRow: isSettingsRow))
             }
             .menuStyle(.button)
             .menuIndicator(.hidden)
             .buttonStyle(.plain)
             .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
             .accessibilityValue(selectedLabel)
+            .accessibilityHint(node.accessibilityHint ?? node.text ?? "")
             .accessibilityActivationPoint(.center)
+    }
+
+    var body: some View {
+        Group {
+            if isSettingsRow && showsLabel {
+                XgentSettingsValueRow(node: node) { menu }
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    if showsLabel { XgentFieldLabel(node: node) }
+                    menu
+                }
+            }
         }
         .disabled(node.disabled == true)
+    }
+}
+
+private struct XgentSelectorSurface: ViewModifier {
+    let node: XgentNode
+    let isSettingsRow: Bool
+
+    @ViewBuilder func body(content: Content) -> some View {
+        #if os(iOS)
+        if isSettingsRow {
+            content
+                .modifier(XgentControlTypography(node: node))
+                .foregroundStyle(.secondary)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        } else { content.modifier(XgentFieldSurface(node: node)) }
+        #else
+        content.modifier(XgentFieldSurface(node: node))
+        #endif
     }
 }
 
@@ -102,16 +133,26 @@ struct XgentSwitch: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    @Environment(\.xgentPresentationTheme) private var theme
+    @ScaledMetric(relativeTo: .subheadline) private var supportingScale = 1.0
 
     var body: some View {
         Toggle(isOn: Binding(
             get: { model.value(node, in: document).boolean },
             set: { model.send(node, in: document, value: .bool($0), editing: true) }
         )) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(node.label ?? "").fixedSize(horizontal: false, vertical: true)
-                if let text = node.text, !text.isEmpty {
-                    Text(text).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                if let icon = node.icon {
+                    Image(systemName: icon).frame(width: 24).accessibilityHidden(true)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(node.label ?? "").fixedSize(horizontal: false, vertical: true)
+                    if let text = node.text, !text.isEmpty {
+                        Text(text)
+                            .font(XgentFonts.body(theme.fontFamily,
+                                size: CGFloat(theme.typography.supporting * theme.fontScale) * supportingScale))
+                            .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }

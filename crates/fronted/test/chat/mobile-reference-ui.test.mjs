@@ -75,9 +75,9 @@ test("mobile navigation and settings retain Astryx drawer and bottom-sheet hiera
   assert.doesNotMatch(nativeSettingsSource, /<MobileSkillsPage|<MobileMcpPage|nav:skills|nav:mcp/);
   assert.doesNotMatch(settingsSource, /id: "skills"|id: "mcp"/);
   assert.equal((mobileMcpSource.match(/<NativeSurface\b/g) ?? []).length, 1);
-  assert.match(nativeBrowserSource, /browser-toolbar[\s\S]*?browser-address[\s\S]*?browser-close[\s\S]*?browser-viewport/);
-  assert.match(nativeBrowserSource, /\.\.\.\(compact \? mobileChrome : \[\]\)/);
-  assert.match(nativeBrowserSource, /\.\.\.\(!compact\s*\?\s*\(\[[\s\S]*?id: "browser-title"[\s\S]*?id: "browser-status"/);
+  assert.match(nativeBrowserSource, /variant: "browser-address-entry"/);
+  assert.match(nativeBrowserSource, /variant: "browser-navigation"[\s\S]*?compact[\s\S]*?browser-close[\s\S]*?browser-viewport/);
+  assert.match(nativeBrowserSource, /!compact[\s\S]*?id: "browser-title"[\s\S]*?id: "browser-status"/);
   assert.match(nativeFilesSource, /files-header[\s\S]*?files-search-row[\s\S]*?files-actions/);
   assert.doesNotMatch(nativeFilesSource, /id: "files-hidden"/);
   assert.match(appSource, /<BottomSheet[\s\S]*?height="tall"[\s\S]*?<SettingsPage/);

@@ -1,0 +1,73 @@
+import SwiftUI
+
+private struct XgentSettingsRowKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var xgentSettingsRow: Bool {
+        get { self[XgentSettingsRowKey.self] }
+        set { self[XgentSettingsRowKey.self] = newValue }
+    }
+}
+
+// A setting has one label and one value. Long translations and accessibility
+// text move the value below its label, without shrinking either control.
+struct XgentSettingsValueRow<Content: View>: View {
+    let node: XgentNode
+    let content: Content
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.xgentPresentationTheme) private var theme
+    @ScaledMetric(relativeTo: .subheadline) private var detailScale = 1.0
+
+    init(node: XgentNode, @ViewBuilder content: () -> Content) {
+        self.node = node
+        self.content = content()
+    }
+
+    private var label: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            if let icon = node.icon {
+                Image(systemName: icon).frame(width: 24).accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                XgentFieldLabel(node: node)
+                if let text = node.text, !text.isEmpty {
+                    Text(text)
+                        .font(XgentFonts.body(theme.fontFamily,
+                            size: CGFloat(theme.typography.supporting * theme.fontScale) * detailScale))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityHidden(true)
+                }
+            }
+        }
+    }
+
+    private var stacked: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            label.fixedSize(horizontal: false, vertical: true)
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize { stacked }
+            else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: 20) {
+                        label.frame(minWidth: 140, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 8)
+                        content.fixedSize(horizontal: true, vertical: false)
+                    }
+                    stacked
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .accessibilityElement(children: .contain)
+    }
+}

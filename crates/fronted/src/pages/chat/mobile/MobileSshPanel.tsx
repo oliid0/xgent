@@ -12,7 +12,7 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
 import { invoke } from "@xgent/runtime";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Key,
@@ -25,11 +25,12 @@ import {
 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
-import type { SshHostConfig } from "../../../lib/settings";
+import type { AppSettings, SshHostConfig } from "../../../lib/settings";
 import { runNativeSshCommand } from "../../../lib/terminal/runNativeSshCommand";
 import type { TerminalSshPrompt } from "../../../lib/terminal/types";
 import { presentationControls } from "../../../presentation/controls";
 import { NativeSurface } from "../../../presentation/NativeSurface";
+import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
 import type { PresentationNode } from "../../../presentation/types";
 import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import { MobileFullscreenPanel } from "./MobilePanelScaffold";
@@ -56,6 +57,7 @@ type MobileSshPanelProps = {
   workdir: string;
   projectPathKey: string;
   hosts: SshHostConfig[];
+  settings?: AppSettings;
   associatedHostIds: string[];
   onAssociatedHostIdsChange: (hostIds: string[]) => void;
   onOpenSettings: () => void;
@@ -91,8 +93,17 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
   } = props;
   const { t } = useLocale();
   const [selectedHostId, setSelectedHostId] = useState("");
-  const [command, setCommand] = useState("");
-  const [keyboardResponse, setKeyboardResponse] = useState("");
+  const [command, setCommandState] = useState("");
+  const [keyboardResponse, setKeyboardResponseState] = useState("");
+  const drafts = useRef({ command: "", keyboardResponse: "", promptAnswer: "" });
+  const setCommand = useCallback((value: string) => {
+    drafts.current.command = value;
+    setCommandState(value);
+  }, []);
+  const setKeyboardResponse = useCallback((value: string) => {
+    drafts.current.keyboardResponse = value;
+    setKeyboardResponseState(value);
+  }, []);
   const [entries, setEntries] = useState<SshCommandEntry[]>([]);
   const [activeRunId, setActiveRunId] = useState("");
   const mobile = isNativeMobileRuntime();
@@ -101,7 +112,11 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
     prompt: TerminalSshPrompt;
     answer: (value: { answer?: string; trustHostKey?: boolean }) => void;
   } | null>(null);
-  const [promptAnswer, setPromptAnswer] = useState("");
+  const [promptAnswer, setPromptAnswerState] = useState("");
+  const setPromptAnswer = useCallback((value: string) => {
+    drafts.current.promptAnswer = value;
+    setPromptAnswerState(value);
+  }, []);
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedHost = useMemo(
     () => hosts.find((host) => host.id === selectedHostId) ?? null,
@@ -165,7 +180,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
     setActiveRunId("");
     setSshPrompt(null);
     setPromptAnswer("");
-  }, [scopeKey]);
+  }, [scopeKey, setCommand, setKeyboardResponse, setPromptAnswer]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -173,19 +188,21 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
 
   const run = async (event?: FormEvent) => {
     event?.preventDefault();
-    const remoteCommand = command.trim();
+    const remoteCommand = drafts.current.command.trim();
+    const keyboardAnswer = drafts.current.keyboardResponse;
     if (
       !selectedHost ||
       !remoteCommand ||
       !isCurrentScope() ||
       runScope.runId ||
       !workdir.trim() ||
-      (mobile && selectedHost.authType === "keyboardInteractive" && !keyboardResponse.trim())
+      (mobile && selectedHost.authType === "keyboardInteractive" && !keyboardAnswer.trim())
     )
       return;
     const id = createRunId();
     runScope.runId = id;
     setCommand("");
+    setKeyboardResponse("");
     setActiveRunId(id);
     setEntries((current) => [...current, { id, command: remoteCommand }]);
     const controller = new AbortController();
@@ -197,7 +214,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
             workdir,
             remote_command: remoteCommand,
             keyboard_response:
-              selectedHost.authType === "keyboardInteractive" ? keyboardResponse : null,
+              selectedHost.authType === "keyboardInteractive" ? keyboardAnswer : null,
             timeout_ms: 300_000,
             run_id: id,
           })
@@ -222,15 +239,19 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
                   return;
                 }
                 setPromptAnswer("");
+                let submitted = false;
                 setSshPrompt({
                   prompt,
                   answer: (value) => {
+                    if (submitted) return;
+                    submitted = true;
                     controller.signal.removeEventListener("abort", abort);
                     if (!isCurrentRun(id) || controller.signal.aborted) {
                       abort();
                       return;
                     }
                     setSshPrompt(null);
+                    setPromptAnswer("");
                     resolve(value);
                   },
                 });
@@ -251,6 +272,7 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
       if (isCurrentRun(id)) {
         runScope.runId = "";
         setSshPrompt(null);
+        setPromptAnswer("");
         setActiveRunId("");
       }
     }
@@ -268,6 +290,11 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
     desktopRun.current?.abort();
     const runId = runScope.runId;
     runScope.runId = "";
+    runScope.active = false;
+    runScope.revision += 1;
+    setCommand("");
+    setKeyboardResponse("");
+    setPromptAnswer("");
     if (runId) void invoke("shell_cancel", { run_id: runId }).catch(() => undefined);
     onClose();
   };
@@ -317,27 +344,73 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
             : []),
           ...entries.map((entry) =>
             c.group(entry.id, `$ ${entry.command}`, [
-              {
-                id: `${entry.id}:output`,
-                kind: "Text",
-                text:
-                  entry.error ||
-                  [entry.response?.stdout, entry.response?.stderr].filter(Boolean).join("\n"),
-              },
-              ...(entry.response
+              ...(
+                [
+                  ["stdout", entry.response?.stdout],
+                  ["stderr", entry.response?.stderr],
+                  ["error", entry.error],
+                ] as const
+              ).flatMap(([stream, text]): PresentationNode[] =>
+                text
+                  ? [
+                      {
+                        id: `${entry.id}:${stream}`,
+                        kind: "CodeBlock",
+                        label: stream,
+                        language: "plaintext",
+                        text,
+                      },
+                    ]
+                  : [],
+              ),
+              ...((entry.response?.exitCode ?? entry.response?.exit_code) !== undefined
                 ? [
                     {
                       id: `${entry.id}:exit`,
-                      kind: "Text" as const,
-                      text: `Exit: ${entry.response.exitCode ?? entry.response.exit_code}`,
+                      kind: "Badge" as const,
+                      label: t("chat.mobileTerminal.exitCode").replace(
+                        "{code}",
+                        String(entry.response?.exitCode ?? entry.response?.exit_code),
+                      ),
+                      status:
+                        (entry.response?.exitCode ?? entry.response?.exit_code) === 0
+                          ? ("completed" as const)
+                          : ("error" as const),
+                    },
+                  ]
+                : []),
+              ...(entry.response?.cancelled
+                ? [
+                    {
+                      id: `${entry.id}:cancelled`,
+                      kind: "Badge" as const,
+                      label: t("chat.mobileTerminal.cancelled"),
+                      status: "paused" as const,
+                    },
+                  ]
+                : []),
+              ...((entry.response?.timedOut ?? entry.response?.timed_out)
+                ? [
+                    {
+                      id: `${entry.id}:timed-out`,
+                      kind: "Badge" as const,
+                      label: t("chat.mobileTerminal.timedOut"),
+                      status: "error" as const,
                     },
                   ]
                 : []),
             ]),
           ),
-          c.input("command", "Command", command, (value) => {
-            if (isCurrentScope()) setCommand(value);
-          }),
+          c.input(
+            "command",
+            t("chat.mobileSsh.placeholder"),
+            command,
+            (value) => {
+              if (isCurrentScope()) setCommand(value);
+            },
+            false,
+            !activeRunId && !!workdir.trim(),
+          ),
           c.action(
             "run",
             t("chat.send"),
@@ -350,6 +423,14 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
                 !!keyboardResponse.trim()),
           ),
           c.action("cancel", t("chat.stopGeneration"), cancel, !!activeRunId),
+          c.action(
+            "clear",
+            t("chat.mobileTerminal.clear"),
+            () => {
+              if (isCurrentScope() && !runScope.runId) setEntries([]);
+            },
+            !activeRunId && entries.length > 0,
+          ),
         ]
       : [
           c.action("settings", t("settings.sshAdd"), () => {
@@ -403,8 +484,9 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
             ]),
         c.action("ssh-confirm", t("settings.confirm"), () => {
           if (!isCurrentScope()) return;
+          const response = drafts.current.promptAnswer;
           sshPrompt.answer(
-            sshPrompt.prompt.kind === "hostKey" ? { trustHostKey: true } : { answer: promptAnswer },
+            sshPrompt.prompt.kind === "hostKey" ? { trustHostKey: true } : { answer: response },
           );
         }),
         c.action("ssh-cancel", t("settings.cancel"), cancel),
@@ -415,10 +497,42 @@ export function MobileSshPanel(props: MobileSshPanelProps) {
     return (
       <NativeSurface
         document={{
-          mode: "root",
+          mode: "sheet",
           title: selectedHost?.name || t("chat.mobileSsh.title"),
-          appearance: "system",
-          nodes,
+          appearance: props.settings?.theme ?? "system",
+          formFactor: mobile ? "mobile" : "desktop",
+          theme: props.settings
+            ? createNativePresentationTheme(props.settings, mobile, "workspaceTools")
+            : undefined,
+          nodes:
+            selectedHost && !sshPrompt
+              ? [
+                  {
+                    id: "mobile-ssh-layout",
+                    kind: "TerminalLayout",
+                    fill: true,
+                    children: [
+                      {
+                        id: "mobile-terminal-output",
+                        kind: "VStack",
+                        spacing: 12,
+                        children: nodes.filter(
+                          (node) =>
+                            !["challenge", "command", "run", "cancel", "clear"].includes(node.id),
+                        ),
+                      },
+                      {
+                        id: "mobile-terminal-input",
+                        kind: "VStack",
+                        spacing: 8,
+                        children: nodes.filter((node) =>
+                          ["challenge", "command", "run", "cancel", "clear"].includes(node.id),
+                        ),
+                      },
+                    ],
+                  },
+                ]
+              : nodes,
           dismissAction: "close",
         }}
         handlers={c.handlers}

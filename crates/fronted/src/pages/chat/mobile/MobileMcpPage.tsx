@@ -8,6 +8,7 @@ import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { useEffect, useMemo, useState } from "react";
+import { useConfirmDialog } from "../../../components/astryx/useConfirmDialog";
 import { MoreHorizontal, Plug, Plus, Server } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import {
@@ -22,12 +23,23 @@ import {
   selectMcpRegistryCardForHost,
   withUniqueMcpServerId,
 } from "../../../lib/mcpRegistry";
-import { type AppSettings, type McpServerConfig, updateMcp } from "../../../lib/settings";
+import { removeMcpServer, saveMcpServer } from "../../../lib/mcpServerSettings";
+import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
+import {
+  type AppSettings,
+  type McpServerConfig,
+  type ToolPolicy,
+  updateSystem,
+} from "../../../lib/settings";
+import { applyMcpOpsToAppSettings } from "../../../lib/settings/mcpOps";
+import { toolGroupPolicyKey } from "../../../lib/tools/toolPolicy";
 import { presentationControls } from "../../../presentation/controls";
 import { NativeSurface } from "../../../presentation/NativeSurface";
+import { nativeMcpServerList } from "../../../presentation/nativeMcpServerList";
 import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
 import type { PresentationNode } from "../../../presentation/types";
 import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
+import { McpImportView } from "../../mcp-hub/McpImportView";
 import { McpRegistryBrowser } from "../../mcp-hub/McpRegistryBrowser";
 import { McpServerEditModal } from "../../mcp-hub/McpServersForm";
 import { MobileHubHeader, MobileHubSearch } from "./MobileHubChrome";
@@ -52,8 +64,10 @@ function serverSubtitle(server: McpServerConfig) {
 
 export function MobileMcpPage(props: MobileMcpPageProps) {
   const { t } = useLocale();
+  const compact = isNativeMobileRuntime();
+  const { confirm, dialog } = useConfirmDialog();
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<"installed" | "store">("installed");
+  const [view, setView] = useState<"installed" | "store" | "import">("installed");
   const [registrySource, setRegistrySource] = useState<McpRegistrySource>("official");
   const [registryItems, setRegistryItems] = useState<McpRegistryCard[]>([]);
   const [registryLoading, setRegistryLoading] = useState(false);
@@ -66,8 +80,18 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
   } | null>(null);
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<EditingState | null>(null);
-  const [nativeDraft, setNativeDraft] = useState<McpServerConfig | null>(null);
   const [nativeError, setNativeError] = useState("");
+  const [installScope] = useState(() => ({ active: true, busy: false, revision: 0 }));
+  useEffect(() => {
+    installScope.active = true;
+    installScope.busy = false;
+    setInstallingCardId("");
+    return () => {
+      installScope.active = false;
+      installScope.busy = false;
+      installScope.revision++;
+    };
+  }, [installScope, view]);
 
   const visibleServers = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -117,11 +141,15 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
     );
 
   async function installRegistryCard(card: McpRegistryCard) {
-    if (installingCardId || cardIsInstalled(card)) return;
+    if (!installScope.active || installScope.busy || cardIsInstalled(card)) return;
+    installScope.busy = true;
+    const revision = ++installScope.revision;
+    const current = () => installScope.active && installScope.revision === revision;
     setInstallingCardId(card.id);
     setRegistryError("");
     try {
       const loaded = await resolveMcpRegistryInstallDraft(card);
+      if (!current()) return;
       const resolved = selectMcpRegistryCardForHost(loaded, props.allowStdio);
       setRegistryItems((items) => items.map((item) => (item.id === card.id ? loaded : item)));
       const draft = resolved.installDraft ?? resolved.manualDraft;
@@ -136,16 +164,21 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
         });
         setConfigValues({});
       } else {
-        const ready = withUniqueMcpServerId(draft, props.settings.mcp.servers);
-        props.setSettings((previous) =>
-          updateMcp(previous, { servers: [...previous.mcp.servers, ready.server] }),
-        );
-        setInstalledServerIds((current) => ({ ...current, [card.id]: ready.server.id }));
+        let installedId = "";
+        props.setSettings((previous) => {
+          const ready = withUniqueMcpServerId(draft, previous.mcp.servers);
+          installedId = ready.server.id;
+          return applyMcpOpsToAppSettings(previous, [{ kind: "upsert", server: ready.server }]);
+        });
+        setInstalledServerIds((current) => ({ ...current, [card.id]: installedId }));
       }
     } catch (cause) {
-      setRegistryError(cause instanceof Error ? cause.message : String(cause));
+      if (current()) setRegistryError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setInstallingCardId("");
+      if (current()) {
+        installScope.busy = false;
+        setInstallingCardId("");
+      }
     }
   }
 
@@ -178,64 +211,78 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
       );
       return;
     }
-    props.setSettings((previous) =>
-      updateMcp(previous, { servers: [...previous.mcp.servers, { ...configured.server, id }] }),
-    );
+    props.setSettings((previous) => saveMcpServer(previous, { ...configured.server, id }, null, t));
     setInstalledServerIds((current) => ({ ...current, [configuring.card.id]: id }));
     setConfiguring(null);
     setRegistryError("");
   }
 
-  const patchServer = (index: number, patch: Partial<McpServerConfig>) => {
+  const patchServer = (serverId: string, patch: Partial<McpServerConfig>) => {
     props.setSettings((prev) =>
-      updateMcp(prev, {
-        servers: prev.mcp.servers.map((server, currentIndex) =>
-          currentIndex === index ? { ...server, ...patch } : server,
-        ),
-      }),
+      applyMcpOpsToAppSettings(prev, [{ kind: "patch", serverId, patch }]),
     );
   };
-
   const saveServer = (server: McpServerConfig) => {
-    props.setSettings((prev) => {
-      if (editing?.mode === "edit") {
-        return updateMcp(prev, {
-          servers: prev.mcp.servers.map((item, index) => (index === editing.index ? server : item)),
-        });
-      }
-      return updateMcp(prev, { servers: [...prev.mcp.servers, server] });
-    });
-  };
-
-  const suggestedServerName = () => {
-    const existing = new Set(props.settings.mcp.servers.map((server) => server.id));
-    let suffix = props.settings.mcp.servers.length + 1;
-    while (existing.has(`MCP Server ${suffix}`)) suffix += 1;
-    return `MCP Server ${suffix}`;
+    props.setSettings((prev) =>
+      saveMcpServer(prev, server, editing?.mode === "edit" ? editing.server.id : null, t),
+    );
   };
   const openAdd = () => {
     setNativeError("");
-    setNativeDraft({
-      id: suggestedServerName(),
-      enabled: true,
-      transport: props.allowStdio ? "stdio" : "http",
-      command: "",
-      args: [],
-      url: "",
-      timeoutMs: 60_000,
-    });
     setEditing({ mode: "add" });
   };
   const openEdit = (index: number, server: McpServerConfig) => {
     setNativeError("");
-    setNativeDraft({ ...server, args: [...(server.args ?? [])] });
     setEditing({ mode: "edit", index, server });
   };
   const closeEditor = () => {
     setEditing(null);
-    setNativeDraft(null);
     setNativeError("");
   };
+  const deleteServer = async (server: McpServerConfig) => {
+    if (
+      !(await confirm({
+        title: t("settings.delete"),
+        description: server.id,
+        confirmLabel: t("settings.delete"),
+        cancelLabel: t("settings.cancel"),
+        tone: "destructive",
+      }))
+    )
+      return;
+    props.setSettings((prev) => removeMcpServer(prev, server.id));
+  };
+
+  if (isApplePresentationRuntime() && editing) {
+    return (
+      <McpServerEditModal
+        key={editing.mode === "edit" ? editing.server.id : "add"}
+        mode={editing.mode}
+        initialServer={editing.mode === "edit" ? editing.server : null}
+        existingServers={props.settings.mcp.servers}
+        allowStdio={props.allowStdio}
+        onClose={closeEditor}
+        onSave={saveServer}
+        nativeSettings={props.settings}
+        nativeSurfaceId={props.nativeSettingsSurfaceId}
+        presentationMode={props.presentationMode}
+      />
+    );
+  }
+
+  if (isApplePresentationRuntime() && !compact && view === "import") {
+    return (
+      <McpImportView
+        settings={props.settings}
+        setSettings={props.setSettings}
+        allowStdio={props.allowStdio}
+        nativeSurfaceId={props.nativeSettingsSurfaceId}
+        presentationMode={props.presentationMode}
+        onChangeView={setView}
+        onOpenSidebar={props.onOpenSidebar}
+      />
+    );
+  }
 
   if (isApplePresentationRuntime()) {
     const root = presentationControls();
@@ -246,45 +293,22 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
         run: props.onOpenSidebar,
       });
     }
-    const installedNodes: PresentationNode[] = visibleServers.map(({ server, index }) => ({
-      id: `mcp-card:${index}`,
-      kind: "Card",
-      children: [
-        {
-          id: `mcp-card:${index}:summary`,
-          kind: "HStack",
-          children: [
-            {
-              id: `mcp-card:${index}:copy`,
-              kind: "VStack",
-              fill: true,
-              children: [
-                { id: `mcp-card:${index}:title`, kind: "Heading", text: server.id },
-                {
-                  id: `mcp-card:${index}:subtitle`,
-                  kind: "Text",
-                  text: serverSubtitle(server) || t("mcpHub.statusEmptyDesc"),
-                  secondary: true,
-                  maxLines: 2,
-                },
-                {
-                  id: `mcp-card:${index}:transport`,
-                  kind: "Badge",
-                  label: server.transport.toUpperCase(),
-                },
-              ],
-            },
-            root.toggle(
-              `mcp-card:${index}:enabled`,
-              server.enabled ? t("settings.disable") : t("settings.enable"),
-              server.enabled,
-              (enabled) => patchServer(index, { enabled }),
-            ),
-          ],
-        },
-        root.action(`mcp-card:${index}:edit`, t("settings.edit"), () => openEdit(index, server)),
-      ],
-    }));
+    const setPolicy = (key: string, policy: ToolPolicy) =>
+      props.setSettings((prev) =>
+        updateSystem(prev, {
+          toolPolicies: { ...(prev.system.toolPolicies ?? {}), [key]: policy },
+        }),
+      );
+    const installedNodes = nativeMcpServerList({
+      controls: root,
+      settings: props.settings,
+      servers: visibleServers,
+      t,
+      patch: patchServer,
+      policy: setPolicy,
+      edit: openEdit,
+      remove: deleteServer,
+    });
     const storeNodes: PresentationNode[] = registryItems.map((card): PresentationNode => {
       const installed = cardIsInstalled(card);
       const pending = installingCardId === card.id;
@@ -361,7 +385,7 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
               {
                 id: "mcp-hub-title",
                 kind: "Heading",
-                text: "MCP",
+                text: compact ? "MCP" : t("mcpHub.title"),
                 fill: true,
                 alignment: "center",
               },
@@ -376,8 +400,9 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
               [
                 { value: "installed", label: t("mcpHub.tabInstalled") },
                 { value: "store", label: t("mcpHub.tabStore") },
+                ...(!compact ? [{ value: "import", label: t("mcpHub.tabImport") }] : []),
               ],
-              (value) => setView(value as "installed" | "store"),
+              (value) => setView(value as "installed" | "store" | "import"),
             ),
             kind: "SegmentedControl",
             padding: 12,
@@ -418,6 +443,34 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
               },
             ],
           },
+          ...(nativeError
+            ? [
+                {
+                  id: "mcp-hub-error",
+                  kind: "Banner" as const,
+                  status: "error" as const,
+                  label: nativeError,
+                },
+              ]
+            : []),
+          ...(view === "installed" && props.settings.mcp.servers.length > 0
+            ? [
+                {
+                  ...root.select(
+                    "mcp-group-policy",
+                    t("settings.toolPermissionsTitle"),
+                    props.settings.system.toolPolicies?.[toolGroupPolicyKey("mcp")] ?? "allow",
+                    ["allow", "ask", "deny"].map((value) => ({
+                      value,
+                      label: t(`settings.toolPolicy.${value}`),
+                    })),
+                    (value) => setPolicy(toolGroupPolicyKey("mcp"), value as ToolPolicy),
+                  ),
+                  kind: "SegmentedControl" as const,
+                  padding: 12,
+                },
+              ]
+            : []),
           {
             id: "mcp-hub-content",
             kind: "ScrollView",
@@ -479,135 +532,6 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
     let activeTitle = "MCP";
     let dismissAction: string | undefined =
       props.presentationMode === "sheet" ? "close" : undefined;
-    if (editing && nativeDraft) {
-      const sheet = presentationControls();
-      const patchDraft = (patch: Partial<McpServerConfig>) =>
-        setNativeDraft((current) => (current ? { ...current, ...patch } : current));
-      const commit = () => {
-        const id = nativeDraft.id.trim();
-        const endpoint =
-          nativeDraft.transport === "stdio"
-            ? (nativeDraft.command ?? "").trim()
-            : (nativeDraft.url ?? "").trim();
-        const duplicate = props.settings.mcp.servers.some(
-          (server, index) =>
-            server.id === id && (editing.mode !== "edit" || index !== editing.index),
-        );
-        if (!id || duplicate || !endpoint) {
-          setNativeError(
-            duplicate
-              ? t("mcpHub.duplicateName")
-              : nativeDraft.transport === "stdio"
-                ? t("mcpHub.invalidCommand")
-                : t("mcpHub.invalidUrl"),
-          );
-          return;
-        }
-        saveServer({
-          ...nativeDraft,
-          id,
-          command: nativeDraft.transport === "stdio" ? endpoint : "",
-          args:
-            nativeDraft.transport === "stdio"
-              ? (nativeDraft.args ?? []).map((arg) => arg.trim()).filter(Boolean)
-              : [],
-          url: nativeDraft.transport === "stdio" ? "" : endpoint,
-        });
-        closeEditor();
-      };
-      sheet.handlers.set("close", {
-        enabled: true,
-        accepts: (value) => value === null,
-        run: closeEditor,
-      });
-      const editorNodes: PresentationNode[] = [
-        ...(nativeError
-          ? [
-              {
-                id: "mcp-editor-error",
-                kind: "Banner" as const,
-                label: nativeError,
-                status: "error" as const,
-              },
-            ]
-          : []),
-        sheet.group("mcp-editor-connection", "MCP", [
-          sheet.input("mcp-editor-id", t("mcpHub.serverName"), nativeDraft.id, (id) =>
-            patchDraft({ id }),
-          ),
-          sheet.select(
-            "mcp-editor-transport",
-            t("mcpHub.transport"),
-            nativeDraft.transport,
-            [
-              ...(props.allowStdio ? [{ value: "stdio", label: "STDIO" }] : []),
-              { value: "http", label: "HTTP" },
-              { value: "sse", label: "SSE" },
-            ],
-            (transport) => patchDraft({ transport: transport as McpServerConfig["transport"] }),
-          ),
-          ...(nativeDraft.transport === "stdio"
-            ? [
-                sheet.input(
-                  "mcp-editor-command",
-                  t("mcpHub.command"),
-                  nativeDraft.command ?? "",
-                  (command) => patchDraft({ command }),
-                ),
-                sheet.input(
-                  "mcp-editor-args",
-                  t("mcpHub.args"),
-                  (nativeDraft.args ?? []).join(" "),
-                  (args) => patchDraft({ args: args.split(/\s+/).filter(Boolean) }),
-                ),
-              ]
-            : [
-                sheet.input("mcp-editor-url", "URL", nativeDraft.url ?? "", (url) =>
-                  patchDraft({ url }),
-                ),
-              ]),
-          sheet.toggle("mcp-editor-enabled", t("settings.enable"), nativeDraft.enabled, (enabled) =>
-            patchDraft({ enabled }),
-          ),
-        ]),
-        {
-          id: "mcp-editor-actions",
-          kind: "HStack",
-          children: [
-            sheet.action("mcp-editor-cancel", t("settings.cancel"), closeEditor),
-            { id: "mcp-editor-actions-space", kind: "Spacer" },
-            ...(editing.mode === "edit"
-              ? [
-                  {
-                    ...sheet.action("mcp-editor-delete", t("settings.delete"), () => {
-                      props.setSettings((previous) =>
-                        updateMcp(previous, {
-                          servers: previous.mcp.servers.filter(
-                            (_, index) => index !== editing.index,
-                          ),
-                        }),
-                      );
-                      closeEditor();
-                    }),
-                    destructive: true,
-                  },
-                ]
-              : []),
-            { ...sheet.action("mcp-editor-save", t("settings.save"), commit), prominent: true },
-          ],
-        },
-      ];
-      activeNodes = [
-        ...(props.presentationMode === "sheet"
-          ? [sheet.action("back", t("settings.close"), closeEditor)]
-          : []),
-        ...editorNodes,
-      ];
-      activeHandlers = sheet.handlers;
-      activeTitle = editing.mode === "add" ? t("mcpHub.add") : nativeDraft.id;
-      dismissAction = "close";
-    }
-
     if (configuring) {
       const sheet = presentationControls();
       const patchServer = (patch: Partial<McpServerConfig>) =>
@@ -686,22 +610,25 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
     }
 
     return (
-      <NativeSurface
-        sessionSurface={props.nativeSettingsSurfaceId}
-        document={{
-          mode: props.presentationMode ?? "root",
-          title: activeTitle,
-          appearance: props.settings.theme,
-          formFactor: "mobile",
-          theme: createNativePresentationTheme(props.settings, true, "workspaceTools"),
-          nodes: activeNodes,
-          dismissAction,
-        }}
-        handlers={activeHandlers}
-        onError={(error) =>
-          configuring ? setRegistryError(String(error)) : setNativeError(String(error))
-        }
-      />
+      <>
+        {dialog}
+        <NativeSurface
+          sessionSurface={props.nativeSettingsSurfaceId}
+          document={{
+            mode: props.presentationMode ?? "root",
+            title: activeTitle,
+            appearance: props.settings.theme,
+            formFactor: compact ? "mobile" : "desktop",
+            theme: createNativePresentationTheme(props.settings, compact, "workspaceTools"),
+            nodes: activeNodes,
+            dismissAction,
+          }}
+          handlers={activeHandlers}
+          onError={(error) =>
+            configuring ? setRegistryError(String(error)) : setNativeError(String(error))
+          }
+        />
+      </>
     );
   }
 
@@ -799,7 +726,7 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
                       label={server.enabled ? t("settings.disable") : t("settings.enable")}
                       isLabelHidden
                       value={server.enabled}
-                      onChange={(enabled) => patchServer(index, { enabled })}
+                      onChange={(enabled) => patchServer(server.id, { enabled })}
                       size="md"
                     />
                   </HStack>

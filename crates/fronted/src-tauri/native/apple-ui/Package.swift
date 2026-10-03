@@ -18,6 +18,7 @@ let package = Package(
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.20.0"),
         .package(url: "https://github.com/danielsaidi/SystemNotification", exact: "1.4.1"),
         .package(url: "https://github.com/cashapp/AccessibilitySnapshot", exact: "0.13.1"),
+        .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", exact: "3.0.1"),
     ],
     targets: [
         .target(name: "XgentNativeUI", dependencies: [
@@ -33,17 +34,19 @@ let package = Package(
             .product(name: "LanguageSupport", package: "CodeEditorView"),
             .product(name: "SwiftTerm", package: "SwiftTerm"),
             .product(name: "SystemNotification", package: "SystemNotification"),
+            .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts", condition: .when(platforms: [.macOS])),
         ], path: ".", exclude: ["Tests", "TestHost"]),
         .testTarget(name: "XgentNativeUITests", dependencies: [
             "XgentNativeUI", .product(name: "MarkdownUI", package: "swift-markdown-ui"),
             .product(name: "Nuke", package: "Nuke"),
             .product(name: "LanguageSupport", package: "CodeEditorView"),
             .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+            .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts", condition: .when(platforms: [.macOS])),
             .product(name: "SwiftTerm", package: "SwiftTerm"),
             .product(name: "AccessibilitySnapshotParser", package: "AccessibilitySnapshot",
                      condition: .when(platforms: [.iOS])),
         ],
-                    path: "Tests"),
+                    path: "Tests", resources: [.copy("Fixtures")]),
     ],
     swiftLanguageVersions: [.v5]
 )

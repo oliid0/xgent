@@ -9,7 +9,7 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/VStack";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../i18n";
 import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import type { AppSettings } from "../../lib/settings";
@@ -42,10 +42,27 @@ export function SoulSection({
 }: SoulSectionProps) {
   const { t } = useLocale();
   const soul = useSoul();
-  const [draft, setDraft] = useState<SoulDraft>({
+  const [draft, setDraftState] = useState<SoulDraft>({
     metadata: DEFAULT_SOUL_METADATA,
     body: "",
   });
+  const draftRef = useRef(draft);
+  // Native edit acknowledgement can precede React's next published document.
+  const setDraft = useCallback((update: SoulDraft | ((current: SoulDraft) => SoulDraft)) => {
+    const next = typeof update === "function" ? update(draftRef.current) : update;
+    draftRef.current = next;
+    setDraftState(next);
+  }, []);
+  const savingRef = useRef(false);
+  const mounted = useRef(true);
+  const [savePending, setSavePending] = useState(false);
+  const saving = soul.saving || savePending;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [localError, setLocalError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -56,7 +73,7 @@ export function SoulSection({
     setDraft(createEmptySoulDraft());
     setLocalError(null);
     setSaved(false);
-  }, []);
+  }, [setDraft]);
 
   useEffect(() => {
     if (creating || !soul.document) return;
@@ -65,7 +82,7 @@ export function SoulSection({
       body: soul.document.body,
     });
     setLocalError(null);
-  }, [creating, soul.document]);
+  }, [creating, soul.document, setDraft]);
 
   useEffect(() => {
     if (createRequestId > 0) beginCreate();
@@ -90,21 +107,31 @@ export function SoulSection({
   };
 
   const handleSave = async () => {
-    if (!validation.valid) {
-      setLocalError(validation.message);
+    if (savingRef.current || soul.saving || soul.loading) return;
+    const currentDraft = draftRef.current;
+    const currentValidation = validateSoulDraft(currentDraft);
+    if (!currentValidation.valid) {
+      setLocalError(currentValidation.message);
       return;
     }
+    savingRef.current = true;
+    setSavePending(true);
     try {
       if (creating) {
-        await soul.create(draft);
-        setCreating(false);
+        await soul.create(currentDraft);
+        if (mounted.current) setCreating(false);
       } else {
-        await soul.save(draft);
+        await soul.save(currentDraft);
       }
-      setLocalError(null);
-      setSaved(true);
+      if (mounted.current) {
+        setLocalError(null);
+        setSaved(true);
+      }
     } catch (error) {
-      setLocalError(error instanceof Error ? error.message : String(error));
+      if (mounted.current) setLocalError(error instanceof Error ? error.message : String(error));
+    } finally {
+      savingRef.current = false;
+      if (mounted.current) setSavePending(false);
     }
   };
 
@@ -155,7 +182,7 @@ export function SoulSection({
     const compact = isNativeMobileRuntime();
     const c = presentationControls();
     c.handlers.set("close", {
-      enabled: !soul.saving,
+      enabled: !saving,
       accepts: (value) => value === null,
       run: () => onBack?.(),
     });
@@ -173,16 +200,17 @@ export function SoulSection({
           soul.activeId,
           presetOptions.map(({ value, label }) => ({ value, label })),
           (value) => handleSelect(value),
+          !saving && !soul.loading && presetOptions.length > 0,
         ),
         ...(creating
-          ? [c.action("soul-cancel-create", t("settings.cancel"), cancelCreate, !soul.saving)]
-          : [c.action("soul-create", t("settings.soulAddPreset"), beginCreate, !soul.saving)]),
+          ? [c.action("soul-cancel-create", t("settings.cancel"), cancelCreate, !saving)]
+          : [c.action("soul-create", t("settings.soulAddPreset"), beginCreate, !saving)]),
         {
           ...c.action(
             "soul-delete",
             t("settings.soulDeletePreset"),
             () => setPresetToDelete(soul.activeId),
-            !soul.saving && !creating && soul.presets.length > 1,
+            !saving && !creating && soul.presets.length > 1,
           ),
           destructive: true,
         },
@@ -198,35 +226,77 @@ export function SoulSection({
           : []),
       ]),
       c.group("soul-identity", t("settings.soulIdentityGroup"), [
-        c.input("soul-name", t("settings.soulName"), draft.metadata.name, (name) =>
-          updateMetadata({ name: name.slice(0, 64) }),
+        c.input(
+          "soul-name",
+          t("settings.soulName"),
+          draft.metadata.name,
+          (name) => updateMetadata({ name: Array.from(name).slice(0, 64).join("") }),
+          false,
+          !saving,
         ),
-        c.select(
-          "soul-language",
-          t("settings.soulLanguage"),
-          draft.metadata.lang,
-          [
-            { value: "auto", label: t("settings.soulLanguageAuto") },
-            { value: "zh-CN", label: "简体中文" },
-            { value: "en-US", label: "English" },
-            { value: "ja-JP", label: "日本語" },
-            { value: "ko-KR", label: "한국어" },
-          ],
-          (lang) => updateMetadata({ lang }),
-        ),
+        { id: "soul-name-hint", kind: "Text", text: t("settings.soulNameHint"), secondary: true },
+        {
+          ...c.select(
+            "soul-language",
+            t("settings.soulLanguage"),
+            draft.metadata.lang,
+            [
+              { value: "auto", label: t("settings.soulLanguageAuto") },
+              { value: "zh-CN", label: "简体中文" },
+              { value: "en-US", label: "English" },
+              { value: "ja-JP", label: "日本語" },
+              { value: "ko-KR", label: "한국어" },
+            ],
+            (lang) => updateMetadata({ lang }),
+            !saving,
+          ),
+          text: t("settings.soulLanguageHint"),
+        },
       ]),
       c.group("soul-voice", t("settings.soulVoiceGroup"), [
-        c.input("soul-style", t("settings.soulStyle"), draft.metadata.style, (style) =>
-          updateMetadata({ style }),
-        ),
         {
-          ...c.input("soul-body", t("settings.soulPersonality"), draft.body, (body) => {
-            setSaved(false);
-            setDraft((current) => ({ ...current, body }));
-          }),
-          kind: "TextArea",
-          fill: true,
+          ...c.input(
+            "soul-style",
+            t("settings.soulStyle"),
+            draft.metadata.style,
+            (style) => updateMetadata({ style }),
+            false,
+            !saving,
+          ),
+          text: t("settings.soulStylePlaceholder"),
         },
+        { id: "soul-style-hint", kind: "Text", text: t("settings.soulStyleHint"), secondary: true },
+        {
+          ...c.input(
+            "soul-body",
+            t("settings.soulPersonality"),
+            draft.body,
+            (body) => {
+              setSaved(false);
+              setDraft((current) => ({ ...current, body }));
+            },
+            false,
+            !saving,
+          ),
+          kind: "TextArea",
+          minHeight: 240,
+        },
+        {
+          id: "soul-body-hint",
+          kind: "Text",
+          text: t("settings.soulPersonalityHint"),
+          secondary: true,
+        },
+        ...(!validation.valid
+          ? [
+              {
+                id: "soul-validation",
+                kind: "Banner" as const,
+                label: validation.message,
+                status: "error" as const,
+              },
+            ]
+          : []),
         {
           id: "soul-count",
           kind: "Text",
@@ -241,13 +311,13 @@ export function SoulSection({
       {
         ...c.action(
           "soul-save",
-          soul.saving ? t("settings.saving") : t("settings.soulSave"),
+          saving ? t("settings.saving") : t("settings.soulSave"),
           handleSave,
-          changed && validation.valid && !soul.saving,
+          changed && validation.valid && !saving && !soul.loading,
         ),
         prominent: true,
       },
-      c.action("soul-reload", t("settings.soulReload"), soul.reload, !soul.loading && !soul.saving),
+      c.action("soul-reload", t("settings.soulReload"), soul.reload, !soul.loading && !saving),
       ...(localError || soul.error
         ? [
             {
@@ -285,7 +355,7 @@ export function SoulSection({
             formFactor: compact ? "mobile" : "desktop",
             theme: createNativePresentationTheme(settings, compact, "workspaceTools"),
             nodes,
-            dismissAction: soul.saving ? undefined : "close",
+            dismissAction: saving ? undefined : "close",
           }}
           handlers={c.handlers}
           onError={(cause) => setLocalError(cause instanceof Error ? cause.message : String(cause))}
@@ -391,7 +461,10 @@ export function SoulSection({
               description={t("settings.soulNameHint")}
               type="text"
               value={draft.metadata.name}
-              onChange={(value) => updateMetadata({ name: value.slice(0, 64) })}
+              onChange={(value) =>
+                updateMetadata({ name: Array.from(value).slice(0, 64).join("") })
+              }
+              isDisabled={saving}
               width="100%"
             />
             <Selector
@@ -399,6 +472,7 @@ export function SoulSection({
               description={t("settings.soulLanguageHint")}
               value={draft.metadata.lang}
               onChange={(lang) => updateMetadata({ lang })}
+              isDisabled={saving}
               options={[
                 { value: "auto", label: t("settings.soulLanguageAuto") },
                 { value: "zh-CN", label: "简体中文" },
@@ -419,6 +493,7 @@ export function SoulSection({
               description={t("settings.soulStyleHint")}
               value={draft.metadata.style}
               onChange={(value) => updateMetadata({ style: value })}
+              isDisabled={saving}
               placeholder={t("settings.soulStylePlaceholder")}
               width="100%"
             />
@@ -431,6 +506,7 @@ export function SoulSection({
                 setDraft((current) => ({ ...current, body: value }));
               }}
               rows={10}
+              isDisabled={saving}
               width="100%"
               status={validation.valid ? undefined : { type: "error", message: validation.message }}
               statusVariant="detached"

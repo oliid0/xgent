@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+﻿import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useLocale } from "../i18n";
 import {
   browserSessionController,
@@ -13,14 +13,7 @@ import { createNativePresentationTheme } from "./nativeTheme";
 import { createNativeWorkspacePanel } from "./nativeWorkspacePanel";
 import type { PresentationHandler, PresentationNode, PresentationValue } from "./types";
 
-type NativeViewport = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  visible: boolean;
-};
-
+type NativeViewport = { x: number; y: number; width: number; height: number; visible: boolean };
 function parseViewport(value: PresentationValue): NativeViewport | null {
   if (typeof value !== "string") return null;
   try {
@@ -30,9 +23,8 @@ function parseViewport(value: PresentationValue): NativeViewport | null {
         (item) => typeof item === "number" && Number.isFinite(item),
       ) ||
       typeof parsed.visible !== "boolean"
-    ) {
+    )
       return null;
-    }
     return {
       x: Math.max(0, parsed.x as number),
       y: Math.max(0, parsed.y as number),
@@ -45,7 +37,7 @@ function parseViewport(value: PresentationValue): NativeViewport | null {
   }
 }
 
-/** Native browser chrome over the shared BrowserSessionController/WebKit session. */
+/** Native chrome; the shared controller owns every browser session and command. */
 export function NativeBrowserPage(props: { settings: AppSettings }) {
   const { t } = useLocale();
   const compact = isNativeMobileRuntime();
@@ -56,33 +48,73 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
   );
   const sessions = browserSessionController.sessionsForConversation();
   const active = sessions.find((session) => session.sessionId === state.activeSessionId);
+  const visible = state.panelOpen && (!compact || state.panelOpenSource === "user");
   const [address, setAddress] = useState("");
-  const [failure, setFailure] = useState<unknown>(null);
-
+  const [failure, setFailure] = useState("");
+  const addressRef = useRef({ sessionId: "", text: "" });
+  const commands = useRef(new Set<string>());
+  const alive = useRef(false);
   useEffect(() => {
-    if (state.panelOpen) void browserSessionController.initialize().catch(setFailure);
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!state.panelOpen) return;
+    let current = true;
+    setFailure("");
+    void browserSessionController.initialize().catch((cause) => {
+      if (current) setFailure(cause instanceof Error ? cause.message : String(cause));
+    });
+    return () => {
+      current = false;
+    };
   }, [state.panelOpen]);
   useEffect(() => {
-    setAddress(active?.url === "about:blank" ? "" : (active?.url ?? ""));
-  }, [active?.url]);
+    const text = active?.url === "about:blank" ? "" : (active?.url ?? "");
+    addressRef.current = { sessionId: active?.sessionId ?? "", text };
+    setAddress(text);
+  }, [active?.sessionId, active?.url]);
   useEffect(() => {
-    const sessionId = active?.sessionId;
+    const sessionId = visible ? active?.sessionId : undefined;
     return () => {
-      if (sessionId) void browserSessionController.setViewport(sessionId, HIDDEN_BROWSER_VIEWPORT);
+      if (sessionId)
+        void browserSessionController
+          .setViewport(sessionId, HIDDEN_BROWSER_VIEWPORT)
+          .catch(() => undefined);
     };
-  }, [active?.sessionId]);
-
-  if (failure) throw failure;
-  if (!state.panelOpen || (compact && state.panelOpenSource !== "user")) return null;
+  }, [active?.sessionId, visible]);
+  useEffect(() => {
+    if (visible && active?.sessionId && active.url === "about:blank") {
+      void browserSessionController
+        .setViewport(active.sessionId, HIDDEN_BROWSER_VIEWPORT)
+        .catch(() => undefined);
+    }
+  }, [active?.sessionId, active?.url, visible]);
+  if (!visible) return null;
 
   const handlers = new Map<string, PresentationHandler>();
+  const currentSession = (id: string | undefined) =>
+    alive.current &&
+    !!id &&
+    browserSessionController.getSnapshot().panelOpen &&
+    browserSessionController.getSnapshot().activeSessionId === id &&
+    browserSessionController.sessionsForConversation().some((session) => session.sessionId === id);
   const bind = (
     id: string,
     run: (value: PresentationValue) => unknown,
     accepts: (value: PresentationValue) => boolean,
     enabled = true,
   ) => {
-    handlers.set(id, { enabled, accepts, run });
+    handlers.set(id, {
+      enabled,
+      accepts,
+      run: (value) => {
+        if (!alive.current || !browserSessionController.getSnapshot().panelOpen) return;
+        return run(value);
+      },
+    });
     return id;
   };
   const button = (
@@ -96,267 +128,235 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
     kind: "IconButton",
     label,
     icon,
+    variant: "ghost",
     disabled: !enabled,
     action: bind(id, run, (value) => value === null, enabled),
   });
-  const run = (action: "navigate" | "reload" | "go_back" | "go_forward") => {
-    if (!active) return;
-    return browserSessionController.action(
-      action,
-      action === "navigate" ? { url: normalizeBrowserAddress(address) } : {},
-      { sessionId: active.sessionId },
-    );
+  const run = async (
+    action: "navigate" | "reload" | "go_back" | "go_forward" | "open_devtools",
+    submitted?: string,
+  ) => {
+    const id = active?.sessionId;
+    if (
+      !currentSession(id) ||
+      !id ||
+      commands.current.has(id) ||
+      browserSessionController.getSnapshot().busySessionIds.includes(id)
+    )
+      return;
+    const text =
+      submitted ?? (addressRef.current.sessionId === id ? addressRef.current.text : address);
+    if (action === "navigate" && !text.trim()) return;
+    commands.current.add(id);
+    try {
+      return await browserSessionController.action(
+        action,
+        action === "navigate" ? { url: normalizeBrowserAddress(text) } : {},
+        { sessionId: id },
+      );
+    } finally {
+      commands.current.delete(id);
+    }
   };
-  handlers.set("close", {
-    enabled: true,
-    accepts: (value) => value === null,
-    run: () =>
-      compact
-        ? window.setTimeout(() => browserSessionController.closePanel(), 0)
-        : browserSessionController.closePanel(),
-  });
-  const busy = Boolean(active && state.busySessionIds.includes(active.sessionId));
-  const mobileChrome: PresentationNode[] = [
-    {
-      id: "browser-toolbar",
-      kind: "VStack",
-      spacing: 0,
-      children: [
+  const close = () => browserSessionController.closePanel();
+  bind("close", close, (value) => value === null);
+  const busy = !!active && state.busySessionIds.includes(active.sessionId);
+  const suffix = active?.sessionId ?? "empty";
+  const inputID = `browser-address:${suffix}`;
+  const submitID = `browser-go:${suffix}`;
+  const entry: PresentationNode = {
+    id: "browser-address-entry",
+    kind: "VStack",
+    variant: "browser-address-entry",
+    fill: true,
+    children: [
+      {
+        id: inputID,
+        kind: "TextInput",
+        label: t("browser.addressPlaceholder"),
+        text: t("browser.addressPlaceholder"),
+        value: address,
+        disabled: !active,
+        action: bind(
+          inputID,
+          (value) => {
+            if (!currentSession(active?.sessionId)) return;
+            addressRef.current = { sessionId: active!.sessionId, text: value as string };
+            setAddress(value as string);
+          },
+          (value) => typeof value === "string",
+          !!active,
+        ),
+      },
+      {
+        id: submitID,
+        kind: "IconButton",
+        label: t("browser.open"),
+        icon: "arrow.right",
+        variant: "ghost",
+        disabled: !active || busy,
+        action: bind(
+          submitID,
+          (value) => run("navigate", typeof value === "string" ? value : undefined),
+          (value) => value === null || typeof value === "string",
+          !!active && !busy,
+        ),
+      },
+    ],
+  };
+  const navigation: PresentationNode = {
+    id: "browser-navigation",
+    kind: "VStack",
+    variant: "browser-navigation",
+    children: [
+      button(
+        "browser-back",
+        t("browser.back"),
+        "chevron.left",
+        () => run("go_back"),
+        !!active && !busy,
+      ),
+      button(
+        "browser-forward",
+        t("browser.forward"),
+        "chevron.right",
+        () => run("go_forward"),
+        !!active && !busy,
+      ),
+      ...(!compact
+        ? [
+            button(
+              "browser-devtools",
+              t("browser.developerTools"),
+              "terminal",
+              () => run("open_devtools"),
+              !!active && !busy,
+            ),
+          ]
+        : []),
+      entry,
+      button(
+        "browser-reload",
+        t("browser.reload"),
+        "arrow.clockwise",
+        () => run("reload"),
+        !!active && !busy,
+      ),
+      ...(compact ? [button("browser-close", t("browser.close"), "xmark", close)] : []),
+    ],
+  };
+  const tabs: PresentationNode = {
+    id: "browser-tabs",
+    kind: "VStack",
+    variant: "browser-tabs",
+    children: [
+      button(
+        "browser-new",
+        t("browser.newTab"),
+        "plus",
+        () => browserSessionController.newSession(),
+        state.sessions.length < MAX_BROWSER_SESSIONS,
+      ),
+      {
+        id: "browser-tab-items",
+        kind: "VStack",
+        variant: "browser-tab-items",
+        children: sessions.map((session) => ({
+          id: `browser-tab:${session.sessionId}`,
+          kind: "Button",
+          label: session.title?.trim() || browserTabLabel(session.url) || t("browser.untitled"),
+          text: session.url,
+          selected: session.sessionId === active?.sessionId,
+          status: state.busySessionIds.includes(session.sessionId) ? "running" : undefined,
+          action: bind(
+            `browser-tab:${session.sessionId}`,
+            () => {
+              if (alive.current) browserSessionController.selectSession(session.sessionId);
+            },
+            (value) => value === null,
+          ),
+        })),
+      },
+      ...(!compact
+        ? [
+            {
+              id: "browser-tab-count",
+              kind: "Badge" as const,
+              label: `${state.sessions.length}/${MAX_BROWSER_SESSIONS}`,
+            },
+          ]
+        : []),
+      button(
+        "browser-close-tab",
+        t("browser.closeTab"),
+        "xmark",
+        () =>
+          currentSession(active?.sessionId) &&
+          browserSessionController.closeSession(active!.sessionId),
+        !!active,
+      ),
+    ],
+  };
+  const localError = failure || state.error;
+  const errorNodes: PresentationNode[] = localError
+    ? [
         {
-          id: "browser-address-row-mobile",
-          kind: "HStack",
-          spacing: 4,
-          padding: 6,
+          id: "browser-error",
+          kind: "VStack",
+          variant: "browser-error",
           children: [
-            button(
-              "browser-back-mobile",
-              t("browser.back"),
-              "chevron.left",
-              () => run("go_back"),
-              !!active && !busy,
-            ),
-            button(
-              "browser-forward-mobile",
-              t("browser.forward"),
-              "chevron.right",
-              () => run("go_forward"),
-              !!active && !busy,
-            ),
-            {
-              id: "browser-address-mobile",
-              kind: "TextInput",
-              label: t("browser.addressPlaceholder"),
-              value: address,
-              fill: true,
-              disabled: !active,
-              action: bind(
-                "browser-address-mobile",
-                (value) => setAddress(value as string),
-                (value) => typeof value === "string",
-                !!active,
-              ),
-            },
-            {
-              ...button("browser-close-mobile", t("browser.close"), "xmark", () =>
-                window.setTimeout(() => browserSessionController.closePanel(), 0),
-              ),
-              variant: "secondary",
-            },
+            { id: "browser-error-message", kind: "Banner", status: "error", label: localError },
+            button("browser-dismiss-error", t("browser.dismissError"), "xmark", () => {
+              setFailure("");
+              browserSessionController.clearError();
+            }),
           ],
         },
-        {
-          id: "browser-tabs-row-mobile",
-          kind: "HStack",
-          spacing: 4,
-          padding: 6,
-          children: [
-            {
-              id: "browser-tabs-mobile",
-              kind: "Selector",
-              variant: "compact",
-              fill: true,
-              label: t("browser.title"),
-              value: active?.sessionId ?? "",
-              disabled: sessions.length === 0,
-              options: sessions.map((session) => ({
-                value: session.sessionId,
-                label: session.title?.trim() || session.url || t("browser.untitled"),
-              })),
-              action: bind(
-                "browser-tabs-mobile",
-                (value) => browserSessionController.selectSession(value as string),
-                (value) =>
-                  typeof value === "string" &&
-                  sessions.some((session) => session.sessionId === value),
-                sessions.length > 0,
-              ),
-            },
-            button(
-              "browser-go-mobile",
-              t("browser.open"),
-              "arrow.right",
-              () => run("navigate"),
-              !!active && !!address.trim() && !busy,
-            ),
-            button(
-              "browser-reload-mobile",
-              t("browser.reload"),
-              "arrow.clockwise",
-              () => run("reload"),
-              !!active && !busy,
-            ),
-            button(
-              "browser-new-mobile",
-              t("browser.newTab"),
-              "plus",
-              () => browserSessionController.newSession("about:blank"),
-              sessions.length < MAX_BROWSER_SESSIONS,
-            ),
-            button(
-              "browser-close-tab-mobile",
-              t("browser.closeTab"),
-              "xmark.circle",
-              () => active && browserSessionController.closeSession(active.sessionId),
-              !!active,
-            ),
-          ],
-        },
-      ],
-    },
-  ];
+      ]
+    : [];
+  const blank = active?.url === "about:blank";
   const nodes: PresentationNode[] = [
     {
       id: "browser-layout",
       kind: "BrowserLayout",
       fill: true,
       children: [
-        ...(compact ? mobileChrome : []),
         ...(!compact
-          ? ([
+          ? [
               {
                 id: "browser-header",
-                kind: "HStack",
-                minHeight: 68,
-                padding: 12,
+                kind: "VStack" as const,
+                variant: "browser-header",
                 children: [
                   {
                     id: "browser-heading",
-                    kind: "VStack",
-                    fill: true,
+                    kind: "VStack" as const,
                     children: [
                       {
                         id: "browser-title",
-                        kind: "Heading",
+                        kind: "Heading" as const,
                         text: t("browser.title"),
                         icon: "globe",
                       },
                       {
                         id: "browser-status",
-                        kind: "Text",
-                        text: busy ? t("browser.agentOperating") : t("browser.sharedSession"),
+                        kind: "Text" as const,
+                        text: state.busySessionIds.length
+                          ? t("browser.agentOperating")
+                          : t("browser.sharedSession"),
                         secondary: true,
-                        maxLines: 2,
                       },
                     ],
                   },
-                  {
-                    ...button("browser-close", t("browser.close"), "xmark", () =>
-                      browserSessionController.closePanel(),
-                    ),
-                    variant: "secondary",
-                  },
+                  button("browser-header-close", t("browser.close"), "xmark", close),
                 ],
-              },
-              {
-                id: "browser-tabs-row",
-                kind: "HStack",
-                padding: 8,
-                children: [
-                  button(
-                    "browser-new",
-                    t("browser.newTab"),
-                    "plus",
-                    () => browserSessionController.newSession(),
-                    sessions.length < MAX_BROWSER_SESSIONS,
-                  ),
-                  {
-                    id: "browser-tabs",
-                    kind: "Selector",
-                    variant: "compact",
-                    fill: true,
-                    label: t("browser.title"),
-                    value: active?.sessionId ?? "",
-                    disabled: sessions.length === 0,
-                    options: sessions.map((session) => ({
-                      value: session.sessionId,
-                      label: session.title?.trim() || session.url || t("browser.untitled"),
-                    })),
-                    action: bind(
-                      "browser-tabs",
-                      (value) => browserSessionController.selectSession(value as string),
-                      (value) =>
-                        typeof value === "string" &&
-                        sessions.some((session) => session.sessionId === value),
-                      sessions.length > 0,
-                    ),
-                  },
-                  button(
-                    "browser-close-tab",
-                    t("browser.closeTab"),
-                    "xmark",
-                    () => active && browserSessionController.closeSession(active.sessionId),
-                    !!active,
-                  ),
-                ],
-              },
-              {
-                id: "browser-address-row",
-                kind: "HStack",
-                padding: 8,
-                children: [
-                  {
-                    id: "browser-address",
-                    kind: "TextInput",
-                    label: t("browser.addressPlaceholder"),
-                    value: address,
-                    fill: true,
-                    disabled: !active,
-                    action: bind(
-                      "browser-address",
-                      (value) => setAddress(value as string),
-                      (value) => typeof value === "string",
-                      !!active,
-                    ),
-                  },
-                  button(
-                    "browser-go",
-                    t("browser.open"),
-                    "arrow.right",
-                    () => run("navigate"),
-                    !!active && !!address.trim() && !busy,
-                  ),
-                  button(
-                    "browser-reload",
-                    t("browser.reload"),
-                    "arrow.clockwise",
-                    () => run("reload"),
-                    !!active && !busy,
-                  ),
-                ],
-              },
-            ] as PresentationNode[])
-          : []),
-        ...(state.error
-          ? [
-              {
-                id: "browser-error",
-                kind: "Banner" as const,
-                label: state.error,
-                status: "error" as const,
               },
             ]
           : []),
-        ...(active
+        tabs,
+        navigation,
+        ...errorNodes,
+        ...(active && !blank
           ? [
               {
                 id: `browser-viewport:${active.sessionId}`,
@@ -366,6 +366,7 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
                 action: bind(
                   `browser-viewport:${active.sessionId}`,
                   (value) => {
+                    if (!currentSession(active.sessionId)) return;
                     const viewport = parseViewport(value);
                     if (!viewport) throw new Error("Invalid native browser viewport");
                     return browserSessionController.setViewport(active.sessionId, {
@@ -377,25 +378,41 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
                 ),
               },
             ]
-          : compact
-            ? [{ id: "browser-preparing", kind: "Spacer" as const, fill: true }]
-            : [
-                {
-                  id: "browser-preparing",
-                  kind: "EmptyState" as const,
-                  icon: "globe",
-                  label: t("browser.preparing"),
-                  text: t("browser.startBrowsingDescription"),
-                },
-              ]),
+          : [
+              {
+                id: "browser-empty",
+                kind: "VStack" as const,
+                variant: "browser-empty",
+                fill: true,
+                children: [
+                  {
+                    id: "browser-empty-message",
+                    kind: "EmptyState" as const,
+                    icon: "globe",
+                    label: t(state.initializing ? "browser.preparing" : "browser.startBrowsing"),
+                    text: t("browser.startBrowsingDescription"),
+                  },
+                  ...(!active
+                    ? [
+                        button(
+                          "browser-empty-new",
+                          t("browser.newTab"),
+                          "plus",
+                          () => browserSessionController.newSession(),
+                          state.sessions.length < MAX_BROWSER_SESSIONS,
+                        ),
+                      ]
+                    : []),
+                ],
+              },
+            ]),
       ],
     },
   ];
-
   return (
     <NativeSurface
       document={{
-        ...createNativeWorkspacePanel(t, compact, state.panelFocusRequest ?? 0),
+        ...createNativeWorkspacePanel(t, compact, state.panelFocusRequest),
         title: t("browser.title"),
         appearance: props.settings.theme,
         formFactor: compact ? "mobile" : "desktop",
@@ -404,7 +421,19 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
         dismissAction: "close",
       }}
       handlers={handlers}
-      onError={setFailure}
+      onError={(cause) => {
+        if (alive.current && browserSessionController.getSnapshot().panelOpen)
+          setFailure(cause instanceof Error ? cause.message : String(cause));
+      }}
     />
   );
+}
+
+function browserTabLabel(url: string) {
+  if (url === "about:blank") return "";
+  try {
+    return new URL(url).hostname || url;
+  } catch {
+    return url;
+  }
 }

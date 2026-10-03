@@ -12,6 +12,7 @@ enum XgentNodeKind: String, Decodable, CaseIterable {
     case heading = "Heading"
     case button = "Button"
     case textInput = "TextInput"
+    case shortcutRecorder = "ShortcutRecorder"
     case numberInput = "NumberInput"
     case colorInput = "ColorInput"
     case timeInput = "TimeInput"
@@ -32,6 +33,7 @@ enum XgentNodeKind: String, Decodable, CaseIterable {
     case markdown = "Markdown"
     case codeBlock = "CodeBlock"
     case list = "List"
+    case providerList = "ProviderList"
     case treeRow = "TreeRow"
     case settingsGroup = "SettingsGroup"
     case settingsLayout = "SettingsLayout"
@@ -50,6 +52,7 @@ enum XgentNodeKind: String, Decodable, CaseIterable {
     case browserViewport = "BrowserViewport"
     case browserLayout = "BrowserLayout"
     case mediaPreview = "MediaPreview"
+    case spreadsheetGrid = "SpreadsheetGrid"
     case htmlPreview = "HTMLPreview"
     case filePicker = "FilePicker"
     case terminalLayout = "TerminalLayout"
@@ -76,6 +79,14 @@ enum XgentNodeKind: String, Decodable, CaseIterable {
             return ["pickFiles"]
         case .terminalViewport:
             return ["streamTerminal"]
+        case .providerList:
+            return ["reorderProviders"]
+        case .shortcutRecorder:
+            return ["recordShortcut"]
+        case .spreadsheetGrid:
+            return ["changeCell"]
+        case .markdown, .codeBlock:
+            return ["highlightCode"]
         default:
             return []
         }

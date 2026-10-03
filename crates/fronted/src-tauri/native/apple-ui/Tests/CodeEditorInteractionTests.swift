@@ -12,6 +12,65 @@ private final class CodeActionRecorder {
 }
 
 final class CodeEditorInteractionTests: XCTestCase {
+    @MainActor func testNativeEditingCommandsUseTheMountedCodeEditorAndRetireWithItsWindow() async throws {
+        let model = XgentPresentationModel(), bridge = CodeActionRecorder()
+        model.actionSink = bridge.record
+        model.update(try document(content: "let count = 1"))
+        let (window, _) = mounted(model)
+        defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
+        try await settle()
+        let input = try XCTUnwrap(editor(in: window)), commands = XgentCodeEditingCommands()
+        commands.attach(input); try await settle()
+        XCTAssertTrue(commands.attached)
+        XCTAssertTrue(input.isFindInteractionEnabled)
+        commands.find(replacing: true); try await settle()
+        XCTAssertTrue(try XCTUnwrap(input.findInteraction).isFindNavigatorVisible)
+        input.findInteraction?.dismissFindNavigator(); try await settle()
+        input.selectedRange = NSRange(location: input.text.utf16.count, length: 0)
+        XCTAssertTrue(input.becomeFirstResponder())
+        input.insertText(" // Added"); try await settle()
+        XCTAssertTrue(commands.canUndo)
+        commands.undo(); try await settle()
+        XCTAssertEqual(input.text, "let count = 1")
+        XCTAssertEqual(bridge.actions.last?.value, .string("let count = 1"))
+        commands.redo(); try await settle()
+        XCTAssertEqual(input.text, "let count = 1 // Added")
+        window.rootViewController = nil; try await settle()
+        let count = bridge.actions.count
+        commands.undo(); commands.redo(); commands.find(replacing: false)
+        XCTAssertEqual(bridge.actions.count, count)
+    }
+
+    @MainActor func testCodeReferenceSelectsAndScrollsTheRequestedLineWithoutResettingLaterTyping() async throws {
+        let model = XgentPresentationModel(), bridge = CodeActionRecorder()
+        model.actionSink = bridge.record
+        let prefix = (1...100).map { "let line\($0) = \($0)" }.joined(separator: "\n") + "\n"
+        let content = prefix + "let result = \"中文 😀\"\n"
+        let location = #"{"request":"1","line":101,"column":5}"#
+        model.update(try document(content: content, location: location))
+        let (window, _) = mounted(model)
+        defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
+        try await settle()
+        let input = try XCTUnwrap(editor(in: window))
+        let expected = try XCTUnwrap(XgentCodeLocation.decode(location)).range(in: content)
+        XCTAssertEqual(input.selectedRange, expected)
+        XCTAssertGreaterThan(input.contentOffset.y, 0)
+        input.selectedRange = NSRange(location: input.text.utf16.count, length: 0)
+        XCTAssertTrue(input.becomeFirstResponder())
+        input.insertText("// Later input")
+        try await settle()
+        let action = try XCTUnwrap(bridge.actions.last)
+        model.complete(XgentActionResult(surface: "editor", requestId: action.requestId, ok: true, error: nil, acceptedValue: action.value))
+        let caret = input.selectedRange
+        model.update(try document(revision: 2, content: action.value.text, location: location))
+        try await settle()
+        XCTAssertEqual(input.selectedRange, caret)
+        XCTAssertTrue(editor(in: window) === input)
+        model.update(try document(revision: 3, content: action.value.text, location: #"{"request":"2","line":1}"#))
+        try await settle()
+        XCTAssertEqual(input.selectedRange.location, 0)
+    }
+
     @MainActor
     func testNativeTypingUsesTheRealEditBridgeAndAcknowledgementsKeepTheCaret() async throws {
         let model = XgentPresentationModel()
@@ -118,13 +177,15 @@ final class CodeEditorInteractionTests: XCTestCase {
     private func settle() async throws { try await Task.sleep(nanoseconds: 500_000_000) }
 
     private func document(surface: String = "editor", revision: Int = 1, content: String,
-                          disabled: Bool = false, removed: Bool = false) throws -> XgentDocument {
+                          disabled: Bool = false, removed: Bool = false, location: String? = nil) throws -> XgentDocument {
+        var code: [String: Any] = ["id": "code", "kind": "TextArea", "label": "Example.swift", "language": "swift",
+                                  "value": content, "action": "edit", "fill": true, "disabled": disabled]
+        if let location { code["variant"] = "workspace-code-editor"; code["text"] = location }
         let json: [String: Any] = [
             "version": 1, "surface": surface, "revision": revision, "mode": "root", "title": "Example.swift",
             "appearance": "light", "formFactor": "mobile", "removed": removed, "nodes": [
                 ["id": "file", "kind": "BrowserLayout", "fill": true, "children": [
-                    ["id": "code", "kind": "TextArea", "label": "Example.swift", "language": "swift",
-                     "value": content, "action": "edit", "fill": true, "disabled": disabled],
+                    code,
                 ]],
             ],
         ]

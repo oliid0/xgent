@@ -25,10 +25,9 @@ import {
   type ShortcutModifier,
   writeGlobalShortcutBindings,
 } from "../../lib/shortcuts/globalShortcuts";
-import { presentationControls } from "../../presentation/controls";
 import { NativeSurface } from "../../presentation/NativeSurface";
+import { useNativeGlobalShortcuts } from "../../presentation/nativeGlobalShortcuts";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
-import type { PresentationNode } from "../../presentation/types";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 
 type ShortcutDraft = {
@@ -97,7 +96,7 @@ function draftAccelerator(draft: ShortcutDraft): string | null {
 }
 
 export function GlobalShortcutsSection(
-  props: { settings?: AppSettings; onBack?: () => void } = {},
+  props: { settings?: AppSettings; onBack?: () => void; nativeSettingsSurfaceId?: string } = {},
 ) {
   const { t } = useLocale();
   const [bindings, setBindings] = useState<GlobalShortcutBindings>(() =>
@@ -106,16 +105,8 @@ export function GlobalShortcutsSection(
   const [recording, setRecording] = useState<GlobalShortcutAction | null>(null);
   const [draft, setDraft] = useState<ShortcutDraft>({ modifiers: [], mainKey: null });
   const [status, setStatus] = useState<ShortcutStatus | null>(null);
-  const [nativeAccelerators, setNativeAccelerators] = useState<
-    Partial<Record<GlobalShortcutAction, string>>
-  >(() =>
-    Object.fromEntries(
-      Object.entries(readGlobalShortcutBindings()).map(([action, binding]) => [
-        action,
-        binding?.accelerator ?? "",
-      ]),
-    ),
-  );
+  const native = isApplePresentationRuntime() && !!props.settings;
+  const nativeShortcuts = useNativeGlobalShortcuts(native, t);
 
   const bindingsRef = useRef(bindings);
   bindingsRef.current = bindings;
@@ -180,7 +171,7 @@ export function GlobalShortcutsSection(
   );
 
   useEffect(() => {
-    if (recordingRef.current) return;
+    if (native || recordingRef.current) return;
     let disposed = false;
     void applyGlobalShortcuts(bindingsRef.current).then((failures) => {
       if (disposed || recordingRef.current || failures.length === 0) return;
@@ -189,7 +180,7 @@ export function GlobalShortcutsSection(
     return () => {
       disposed = true;
     };
-  }, [formatRegisterFailures]);
+  }, [formatRegisterFailures, native]);
 
   const startRecording = useCallback((action: GlobalShortcutAction) => {
     setRecording(action);
@@ -319,113 +310,25 @@ export function GlobalShortcutsSection(
 
   if (isApplePresentationRuntime() && props.settings) {
     const compact = isNativeMobileRuntime();
-    const c = presentationControls();
-    c.handlers.set("close", {
+    nativeShortcuts.handlers.set("close", {
       enabled: true,
       accepts: (value) => value === null,
       run: () => props.onBack?.(),
     });
-    const saveNativeBinding = (action: GlobalShortcutAction) => {
-      const accelerator = nativeAccelerators[action]?.trim() ?? "";
-      if (!accelerator) throw new Error(t("settings.shortcutNeedMainKey"));
-      if (
-        GLOBAL_SHORTCUT_ACTIONS.some(
-          (other) =>
-            other !== action &&
-            bindings[other]?.accelerator.toLocaleLowerCase() === accelerator.toLocaleLowerCase(),
-        )
-      ) {
-        throw new Error(t("settings.shortcutConflict"));
-      }
-      commit({
-        ...bindings,
-        [action]: { accelerator, enabled: bindings[action]?.enabled ?? true },
-      });
-    };
-    const nodes: PresentationNode[] = [
-      {
-        id: "shortcut-description",
-        kind: "Text",
-        text: t("settings.globalShortcutsDesc"),
-        secondary: true,
-      },
-      ...actionMeta.map((action) =>
-        c.group(`shortcut:${action.id}`, action.label, [
-          {
-            id: `shortcut:${action.id}:description`,
-            kind: "Text",
-            text: action.description,
-            secondary: true,
-          },
-          c.input(
-            `shortcut:${action.id}:accelerator`,
-            t("settings.shortcutSet"),
-            nativeAccelerators[action.id] ?? "",
-            (accelerator) =>
-              setNativeAccelerators((current) => ({ ...current, [action.id]: accelerator })),
-          ),
-          c.toggle(
-            `shortcut:${action.id}:enabled`,
-            t("settings.shortcutToggleOnOff"),
-            bindings[action.id]?.enabled === true,
-            (enabled) => setBindingEnabled(action.id, enabled),
-            Boolean(bindings[action.id]),
-          ),
-          c.action(`shortcut:${action.id}:save`, t("settings.save"), () =>
-            saveNativeBinding(action.id),
-          ),
-          {
-            ...c.action(
-              `shortcut:${action.id}:clear`,
-              t("settings.shortcutClear"),
-              () => {
-                setNativeAccelerators((current) => ({ ...current, [action.id]: "" }));
-                clearBinding(action.id);
-              },
-              Boolean(bindings[action.id]),
-            ),
-            destructive: true,
-          },
-        ]),
-      ),
-      c.action("shortcut-restore", t("settings.shortcutRestoreDefaults"), () => {
-        const defaults = getDefaultGlobalShortcutBindings();
-        setNativeAccelerators(
-          Object.fromEntries(
-            Object.entries(defaults).map(([action, binding]) => [
-              action,
-              binding?.accelerator ?? "",
-            ]),
-          ),
-        );
-        commit(defaults);
-      }),
-      ...(status
-        ? [
-            {
-              id: "shortcut-status",
-              kind: "Banner" as const,
-              label: status.text,
-              status: status.kind === "success" ? ("completed" as const) : ("error" as const),
-            },
-          ]
-        : []),
-    ];
     return (
       <NativeSurface
+        sessionSurface={props.nativeSettingsSurfaceId}
         document={{
           mode: "sheet",
           title: t("settings.globalShortcuts"),
           appearance: props.settings.theme,
           formFactor: compact ? "mobile" : "desktop",
           theme: createNativePresentationTheme(props.settings, compact, "workspaceTools"),
-          nodes,
+          nodes: nativeShortcuts.nodes,
           dismissAction: "close",
         }}
-        handlers={c.handlers}
-        onError={(cause) =>
-          setStatus({ kind: "error", text: cause instanceof Error ? cause.message : String(cause) })
-        }
+        handlers={nativeShortcuts.handlers}
+        onError={nativeShortcuts.notice}
       />
     );
   }

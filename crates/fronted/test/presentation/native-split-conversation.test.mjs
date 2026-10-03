@@ -49,7 +49,7 @@ function harness(options = {}) {
     return handler.run(value);
   };
   const approval = loader.loadModule("src/lib/tools/toolApproval.ts");
-  return { props, calls, render, action, approval, unmount: () => {
+  return { props, calls, render, action, approval, loader, unmount: () => {
     hooks.unmount(); approval.cancelPendingToolApprovalsForConversation("side");
     approval.cancelPendingToolApprovalsForConversation(props.conversationId);
   } };
@@ -75,6 +75,21 @@ test("native side conversation shares real draft/send/stop/retry/activate and cl
   h.props.record = { title: "Side", state: { transcript: { items: [] } } };
   h.action("side-activate");
   assert.deepEqual(h.calls.slice(1), [["stop"], ["retry"], ["activate"]]);
+  h.unmount();
+});
+
+test("native side conversation renders and settles its own shared question tool", async () => {
+  const h = harness();
+  const ask = h.loader.loadModule("src/lib/tools/askUserQuestionTools.ts");
+  const toolCall = { id: "side-question", name: "AskUserQuestion", arguments: { questions: [
+    { id: "style", prompt: "选择风格", options: [{ label: "简洁" }, { label: "活泼" }] },
+  ] } };
+  const pending = ask.createAskUserQuestionTools({ conversationId: "side" }).executeToolCall(toolCall);
+  h.props.liveTranscriptStore.updateLiveRounds(() => [{ round: 1, key: "r", blocks: [{ kind: "tool", item: { toolCall } }], runningToolCallIds: [toolCall.id] }]);
+  const prefix = "question:side:side-question";
+  assert.equal(find(h.render().document.nodes, prefix).variant, "question-card");
+  h.action(`${prefix}:option:0:0`); await h.action(`${prefix}:submit`);
+  assert.equal((await pending).details.answers[0].selectedLabel, "简洁");
   h.unmount();
 });
 

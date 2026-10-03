@@ -28,9 +28,11 @@ import {
   useAutomation,
 } from "../../lib/automation";
 import { buildModelOptions } from "../../lib/chat/page/chatPageHelpers";
+import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import { workspaceProjectPathKey } from "../../lib/settings";
 import { presentationControls } from "../../presentation/controls";
 import { NativeSurface } from "../../presentation/NativeSurface";
+import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import { type CronTaskFormData, CronTaskModal } from "./CronTaskModal";
@@ -130,12 +132,13 @@ export function CronSection(
 
   function handleToggle(task: CronTask) {
     if (isCronTaskExhausted(task)) return;
-    runOps(() => applyCronOps([{ op: "update", id: task.id, patch: { enabled: !task.enabled } }]));
+    return applyCronOps([{ op: "update", id: task.id, patch: { enabled: !task.enabled } }]);
   }
 
   if (detail.open && detail.mode === "view") {
     return (
       <CronTaskViewModal
+        settings={settings}
         nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
         taskId={detail.taskId}
         nativePresentationMode={props.nativePresentationMode}
@@ -147,6 +150,7 @@ export function CronSection(
   if (detail.open) {
     return (
       <CronTaskModal
+        settings={settings}
         nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
         mode={detail.mode}
         nativePresentationMode={props.nativePresentationMode}
@@ -177,31 +181,75 @@ export function CronSection(
       ...(tasks.length
         ? []
         : [{ id: "empty", kind: "Text" as const, text: t("settings.cronEmptyDesc") }]),
-      ...tasks.map((task) =>
-        c.group(task.id, task.name, [
-          { id: `${task.id}:description`, kind: "Text", text: task.description || task.cron },
+      ...tasks.map((task) => ({
+        ...c.group(task.id, task.name, [
+          ...(task.description
+            ? [
+                {
+                  id: `${task.id}:description`,
+                  kind: "Text" as const,
+                  text: task.description,
+                  secondary: true,
+                },
+              ]
+            : []),
+          { id: `${task.id}:type`, kind: "Badge", label: t(TASK_TYPE_LABEL[task.type]) },
+          { id: `${task.id}:schedule`, kind: "Badge", label: task.cron },
+          {
+            id: `${task.id}:remaining`,
+            kind: "Badge",
+            label: formatRemainingExecutionsLabel(t, task),
+            status: isCronTaskExhausted(task) ? "paused" : "pending",
+          },
           c.toggle(
             `${task.id}:enabled`,
-            t("settings.cronEnable"),
+            t(
+              isCronTaskExhausted(task)
+                ? "settings.cronRemainingExecutionsEditRequired"
+                : task.enabled
+                  ? "settings.cronDisable"
+                  : "settings.cronEnable",
+            ),
             task.enabled,
             () => handleToggle(task),
             !isCronTaskExhausted(task),
           ),
-          c.action(`${task.id}:edit`, t("settings.cronModalEdit"), () =>
-            setDetail({ open: true, mode: "edit", task }),
-          ),
-          c.action(`${task.id}:view`, t("settings.cronViewTitle"), () =>
-            setDetail({ open: true, mode: "view", taskId: task.id }),
-          ),
+          {
+            ...c.action(`${task.id}:edit`, t("settings.cronModalEdit"), () =>
+              setDetail({ open: true, mode: "edit", task }),
+            ),
+            kind: "IconButton",
+            icon: "pencil",
+          },
+          {
+            ...c.action(`${task.id}:view`, t("settings.cronViewTitle"), () =>
+              setDetail({ open: true, mode: "view", taskId: task.id }),
+            ),
+            kind: "IconButton",
+            icon: "eye",
+          },
           {
             ...c.action(`${task.id}:delete`, t("settings.cronDelete"), () => setDeleteId(task.id)),
+            kind: "IconButton",
+            icon: "trash",
             destructive: true,
           },
           ...(task.lastError
-            ? [{ id: `${task.id}:error`, kind: "Text" as const, text: task.lastError }]
+            ? [
+                {
+                  id: `${task.id}:error`,
+                  kind: "Banner" as const,
+                  label: t("settings.cronScheduleError"),
+                  text: task.lastError,
+                  status: "error" as const,
+                },
+              ]
             : []),
         ]),
-      ),
+        kind: "VStack" as const,
+        variant: "automation-row",
+        icon: task.type === "bash" ? "terminal" : task.type === "http" ? "network" : "bubble.left",
+      })),
       ...(actionError ? [{ id: "error", kind: "Text" as const, text: actionError }] : []),
     ];
     const confirmation = presentationControls();
@@ -218,6 +266,12 @@ export function CronSection(
             mode: props.nativePresentationMode ?? "sheet",
             title: t("settings.navCron"),
             appearance: settings.theme,
+            formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
+            theme: createNativePresentationTheme(
+              settings,
+              isNativeMobileRuntime(),
+              "workspaceTools",
+            ),
             nodes,
             dismissAction: "close",
           }}
@@ -361,7 +415,7 @@ export function CronSection(
                       checked={task.enabled}
                       disabled={exhausted}
                       title={switchTitle}
-                      onToggle={() => handleToggle(task)}
+                      onToggle={() => runOps(() => Promise.resolve(handleToggle(task)))}
                     />
                   </HStack>
                 }

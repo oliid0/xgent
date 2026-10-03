@@ -9,7 +9,8 @@ import { useState } from "react";
 import { HubHeader } from "../../components/hub/HubChrome";
 import { Cable, Cloud, Download, Server } from "../../components/icons";
 import { useLocale } from "../../i18n";
-import { type AppSettings, type McpServerConfig, updateMcp } from "../../lib/settings";
+import { saveMcpServer } from "../../lib/mcpServerSettings";
+import type { AppSettings, McpServerConfig } from "../../lib/settings";
 import { McpImportView } from "./McpImportView";
 import { McpRegistryBrowser } from "./McpRegistryBrowser";
 import { McpServerEditModal, McpServersForm } from "./McpServersForm";
@@ -50,15 +51,9 @@ export function McpHubPage(props: McpHubPageProps) {
   }
 
   function handleModalSave(server: McpServerConfig) {
-    setSettings((prev) => {
-      if (editing?.mode === "edit") {
-        const targetIdx = editing.idx;
-        return updateMcp(prev, {
-          servers: prev.mcp.servers.map((item, index) => (index === targetIdx ? server : item)),
-        });
-      }
-      return updateMcp(prev, { servers: [...prev.mcp.servers, server] });
-    });
+    setSettings((prev) =>
+      saveMcpServer(prev, server, editing?.mode === "edit" ? editing.server.id : null, t),
+    );
   }
 
   const content =
@@ -185,6 +180,7 @@ export function McpHubPage(props: McpHubPageProps) {
 
       {editing ? (
         <McpServerEditModal
+          key={editing.mode === "edit" ? editing.server.id : "add"}
           mode={editing.mode}
           initialServer={editing.mode === "edit" ? editing.server : null}
           existingServers={settings.mcp.servers}

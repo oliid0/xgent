@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MEMORY_TYPES } from "../../../lib/memory/schema";
 import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
 import type { AppSettings } from "../../../lib/settings";
@@ -46,13 +46,22 @@ export function NativeMemoryPanel(props: Props) {
       navigation.revision += 1;
     };
   }, [navigation, workdir]);
-  const [draft, setDraft] = useState<MemoryCreateDraft>({
+  const [draft, setDraftState] = useState<MemoryCreateDraft>({
     slug: "",
     scope: "global",
     memoryType: "user",
     description: "",
     body: "",
   });
+  const draftRef = useRef(draft);
+  const setDraft = useCallback(
+    (update: MemoryCreateDraft | ((current: MemoryCreateDraft) => MemoryCreateDraft)) => {
+      const next = typeof update === "function" ? update(draftRef.current) : update;
+      draftRef.current = next;
+      setDraftState(next);
+    },
+    [],
+  );
   const c = presentationControls();
   const busy = data.loading || data.saving;
   const nodes: PresentationNode[] = [];
@@ -107,10 +116,13 @@ export function NativeMemoryPanel(props: Props) {
               "memory-confirm-action",
               t(confirmation === "wipe" ? "settings.memoryWipeAll" : "settings.memoryDelete"),
               async () => {
-                if (confirmation === "wipe") await data.wipeAll();
-                else await data.deleteSelected();
-                setConfirmation(null);
-                setScreen("list");
+                const revision = navigation.revision;
+                const completed =
+                  confirmation === "wipe" ? await data.wipeAll() : await data.deleteSelected();
+                if (completed && navigation.active && navigation.revision === revision) {
+                  setConfirmation(null);
+                  setScreen("list");
+                }
               },
               !busy,
             ),
@@ -174,7 +186,14 @@ export function NativeMemoryPanel(props: Props) {
           "memory-create-save",
           t("settings.memorySave"),
           async () => {
-            if (await data.createEntry(draft)) {
+            const submittedDraft = draftRef.current;
+            const revision = navigation.revision;
+            if (
+              (await data.createEntry(submittedDraft)) &&
+              navigation.active &&
+              navigation.revision === revision &&
+              draftRef.current === submittedDraft
+            ) {
               setDraft({
                 slug: "",
                 scope: "global",

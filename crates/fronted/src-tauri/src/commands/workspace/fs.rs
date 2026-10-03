@@ -3975,7 +3975,9 @@ pub async fn fs_file_applications(workdir: String, path: String) -> Result<Vec<s
         if !target.is_file() { return Err(FsError::Other("Choose a regular file".into()).into()); }
         #[cfg(target_os = "windows")]
         { xgent_computer_use::file_handlers::applications(&target, None).map_err(|error| FsError::Other(error).into()) }
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(target_os = "macos")]
+        { super::file_applications_macos::applications(&target).map_err(|error| FsError::Other(error).into()) }
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
         { Ok(Vec::new()) }
     }).await
 }
@@ -3997,15 +3999,12 @@ fn fs_open_workspace_path_impl(
             "Only regular files and directories can be opened".to_string(),
         ));
     };
-    let normalized_mode = mode
-        .as_deref()
-        .unwrap_or("open")
-        .trim()
-        .to_ascii_lowercase();
-    let normalized_mode = match normalized_mode.as_str() {
+    let requested_mode = mode.as_deref().unwrap_or("open").trim();
+    let lowercase_mode = requested_mode.to_ascii_lowercase();
+    let normalized_mode = match lowercase_mode.as_str() {
         "" | "open" => "open",
         "choose" => "choose",
-        value if value.starts_with("app:") => value,
+        value if value.starts_with("app:") => requested_mode,
         "reveal" | "containing_dir" | "containing-directory" => "reveal",
         other => {
             return Err(FsError::Other(format!(
@@ -4014,11 +4013,14 @@ fn fs_open_workspace_path_impl(
         }
     };
 
-    if let Some(selected) = normalized_mode.strip_prefix("app:") {
+    if lowercase_mode.starts_with("app:") {
+        let selected = &requested_mode[4..];
         if !meta.is_file() { return Err(FsError::Other("Choose a regular file".into())); }
         #[cfg(target_os = "windows")]
         { xgent_computer_use::file_handlers::applications(&target, Some(selected)).map_err(FsError::Other)?; }
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(target_os = "macos")]
+        { super::file_applications_macos::open(&target, selected).map_err(FsError::Other)?; }
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
         { let _ = selected; return Err(FsError::Other("Use the system application chooser on this platform".into())); }
     } else if normalized_mode == "choose" && meta.is_file() {
         choose_workspace_application(&target).map_err(FsError::Other)?;

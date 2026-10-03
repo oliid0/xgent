@@ -96,8 +96,9 @@ test("native backup retains settings surface, secure input, presets and desktop-
     assert.equal(s.document.formFactor, mobile ? "mobile" : "desktop");
     assert.equal(s.document.dismissAction, "backup-back");
     const connection = s.document.nodes.find(node => node.id === "backup-connection");
-    assert.equal(connection.children.find(node => node.id === "backup-password").secure, true);
-    assert.equal(connection.children.find(node => node.id === "backup-preset").options.length, 4);
+    const fields = connection.children.find(node => node.variant === "backup-connection-fields").children;
+    assert.equal(fields.find(node => node.id === "backup-password").secure, true);
+    assert.equal(fields.find(node => node.id === "backup-preset").options.length, 4);
     assert.equal(s.handlers.has("backup-import"), !mobile);
     assert.equal(s.handlers.has("backup-export"), !mobile);
     await h.data.handleImport(); await h.data.handleExport();

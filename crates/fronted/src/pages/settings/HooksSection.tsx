@@ -24,11 +24,9 @@ import { useLocale } from "../../i18n";
 import {
   applyHookOps,
   HOOK_EVENT_TRANSLATION_KEYS,
-  HOOK_EVENTS,
   type HookDef,
   type HookEvent,
   type HookType,
-  HTTP_METHODS,
   useAutomation,
 } from "../../lib/automation";
 import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
@@ -38,7 +36,6 @@ import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import { HookModal } from "./HookModal";
-import { type HttpRequestDraft, parseHttpRequestDrafts } from "./httpRequestEditor";
 import { AgentActivationSwitch, ConfirmDeletePopover } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
@@ -81,13 +78,6 @@ export function HooksSection(
   const [editingHook, setEditingHook] = useState<HookDef | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [nativeName, setNativeName] = useState("");
-  const [nativeDescription, setNativeDescription] = useState("");
-  const [nativeEvent, setNativeEvent] = useState<HookEvent>(HOOK_EVENTS[0]);
-  const [nativeType, setNativeType] = useState<HookType>("command");
-  const [nativeScript, setNativeScript] = useState("");
-  const [nativeRequests, setNativeRequests] = useState("[]");
-  const [nativeTimeout, setNativeTimeout] = useState("60");
   const { hooks: hooksSnapshot } = useAutomation();
   const hooks = hooksSnapshot.hooks;
   const enabledCount = hooks.filter((hook) => hook.enabled).length;
@@ -134,25 +124,13 @@ export function HooksSection(
 
   function openAdd() {
     setEditingHook(null);
-    setNativeName("");
-    setNativeDescription("");
-    setNativeEvent(HOOK_EVENTS[0]);
-    setNativeType("command");
-    setNativeScript("");
-    setNativeRequests("[]");
-    setNativeTimeout("60");
+    setActionError(null);
     setModalOpen(true);
   }
 
   function openEdit(hook: HookDef) {
     setEditingHook(hook);
-    setNativeName(hook.name);
-    setNativeDescription(hook.description);
-    setNativeEvent(hook.event);
-    setNativeType(hook.type);
-    setNativeScript(hook.script ?? "");
-    setNativeRequests(JSON.stringify(hook.requests ?? [], null, 2));
-    setNativeTimeout(String(Math.round((hook.timeoutMs ?? 60_000) / 1000)));
+    setActionError(null);
     setModalOpen(true);
   }
 
@@ -173,171 +151,29 @@ export function HooksSection(
   }
 
   function toggleHook(hook: HookDef) {
-    runOps(() => applyHookOps([{ op: "update", id: hook.id, patch: { enabled: !hook.enabled } }]));
+    return applyHookOps([{ op: "update", id: hook.id, patch: { enabled: !hook.enabled } }]);
   }
 
   function deleteHook(hookId: string) {
-    runOps(() => applyHookOps([{ op: "delete", id: hookId }]));
+    return applyHookOps([{ op: "delete", id: hookId }]);
+  }
+
+  if (modalOpen) {
+    return (
+      <HookModal
+        key={editingHook?.id ?? "add"}
+        settings={_props.settings}
+        nativeSettingsSurfaceId={_props.nativeSettingsSurfaceId}
+        nativePresentationMode={_props.nativePresentationMode}
+        event={editingHook?.event}
+        initialData={editingHook ?? undefined}
+        onSave={handleSave}
+        onClose={closeModal}
+      />
+    );
   }
 
   if (isApplePresentationRuntime()) {
-    if (modalOpen) {
-      const c = presentationControls();
-      const save = async () => {
-        const name = nativeName.trim();
-        if (!name) throw new Error(t("settings.hooksNameRequired"));
-        const timeoutSeconds = Number(nativeTimeout);
-        if (!Number.isSafeInteger(timeoutSeconds) || timeoutSeconds <= 0)
-          throw new Error(t("settings.hooksTimeoutInvalid"));
-        let requests: HookDef["requests"];
-        if (nativeType === "command") {
-          if (!nativeScript.trim()) throw new Error(t("settings.hooksCommandRequired"));
-        } else {
-          const parsed = JSON.parse(nativeRequests) as unknown;
-          if (!Array.isArray(parsed) || parsed.length === 0)
-            throw new Error(t("settings.cronHttpRequestRequired"));
-          const drafts = parsed.map((raw, index): HttpRequestDraft => {
-            if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-              throw new Error(`${t("settings.cronHttpUrlInvalid")} #${index + 1}`);
-            }
-            const candidate = raw as Record<string, unknown>;
-            const method = candidate.method;
-            if (
-              typeof method !== "string" ||
-              !HTTP_METHODS.some((candidate) => candidate === method)
-            ) {
-              throw new Error(`${t("settings.cronHttpMethod")} #${index + 1}`);
-            }
-            return {
-              id:
-                typeof candidate.id === "string" && candidate.id.trim()
-                  ? candidate.id.trim()
-                  : `request-${index + 1}`,
-              url: typeof candidate.url === "string" ? candidate.url : "",
-              method: method as HttpRequestDraft["method"],
-              headersText: candidate.headers === undefined ? "" : JSON.stringify(candidate.headers),
-              bodyText: candidate.body === undefined ? "" : JSON.stringify(candidate.body),
-            };
-          });
-          requests = parseHttpRequestDrafts(drafts, t);
-        }
-        await handleSave({
-          event: nativeEvent,
-          name,
-          description: nativeDescription.trim(),
-          enabled: editingHook?.enabled ?? true,
-          type: nativeType,
-          script: nativeType === "command" ? nativeScript.trim() : undefined,
-          requests,
-          timeoutMs: nativeType === "command" ? timeoutSeconds * 1000 : undefined,
-        });
-        closeModal();
-      };
-      c.handlers.set("close", {
-        enabled: true,
-        accepts: (value) => value === null,
-        run: closeModal,
-      });
-      const nodes: PresentationNode[] = [
-        c.select(
-          "hook-event",
-          t("settings.hooksLifecycle"),
-          nativeEvent,
-          HOOK_EVENTS.map((event) => ({
-            value: event,
-            label: t(HOOK_EVENT_TRANSLATION_KEYS[event]),
-          })),
-          (value) => setNativeEvent(value as HookEvent),
-        ),
-        c.input("hook-name", t("settings.hooksName"), nativeName, setNativeName),
-        c.input(
-          "hook-description",
-          t("settings.hooksDescription"),
-          nativeDescription,
-          setNativeDescription,
-        ),
-        c.select(
-          "hook-type",
-          t("settings.hooksType"),
-          nativeType,
-          [
-            { value: "command", label: t("settings.hooksTypeCommand") },
-            { value: "http", label: t("settings.hooksTypeHttp") },
-          ],
-          (value) => setNativeType(value as HookType),
-        ),
-        ...(nativeType === "command"
-          ? [
-              {
-                ...c.input(
-                  "hook-script",
-                  t("settings.hooksCommandList"),
-                  nativeScript,
-                  setNativeScript,
-                ),
-                kind: "TextArea" as const,
-              },
-            ]
-          : [
-              {
-                ...c.input(
-                  "hook-requests",
-                  t("settings.hooksHttpRequests"),
-                  nativeRequests,
-                  setNativeRequests,
-                ),
-                kind: "TextArea" as const,
-              },
-              {
-                id: "hook-http-hint",
-                kind: "Text" as const,
-                secondary: true,
-                text: '[{"id":"notify","url":"https://example.com/hook","method":"POST","headers":{},"body":{}}]',
-              },
-            ]),
-        ...(nativeType === "command"
-          ? [
-              c.input("hook-timeout", t("settings.hooksTimeout"), nativeTimeout, (value) => {
-                if (!value || /^\d+$/.test(value)) setNativeTimeout(value);
-              }),
-            ]
-          : []),
-        { ...c.action("hook-save", t("settings.save"), save), prominent: true },
-        ...(actionError
-          ? [
-              {
-                id: "hook-form-error",
-                kind: "Banner" as const,
-                label: actionError,
-                status: "error" as const,
-              },
-            ]
-          : []),
-      ];
-      return (
-        <NativeSurface
-          sessionSurface={_props.nativeSettingsSurfaceId}
-          document={{
-            mode: _props.nativePresentationMode ?? "sheet",
-            title: t(editingHook ? "settings.hooksEdit" : "settings.hooksAdd"),
-            appearance: _props.settings.theme,
-            formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
-            theme: createNativePresentationTheme(
-              _props.settings,
-              isNativeMobileRuntime(),
-              "workspaceTools",
-            ),
-            nodes,
-            dismissAction: "close",
-          }}
-          handlers={c.handlers}
-          onError={(error) =>
-            setActionError(error instanceof Error ? error.message : String(error))
-          }
-        />
-      );
-    }
-
     const c = presentationControls();
     c.handlers.set("close", {
       enabled: true,
@@ -345,6 +181,31 @@ export function HooksSection(
       run: () => _props.onBack?.(),
     });
     const nodes: PresentationNode[] = [
+      { id: "hooks-description", kind: "Text", text: t("settings.hooksDesc"), secondary: true },
+      {
+        id: "hooks-enabled-count",
+        kind: "Badge",
+        label: `${enabledCount} ${t("settings.hooksEnabledCount")}`,
+      },
+      {
+        id: "hooks-lifecycle",
+        kind: "VStack",
+        variant: "hook-lifecycle",
+        children: EVENT_FLOW.map(({ event, phaseKey }) => ({
+          id: `hooks-phase:${event}`,
+          kind: "Badge",
+          label: t(HOOK_EVENT_TRANSLATION_KEYS[event]),
+          text: phasesByKey[phaseKey].label,
+          icon:
+            phaseKey === "agent"
+              ? "person.crop.circle"
+              : phaseKey === "turn"
+                ? "arrow.triangle.2.circlepath"
+                : phaseKey === "message"
+                  ? "bubble.left"
+                  : "wrench",
+        })),
+      },
       c.action("hook-add", t("settings.hooksAdd"), openAdd),
       ...(actionError
         ? [
@@ -357,26 +218,60 @@ export function HooksSection(
           ]
         : []),
       ...(hooks.length
-        ? hooks.map((hook) =>
-            c.group(`hook:${hook.id}`, hook.name, [
+        ? hooks.map((hook) => ({
+            ...c.group(`hook:${hook.id}`, hook.name, [
               {
                 id: `hook:${hook.id}:metadata`,
                 kind: "Text",
-                text: `${t(HOOK_EVENT_TRANSLATION_KEYS[hook.event])} · ${hook.type}\n${hook.description}`,
+                text: hook.description || t("settings.hooksNoDescription"),
                 secondary: true,
+              },
+              {
+                id: `hook:${hook.id}:event`,
+                kind: "Badge",
+                label: t(HOOK_EVENT_TRANSLATION_KEYS[hook.event]),
+              },
+              {
+                id: `hook:${hook.id}:type`,
+                kind: "Badge",
+                label: t(
+                  hook.type === "command" ? "settings.hooksTypeCommand" : "settings.hooksTypeHttp",
+                ),
+              },
+              {
+                id: `hook:${hook.id}:phase`,
+                kind: "Badge",
+                label: phaseByEvent.get(hook.event)?.label,
+              },
+              {
+                id: `hook:${hook.id}:steps`,
+                kind: "Badge",
+                label:
+                  hook.type === "command"
+                    ? `${(hook.script ?? "").split(/\r?\n/).filter((line) => line.trim()).length} ${t("settings.hooksScriptLinesCount")}`
+                    : `${hook.requests?.length ?? 0} ${t("settings.hooksRequestsCount")}`,
               },
               c.toggle(`hook:${hook.id}:enabled`, t("settings.enable"), hook.enabled, () =>
                 toggleHook(hook),
               ),
-              c.action(`hook:${hook.id}:edit`, t("settings.edit"), () => openEdit(hook)),
+              {
+                ...c.action(`hook:${hook.id}:edit`, t("settings.edit"), () => openEdit(hook)),
+                kind: "IconButton",
+                icon: "pencil",
+              },
               {
                 ...c.action(`hook:${hook.id}:delete`, t("settings.delete"), () =>
                   setDeleteId(hook.id),
                 ),
+                kind: "IconButton",
+                icon: "trash",
                 destructive: true,
               },
             ]),
-          )
+            kind: "VStack" as const,
+            variant: "automation-row",
+            icon: hook.type === "command" ? "terminal" : "network",
+          }))
         : [
             {
               id: "hooks-empty",
@@ -389,8 +284,8 @@ export function HooksSection(
     ];
     const confirmation = presentationControls();
     const cancel = confirmation.action("cancel", t("settings.cancel"), () => setDeleteId(null));
-    const remove = confirmation.action("delete", t("settings.delete"), () => {
-      if (deleteId) deleteHook(deleteId);
+    const remove = confirmation.action("delete", t("settings.delete"), async () => {
+      if (deleteId) await deleteHook(deleteId);
       setDeleteId(null);
     });
     return (
@@ -437,17 +332,6 @@ export function HooksSection(
           />
         ) : null}
       </>
-    );
-  }
-
-  if (modalOpen) {
-    return (
-      <HookModal
-        event={editingHook?.event}
-        initialData={editingHook ?? undefined}
-        onSave={handleSave}
-        onClose={closeModal}
-      />
     );
   }
 
@@ -557,7 +441,7 @@ export function HooksSection(
                         <AgentActivationSwitch
                           checked={hook.enabled}
                           title={hook.enabled ? t("settings.disable") : t("settings.enable")}
-                          onToggle={() => toggleHook(hook)}
+                          onToggle={() => runOps(() => toggleHook(hook))}
                         />
                         <IconButton
                           label={t("settings.edit")}
@@ -569,7 +453,7 @@ export function HooksSection(
                         />
                         <ConfirmDeletePopover
                           name={hook.name}
-                          onConfirm={() => deleteHook(hook.id)}
+                          onConfirm={() => runOps(() => deleteHook(hook.id))}
                         >
                           {(open) => (
                             <IconButton

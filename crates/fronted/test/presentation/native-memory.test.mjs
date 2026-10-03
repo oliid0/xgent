@@ -19,8 +19,8 @@ function harness(options = {}) {
     memoryWrite: async args => { calls.push(["write", args]); if (options.write) await options.write(args); records.set(args.slug, { ...entry(args.slug), ...args }); return { slug: args.slug }; },
     memoryUpdate: async args => { calls.push(["update", args]); const e = records.get(args.slug); records.set(args.slug, { ...e, ...args, body: args.mode === "append" ? `${e.body}\n${args.body}` : args.body }); return { slug: args.slug }; },
     memoryAccept: async args => { calls.push(["accept", args]); records.get(args.slug).unreviewed = false; },
-    memoryDelete: async args => { calls.push(["delete", args]); records.delete(args.slug); },
-    memoryWipeAll: async () => { calls.push(["wipe"]); records.clear(); return { root: "/memory" }; },
+    memoryDelete: async args => { calls.push(["delete", args]); await options.delete?.(args); records.delete(args.slug); },
+    memoryWipeAll: async () => { calls.push(["wipe"]); await options.wipe?.(); records.clear(); return { root: "/memory" }; },
   };
   const loader = createTsModuleLoader({ mocks: {
     react: hooks.react, "../../../lib/memory/api": api,
@@ -140,4 +140,53 @@ test("a delayed entry read cannot reopen native memory after Back or New entry",
     assert.equal(h.render().handlers.has("memory-create-save"), action === "memory-create");
     h.unmount();
   }
+});
+
+test("native memory create and edit preserve the final accepted text before a new document is published", async () => {
+  const h = harness(); h.render(); await tick();
+  try {
+    await h.dispatch("memory-create");
+    await h.dispatch("memory-slug", "last-character"); await h.dispatch("memory-body", "Draft");
+    let handlers = h.render().handlers;
+    handlers.get("memory-body").run("Draft末尾🙂");
+    handlers.get("memory-description").run("Final description");
+    await handlers.get("memory-create-save").run(null); await tick(); h.render();
+    assert.equal(h.records.get("last-character").body, "Draft末尾🙂");
+    assert.equal(h.records.get("last-character").description, "Final description");
+    handlers = h.render().handlers;
+    handlers.get("memory-edit-body").run("Edited末尾🙂");
+    handlers.get("memory-edit-description").run("Updated description");
+    await handlers.get("memory-save").run(null); await tick(); h.render();
+    assert.equal(h.records.get("last-character").body, "Edited末尾🙂");
+    assert.equal(h.records.get("last-character").description, "Updated description");
+    await h.dispatch("back"); await h.dispatch("memory-category", "journal"); await h.dispatch("memory-open:global::daily");
+    await h.dispatch("memory-append", "append");
+    handlers = h.render().handlers;
+    handlers.get("memory-append").run("append末尾🙂");
+    await handlers.get("memory-save").run(null);
+    assert.equal(h.records.get("daily").body, "body daily\nappend末尾🙂");
+  } finally { h.unmount(); }
+});
+
+test("failed memory deletion and wipe retain the confirmation and records for an explicit retry", async () => {
+  let fail = true;
+  const failing = async () => { if (fail) throw new Error("memory store unavailable"); };
+  const h = harness({ delete: failing, wipe: failing }); h.render(); await tick();
+  try {
+    await h.dispatch("memory-open:global::one"); await h.dispatch("memory-delete");
+    await h.dispatch("memory-confirm-action");
+    assert.equal(h.records.has("one"), true);
+    assert.ok(h.render().handlers.has("memory-confirm-cancel"));
+    assert.ok(JSON.stringify(h.render().document).includes("memory store unavailable"));
+    fail = false; await h.dispatch("memory-confirm-action");
+    assert.equal(h.records.has("one"), false);
+    assert.ok(!h.render().handlers.has("memory-confirm-cancel"));
+    await h.dispatch("memory-wipe"); fail = true;
+    await h.dispatch("memory-confirm-action");
+    assert.equal(h.records.size, 2);
+    assert.ok(h.render().handlers.has("memory-confirm-cancel"));
+    fail = false; await h.dispatch("memory-confirm-action");
+    assert.equal(h.records.size, 0);
+    assert.ok(!h.render().handlers.has("memory-confirm-cancel"));
+  } finally { h.unmount(); }
 });

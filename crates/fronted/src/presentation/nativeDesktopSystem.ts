@@ -60,25 +60,22 @@ export function useNativeDesktopSystem(
   const selected =
     current === "auto" || shell.options.some((option) => option.id === current) ? current : "auto";
   const nodes: PresentationNode[] = [
-    c.group("desktop-terminal", t("settings.terminalShell"), [
-      c.select(
-        "terminal-shell",
-        t("settings.terminalShell"),
-        selected,
-        [
-          { value: "auto", label: t("settings.terminalShellAuto") },
-          ...shell.options.map((option) => ({ value: option.id, label: option.label })),
-        ],
-        (value) =>
-          setSettings((previous) =>
-            updateSystem(previous, { terminalShell: value as TerminalShellPreference }),
-          ),
-        ready,
-      ),
+    c.group("desktop-terminal", "", [
       {
-        id: "desktop-shell-description",
-        kind: "Text",
-        secondary: true,
+        ...c.select(
+          "terminal-shell",
+          t("settings.terminalShell"),
+          selected,
+          [
+            { value: "auto", label: t("settings.terminalShellAuto") },
+            ...shell.options.map((option) => ({ value: option.id, label: option.label })),
+          ],
+          (value) =>
+            setSettings((previous) =>
+              updateSystem(previous, { terminalShell: value as TerminalShellPreference }),
+            ),
+          ready,
+        ),
         text: t("settings.terminalShellDesc"),
       },
       ...(!ready

@@ -12,9 +12,13 @@ import { Shield } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import { type CommandSafetyMode, type ToolPolicy, updateSystem } from "../../lib/settings";
-import { BUILTIN_TOOL_CATALOG, BUILTIN_TOOL_CATEGORIES } from "../../lib/tools/builtinToolCatalog";
+import { BUILTIN_TOOL_CATEGORIES } from "../../lib/tools/builtinToolCatalog";
 import { PERSONAL_POLICY_PREFIX } from "../../lib/tools/mobileAssistantPolicy";
-import { resolveRuntimeToolCapabilities } from "../../lib/tools/runtimeToolCapabilities";
+import {
+  patchToolPolicies,
+  resetToolPolicies,
+  settingsToolsForCategory,
+} from "../../lib/tools/toolPolicySettings";
 import { SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
@@ -29,36 +33,18 @@ const COMMAND_SAFETY_OPTIONS: readonly CommandSafetyMode[] = [
 export function ToolPermissionsSection({ settings, setSettings }: SettingsSectionProps) {
   const { t } = useLocale();
   const nativeMobile = isNativeMobileRuntime();
-  const capabilities = resolveRuntimeToolCapabilities(nativeMobile ? "native-mobile" : "desktop");
   const policies = Object.fromEntries(
     Object.entries(settings.system.toolPolicies ?? {}).filter(
       ([key]) => !key.startsWith(PERSONAL_POLICY_PREFIX),
     ),
   );
 
-  const setToolPolicies = (nextPolicies: Record<string, ToolPolicy>) => {
-    setSettings((prev) =>
-      updateSystem(prev, {
-        toolPolicies: {
-          ...Object.fromEntries(
-            Object.entries(prev.system.toolPolicies ?? {}).filter(([key]) =>
-              key.startsWith(PERSONAL_POLICY_PREFIX),
-            ),
-          ),
-          ...nextPolicies,
-        },
-      }),
-    );
-  };
-
   const setToolPolicy = (toolName: string, policy: ToolPolicy) => {
-    setToolPolicies({ ...policies, [toolName]: policy });
+    setSettings((prev) => patchToolPolicies(prev, [toolName], policy));
   };
 
   const setCategoryPolicy = (toolNames: readonly string[], policy: ToolPolicy) => {
-    const next = { ...policies };
-    for (const toolName of toolNames) next[toolName] = policy;
-    setToolPolicies(next);
+    setSettings((prev) => patchToolPolicies(prev, toolNames, policy));
   };
 
   return (
@@ -81,7 +67,7 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
                 label={t("settings.toolPermissionsReset")}
                 variant="ghost"
                 size="sm"
-                onClick={() => setToolPolicies({})}
+                onClick={() => setSettings(resetToolPolicies)}
               />
             ) : null}
           </HStack>
@@ -125,12 +111,7 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
       ) : null}
 
       {BUILTIN_TOOL_CATEGORIES.map((category) => {
-        const tools = BUILTIN_TOOL_CATALOG.filter(
-          (tool) =>
-            tool.categoryId === category.id &&
-            (tool.toolName !== "ManagedProcess" || capabilities.managedProcess) &&
-            (tool.toolName !== "ReadTerminal" || capabilities.terminal),
-        );
+        const tools = settingsToolsForCategory(category.id, nativeMobile);
         if (tools.length === 0) return null;
         const toolNames = tools.map((tool) => tool.toolName);
         return (

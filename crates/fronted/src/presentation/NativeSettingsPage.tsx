@@ -1,4 +1,3 @@
-import { invoke } from "@xgent/runtime";
 import { useEffect, useState } from "react";
 import { SUPPORTED_LOCALES, useLocale } from "../i18n";
 import {
@@ -27,7 +26,6 @@ import {
   setMobileAlpineMirror,
 } from "../lib/mobileExecution";
 import {
-  type AppSettings,
   type CustomProvider,
   normalizeCustomProvider,
   normalizeFontScale,
@@ -35,7 +33,6 @@ import {
   STT_PROVIDER_IDS,
   type SttProviderId,
   type SttProviderSettings,
-  updateAccessSettings,
   updateCustomProviders,
   updateCustomSettings,
   updateSystem,
@@ -43,6 +40,7 @@ import {
 import { UI_THEME_PRESETS } from "../lib/settings/appearance";
 import { createUuid } from "../lib/shared/id";
 import { desktopSttSettingsService } from "../lib/stt/desktopSttSettingsService";
+import { STT_PROVIDER_FIELDS } from "../lib/stt/providerFields";
 import {
   PERSONAL_CAPABILITIES,
   personalPolicy,
@@ -56,12 +54,9 @@ import { HooksSection } from "../pages/settings/HooksSection";
 import { MobileEnvironmentBrowser } from "../pages/settings/MobileEnvironmentBrowser";
 import { MemoryPanel } from "../pages/settings/memory/MemoryPanel";
 import { NativeProviderModelSettings } from "../pages/settings/NativeProviderModelSettings";
+import { NativeProviderRequestSettings } from "../pages/settings/NativeProviderRequestSettings";
 import { NativeProviderRuntimeSettings } from "../pages/settings/NativeProviderRuntimeSettings";
-import {
-  createDraftModelConfig,
-  fetchModelsFromApi,
-  mergeFetchedModels,
-} from "../pages/settings/providerUtils";
+import { ProjectRootsSection } from "../pages/settings/ProjectRootsSection";
 import { SoulSection } from "../pages/settings/SoulSection";
 import { SshSettingsSection } from "../pages/settings/SshSettingsSection";
 import type { SectionId, SettingsPageProps } from "../pages/settings/types";
@@ -72,25 +67,19 @@ import {
   removeNativeSurfaceSession,
   retainNativeSurfaceSession,
 } from "./NativeSurface";
+import { useNativeAccessSettings } from "./nativeAccessSettings";
 import { createNativeDesktopAppearance } from "./nativeDesktopAppearance";
 import { useNativeDesktopProxy } from "./nativeDesktopProxy";
 import { useNativeDesktopSystem } from "./nativeDesktopSystem";
+import { useNativeFontSettings } from "./nativeFontSettings";
 import { nativeOAuthAccounts } from "./nativeOAuthAccounts";
+import { useNativeProviderImports } from "./nativeProviderImports";
+import { useNativeProviderList } from "./nativeProviderList";
+import { useNativeProviderModels } from "./nativeProviderModels";
+import { setNativeSettingsChrome } from "./nativeSettingsChrome";
 import { createNativePresentationTheme } from "./nativeTheme";
 import { createNativeToolPermissions } from "./nativeToolPermissions";
 import type { PresentationNode } from "./types";
-
-type LanPcClientStatus = {
-  paired: boolean;
-  baseUrl?: string | null;
-  deviceId?: string | null;
-  expiresAt?: number | null;
-};
-
-type CloudSecretVaultStatus = {
-  githubTokenConfigured: boolean;
-  githubUsername?: string | null;
-};
 
 function formatByteCount(value?: number | null) {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return "—";
@@ -121,7 +110,9 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         : "system"
       : nativeMobile && props.initialSection === "system"
         ? ""
-        : (props.initialSection ?? (nativeMobile ? "" : "system"));
+        : props.initialSection === "failover" || props.initialSection === "usage"
+          ? "providers"
+          : (props.initialSection ?? (nativeMobile ? "" : "system"));
   const [page, setPage] = useState(initialPage);
   const desktopSystem = useNativeDesktopSystem(
     { settings, setSettings },
@@ -129,6 +120,18 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     t,
   );
   const desktopProxy = useNativeDesktopProxy(
+    { settings, setSettings },
+    !nativeMobile && page === "system",
+    t,
+  );
+  const access = useNativeAccessSettings(
+    { settings, setSettings },
+    page === "access",
+    nativeMobile,
+    t,
+    props.onBack,
+  );
+  const fonts = useNativeFontSettings(
     { settings, setSettings },
     !nativeMobile && page === "system",
     t,
@@ -150,28 +153,59 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [busyScope, setBusyScope] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [providerId, setProviderId] = useState("");
-  const [providerRuntimeOpen, setProviderRuntimeOpen] = useState(false);
+  const [providerRuntimeOpen, setProviderRuntimeOpen] = useState(
+    props.initialSection === "failover" || props.initialSection === "usage",
+  );
   const [providerModelId, setProviderModelId] = useState("");
+  const [providerRequestOpen, setProviderRequestOpen] = useState(false);
   // A stalled Shell/status request must not disable provider controls after
   // navigation. Only the latest operation in the current route owns feedback.
   const [operations] = useState(() => ({ scope: "", revision: 0 }));
-  const operationScope = `${page}:${providerId}`;
+  const operationScope = `${page}:${providerId}${page === "voice" ? `:${settings.stt.provider}` : ""}`;
   operations.scope = operationScope;
   const busy = busyScope === operationScope;
   const [providerUrlDraft, setProviderUrlDraft] = useState<{ id: string; value: string } | null>(
     null,
   );
-  const [modelId, setModelId] = useState("");
   const [providerDeletePending, setProviderDeletePending] = useState(false);
-  const [lanPairingCode, setLanPairingCode] = useState("");
-  const [lanDeviceName, setLanDeviceName] = useState("Xgent mobile");
-  const [lanPc, setLanPc] = useState<LanPcClientStatus>({ paired: false });
-  const [vault, setVault] = useState<CloudSecretVaultStatus>({
-    githubTokenConfigured: false,
-  });
-  const [accessStatus, setAccessStatus] = useState("");
-  const [githubToken, setGithubToken] = useState("");
-  const [voiceTest, setVoiceTest] = useState<{ ok: boolean; message: string } | null>(null);
+  const [voiceTest, setVoiceTest] = useState<{
+    ok: boolean;
+    message: string;
+    configuration: typeof settings.stt;
+  } | null>(null);
+  const [voiceRequests] = useState(() => ({
+    configuration: settings.stt,
+    active: false,
+    mounted: true,
+    revision: 0,
+  }));
+  const voiceActive = page === "voice" && !nativeMobile;
+  if (voiceRequests.configuration !== settings.stt || voiceRequests.active !== voiceActive) {
+    voiceRequests.configuration = settings.stt;
+    voiceRequests.active = voiceActive;
+    voiceRequests.revision++;
+  }
+  useEffect(() => {
+    voiceRequests.mounted = true;
+    return () => {
+      voiceRequests.mounted = false;
+      voiceRequests.revision++;
+    };
+  }, [voiceRequests]);
+  useEffect(() => {
+    // External shortcuts can change the destination while Settings remains open.
+    setPage(initialPage);
+    setReturnPage("");
+    setProviderId("");
+    setProviderModelId("");
+    setProviderRequestOpen(false);
+    setProviderDeletePending(false);
+    setProviderUrlDraft(null);
+    setProviderRuntimeOpen(props.initialSection === "failover" || props.initialSection === "usage");
+    setShellFilesOpen(false);
+    setError("");
+    operations.revision++;
+  }, [props.initialSection, nativeMobile]);
   const c = presentationControls();
   const provider = settings.customProviders.find((item) => item.id === providerId);
   const oauth = useCodexOAuthAccounts(
@@ -190,6 +224,31 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   // API suffixes in base-URL mode; switching to an exact endpoint must restore it.
   const providerUrl =
     providerUrlDraft?.id === providerId ? providerUrlDraft.value : (provider?.baseUrl ?? "");
+  const providerModels = useNativeProviderModels(
+    props,
+    page === "providers" ? provider : undefined,
+    page === "providers" &&
+      !!provider &&
+      !providerModelId &&
+      !providerRuntimeOpen &&
+      !providerRequestOpen,
+    busy,
+    work,
+    setProviderModelId,
+    t,
+  );
+  const providerList = useNativeProviderList(
+    props,
+    page === "providers" && !provider,
+    setProviderId,
+    t,
+  );
+  const providerImports = useNativeProviderImports(
+    props,
+    !nativeMobile && page === "providers" && !provider,
+    providerList.type,
+    t,
+  );
   const returnToSettings = () => {
     setPage(nativeMobile ? returnPage : "system");
     setReturnPage("");
@@ -303,25 +362,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     if ((page === "mobileAssistant" || page === "voice") && nativeMobile)
       void work(refreshPermissions).catch(() => undefined);
     if (page === "mobileExecution" && nativeMobile) void work(refreshShell).catch(() => undefined);
-    if (page === "access") {
-      void work(async () => {
-        const nextVault = await invoke<CloudSecretVaultStatus>("cloud_secret_vault_status");
-        setVault(nextVault);
-        if (!nativeMobile) {
-          setAccessStatus(
-            nextVault.githubTokenConfigured
-              ? t("settings.accessTokenConfigured")
-              : t("settings.accessTokenMissing"),
-          );
-          return;
-        }
-        const lan = await invoke<LanPcClientStatus>("lan_pc_status");
-        setLanPc(lan);
-        setAccessStatus(
-          `${lan.paired ? t("settings.accessComputerPaired") : t("settings.accessComputerNotPaired")} · ${nextVault.githubTokenConfigured ? t("settings.accessTokenConfigured") : t("settings.accessTokenMissing")}`,
-        );
-      }).catch(() => undefined);
-    }
   }, [page, nativeMobile]);
   useEffect(() => {
     if (page !== "mobileAssistant" || !nativeMobile) return;
@@ -348,20 +388,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       ),
     );
   }
-  function patchAccess(patch: Partial<AppSettings["access"]>) {
-    setSettings((previous) => updateAccessSettings(previous, patch));
-  }
-  function setCapabilityBlocked(
-    capability: AppSettings["access"]["blockedLocalCapabilities"][number],
-    blocked: boolean,
-  ) {
-    const next = new Set(settings.access.blockedLocalCapabilities);
-    if (blocked) next.add(capability);
-    else next.delete(capability);
-    patchAccess({ blockedLocalCapabilities: Array.from(next) });
-  }
   function patchSttProvider(patch: Partial<SttProviderSettings>) {
+    const targetProvider = settings.stt.provider;
+    voiceRequests.revision++;
     setVoiceTest(null);
+    setError("");
     setSettings((previous) =>
       normalizeSettings({
         ...previous,
@@ -369,8 +400,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           ...previous.stt,
           providers: {
             ...previous.stt.providers,
-            [previous.stt.provider]: {
-              ...previous.stt.providers[previous.stt.provider],
+            [targetProvider]: {
+              ...previous.stt.providers[targetProvider],
               ...patch,
             },
           },
@@ -405,7 +436,107 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     cron: t("settings.navCron"),
     ssh: t("settings.navSsh"),
     about: t("settings.navAbout"),
+    projectRoots: t("settings.navProjectRoots"),
   };
+  const desktopSections: Array<{ id: SectionId; icon: string }> = [
+    { id: "system", icon: "gearshape" },
+    { id: "providers", icon: "cpu" },
+    { id: "shortcuts", icon: "keyboard" },
+    { id: "backup", icon: "archivebox" },
+    { id: "computerUse", icon: "display" },
+    { id: "toolPermissions", icon: "lock.shield" },
+    { id: "voice", icon: "mic" },
+    { id: "soul", icon: "person.crop.circle" },
+    { id: "memory", icon: "brain" },
+    { id: "other", icon: "ellipsis.circle" },
+    { id: "access", icon: "icloud" },
+    { id: "about", icon: "info.circle" },
+  ];
+  const normalizedQuery = settingsQuery.trim().toLocaleLowerCase();
+  const desktopNavigation = desktopSections
+    .filter(({ id }) => !props.hiddenSections?.includes(id))
+    .filter(
+      ({ id }) => !normalizedQuery || titles[id].toLocaleLowerCase().includes(normalizedQuery),
+    )
+    .map(
+      ({ id, icon }): PresentationNode => ({
+        ...row(`desktop-nav:${id}`, titles[id], icon, () => {
+          setProviderId("");
+          setProviderDeletePending(false);
+          setProviderRuntimeOpen(false);
+          setProviderModelId("");
+          setProviderRequestOpen(false);
+          setReturnPage("");
+          setPage(id);
+          setError("");
+        }),
+        selected: page === id || (id === "other" && ["hooks", "cron", "ssh"].includes(page)),
+      }),
+    );
+  const settingsSidebar: PresentationNode = {
+    id: "settings-sidebar",
+    kind: "VStack",
+    fill: true,
+    spacing: 12,
+    padding: 16,
+    children: [
+      { id: "settings-title", kind: "Heading", text: t("settings.title") },
+      c.input("settings-search", t("settings.searchPlaceholder"), settingsQuery, setSettingsQuery),
+      { id: "settings-navigation", kind: "List", children: desktopNavigation },
+      { id: "settings-sidebar-space", kind: "Spacer" },
+      {
+        ...c.action("settings-close", t("settings.backToChat"), props.onBack, !busy),
+        kind: "IconButton",
+        icon: "xmark",
+      },
+    ],
+  };
+  setNativeSettingsChrome(
+    sessionSurface,
+    nativeMobile
+      ? undefined
+      : {
+          sidebar: settingsSidebar,
+          saveStatus: {
+            id: "save-status",
+            kind: "Text",
+            secondary: props.saveState.status !== "error",
+            text:
+              props.saveState.status === "error"
+                ? props.saveState.message
+                : t(props.saveState.status === "saving" ? "settings.saving" : "settings.saved"),
+          },
+          handlers: new Map(c.handlers),
+        },
+  );
+  if (page === "providers" && providerRequestOpen && provider)
+    return (
+      <NativeProviderRequestSettings
+        key={provider.id}
+        settings={settings}
+        setSettings={setSettings}
+        providerId={provider.id}
+        onBack={() => setProviderRequestOpen(false)}
+        nativeSettingsSurfaceId={sessionSurface}
+      />
+    );
+  if (page === "providers" && providerImports.opened)
+    return (
+      <NativeSurface
+        sessionSurface={sessionSurface}
+        document={{
+          mode: "sheet",
+          title: providerImports.source === "ccs" ? "CC Switch" : "Cherry Studio",
+          appearance: settings.theme,
+          formFactor: "desktop",
+          theme: createNativePresentationTheme(settings, false),
+          dismissAction: "provider-import-back",
+          nodes: providerImports.formNodes,
+        }}
+        handlers={providerImports.handlers}
+        onError={providerImports.notice}
+      />
+    );
   if (page === "providers" && providerModelId && provider)
     return (
       <NativeProviderModelSettings
@@ -443,6 +574,15 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   if (page === "ssh")
     return (
       <SshSettingsSection
+        settings={settings}
+        setSettings={setSettings}
+        onBack={returnToSettings}
+        nativeSettingsSurfaceId={sessionSurface}
+      />
+    );
+  if (page === "projectRoots")
+    return (
+      <ProjectRootsSection
         settings={settings}
         setSettings={setSettings}
         onBack={returnToSettings}
@@ -497,10 +637,21 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       />
     );
   if (page === "shortcuts" && !nativeMobile)
-    return <GlobalShortcutsSection settings={settings} onBack={returnToSettings} />;
+    return (
+      <GlobalShortcutsSection
+        settings={settings}
+        onBack={returnToSettings}
+        nativeSettingsSurfaceId={sessionSurface}
+      />
+    );
   if (page === "computerUse" && !nativeMobile)
     return (
-      <ComputerUseSection settings={settings} setSettings={setSettings} onBack={returnToSettings} />
+      <ComputerUseSection
+        settings={settings}
+        setSettings={setSettings}
+        onBack={returnToSettings}
+        nativeSettingsSurfaceId={sessionSurface}
+      />
     );
   const nodes: PresentationNode[] = [];
   if (page && (nativeMobile || providerId))
@@ -601,18 +752,24 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         ),
         ...(appearance.customized
           ? [
-              c.color(
-                "accent-light",
-                t("settings.ui.accentLight"),
-                appearance.accentLight,
-                (accentLight) => updateAppearance({ accentLight }),
-              ),
-              c.color(
-                "accent-dark",
-                t("settings.ui.accentDark"),
-                appearance.accentDark,
-                (accentDark) => updateAppearance({ accentDark }),
-              ),
+              {
+                ...c.color(
+                  "accent-light",
+                  t("settings.ui.accentLight"),
+                  appearance.accentLight,
+                  (accentLight) => updateAppearance({ accentLight }),
+                ),
+                accessibilityHint: t("settings.ui.colorFormat"),
+              },
+              {
+                ...c.color(
+                  "accent-dark",
+                  t("settings.ui.accentDark"),
+                  appearance.accentDark,
+                  (accentDark) => updateAppearance({ accentDark }),
+                ),
+                accessibilityHint: t("settings.ui.colorFormat"),
+              },
             ]
           : []),
       ]),
@@ -806,64 +963,74 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       ]),
     );
   } else if (page === "system") {
-    nodes.push(
-      c.group("general", titles.system, [
-        c.select(
-          "theme",
-          t("settings.native.appearance"),
-          settings.theme,
-          [
-            { value: "system", label: t("settings.native.system") },
-            { value: "light", label: t("settings.native.light") },
-            { value: "dark", label: t("settings.native.dark") },
-          ],
-          (theme) =>
-            setSettings((previous) => ({ ...previous, theme: theme as typeof previous.theme })),
+    const executionMode = {
+      ...c.select(
+        "mode",
+        t("settings.executionMode"),
+        settings.system.executionMode === "text" ? "text" : "tools",
+        [
+          { value: "text", label: t("settings.chatMode") },
+          { value: "tools", label: t("settings.agentMode") },
+        ],
+        (value) =>
+          setSettings((previous) =>
+            updateSystem(previous, {
+              executionMode: value === "text" ? "text" : "tools",
+            }),
+          ),
+      ),
+      text: t(
+        settings.system.executionMode === "text"
+          ? "settings.chatModeDesc"
+          : "settings.agentModeDesc",
+      ),
+    };
+    const language = c.select(
+      "language",
+      t("settings.language"),
+      settings.locale,
+      SUPPORTED_LOCALES.map((value) => ({
+        value,
+        label: t(
+          value === "system"
+            ? "settings.auto"
+            : value === "zh-CN"
+              ? "settings.chinese"
+              : "settings.english",
         ),
-        c.select(
-          "language",
-          t("settings.language"),
-          settings.locale,
-          SUPPORTED_LOCALES.map((value) => ({
-            value,
-            label: t(
-              value === "system"
-                ? "settings.auto"
-                : value === "zh-CN"
-                  ? "settings.chinese"
-                  : "settings.english",
-            ),
-          })),
-          (locale) =>
-            setSettings((previous) => ({ ...previous, locale: locale as typeof previous.locale })),
-        ),
-        c.select(
-          "mode",
-          t("settings.executionMode"),
-          settings.system.executionMode === "text" ? "text" : "tools",
-          [
-            { value: "text", label: t("settings.chatMode") },
-            { value: "tools", label: t("settings.agentMode") },
-          ],
-          (value) =>
-            setSettings((previous) =>
-              updateSystem(previous, { executionMode: value === "text" ? "text" : "tools" }),
-            ),
-        ),
-      ]),
+      })),
+      (locale) =>
+        setSettings((previous) => ({ ...previous, locale: locale as typeof previous.locale })),
     );
     if (nativeMobile) {
-      nodes.push({
-        id: "system-font",
-        kind: "Text",
-        secondary: true,
-        text: t("settings.native.accessibilityNote"),
-      });
+      nodes.push(c.group("general", "", [executionMode, language]));
     } else {
+      nodes.push(c.group("execution-mode", "", [executionMode]));
+      nodes.push(...desktopSystem.nodes.filter((node) => node.id === "desktop-terminal"));
+      nodes.push(
+        c.group("general", "", [
+          c.select(
+            "theme",
+            t("settings.appearance"),
+            settings.theme,
+            [
+              { value: "system", label: t("settings.auto") },
+              { value: "light", label: t("settings.light") },
+              { value: "dark", label: t("settings.dark") },
+            ],
+            (theme) =>
+              setSettings((previous) => ({ ...previous, theme: theme as typeof previous.theme })),
+          ),
+          language,
+        ]),
+      );
       const appearance = createNativeDesktopAppearance({ settings, setSettings }, t);
-      nodes.push(...appearance.nodes);
+      nodes.push(...appearance.nodes.filter((node) => node.id === "desktop-appearance"));
       for (const [id, handler] of appearance.handlers) c.handlers.set(id, handler);
-      nodes.push(...desktopSystem.nodes);
+      nodes.push(...fonts.nodes);
+      for (const [id, handler] of fonts.handlers) c.handlers.set(id, handler);
+      nodes.push(...appearance.nodes.filter((node) => node.id !== "desktop-appearance"));
+      nodes.push(...desktopSystem.nodes.filter((node) => node.id !== "desktop-terminal"));
       for (const [id, handler] of desktopSystem.handlers) c.handlers.set(id, handler);
       nodes.push(...desktopProxy.nodes);
       for (const [id, handler] of desktopProxy.handlers) c.handlers.set(id, handler);
@@ -878,28 +1045,17 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       ),
     );
     if (!provider) {
-      nodes.push(
-        c.group(
-          "providers",
-          titles.providers,
-          settings.customProviders.map((item) =>
-            row(
-              "provider:" + item.id,
-              item.name,
-              "cpu",
-              () => setProviderId(item.id),
-              item.baseUrl,
-            ),
-          ),
-        ),
-      );
+      nodes.push(...providerImports.listNodes);
+      for (const [id, handler] of providerImports.handlers) c.handlers.set(id, handler);
+      nodes.push(...providerList.nodes);
+      for (const [id, handler] of providerList.handlers) c.handlers.set(id, handler);
       nodes.push(
         c.action("add-provider", t("settings.native.addProvider"), () => {
           const id = createUuid();
           const next = normalizeCustomProvider({
             id,
             name: t("settings.native.newProvider"),
-            type: "codex",
+            type: providerList.type,
           });
           setSettings((previous) =>
             updateCustomProviders(previous, [...previous.customProviders, next]),
@@ -1062,119 +1218,20 @@ export function NativeSettingsPage(props: SettingsPageProps) {
                 ),
               ]
             : []),
-          c.action(
-            "fetch-models",
-            t("settings.native.fetchModels"),
-            () =>
-              work(async () => {
-                const targetId = provider.id;
-                const fetched = await fetchModelsFromApi(
-                  provider.type,
-                  provider.baseUrl,
-                  provider.apiKey,
-                  {
-                    ...provider,
-                    providerConfigId: targetId,
-                  },
-                );
-                if (fetched.length === 0) throw new Error(t("settings.noMatchingModels"));
-                setSettings((previous) => {
-                  const updated = updateCustomProviders(
-                    previous,
-                    previous.customProviders.map((item) => {
-                      if (item.id !== targetId) return item;
-                      const models = mergeFetchedModels(fetched, item.models);
-                      return { ...item, models, activeModels: models.map((model) => model.id) };
-                    }),
-                  );
-                  return updated.selectedModel
-                    ? updated
-                    : {
-                        ...updated,
-                        selectedModel: { customProviderId: targetId, model: fetched[0].id },
-                      };
-                });
-              }),
-            !busy && !!(provider.baseUrl.trim() || provider.modelsUrl?.trim()),
-          ),
+          ...(providerModels.fetch ? [providerModels.fetch] : []),
         ]),
       );
       if (provider.authMode === "oauth-managed")
         nodes.push(nativeOAuthAccounts(c, oauth, provider.oauthAccountId ?? "", t));
+      nodes.push(...providerModels.nodes);
+      for (const [id, handler] of providerModels.handlers) c.handlers.set(id, handler);
       nodes.push(
-        c.group(
-          "models",
-          t("settings.native.enabledModels"),
-          provider.models.map((model) => ({
-            id: `model-row:${provider.id}:${model.id}`,
-            kind: "VStack",
-            children: [
-              c.toggle(
-                `model:${provider.id}:${model.id}`,
-                model.id,
-                provider.activeModels.includes(model.id),
-                (enabled) =>
-                  setSettings((previous) =>
-                    updateCustomProviders(
-                      previous,
-                      previous.customProviders.map((item) =>
-                        item.id === provider.id
-                          ? {
-                              ...item,
-                              activeModels: enabled
-                                ? [...new Set([...item.activeModels, model.id])]
-                                : item.activeModels.filter((id) => id !== model.id),
-                            }
-                          : item,
-                      ),
-                    ),
-                  ),
-              ),
-              c.action(
-                `model-edit:${provider.id}:${model.id}`,
-                `${t("settings.modelSettings")} · ${model.id}`,
-                () => setProviderModelId(model.id),
-                !busy,
-              ),
-            ],
-          })),
+        c.action(
+          "provider-request-settings",
+          t("settings.providerDialogRequest"),
+          () => setProviderRequestOpen(true),
+          !busy,
         ),
-      );
-      nodes.push(
-        c.group("manual-model", t("settings.native.addModel"), [
-          c.input("model-id", "Model ID", modelId, setModelId),
-          c.action(
-            "add-model",
-            t("settings.native.add"),
-            () => {
-              const id = modelId.trim();
-              setSettings((previous) => {
-                const updated = updateCustomProviders(
-                  previous,
-                  previous.customProviders.map((item) =>
-                    item.id === provider.id
-                      ? {
-                          ...item,
-                          models: item.models.some((model) => model.id === id)
-                            ? item.models
-                            : [...item.models, createDraftModelConfig(item.type, id)],
-                          activeModels: [...new Set([...item.activeModels, id])],
-                        }
-                      : item,
-                  ),
-                );
-                return updated.selectedModel
-                  ? updated
-                  : {
-                      ...updated,
-                      selectedModel: { customProviderId: provider.id, model: id },
-                    };
-              });
-              setModelId("");
-            },
-            !!modelId.trim(),
-          ),
-        ]),
       );
       nodes.push(
         providerDeletePending
@@ -1496,11 +1553,14 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     if (nativeMobile) {
       nodes.push(
         c.group("voice-general", t("settings.stt.title"), [
-          c.toggle("voice-enabled", t("settings.stt.title"), settings.stt.enabled, (enabled) =>
-            setSettings((previous) =>
-              normalizeSettings({ ...previous, stt: { ...previous.stt, enabled } }),
+          {
+            ...c.toggle("voice-enabled", t("settings.stt.title"), settings.stt.enabled, (enabled) =>
+              setSettings((previous) =>
+                normalizeSettings({ ...previous, stt: { ...previous.stt, enabled } }),
+              ),
             ),
-          ),
+            text: t("settings.stt.desc"),
+          },
           {
             id: "voice-device-status",
             kind: "StatusDot",
@@ -1553,54 +1613,33 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         volcengine_seed_v3: t("settings.native.volcengineV3"),
         baidu_cloud: t("settings.native.baidu"),
       };
-      const providerFields: Record<
-        SttProviderId,
-        Array<{ key: keyof SttProviderSettings; label: string; secure?: boolean }>
-      > = {
-        aliyun_dashscope: [
-          { key: "websocketUrl", label: "WebSocket URL" },
-          { key: "model", label: "Model" },
-          { key: "apiKey", label: "API Key", secure: true },
-        ],
-        tencent_cloud: [
-          { key: "appId", label: "AppId" },
-          { key: "engineModelType", label: "Engine Model Type" },
-          { key: "secretId", label: "SecretId", secure: true },
-          { key: "secretKey", label: "SecretKey", secure: true },
-        ],
-        volcengine_v2: [
-          { key: "websocketUrl", label: "WebSocket URL" },
-          { key: "appId", label: "App ID" },
-          { key: "cluster", label: "Cluster" },
-          { key: "accessToken", label: "Access Token", secure: true },
-        ],
-        volcengine_seed_v3: [
-          { key: "websocketUrl", label: "WebSocket URL" },
-          { key: "appId", label: "App ID" },
-          { key: "resourceId", label: "Resource ID" },
-          { key: "accessToken", label: "Access Token", secure: true },
-        ],
-        baidu_cloud: [
-          { key: "websocketUrl", label: "WebSocket URL" },
-          { key: "baiduAppId", label: "App ID" },
-          { key: "devPid", label: "dev_pid" },
-          { key: "baiduApiKey", label: "API Key", secure: true },
-        ],
-      };
       nodes.push(
         c.group("voice-general", t("settings.stt.title"), [
-          c.toggle("voice-enabled", t("settings.stt.title"), settings.stt.enabled, (enabled) =>
-            setSettings((previous) =>
-              normalizeSettings({ ...previous, stt: { ...previous.stt, enabled } }),
+          {
+            ...c.toggle(
+              "voice-enabled",
+              t("settings.stt.title"),
+              settings.stt.enabled,
+              (enabled) => {
+                voiceRequests.revision++;
+                setVoiceTest(null);
+                setError("");
+                setSettings((previous) =>
+                  normalizeSettings({ ...previous, stt: { ...previous.stt, enabled } }),
+                );
+              },
             ),
-          ),
+            text: t("settings.stt.desc"),
+          },
           c.select(
             "voice-provider",
             t("settings.stt.provider"),
             providerId,
             STT_PROVIDER_IDS.map((id) => ({ value: id, label: providerLabels[id] })),
             (value) => {
+              voiceRequests.revision++;
               setVoiceTest(null);
+              setError("");
               setSettings((previous) =>
                 normalizeSettings({
                   ...previous,
@@ -1610,37 +1649,56 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             },
           ),
         ]),
-        c.group(
-          "voice-provider-fields",
-          providerLabels[providerId],
-          providerFields[providerId].map((field) =>
-            c.input(
-              `voice:${field.key}`,
-              field.label,
-              typeof sttProvider[field.key] === "string" ? String(sttProvider[field.key]) : "",
-              (value) => patchSttProvider({ [field.key]: value }),
-              field.secure,
-            ),
-          ),
-        ),
+        c.group("voice-provider-fields", providerLabels[providerId], [
+          {
+            id: "voice-credentials",
+            kind: "VStack",
+            variant: "voice-credentials",
+            children: STT_PROVIDER_FIELDS[providerId].map((field) => ({
+              ...c.input(
+                `voice:${providerId}:${field.key}`,
+                field.label,
+                typeof sttProvider[field.key] === "string" ? String(sttProvider[field.key]) : "",
+                (value) => patchSttProvider({ [field.key]: value }),
+                Boolean(field.secret),
+              ),
+              text:
+                field.secret && sttProvider.configured ? t("settings.stt.secretSaved") : undefined,
+            })),
+          },
+        ]),
         c.action(
           "voice-test",
           t("settings.stt.test"),
           () =>
             work(async () => {
+              const configuration = settings.stt;
+              const revision = ++voiceRequests.revision;
+              const current = () =>
+                voiceRequests.mounted &&
+                voiceRequests.active &&
+                voiceRequests.configuration === configuration &&
+                voiceRequests.revision === revision;
               setVoiceTest(null);
-              await desktopSttSettingsService.update(settings.stt);
-              const result = await desktopSttSettingsService.test(providerId);
-              const ok = result.result === "connected" || result.result === "connected_no_speech";
-              setVoiceTest({
-                ok,
-                message: result.message || t(`settings.stt.test.${result.result}`),
-              });
+              try {
+                await desktopSttSettingsService.update(configuration);
+                if (!current()) return;
+                const result = await desktopSttSettingsService.test(providerId);
+                if (!current()) return;
+                const ok = result.result === "connected" || result.result === "connected_no_speech";
+                setVoiceTest({
+                  ok,
+                  message: result.message || t(`settings.stt.test.${result.result}`),
+                  configuration,
+                });
+              } catch (cause) {
+                if (current()) throw cause;
+              }
             }),
           !busy,
         ),
       );
-      if (voiceTest)
+      if (voiceTest?.configuration === settings.stt)
         nodes.push({
           id: "voice-test-result",
           kind: "Banner",
@@ -1657,193 +1715,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       ]),
     );
   } else if (page === "access") {
-    const normalizeLanUrl = (input: string) => {
-      const source = /^[a-z][a-z\d+.-]*:\/\//i.test(input.trim())
-        ? input.trim()
-        : `http://${input.trim()}`;
-      const url = new URL(source);
-      if (url.protocol !== "http:" && url.protocol !== "https:") {
-        throw new Error("The computer address must use HTTP or HTTPS.");
-      }
-      if (url.protocol === "http:" && !url.port) url.port = "28367";
-      url.pathname = "/";
-      url.search = "";
-      url.hash = "";
-      return url.toString();
-    };
-    if (nativeMobile) {
-      nodes.push(
-        c.group("lan-computer", t("settings.accessLanControl"), [
-          c.input(
-            "lan-url",
-            t("settings.accessComputerAddress"),
-            settings.access.lanControlUrl,
-            (lanControlUrl) => patchAccess({ lanControlUrl }),
-          ),
-          c.input(
-            "lan-pairing-code",
-            t("settings.accessLanPairingCode"),
-            lanPairingCode,
-            setLanPairingCode,
-            false,
-            true,
-            (value) => value.replace(/\D/g, "").slice(0, 6),
-          ),
-          c.input(
-            "lan-device-name",
-            t("settings.accessLanDeviceName"),
-            lanDeviceName,
-            setLanDeviceName,
-          ),
-          c.action(
-            "lan-pair",
-            t("settings.accessPairComputer"),
-            () =>
-              work(async () => {
-                const baseUrl = normalizeLanUrl(settings.access.lanControlUrl);
-                patchAccess({ lanControlUrl: baseUrl });
-                const next = await invoke<LanPcClientStatus>("lan_pc_pair", {
-                  baseUrl,
-                  code: lanPairingCode,
-                  deviceName: lanDeviceName.trim(),
-                });
-                setLanPc(next);
-                setLanPairingCode("");
-                setAccessStatus(t("settings.accessComputerPaired"));
-              }),
-            !busy &&
-              !!settings.access.lanControlUrl.trim() &&
-              lanPairingCode.length === 6 &&
-              !!lanDeviceName.trim(),
-          ),
-          ...(lanPc.paired
-            ? [
-                c.action("lan-disconnect", t("settings.accessDisconnectComputer"), () =>
-                  work(async () => {
-                    setLanPc(await invoke<LanPcClientStatus>("lan_pc_disconnect"));
-                    patchAccess({ preferLanPcExecution: false });
-                    setAccessStatus(t("settings.accessComputerNotPaired"));
-                  }),
-                ),
-              ]
-            : []),
-          c.toggle(
-            "lan-prefer",
-            t("settings.accessPreferLanPc"),
-            settings.access.preferLanPcExecution,
-            (preferLanPcExecution) => patchAccess({ preferLanPcExecution }),
-            lanPc.paired,
-          ),
-          c.toggle("ios-ashell", "a-Shell", settings.access.iosAShellEnabled, (iosAShellEnabled) =>
-            patchAccess({ iosAShellEnabled }),
-          ),
-        ]),
-      );
-    } else {
-      nodes.push(
-        c.group("local-web-ui", t("settings.accessWebUi"), [
-          c.toggle(
-            "web-ui-enabled",
-            t("settings.accessWebUi"),
-            settings.access.webUiEnabled,
-            (webUiEnabled) => patchAccess({ webUiEnabled }),
-          ),
-          c.select(
-            "web-ui-scope",
-            t("settings.accessScope"),
-            settings.access.webUiScope,
-            [
-              { value: "lan", label: t("settings.accessScopeLan") },
-              { value: "loopback", label: t("settings.accessScopeLoopback") },
-            ],
-            (webUiScope) => patchAccess({ webUiScope: webUiScope as "lan" | "loopback" }),
-          ),
-          c.input(
-            "web-ui-port",
-            t("settings.accessPort"),
-            String(settings.access.webUiPort),
-            (value) => {
-              const port = Number(value);
-              if (Number.isInteger(port) && port >= 1 && port <= 65535)
-                patchAccess({ webUiPort: port });
-            },
-          ),
-        ]),
-      );
-    }
-    const capabilityRows: Array<
-      [AppSettings["access"]["blockedLocalCapabilities"][number], string]
-    > = [
-      ["terminal", "settings.accessBlockTerminal"],
-      ["browser_automation", "settings.accessBlockBrowserAutomation"],
-      ["ssh", "settings.accessBlockSsh"],
-      ["git", "settings.accessBlockGit"],
-      ["file_write", "settings.accessBlockFileWrite"],
-    ];
-    nodes.push(
-      c.group(
-        "local-capabilities",
-        t("settings.accessPairing"),
-        capabilityRows.map(([capability, labelKey]) =>
-          c.toggle(
-            `block:${capability}`,
-            t(labelKey),
-            settings.access.blockedLocalCapabilities.includes(capability),
-            (blocked) => setCapabilityBlocked(capability, blocked),
-          ),
-        ),
-      ),
-      c.group("cloud-execution", t("settings.accessCloudExecution"), [
-        c.toggle(
-          "cloud-enabled",
-          t("settings.accessCloudExecution"),
-          settings.access.cloudExecutionEnabled,
-          (cloudExecutionEnabled) => patchAccess({ cloudExecutionEnabled }),
-        ),
-        c.input(
-          "github-owner",
-          t("settings.accessGithubOwner"),
-          settings.access.githubOwner,
-          (githubOwner) => patchAccess({ githubOwner }),
-        ),
-        c.input(
-          "github-repository",
-          t("settings.accessGithubRepository"),
-          settings.access.githubRepository,
-          (githubRepository) => patchAccess({ githubRepository }),
-        ),
-        c.input("github-token", t("settings.accessGithubToken"), githubToken, setGithubToken, true),
-        c.action(
-          "github-token-save",
-          t("settings.accessSaveToken"),
-          () =>
-            work(async () => {
-              const next = await invoke<CloudSecretVaultStatus>(
-                "cloud_secret_vault_set_github_token",
-                { username: settings.access.githubOwner, token: githubToken },
-              );
-              setVault(next);
-              setGithubToken("");
-              setAccessStatus(t("settings.accessTokenConfigured"));
-            }),
-          !busy && !!settings.access.githubOwner.trim() && !!githubToken.trim(),
-        ),
-        ...(vault.githubTokenConfigured
-          ? [
-              c.action("github-token-remove", t("settings.accessRemoveToken"), () =>
-                work(async () => {
-                  setVault(
-                    await invoke<CloudSecretVaultStatus>("cloud_secret_vault_remove_github_token"),
-                  );
-                  setAccessStatus(t("settings.accessTokenMissing"));
-                }),
-              ),
-            ]
-          : []),
-      ]),
-    );
-    if (accessStatus)
-      nodes.push({ id: "access-status", kind: "Banner", label: accessStatus, status: "completed" });
+    nodes.push(...access.nodes);
+    for (const [id, handler] of access.handlers) c.handlers.set(id, handler);
   } else if (page === "about") {
     nodes.push(
       { id: "about-name", kind: "Heading", text: "XGent" },
@@ -1863,37 +1736,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     accepts: (value) => value === null,
     run: props.onBack,
   });
-  const desktopSections: Array<{ id: SectionId; icon: string }> = [
-    { id: "system", icon: "gearshape" },
-    { id: "providers", icon: "cpu" },
-    { id: "shortcuts", icon: "keyboard" },
-    { id: "backup", icon: "archivebox" },
-    { id: "computerUse", icon: "display" },
-    { id: "toolPermissions", icon: "lock.shield" },
-    { id: "voice", icon: "mic" },
-    { id: "soul", icon: "person.crop.circle" },
-    { id: "memory", icon: "brain" },
-    { id: "other", icon: "ellipsis.circle" },
-    { id: "access", icon: "icloud" },
-    { id: "about", icon: "info.circle" },
-  ];
-  const normalizedQuery = settingsQuery.trim().toLocaleLowerCase();
-  const desktopNavigation = desktopSections
-    .filter(({ id }) => visible(id))
-    .filter(
-      ({ id }) => !normalizedQuery || titles[id].toLocaleLowerCase().includes(normalizedQuery),
-    )
-    .map(
-      ({ id, icon }): PresentationNode => ({
-        ...row(`desktop-nav:${id}`, titles[id], icon, () => {
-          setProviderId("");
-          setProviderDeletePending(false);
-          setPage(id);
-          setError("");
-        }),
-        selected: page === id,
-      }),
-    );
   const settingIcons: Record<string, string> = {
     theme: "sun.max",
     "appearance-preset": "paintpalette",
@@ -1913,25 +1755,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           kind: "SettingsLayout",
           fill: true,
           children: [
-            {
-              id: "settings-sidebar",
-              kind: "VStack",
-              fill: true,
-              spacing: 12,
-              padding: 16,
-              children: [
-                { id: "settings-title", kind: "Heading", text: t("settings.title") },
-                c.input(
-                  "settings-search",
-                  t("settings.searchPlaceholder"),
-                  settingsQuery,
-                  setSettingsQuery,
-                ),
-                { id: "settings-navigation", kind: "List", children: desktopNavigation },
-                { id: "settings-sidebar-space", kind: "Spacer" },
-                c.action("settings-close", t("settings.backToChat"), props.onBack, !busy),
-              ],
-            },
+            settingsSidebar,
             {
               id: "settings-detail",
               kind: "ScrollView",

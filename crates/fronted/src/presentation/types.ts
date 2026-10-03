@@ -40,6 +40,8 @@ export type PresentationTheme = {
     saturation: number;
   };
   fontScale: number;
+  fontFamily?: string;
+  codeFontFamily?: string;
 };
 
 export type PresentationNode = {
@@ -78,6 +80,8 @@ export type PresentationNode = {
   minimum?: number;
   maximum?: number;
   step?: number;
+  integerOnly?: boolean;
+  clearable?: boolean;
   current?: number;
   total?: number;
   options?: {
@@ -137,4 +141,6 @@ export type PresentationHandler = {
   accepts: (value: PresentationValue) => boolean;
   normalize?: (value: PresentationValue) => PresentationValue;
   run: (value: PresentationValue) => unknown | Promise<unknown>;
+  /** Explicit read-only replies; ordinary command return values remain ignored. */
+  resultValue?: (result: unknown) => PresentationValue;
 };

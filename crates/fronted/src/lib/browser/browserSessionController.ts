@@ -181,6 +181,7 @@ export class BrowserSessionController {
   private initializePromise: Promise<BrowserControllerState> | null = null;
   private readonly openingSessions = new Map<string, Promise<BrowserSessionSummary>>();
   private nextUserTabId = 0;
+  private closeAllPromise: Promise<void> | null = null;
 
   subscribe = (listener: Listener) => {
     this.listeners.add(listener);
@@ -455,27 +456,29 @@ export class BrowserSessionController {
     });
   }
 
-  async closeAllSessions() {
-    if (this.state.humanAssistance) {
-      this.finishHumanAssistance(this.state.humanAssistance.sessionId);
-    }
+  closeAllSessions(): Promise<void> {
+    if (this.closeAllPromise) return this.closeAllPromise;
     const sessionIds = this.state.sessions.map((session) => session.sessionId);
-    for (const sessionId of sessionIds) {
-      await this.enqueue(sessionId, () => this.client.closeSession(sessionId));
-    }
-    this.agentObservations.clear();
-    this.viewports.clear();
-    this.sessionOwners.clear();
-    this.sessionAliases.clear();
-    this.update({
-      sessions: [],
-      activeSessionId: null,
-      busySessionIds: [],
-      humanAssistance: null,
-      completedHumanAssistance: {},
-      previewDataUrls: {},
-      error: null,
+    const operation = async () => {
+      const failures: string[] = [];
+      for (const sessionId of sessionIds) {
+        try {
+          await this.closeSession(sessionId);
+        } catch (cause) {
+          failures.push(`${sessionId}: ${errorMessage(cause)}`);
+        }
+      }
+      if (failures.length) {
+        const message = failures.join("\n");
+        this.update({ error: message });
+        throw new Error(message);
+      }
+    };
+    const request = operation().finally(() => {
+      if (this.closeAllPromise === request) this.closeAllPromise = null;
     });
+    this.closeAllPromise = request;
+    return request;
   }
 
   beginHumanAssistance(sessionIdInput?: string) {

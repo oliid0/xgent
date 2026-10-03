@@ -146,18 +146,28 @@ export function validatePresentationDocument(
         throw new Error(`Invalid native step: ${node.id}`);
       }
       if (
+        [node.integerOnly, node.clearable].some(
+          (value) => value !== undefined && typeof value !== "boolean",
+        ) ||
+        ((node.integerOnly !== undefined || node.clearable !== undefined) &&
+          node.kind !== "NumberInput")
+      )
+        throw new Error(`Invalid native numeric policy: ${node.id}`);
+      if (
         node.kind === "NumberInput" &&
-        (typeof node.value !== "number" ||
-          !Number.isFinite(node.value) ||
+        ((!(node.value === null && node.clearable) &&
+          (typeof node.value !== "number" || !Number.isFinite(node.value))) ||
           typeof node.minimum !== "number" ||
           !Number.isFinite(node.minimum) ||
-          typeof node.maximum !== "number" ||
-          !Number.isFinite(node.maximum) ||
+          (!(node.clearable && node.maximum === undefined) &&
+            (typeof node.maximum !== "number" || !Number.isFinite(node.maximum))) ||
           typeof node.step !== "number" ||
           !Number.isFinite(node.step) ||
           node.step <= 0 ||
-          node.value < node.minimum ||
-          node.value > node.maximum)
+          (typeof node.value === "number" &&
+            (node.value < node.minimum ||
+              (node.maximum !== undefined && node.value > node.maximum) ||
+              (node.integerOnly && !Number.isInteger(node.value)))))
       )
         throw new Error(`Invalid native numeric input: ${node.id}`);
       if (node.total !== undefined && (!Number.isFinite(node.total) || node.total < 0)) {

@@ -49,14 +49,48 @@ struct XgentCodeBlock: View {
     let text: String
     var language: String?
     var label: String?
+    var configuration = XgentCodeBlockConfiguration.plain
+    var retainedState: XgentCodeBlockState? = nil
+    var highlightCode: ((String, String) async -> String?)? = nil
+    @StateObject private var localState = XgentCodeBlockState()
+
+    var body: some View {
+        XgentCodeBlockSurface(text: text, language: language, label: label, configuration: configuration,
+                              state: retainedState ?? localState, highlightCode: highlightCode)
+    }
+}
+
+private struct XgentCodeBlockSurface: View {
+    let text: String
+    let language: String?
+    let label: String?
+    let configuration: XgentCodeBlockConfiguration
+    @ObservedObject var state: XgentCodeBlockState
+    let highlightCode: ((String, String) async -> String?)?
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.xgentCodeBlockViewportHeight) private var viewportHeight
     @ScaledMetric(relativeTo: .body) private var fontSize: CGFloat = 13
-    @State private var copied = false
     @State private var viewportWidth: CGFloat = 0
 
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
-    private var diffRows: [XgentDiffRow] { XgentDiffRow.parse(text) }
+    private var metrics: XgentCodeBlockMetrics { .init(source: text) }
+    private var title: String? {
+        let languageLabel = configuration.hasLanguageLabel && language != "plaintext" ? language : nil
+        if let label, let languageLabel { return "\(label) · \(languageLabel)" }
+        return label ?? languageLabel
+    }
+    private var canCollapse: Bool { metrics.canCollapse(configuration, hasHeader: title != nil) }
+    private var maximumHeight: CGFloat? {
+        XgentCodeBlockMetrics.heightLimit(configuration, viewportHeight: Double(viewportHeight)).map { CGFloat($0) }
+    }
+    private var codeFont: Font { XgentFonts.code(theme.codeFontFamily, size: fontSize * CGFloat(theme.fontScale)) }
+    private var backgroundColor: String {
+        configuration.syntaxBackground.map { colorScheme == .dark ? $0.dark : $0.light } ?? palette.muted
+    }
+    private var headerColor: String? {
+        configuration.syntaxComment.map { colorScheme == .dark ? $0.dark : $0.light }
+    }
     private var gutterWidth: CGFloat { 28 * fontSize * CGFloat(theme.fontScale) / 13 }
 
     private func diffForeground(_ row: XgentDiffRow) -> Color {
@@ -82,70 +116,63 @@ struct XgentCodeBlock: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Text(label ?? language ?? "Code")
-                    .font(.caption.monospaced())
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 8)
-                Button {
-                    XgentCodeClipboard.copy(text)
-                    copied = true
-                } label: {
-                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text(copied ? "Copied" : "Copy code"))
+            if let title {
+                XgentCodeBlockHeader(title: title, text: text, canCollapse: canCollapse,
+                                     lineCount: metrics.lineCount, labels: configuration.labels, collapsed: $state.collapsed, foreground: headerColor)
             }
-            .padding(.horizontal, 12)
-            Divider()
-            ScrollView(.horizontal) {
-                if language?.lowercased() == "diff" {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(diffRows, id: \.index) { row in
-                            HStack(spacing: 0) {
-                                Text(row.oldLine.map { String($0) } ?? " ")
-                                    .frame(width: gutterWidth, alignment: .trailing)
-                                Text(row.newLine.map { String($0) } ?? " ")
-                                    .frame(width: gutterWidth, alignment: .trailing)
-                                Text(row.text.isEmpty ? " " : row.text)
-                                    .padding(.leading, 8)
-                                    .fixedSize(horizontal: true, vertical: false)
-                            }
-                            .foregroundStyle(diffForeground(row))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(diffBackground(row))
-                        }
-                    }
-                    .font(.system(size: fontSize * CGFloat(theme.fontScale), design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(minWidth: viewportWidth, alignment: .leading)
-                    .padding(.vertical, 10)
-                } else {
-                    XgentSwiftHighlighter(dark: colorScheme == .dark).highlightCode(text, language: language)
-                        .font(.system(size: fontSize * CGFloat(theme.fontScale), design: .monospaced))
-                        .textSelection(.enabled)
-                        .padding(12)
+            XgentCodeBlockScroll(maximumHeight: maximumHeight, hidden: canCollapse && state.collapsed, state: state) { codeBody }
+                .accessibilityLabel(title ?? configuration.labels.code ?? "Code")
+                .overlay(alignment: .topTrailing) {
+                    if title == nil { XgentCodeBlockCopy(text: text, labels: configuration.labels).padding(4) }
                 }
-            }
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { viewportWidth = $0 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { viewportWidth = $0 }
         }
         .foregroundStyle(Color(xgentHex: palette.text))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(xgentHex: palette.muted), in: RoundedRectangle(cornerRadius: 14))
+        .background {
+            if configuration.container == "card" {
+                RoundedRectangle(cornerRadius: CGFloat(theme.radius.element)).fill(Color(xgentHex: backgroundColor))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: configuration.container == "card" ? CGFloat(theme.radius.element) : 0))
         .overlay {
-            RoundedRectangle(cornerRadius: 14).stroke(Color(xgentHex: palette.border), lineWidth: 1)
+            if configuration.container == "card" {
+                RoundedRectangle(cornerRadius: CGFloat(theme.radius.element)).stroke(Color(xgentHex: palette.border), lineWidth: 1)
+            }
         }
-        .task(id: copied) {
-            guard copied else { return }
-            try? await Task.sleep(for: .seconds(2))
-            guard !Task.isCancelled else { return }
-            copied = false
+        .accessibilityIdentifier("xgent-code-block")
+    }
+
+    @ViewBuilder private var codeBody: some View {
+        if language?.lowercased() == "diff" {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(XgentDiffRow.parse(metrics.displayText), id: \.index) { row in
+                    HStack(spacing: 0) {
+                        Text(row.oldLine.map { String($0) } ?? " ")
+                            .frame(width: gutterWidth, alignment: .trailing)
+                        Text(row.newLine.map { String($0) } ?? " ")
+                            .frame(width: gutterWidth, alignment: .trailing)
+                        Text(row.text.isEmpty ? " " : row.text)
+                            .padding(.leading, 8)
+                            .fixedSize(horizontal: true, vertical: true)
+                    }
+                    .foregroundStyle(diffForeground(row))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(diffBackground(row))
+                }
+            }
+            .font(codeFont)
+            .textSelection(.enabled)
+            .frame(minWidth: viewportWidth, alignment: .leading)
+            .padding(.vertical, 10)
+        } else {
+            XgentReadOnlyCodeText(source: text, display: metrics.displayText, language: language ?? "plaintext",
+                                 theme: configuration.syntaxTheme, foreground: configuration.syntaxForeground, query: highlightCode, state: state)
+                .font(codeFont)
+                .textSelection(.enabled)
+                .padding(12)
         }
-        .onChange(of: text) { _, _ in copied = false }
     }
 }

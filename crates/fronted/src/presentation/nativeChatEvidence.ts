@@ -165,6 +165,7 @@ export function roundNodes(
   prefix: string,
   showThinking: boolean,
   labels: { thinking: string; search: string; arguments: string; result: string },
+  questionNodes?: ReadonlyMap<string, PresentationNode>,
 ): PresentationNode[] {
   return rounds.flatMap((round) =>
     round.blocks.flatMap((block): PresentationNode[] => {
@@ -193,6 +194,8 @@ export function roundNodes(
       }
       if (block.kind === "tool") {
         if (isTaskToolBlock(block)) return [];
+        const question = questionNodes?.get(block.item.toolCall.id);
+        if (question) return [question];
         const running =
           "runningToolCallIds" in round &&
           Array.isArray(round.runningToolCallIds) &&
@@ -261,7 +264,15 @@ export function splitWorkNodes(nodes: PresentationNode[]) {
   nodes.forEach((node, index) => {
     if (node.kind === "ToolCall" || node.kind === "Thinking") lastWork = index;
   });
-  return lastWork < 0
-    ? { work: [] as PresentationNode[], answer: nodes }
-    : { work: nodes.slice(0, lastWork + 1), answer: nodes.slice(lastWork + 1) };
+  const work: PresentationNode[] = [];
+  const answer: PresentationNode[] = [];
+  nodes.forEach((node, index) => {
+    const special =
+      node.variant === "question-card" ||
+      (node.kind === "ToolCall" &&
+        ["AskUserQuestion", "Image", "Agent"].includes(node.label ?? ""));
+    if (index <= lastWork && !special) work.push(node);
+    else answer.push(node);
+  });
+  return { work, answer };
 }

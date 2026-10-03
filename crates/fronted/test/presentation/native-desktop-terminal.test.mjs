@@ -24,7 +24,7 @@ function harness(options = {}) {
       { id: "zsh", label: "zsh", command: "/bin/zsh" },
     ] }; },
     async create(params) { calls.push(["create", params]); return options.create ? options.create(params) : { session: session("new", { shell: params.shell }) }; },
-    async rename(id, title, key) { calls.push(["rename", id, title, key]); return session(id, { title }); },
+    async rename(id, title, key) { calls.push(["rename", id, title, key]); return options.rename ? options.rename(id, title, key) : session(id, { title }); },
     async close(id, key) { calls.push(["close", id, key]); return session(id, { running: false }); },
     async createSsh(params) { calls.push(["createSsh", params]); return options.createSsh?.(params); },
     async answerSshPrompt(params) { calls.push(["answer", params]); return options.answerSshPrompt?.(params); },
@@ -86,6 +86,59 @@ test("native terminal loads only this project's local sessions and keeps shell c
   assert.deepEqual(h.calls.find(([type]) => type === "rename"), ["rename", "new", "task shell", "/project"]);
   assert.equal(h.node("terminal-session").options.find(item => item.value === "new").label, "task shell");
   h.unmount();
+});
+
+test("native terminal submits immediate title and shell edits before the next document rerender", async () => {
+  const h = harness();
+  try {
+    h.render(); await settle(); h.render(); await settle();
+    const published = h.render();
+    published.handlers.get("terminal-shell").run("/bin/zsh");
+    await published.handlers.get("terminal-new").run(null); await settle();
+    assert.equal(h.calls.find(([kind]) => kind === "create")[1].shell, "/bin/zsh");
+    await h.dispatch("terminal-rename");
+    const editor = h.render(); editor.handlers.get("terminal-name").run(" fresh title ");
+    await editor.handlers.get("terminal-name-save").run(null);
+    assert.deepEqual(h.calls.find(([kind]) => kind === "rename"), ["rename", "new", "fresh title", "/project"]);
+    assert.equal(h.node("terminal-session").variant, "terminal-session-tabs");
+    assert.equal(h.node("terminal-session-state:new").status, "running");
+    assert.equal(editor.handlers.get("terminal-name-save").accepts(3), false);
+  } finally { h.unmount(); }
+});
+
+test("native rename Return carries the actual field string, retains failures and locks repeated submissions", async () => {
+  const pending = deferred(); const h = harness({ rename: () => pending.promise });
+  try {
+    h.render(); await settle(); h.render(); await h.dispatch("terminal-rename");
+    const editor = h.render(); const first = editor.handlers.get("terminal-name-save").run(" return title ");
+    await editor.handlers.get("terminal-name-save").run("duplicate");
+    assert.equal(h.calls.filter(([kind]) => kind === "rename").length, 1);
+    pending.reject(Error("rename refused")); await first;
+    assert.ok(h.node("terminal-rename-form")); assert.equal(h.node("terminal-error").text, "rename refused");
+    assert.equal(h.node("terminal-name").value, " return title ");
+    assert.deepEqual(h.calls.find(([kind]) => kind === "rename"), ["rename", "one", "return title", "/project"]);
+    await h.dispatch("terminal-name-cancel");
+    await editor.handlers.get("terminal-name-save").run("retired");
+    assert.equal(h.calls.filter(([kind]) => kind === "rename").length, 1);
+  } finally { h.unmount(); }
+});
+
+test("new SSH connection uses the immediately selected host instead of the old rendered host", async () => {
+  const hosts = [{ id: "a", host: "a.test", username: "a", port: 22 }, { id: "b", host: "b.test", username: "b", port: 22 }];
+  const pending = deferred();
+  const h = harness({ props: { kind: "ssh", settings: { theme: "dark", ssh: { hosts } } }, list: () => [],
+    createSsh: () => pending.promise });
+  try {
+    h.render(); await settle(); h.render(); await settle();
+    const published = h.render(); published.handlers.get("terminal-host").run("b");
+    const creating = published.handlers.get("terminal-new").run(null);
+    h.render(); await settle();
+    pending.resolve({ snapshot: { session: session("ssh", { kind: "ssh" }) } });
+    await creating; await settle(); h.render();
+    assert.equal(h.calls.find(([kind]) => kind === "createSsh")[1].hostId, "b");
+    assert.equal(h.node("terminal-session").value, "ssh");
+    assert.ok(!h.calls.some(([kind]) => kind === "close"));
+  } finally { h.unmount(); }
 });
 
 test("native terminal confirms running closes, consumes metadata-free closed events, and retires raw input on hide", async () => {

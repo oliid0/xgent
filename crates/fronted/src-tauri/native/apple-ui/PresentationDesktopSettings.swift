@@ -7,6 +7,7 @@ struct XgentDesktopSettingsLayout: View {
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.colorScheme) private var colorScheme
+    @ScaledMetric(relativeTo: .title2) private var titleSize: CGFloat = 22
 
     private var sidebar: XgentNode? { node.children?.first }
     private var detail: XgentNode? { (node.children ?? []).dropFirst().first }
@@ -15,6 +16,8 @@ struct XgentDesktopSettingsLayout: View {
     }
     private var search: XgentNode? { sidebar?.children?.first { $0.id == "settings-search" } }
     private var close: XgentNode? { sidebar?.children?.first { $0.id == "settings-close" } }
+    private var saveStatus: XgentNode? { detail?.children?.first { $0.id == "save-status" } }
+    private var titleNode: XgentNode? { detail?.children?.first { $0.id == "settings-detail-title" } }
     private var sectionTitle: String { navigation.first { $0.selected == true }?.label ?? document.title }
 
     var body: some View {
@@ -45,6 +48,9 @@ struct XgentDesktopSettingsLayout: View {
                             Spacer(minLength: 8)
                             if let close { XgentActionButton(node: close, document: document, model: model) }
                         }
+                        if let saveStatus {
+                            XgentNodeView(node: saveStatus, document: document, model: model)
+                        }
                     }.padding(16)
                     Divider()
                     detailContent
@@ -55,8 +61,7 @@ struct XgentDesktopSettingsLayout: View {
 
     private var navigationColumn: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(document.title).font(.headline).fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
+            if let close { XgentActionButton(node: close, document: document, model: model) }
             if let search { XgentTextInput(node: search, document: document, model: model) }
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
@@ -65,7 +70,9 @@ struct XgentDesktopSettingsLayout: View {
                     }
                 }
             }
-            if let close { XgentActionButton(node: close, document: document, model: model) }
+            if let saveStatus {
+                XgentNodeView(node: saveStatus, document: document, model: model)
+            }
         }
         .padding(16)
         .frame(maxHeight: .infinity, alignment: .topLeading)
@@ -96,15 +103,25 @@ struct XgentDesktopSettingsLayout: View {
 
     @ViewBuilder private var detailContent: some View {
         if let detail {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: CGFloat(theme.spacing.lg)) {
-                    ForEach(detail.children ?? []) { child in
-                        XgentNodeView(node: child, document: document, model: model, parentAxis: .vertical)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(titleNode?.text ?? sectionTitle)
+                    .font(XgentFonts.body(theme.fontFamily, size: titleSize * CGFloat(theme.fontScale), weight: .bold))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(20)
+                Divider()
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: CGFloat(theme.spacing.lg)) {
+                        ForEach((detail.children ?? []).filter {
+                            $0.id != "settings-detail-title" && $0.id != "save-status"
+                        }) { child in
+                            XgentNodeView(node: child, document: document, model: model, parentAxis: .vertical)
+                        }
                     }
+                    .padding(20)
+                    .frame(maxWidth: 820, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                .padding(20)
-                .frame(maxWidth: 820, alignment: .leading)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -117,18 +134,47 @@ struct XgentDesktopSettingsCard: View {
     @ObservedObject var model: XgentPresentationModel
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @ScaledMetric(relativeTo: .headline) private var headerSize: CGFloat = 18
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: CGFloat(theme.spacing.md)) {
-            if let label = node.label, !label.isEmpty {
-                Text(label).modifier(XgentControlTypography(node: node)).fontWeight(.semibold)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.isHeader)
+    @ViewBuilder var body: some View {
+        if node.kind == .settingsGroup {
+            VStack(alignment: .leading, spacing: CGFloat(theme.spacing.md)) {
+                if let label = node.label, !label.isEmpty {
+                    Text(label)
+                        .font(XgentFonts.body(theme.fontFamily,
+                            size: headerSize * CGFloat(theme.fontScale), weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                surface {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array((node.children ?? []).enumerated()), id: \.element.id) { index, child in
+                            if index > 0 { Divider().padding(.horizontal, CGFloat(theme.spacing.lg)) }
+                            XgentNodeView(node: child, document: document, model: model, parentAxis: .vertical)
+                                .environment(\.xgentSettingsRow, true)
+                                .padding(CGFloat(theme.spacing.lg))
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        }
+                    }
+                }
             }
-            XgentNodeChildren(nodes: node.children ?? [], document: document, model: model, parentAxis: .vertical)
+        } else {
+            surface {
+                VStack(alignment: .leading, spacing: CGFloat(theme.spacing.md)) {
+                    if let label = node.label, !label.isEmpty {
+                        Text(label).modifier(XgentControlTypography(node: node)).fontWeight(.semibold)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                    XgentNodeChildren(nodes: node.children ?? [], document: document, model: model, parentAxis: .vertical)
+                }.padding(CGFloat(theme.spacing.lg))
+            }
         }
-        .padding(CGFloat(theme.spacing.lg))
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func surface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content().frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(xgentHex: theme.palette(for: colorScheme).card), in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.container)))
         .overlay {
             RoundedRectangle(cornerRadius: CGFloat(theme.radius.container))

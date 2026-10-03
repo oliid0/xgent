@@ -22,7 +22,7 @@ extension XgentPresentationTheme {
             dark: XgentMaterialMode(surfaceOpacity: 0.72, popoverOpacity: 0.8, shadowOpacity: 0.34),
             blur: 28, saturation: 1.45
         ),
-        fontScale: 1
+        fontScale: 1, fontFamily: nil, codeFontFamily: nil
     )
 
     func palette(for scheme: ColorScheme) -> XgentPalette { scheme == .dark ? dark : light }
@@ -71,7 +71,7 @@ struct XgentPresentationThemeModifier: ViewModifier {
         content
             .environment(\.xgentPresentationTheme, theme)
             .environment(\.colorScheme, scheme)
-            .environment(\.font, .system(size: CGFloat(17 * theme.fontScale)))
+            .environment(\.font, XgentFonts.body(theme.fontFamily, size: CGFloat(17 * theme.fontScale)))
             .tint(Color(xgentHex: palette.accent))
     }
 }
@@ -264,7 +264,12 @@ private struct XgentNodeControlModifier: ViewModifier {
     let busy: Bool
 
     @ViewBuilder func body(content: Content) -> some View {
-        if node.variant == "sidebar-conversation-row" {
+        if node.variant == "sidebar-conversation-row" || node.kind == .colorInput ||
+           node.kind == .spreadsheetGrid || node.variant == "workspace-file-layout" ||
+           node.variant == "workspace-file-toolbar" || node.variant == "workspace-file-sheets" ||
+           node.variant == "workspace-file-metadata" || node.variant == "workspace-file-annotations" ||
+           node.variant == "workspace-image-preview" ||
+           node.variant == "document-annotation" || node.variant == "document-annotation-page" {
             // Selection and the menu retain their own accessibility identities.
             content.controlSize(controlSize)
                 .disabled(node.disabled == true || busy)
@@ -533,8 +538,12 @@ struct XgentSheetView: View {
         }
     }
 
-    var body: some View {
-        NavigationStack {
+    @ViewBuilder private var navigationContent: some View {
+        if visibleNodes.contains(where: { $0.kind == .settingsLayout }) {
+            // The desktop settings shell owns its fixed title and close button.
+            sheetContent
+        } else {
+          NavigationStack {
             sheetContent
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -554,7 +563,12 @@ struct XgentSheetView: View {
                     }
                 }
             }
+          }
         }
+    }
+
+    var body: some View {
+        navigationContent
         #if os(iOS)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)

@@ -50,7 +50,7 @@ struct XgentActionButtonStyle: ButtonStyle {
         let foreground = emphasis == .primary ? palette.onAccent ?? "#ffffff"
             : emphasis == .destructive ? palette.onError ?? "#ffffff" : palette.text
         configuration.label
-            .font(.system(size: metrics.fontSize * scale, weight: .medium))
+            .font(XgentFonts.body(theme.fontFamily, size: metrics.fontSize * scale, weight: .medium))
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, iconOnly ? 0 : metrics.horizontalPadding)
@@ -133,13 +133,14 @@ struct XgentControlTypography: ViewModifier {
 
     func body(content: Content) -> some View {
         let small = node.size == "small" || (node.size == nil && node.variant == "compact")
-        content.font(.system(size: CGFloat((small ? theme.typography.supporting : theme.typography.body) * theme.fontScale) * scale))
+        content.font(XgentFonts.body(theme.fontFamily, size: CGFloat((small ? theme.typography.supporting : theme.typography.body) * theme.fontScale) * scale))
     }
 }
 
 struct XgentFieldSurface: ViewModifier {
     let node: XgentNode
     var active = false
+    var tracksFocus = true
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @FocusState private var focused: Bool
@@ -162,12 +163,15 @@ struct XgentFieldSurface: ViewModifier {
                     .stroke(Color(xgentHex: focused || active ? palette.accent : palette.emphasizedBorder), lineWidth: focused || active ? 2 : 1)
                     .allowsHitTesting(false)
             }
+        if !tracksFocus { surface }
+        else {
         #if os(iOS)
         if node.secure == true { surface }
         else { surface.focused($focused) }
         #else
         surface.focused($focused)
         #endif
+        }
     }
 }
 
@@ -175,12 +179,14 @@ struct XgentFieldLabel: View {
     let node: XgentNode
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.xgentSettingsRow) private var isSettingsRow
 
     var body: some View {
         if node.variant != "compact", let label = node.label, !label.isEmpty {
             Text(label)
                 .modifier(XgentControlTypography(node: node))
-                .foregroundStyle(Color(xgentHex: theme.palette(for: colorScheme).secondaryText))
+                .foregroundStyle(Color(xgentHex: isSettingsRow
+                    ? theme.palette(for: colorScheme).text : theme.palette(for: colorScheme).secondaryText))
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityHidden(true)
         }

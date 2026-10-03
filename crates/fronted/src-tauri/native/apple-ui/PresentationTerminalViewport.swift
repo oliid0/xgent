@@ -14,10 +14,10 @@ struct XgentTerminalViewport: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let palette = theme.palette(for: colorScheme)
         XgentPlatformTerminal(
             value: node.value?.text ?? "", fontSize: 13 * CGFloat(theme.fontScale),
-            foreground: SwiftUI.Color(xgentHex: palette.text), background: SwiftUI.Color(xgentHex: palette.background),
+            fontFamily: theme.codeFontFamily,
+            colors: XgentTerminalColors(dark: colorScheme == .dark),
             label: node.label ?? "Terminal", emit: { value in
                 model.send(node, in: document, value: .string(value), continuous: true)
             }
@@ -31,8 +31,8 @@ struct XgentTerminalViewport: View {
 struct XgentPlatformTerminal: UIViewRepresentable {
     let value: String
     let fontSize: CGFloat
-    let foreground: SwiftUI.Color
-    let background: SwiftUI.Color
+    let fontFamily: String?
+    let colors: XgentTerminalColors
     let label: String
     let emit: (String) -> Void
 
@@ -47,11 +47,10 @@ struct XgentPlatformTerminal: UIViewRepresentable {
 
     func updateUIView(_ view: TerminalView, context: Context) {
         context.coordinator.emit = emit
-        let font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        let font = XgentFonts.name(for: fontFamily).flatMap { UIFont(name: $0, size: fontSize) }
+            ?? UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
         if view.font != font { view.font = font }
-        view.nativeForegroundColor = UIColor(foreground)
-        view.nativeBackgroundColor = UIColor(background)
-        view.caretColor = UIColor(foreground)
+        context.coordinator.updateColors(colors, view: view)
         context.coordinator.update(value: value, view: view)
     }
 
@@ -65,8 +64,8 @@ struct XgentPlatformTerminal: UIViewRepresentable {
 struct XgentPlatformTerminal: NSViewRepresentable {
     let value: String
     let fontSize: CGFloat
-    let foreground: SwiftUI.Color
-    let background: SwiftUI.Color
+    let fontFamily: String?
+    let colors: XgentTerminalColors
     let label: String
     let emit: (String) -> Void
 
@@ -81,11 +80,10 @@ struct XgentPlatformTerminal: NSViewRepresentable {
 
     func updateNSView(_ view: TerminalView, context: Context) {
         context.coordinator.emit = emit
-        let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        let font = XgentFonts.name(for: fontFamily).flatMap { NSFont(name: $0, size: fontSize) }
+            ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
         if view.font != font { view.font = font }
-        view.nativeForegroundColor = NSColor(foreground)
-        view.nativeBackgroundColor = NSColor(background)
-        view.caretColor = NSColor(foreground)
+        context.coordinator.updateColors(colors, view: view)
         context.coordinator.update(value: value, view: view)
     }
 

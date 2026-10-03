@@ -24,9 +24,15 @@ export function createNativeDesktopAppearance(
     );
   const nodes = [
     c.group("desktop-appearance", t("settings.ui.title"), [
-      c.toggle("thinking", t("settings.ui.showThinking"), appearance.showThinking, (showThinking) =>
-        update({ showThinking }),
-      ),
+      {
+        ...c.toggle(
+          "thinking",
+          t("settings.ui.showThinking"),
+          appearance.showThinking,
+          (showThinking) => update({ showThinking }),
+        ),
+        text: t("settings.ui.showThinkingDesc"),
+      },
       c.select(
         "appearance-preset",
         t("settings.ui.preset"),
@@ -38,21 +44,28 @@ export function createNativeDesktopAppearance(
         })),
         (preset) => update({ preset: preset as typeof appearance.preset, customized: false }),
       ),
-      c.toggle(
-        "appearance-customized",
-        t("settings.ui.customize"),
-        appearance.customized,
-        (customized) => update({ customized }),
-      ),
+      {
+        ...c.toggle(
+          "appearance-customized",
+          t("settings.ui.customize"),
+          appearance.customized,
+          (customized) => update({ customized }),
+        ),
+        text: t("settings.ui.customizeDesc"),
+      },
       ...(appearance.customized
         ? [
-            ...(["accentLight", "accentDark", "sidebarLight", "sidebarDark"] as const).map((key) =>
-              c.color(
-                `appearance-color:${key}`,
-                t(`settings.ui.${key}`),
-                appearance[key],
-                (value) => update({ [key]: value }),
-              ),
+            ...(["accentLight", "accentDark", "sidebarLight", "sidebarDark"] as const).map(
+              (key) => ({
+                ...c.color(
+                  `appearance-color:${key}`,
+                  t(`settings.ui.${key}`),
+                  appearance[key],
+                  (value) => update({ [key]: value }),
+                ),
+                text: key.startsWith("accent") ? t("settings.ui.accentDescription") : undefined,
+                accessibilityHint: t("settings.ui.colorFormat"),
+              }),
             ),
             c.select(
               "appearance-radius",

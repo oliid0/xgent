@@ -24,6 +24,39 @@ function setup(action) {
   return { controller: new BrowserSessionController(client), client, opens: () => opens };
 }
 
+test("clearing sessions removes every successful close and retains failed sessions with their actual error", async () => {
+  const { controller, client } = setup();
+  controller.selectConversation("chat-a");
+  const a = await controller.newSession(), b = await controller.newSession(), c = await controller.newSession();
+  const closed = [];
+  client.closeSession = async id => { closed.push(id); if (id === b.sessionId) throw Error("engine refused"); };
+  await assert.rejects(controller.closeAllSessions(), /engine refused/);
+  assert.deepEqual(closed, [a.sessionId, b.sessionId, c.sessionId]);
+  assert.deepEqual(controller.getSnapshot().sessions.map(item => item.sessionId), [b.sessionId]);
+  assert.equal(controller.getSnapshot().activeSessionId, b.sessionId);
+  assert.match(controller.getSnapshot().error, /engine refused/);
+  client.closeSession = async () => {};
+  await controller.closeAllSessions();
+  assert.equal(controller.sessionsForConversation().length, 0);
+  assert.equal(controller.getSnapshot().error, null);
+});
+
+test("concurrent session cleanup shares one request and preserves tabs created after it started", async () => {
+  const { controller, client } = setup();
+  const original = await controller.newSession();
+  let finish, started;
+  const signal = new Promise(resolve => { started = resolve; });
+  const closes = [];
+  client.closeSession = async id => { closes.push(id); started(); await new Promise(resolve => { finish = resolve; }); };
+  const first = controller.closeAllSessions();
+  assert.equal(controller.closeAllSessions(), first);
+  await signal;
+  const fresh = await controller.newSession(); finish(); await first;
+  assert.deepEqual(closes, [original.sessionId]);
+  assert.deepEqual(controller.getSnapshot().sessions.map(item => item.sessionId), [fresh.sessionId]);
+  assert.equal(controller.getSnapshot().activeSessionId, fresh.sessionId);
+});
+
 test("explicit browser opens request native focus without agent output repeatedly stealing the tab", async () => {
   const { controller } = setup(async (id, action) => ({ sessionId: id, action }));
   await controller.ensureSession({ sessionId: "main" });

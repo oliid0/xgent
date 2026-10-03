@@ -6,6 +6,7 @@ import { collectCloudArtifacts } from "../lib/chat/messages/cloudArtifacts";
 import { collectPreviewedFiles } from "../lib/chat/messages/previewedFiles";
 import { workDuration } from "../pages/chat/transcript/workRecord";
 import { roundNodes, splitWorkNodes } from "./nativeChatEvidence";
+import { nativeReadOnlyCodeNodes } from "./nativeReadOnlyCode";
 import type { PresentationNode } from "./types";
 
 /** Shared native transcript for main and auxiliary conversations. */
@@ -16,6 +17,7 @@ export function createNativeChatTranscript(
   t: (key: string) => string,
   action: (id: string, run: () => unknown) => string,
   onOpenWorkspaceFile: (path: string) => void,
+  questionNodes?: ReadonlyMap<string, PresentationNode>,
 ): PresentationNode[] {
   const contentLabels = {
     thinking: t("chat.thinking"),
@@ -31,7 +33,7 @@ export function createNativeChatTranscript(
       const changedFiles = changedSummary?.files.filter((file) => !file.deleted) ?? [];
       const previewedFiles = collectPreviewedFiles(item.rounds, changedSummary);
       const { work, answer } = splitWorkNodes(
-        roundNodes(item.rounds, item.key, showThinking, contentLabels),
+        roundNodes(item.rounds, item.key, showThinking, contentLabels, questionNodes),
       );
       const duration = workDuration(lastUserAt, item.timestamp);
       const changedFileNodes: PresentationNode[] = changedFiles.map((file) => {
@@ -137,7 +139,13 @@ export function createNativeChatTranscript(
     ];
   });
   if (!live.isSettled) {
-    const liveChildren = roundNodes(live.liveRounds, "live", showThinking, contentLabels);
+    const liveChildren = roundNodes(
+      live.liveRounds,
+      "live",
+      showThinking,
+      contentLabels,
+      questionNodes,
+    );
     if (live.liveRounds.length === 0 && live.draftAssistantText) {
       liveChildren.push({ id: "live:draft", kind: "Markdown", text: live.draftAssistantText });
     }
@@ -186,5 +194,5 @@ export function createNativeChatTranscript(
       });
     }
   }
-  return messages;
+  return nativeReadOnlyCodeNodes(messages, t);
 }

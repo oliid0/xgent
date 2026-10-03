@@ -71,22 +71,17 @@ export function NativeMobileSystemSettings({
                 id: "execution-mode",
                 kind: "Selector",
                 label: t("settings.executionMode"),
+                text: t(
+                  settings.system.executionMode === "text"
+                    ? "settings.chatModeDesc"
+                    : "settings.agentModeDesc",
+                ),
                 value: settings.system.executionMode === "text" ? "text" : "tools",
                 action: "execution-mode",
                 options: [
                   { value: "text", label: t("settings.chatMode") },
                   { value: "tools", label: t("settings.agentMode") },
                 ],
-              },
-              {
-                id: "execution-description",
-                kind: "Text",
-                secondary: true,
-                text: t(
-                  settings.system.executionMode === "text"
-                    ? "settings.chatModeDesc"
-                    : "settings.agentModeDesc",
-                ),
               },
               {
                 id: "locale",

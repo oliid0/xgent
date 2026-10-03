@@ -113,7 +113,6 @@ function SshHostModal(props: {
   const [name, setName] = useState(initialData?.name ?? "");
   const [host, setHost] = useState(initialData?.host ?? "");
   const [port, setPort] = useState(initialData?.port ?? 22);
-  const [nativePort, setNativePort] = useState(String(initialData?.port ?? 22));
   const [username, setUsername] = useState(initialData?.username ?? "");
   const [authType, setAuthType] = useState<SshAuthType>(initialData?.authType ?? "password");
   const [password, setPassword] = useState(initialData?.password ?? "");
@@ -246,10 +245,7 @@ function SshHostModal(props: {
       c.group("connection", t("settings.sshAdd"), [
         c.input("name", t("settings.sshName"), name, setName),
         c.input("host", t("settings.sshHost"), host, setHost),
-        c.input("port", t("settings.sshPort"), nativePort, (value) => {
-          setNativePort(value);
-          setPort(Number(value));
-        }),
+        c.number("port", t("settings.sshPort"), port, 1, 65535, 1, setPort, true, undefined, true),
         c.input("username", t("settings.sshUsername"), username, setUsername),
         c.select(
           "auth",
@@ -299,16 +295,16 @@ function SshHostModal(props: {
           (value) => setProxyType(value as SshProxyType),
         ),
         c.input("proxy-url", t("settings.sshProxyUrl"), proxyUrl, setProxyUrl),
-        c.input(
+        c.optionalNumber(
           "proxy-port",
-          t("settings.sshPort"),
-          proxyPort == null ? "" : String(proxyPort),
-          (value) => {
-            const next = Number(value);
-            if (value && (!Number.isInteger(next) || next < 1 || next > 65535))
-              throw new Error("Port must be 1-65535");
-            setProxyPort(value ? next : null);
-          },
+          t("settings.sshProxyPort"),
+          proxyPort,
+          1,
+          65535,
+          1,
+          setProxyPort,
+          true,
+          true,
         ),
         c.input("proxy-user", t("settings.sshUsername"), proxyUsername, setProxyUsername),
         c.input("proxy-password", t("settings.sshPassword"), proxyPassword, setProxyPassword, true),
@@ -318,7 +314,7 @@ function SshHostModal(props: {
           "save",
           t("settings.save"),
           handleSave,
-          !!name.trim() && !!host.trim() && /^\d+$/.test(nativePort) && port >= 1 && port <= 65535,
+          !!name.trim() && !!host.trim() && Number.isInteger(port) && port >= 1 && port <= 65535,
         ),
         prominent: true,
       },

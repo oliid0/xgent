@@ -293,8 +293,10 @@ import {
 } from "../lib/workspaceRootGrants";
 import { NativeBrowserPage } from "../presentation/NativeBrowserPage";
 import { NativeChatPage } from "../presentation/NativeChatPage";
+import { NativeDesktopGitPanel } from "../presentation/NativeDesktopGitPanel";
 import { NativeDesktopTerminalPanel } from "../presentation/NativeDesktopTerminalPanel";
 import { NativeWorkspaceFilePage } from "../presentation/NativeWorkspaceFilePage";
+import type { NativeWorkspaceEditorSessions } from "../presentation/nativeWorkspaceEditorSessions";
 import { isApplePresentationRuntime } from "../runtime/applePresentation";
 import {
   buildErrorAssistantMessage,
@@ -941,6 +943,7 @@ export function ChatPage(props: ChatPageProps) {
   const previousWorkspaceFileTreeOpenRef = useRef(false);
   const [workspaceEditorMounted, setWorkspaceEditorMounted] = useState(false);
   const [workspaceEditorOpen, setWorkspaceEditorOpen] = useState(false);
+  const [nativeEditorSessions, setNativeEditorSessions] = useState<NativeWorkspaceEditorSessions>();
   const [workspaceEditorCleanupPending, setWorkspaceEditorCleanupPending] = useState(false);
   const [workspaceEditorOpenRequest, setWorkspaceEditorOpenRequest] =
     useState<WorkspaceCodeEditorOpenRequest | null>(null);
@@ -6339,6 +6342,7 @@ export function ChatPage(props: ChatPageProps) {
       <>
         <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
         <NativeChatPage
+          editorSessions={nativeEditorSessions}
           conversationId={currentConversationId}
           uploadWorkdir={workdir}
           settings={settings}
@@ -6437,6 +6441,7 @@ export function ChatPage(props: ChatPageProps) {
             settings={settings}
             setSettings={setSettings}
             initialSkills={availableSkills}
+            initialRootDir={skillsRootDir}
             presentationMode="root"
             onOpenSidebar={() => setNativeSidebarOpenRequestId((request) => request + 1)}
           />
@@ -6467,6 +6472,7 @@ export function ChatPage(props: ChatPageProps) {
             workdir={mobileWorkspacePath}
             projectPathKey={mobileWorkspacePathKey}
             hosts={settings.ssh.hosts}
+            settings={settings}
             associatedHostIds={mobileAssociatedSshHostIds}
             onAssociatedHostIdsChange={handleMobileSshProjectHostIdsChange}
             onOpenSettings={() => {
@@ -6499,20 +6505,59 @@ export function ChatPage(props: ChatPageProps) {
           <MobileTerminalPanel
             open={mobileTerminalOpen}
             workdir={mobileWorkspacePath}
+            settings={settings}
             mode={mobileTerminalDestination?.mode ?? "terminal"}
             preferLanPcExecution={
               settings.access.preferLanPcExecution && Boolean(settings.access.lanControlUrl.trim())
             }
             sshHosts={settings.ssh.hosts}
+            initialCommand={mobileTerminalDestination?.initialCommand ?? ""}
+            autoRunInitialCommand={mobileTerminalDestination?.autoRun ?? false}
             onClose={() => setMobileWorkspaceDestination(null)}
           />
         )}
-        <MobileGitReviewPanel
-          open={mobileWorkspaceDestination?.kind === "git-review"}
-          workdir={mobileWorkspacePath}
-          settings={settings}
-          onClose={() => setMobileWorkspaceDestination(null)}
-        />
+        {!nativeMobile ? (
+          <NativeDesktopGitPanel
+            open={mobileWorkspaceDestination?.kind === "git-review"}
+            workdir={mobileWorkspacePath}
+            projectPathKey={mobileWorkspacePathKey}
+            settings={settings}
+            client={tauriGitClient}
+            terminalClient={tauriTerminalClient}
+            workspaceActivityClient={tauriWorkspaceActivityClient}
+            fileTreeState={mobileFileTreeState}
+            onFileTreeStateChange={handleMobileFileTreeStateChange}
+            onRevealFile={(path) => {
+              handleMobileFileTreeStateChange({
+                selectedPath: path,
+                query: "",
+                expandedPaths: Array.from(
+                  new Set([
+                    ...mobileFileTreeState.expandedPaths,
+                    ...expandedPathsForFileTreePath(path),
+                  ]),
+                ),
+                bumpRevision: true,
+              });
+              setMobileWorkspaceDestination({ kind: "files" });
+            }}
+            git={{
+              onInsertCodeReviewSkill: codeReviewSkill
+                ? handleWorkspaceToolsInsertCodeReviewSkill
+                : undefined,
+              onInsertCommitMention: handleWorkspaceToolsInsertCommitMention,
+              onInsertGitFileMention: handleWorkspaceToolsInsertGitFileMention,
+            }}
+            onClose={() => setMobileWorkspaceDestination(null)}
+          />
+        ) : (
+          <MobileGitReviewPanel
+            open={mobileWorkspaceDestination?.kind === "git-review"}
+            workdir={mobileWorkspacePath}
+            settings={settings}
+            onClose={() => setMobileWorkspaceDestination(null)}
+          />
+        )}
         <MobileFilesPanel
           open={mobileWorkspaceDestination?.kind === "files"}
           projectPathKey={mobileWorkspacePathKey}
@@ -6563,6 +6608,7 @@ export function ChatPage(props: ChatPageProps) {
         ) : null}
         <NativeBrowserPage settings={settings} />
         <NativeWorkspaceFilePage
+          onEditorSessionsChanged={setNativeEditorSessions}
           settings={settings}
           editorRequest={workspaceEditorOpenRequest}
           editorOpen={workspaceEditorOpen}
@@ -7371,6 +7417,7 @@ export function ChatPage(props: ChatPageProps) {
           workdir={mobileWorkspacePath}
           projectPathKey={mobileWorkspacePathKey}
           hosts={settings.ssh.hosts}
+          settings={settings}
           associatedHostIds={mobileAssociatedSshHostIds}
           onAssociatedHostIdsChange={handleMobileSshProjectHostIdsChange}
           onOpenSettings={() => {
@@ -7384,6 +7431,7 @@ export function ChatPage(props: ChatPageProps) {
         <MobileTerminalPanel
           open={mobileTerminalOpen}
           workdir={mobileWorkspacePath}
+          settings={settings}
           mode={mobileTerminalDestination?.mode ?? "terminal"}
           preferLanPcExecution={
             settings.access.preferLanPcExecution && Boolean(settings.access.lanControlUrl.trim())

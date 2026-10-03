@@ -671,6 +671,9 @@ struct XgentIOSSheetPresentation: View {
             header
             if grouped {
                 XgentIOSSettingsForm(nodes: contentNodes, document: document, model: model)
+            } else if contentNodes.contains(where: { $0.kind == .terminalLayout }) {
+                XgentIOSNodes(nodes: contentNodes, document: document, model: model)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {

@@ -32,116 +32,156 @@ export function NativeBackupSyncSection(props: {
       ? [c.action("backup-retry", t("presentation.retry"), data.reload, data.operation === null)]
       : []),
     c.group("backup-connection", t("settings.backupSyncTitle"), [
-      c.select(
-        "backup-preset",
-        t("settings.backupSyncPreset"),
-        data.preset,
-        [
-          ...SYNC_PRESETS.map((item) => ({
-            value: item.id,
-            label: t(`settings.backupSyncPreset_${item.id}`),
-          })),
-          { value: "custom", label: t("settings.backupSyncPreset_custom") },
+      {
+        id: "backup-connection-description",
+        kind: "Text",
+        text: t("settings.backupSyncDesc"),
+        secondary: true,
+      },
+      {
+        id: "backup-connection-fields",
+        kind: "VStack",
+        variant: "backup-connection-fields",
+        children: [
+          c.select(
+            "backup-preset",
+            t("settings.backupSyncPreset"),
+            data.preset,
+            [
+              ...SYNC_PRESETS.map((item) => ({
+                value: item.id,
+                label: t(`settings.backupSyncPreset_${item.id}`),
+              })),
+              { value: "custom", label: t("settings.backupSyncPreset_custom") },
+            ],
+            data.handlePresetChange,
+            !locked,
+          ),
+          c.input(
+            "backup-url",
+            t("settings.backupSyncUrl"),
+            form.url,
+            (url) => data.patchForm({ url }),
+            false,
+            !locked,
+          ),
+          c.input(
+            "backup-username",
+            t("settings.backupSyncUsername"),
+            form.username,
+            (username) => data.patchForm({ username }),
+            false,
+            !locked,
+          ),
+          c.input(
+            "backup-password",
+            t("settings.backupSyncPassword"),
+            form.password,
+            (password) => data.patchForm({ password, passwordTouched: password.length > 0 }),
+            true,
+            !locked,
+          ),
+          ...(syncView?.hasPassword && !form.passwordTouched
+            ? [
+                {
+                  id: "backup-password-saved",
+                  kind: "Text" as const,
+                  text: t("settings.backupSyncPasswordSaved"),
+                  secondary: true,
+                },
+              ]
+            : []),
+          ...(syncView?.hasPassword
+            ? [
+                {
+                  ...c.action(
+                    "backup-clear-password",
+                    t("settings.backupSyncClearPassword"),
+                    () => data.patchForm({ password: "", passwordTouched: true }),
+                    !locked,
+                  ),
+                  destructive: true,
+                },
+              ]
+            : []),
+          c.input(
+            "backup-directory",
+            t("settings.backupSyncRemoteDir"),
+            form.remoteDir,
+            (remoteDir) => data.patchForm({ remoteDir }),
+            false,
+            !locked,
+          ),
+          c.input(
+            "backup-profile",
+            t("settings.backupSyncProfile"),
+            form.profile,
+            (profile) => data.patchForm({ profile }),
+            false,
+            !locked,
+          ),
+          {
+            id: "backup-profile-hint",
+            kind: "Text",
+            text: t("settings.backupSyncProfileHint"),
+            secondary: true,
+          },
+          {
+            ...c.toggle(
+              "backup-auto",
+              t("settings.backupSyncAuto"),
+              form.autoSync,
+              data.handleAutoSyncChange,
+              !locked,
+            ),
+            text: t("settings.backupSyncAutoHint"),
+          },
         ],
-        data.handlePresetChange,
-        !locked,
-      ),
-      c.input(
-        "backup-url",
-        t("settings.backupSyncUrl"),
-        form.url,
-        (url) => data.patchForm({ url }),
-        false,
-        !locked,
-      ),
-      c.input(
-        "backup-username",
-        t("settings.backupSyncUsername"),
-        form.username,
-        (username) => data.patchForm({ username }),
-        false,
-        !locked,
-      ),
-      c.input(
-        "backup-password",
-        t("settings.backupSyncPassword"),
-        form.password,
-        (password) => data.patchForm({ password, passwordTouched: password.length > 0 }),
-        true,
-        !locked,
-      ),
-      ...(syncView?.hasPassword && !form.passwordTouched
-        ? [
-            {
-              id: "backup-password-saved",
-              kind: "Text" as const,
-              text: t("settings.backupSyncPasswordSaved"),
-              secondary: true,
-            },
-          ]
-        : []),
-      ...(syncView?.hasPassword
-        ? [
-            {
-              ...c.action(
-                "backup-clear-password",
-                t("settings.backupSyncClearPassword"),
-                () => data.patchForm({ password: "", passwordTouched: true }),
-                !locked,
-              ),
-              destructive: true,
-            },
-          ]
-        : []),
-      c.input(
-        "backup-directory",
-        t("settings.backupSyncRemoteDir"),
-        form.remoteDir,
-        (remoteDir) => data.patchForm({ remoteDir }),
-        false,
-        !locked,
-      ),
-      c.input(
-        "backup-profile",
-        t("settings.backupSyncProfile"),
-        form.profile,
-        (profile) => data.patchForm({ profile }),
-        false,
-        !locked,
-      ),
-      {
-        id: "backup-profile-hint",
-        kind: "Text",
-        text: t("settings.backupSyncProfileHint"),
-        secondary: true,
       },
-      c.toggle(
-        "backup-auto",
-        t("settings.backupSyncAuto"),
-        form.autoSync,
-        data.handleAutoSyncChange,
-        !locked,
-      ),
       {
-        id: "backup-auto-hint",
-        kind: "Text",
-        text: t("settings.backupSyncAutoHint"),
-        secondary: true,
+        id: "backup-transfer-actions",
+        kind: "VStack",
+        variant: "backup-transfer-actions",
+        children: [
+          {
+            ...c.action(
+              "backup-save-connection",
+              t("settings.backupSyncSave"),
+              data.handleSaveSync,
+              !locked,
+            ),
+            prominent: true,
+            icon: "checkmark",
+          },
+          {
+            ...c.action(
+              "backup-test-connection",
+              t("settings.backupSyncTest"),
+              data.handleTestSync,
+              available,
+            ),
+            icon: "network",
+          },
+          {
+            ...c.action(
+              "backup-upload",
+              t("settings.backupSyncUpload"),
+              data.handleUpload,
+              available,
+            ),
+            icon: "icloud.and.arrow.up",
+          },
+          {
+            ...c.action(
+              "backup-download",
+              t("settings.backupSyncDownload"),
+              data.handleDownload,
+              available,
+            ),
+            icon: "icloud.and.arrow.down",
+          },
+        ],
       },
-      c.action(
-        "backup-save-connection",
-        t("settings.backupSyncSave"),
-        data.handleSaveSync,
-        !locked,
-      ),
-      c.action(
-        "backup-test-connection",
-        t("settings.backupSyncTest"),
-        data.handleTestSync,
-        available,
-      ),
-      c.action("backup-upload", t("settings.backupSyncUpload"), data.handleUpload, available),
-      c.action("backup-download", t("settings.backupSyncDownload"), data.handleDownload, available),
     ]),
     ...(data.dirty && !locked
       ? [

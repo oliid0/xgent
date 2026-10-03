@@ -18,6 +18,7 @@ import { invoke } from "@xgent/runtime";
 import { useEffect, useMemo, useState } from "react";
 import { FolderTree, Trash2 } from "../../components/icons";
 import { useLocale } from "../../i18n";
+import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import {
   updateWorkspaceResourceSettings,
   type WorkspaceProject,
@@ -33,6 +34,11 @@ import {
   type WorkspaceRootGrantDraft,
   type WorkspaceRootGrantState,
 } from "../../lib/workspaceRootGrants";
+import { presentationControls } from "../../presentation/controls";
+import { NativeSurface } from "../../presentation/NativeSurface";
+import { createNativePresentationTheme } from "../../presentation/nativeTheme";
+import type { PresentationNode } from "../../presentation/types";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import type { SettingsSectionProps } from "./types";
 
 type EditableRoot = WorkspaceRootGrantDraft & {
@@ -64,6 +70,7 @@ function pathAlias(path: string, used: ReadonlySet<string>) {
 type ProjectRootsSectionProps = SettingsSectionProps & {
   selectedProjectId?: string;
   showProjectSelector?: boolean;
+  onBack?: () => void;
 };
 
 export function ProjectRootsSection({
@@ -71,6 +78,8 @@ export function ProjectRootsSection({
   setSettings,
   selectedProjectId,
   showProjectSelector = true,
+  nativeSettingsSurfaceId,
+  onBack,
 }: ProjectRootsSectionProps) {
   const { t } = useLocale();
   const projects = useMemo(
@@ -86,12 +95,29 @@ export function ProjectRootsSection({
   const [roots, setRoots] = useState<EditableRoot[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availableSkills, setAvailableSkills] = useState<SkillSummary[]>([]);
   const [resourceMode, setResourceMode] = useState<"inherit" | "custom">("inherit");
   const [resourceSkillNames, setResourceSkillNames] = useState<string[]>([]);
   const [resourceMcpServerIds, setResourceMcpServerIds] = useState<string[]>([]);
   const project: WorkspaceProject | undefined = projects.find((item) => item.id === projectId);
+  const [scope] = useState(() => ({ key: "", revision: 0, active: true, busy: false }));
+  const scopeKey = `${project?.id ?? ""}\n${project?.path ?? ""}`;
+  if (scope.key !== scopeKey) {
+    scope.key = scopeKey;
+    scope.revision++;
+    scope.busy = false;
+  }
+  useEffect(() => {
+    scope.active = true;
+    setPicking(false);
+    setSaving(false);
+    return () => {
+      scope.active = false;
+      scope.revision++;
+    };
+  }, [scopeKey]);
 
   useEffect(() => {
     let active = true;
@@ -158,20 +184,34 @@ export function ProjectRootsSection({
   }, [project?.path, settings.system.workspaceResourceSettings]);
 
   const addRoot = async () => {
-    const picked = await invoke<string | null>("system_pick_folder", {
-      title: t("settings.projectRoots.pick"),
-    });
-    if (!picked) return;
-    const used = new Set(roots.map((root) => root.alias));
-    setRoots((previous) => [
-      ...previous,
-      {
-        localId: `draft-${createUuid()}`,
-        alias: pathAlias(picked, used),
-        displayPath: picked,
-        access: "read",
-      },
-    ]);
+    if (!project || loading || scope.busy || !scope.active) return;
+    const revision = scope.revision;
+    const current = () => scope.active && scope.revision === revision;
+    scope.busy = true;
+    setPicking(true);
+    setError(null);
+    try {
+      const picked = await invoke<string | null>("system_pick_folder", {
+        title: t("settings.projectRoots.pick"),
+      });
+      if (!picked || !current()) return;
+      setRoots((previous) => [
+        ...previous,
+        {
+          localId: `draft-${createUuid()}`,
+          alias: pathAlias(picked, new Set(previous.map((root) => root.alias))),
+          displayPath: picked,
+          access: "read",
+        },
+      ]);
+    } catch (reason) {
+      if (current()) setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      if (current()) {
+        scope.busy = false;
+        setPicking(false);
+      }
+    }
   };
 
   const updateRoot = (localId: string, next: Partial<EditableRoot>) => {
@@ -181,7 +221,10 @@ export function ProjectRootsSection({
   };
 
   const save = async () => {
-    if (!project) return;
+    if (!project || loading || scope.busy || !scope.active) return;
+    const revision = scope.revision;
+    const current = () => scope.active && scope.revision === revision;
+    scope.busy = true;
     setSaving(true);
     setError(null);
     try {
@@ -194,16 +237,17 @@ export function ProjectRootsSection({
           access: root.access,
         })),
       );
-      setRoots(
-        saved.map((grant) => ({
-          id: grant.id,
-          localId: grant.id,
-          alias: grant.alias,
-          displayPath: grant.displayPath,
-          access: grant.access,
-          state: grant.state,
-        })),
-      );
+      if (current())
+        setRoots(
+          saved.map((grant) => ({
+            id: grant.id,
+            localId: grant.id,
+            alias: grant.alias,
+            displayPath: grant.displayPath,
+            access: grant.access,
+            state: grant.state,
+          })),
+        );
       setSettings((previous) =>
         updateWorkspaceResourceSettings(previous, project.path, {
           mode: resourceMode,
@@ -212,23 +256,32 @@ export function ProjectRootsSection({
         }),
       );
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      if (current()) setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
-      setSaving(false);
+      if (current()) {
+        scope.busy = false;
+        setSaving(false);
+      }
     }
   };
 
   const revoke = async () => {
-    if (!project) return;
+    if (!project || loading || scope.busy || !scope.active) return;
+    const revision = scope.revision;
+    const current = () => scope.active && scope.revision === revision;
+    scope.busy = true;
     setSaving(true);
     setError(null);
     try {
       await revokeWorkspaceRootGrants(project);
-      setRoots([]);
+      if (current()) setRoots([]);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      if (current()) setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
-      setSaving(false);
+      if (current()) {
+        scope.busy = false;
+        setSaving(false);
+      }
     }
   };
 
@@ -241,6 +294,225 @@ export function ProjectRootsSection({
     label: server.enabled ? server.id : `${server.id} — ${t("settings.projectRoots.disabled")}`,
     disabled: !server.enabled,
   }));
+
+  if (isApplePresentationRuntime()) {
+    const c = presentationControls();
+    const editable = !!project && !loading && !saving && !picking;
+    const nodes: PresentationNode[] = [
+      {
+        id: "roots-description",
+        kind: "Text",
+        text: t("settings.projectRoots.desc"),
+        secondary: true,
+      },
+      ...(showProjectSelector
+        ? [
+            c.select(
+              "roots-project",
+              t("settings.projectRoots.project"),
+              projectId,
+              projects.map((item) => ({ value: item.id, label: `${item.name} — ${item.path}` })),
+              setProjectId,
+              !saving && !picking,
+            ),
+          ]
+        : []),
+      ...(project
+        ? [
+            {
+              id: "roots-project-path",
+              kind: "Text" as const,
+              text: `${project.name}\n${project.path}`,
+              secondary: true,
+            },
+          ]
+        : []),
+      c.action("roots-add", t("settings.projectRoots.add"), addRoot, editable),
+      ...(loading
+        ? [{ id: "roots-loading", kind: "Progress" as const, label: t("settings.loading") }]
+        : []),
+      ...roots.map((root) =>
+        c.group(`root:${root.localId}`, root.alias || root.displayPath, [
+          c.input(
+            `root:${root.localId}:path`,
+            t("settings.projectRoots.path"),
+            root.displayPath,
+            (displayPath) => updateRoot(root.localId, { displayPath }),
+            false,
+            editable,
+          ),
+          c.input(
+            `root:${root.localId}:alias`,
+            t("settings.projectRoots.alias"),
+            root.alias,
+            (alias) => updateRoot(root.localId, { alias }),
+            false,
+            editable,
+            (value) => value.slice(0, 32),
+          ),
+          c.select(
+            `root:${root.localId}:access`,
+            t("settings.projectRoots.grants"),
+            root.access,
+            [
+              { value: "read", label: t("settings.projectRoots.read") },
+              { value: "write", label: t("settings.projectRoots.write") },
+            ],
+            (access) => updateRoot(root.localId, { access: access as WorkspaceRootAccess }),
+            editable,
+          ),
+          ...(root.state && root.state !== "active"
+            ? [
+                {
+                  id: `root:${root.localId}:status`,
+                  kind: "StatusDot" as const,
+                  status: "pending" as const,
+                  label: t(`settings.projectRoots.state.${root.state}`),
+                },
+              ]
+            : []),
+          {
+            ...c.action(
+              `root:${root.localId}:remove`,
+              t("settings.projectRoots.remove"),
+              () =>
+                setRoots((previous) => previous.filter((item) => item.localId !== root.localId)),
+              editable,
+            ),
+            destructive: true,
+          },
+        ]),
+      ),
+      ...(!loading && !roots.length
+        ? [
+            {
+              id: "roots-empty",
+              kind: "EmptyState" as const,
+              icon: "folder",
+              label: t(
+                projects.length
+                  ? "settings.projectRoots.empty"
+                  : "settings.projectRoots.noProjects",
+              ),
+            },
+          ]
+        : []),
+      c.group("roots-resources", t("settings.projectRoots.resources"), [
+        {
+          id: "roots-resources-description",
+          kind: "Text",
+          text: t("settings.projectRoots.resourcesDesc"),
+          secondary: true,
+        },
+        c.select(
+          "roots-resource-mode",
+          t("settings.projectRoots.resources"),
+          resourceMode,
+          [
+            { value: "inherit", label: t("settings.projectRoots.resources.inherit") },
+            { value: "custom", label: t("settings.projectRoots.resources.custom") },
+          ],
+          (mode) => setResourceMode(mode as "inherit" | "custom"),
+          editable,
+        ),
+        ...(resourceMode === "custom"
+          ? [
+              c.group("roots-skills", t("settings.projectRoots.skills"), [
+                c.action(
+                  "roots-skills-all",
+                  t("settings.selectAll"),
+                  () => setResourceSkillNames(skillOptions.map((option) => option.value)),
+                  editable,
+                ),
+                c.action(
+                  "roots-skills-clear",
+                  t("skills.clearSelection"),
+                  () => setResourceSkillNames([]),
+                  editable,
+                ),
+                ...skillOptions.map((option) =>
+                  c.toggle(
+                    `roots-skill:${option.value}`,
+                    option.label,
+                    resourceSkillNames.includes(option.value),
+                    (selected) =>
+                      setResourceSkillNames((previous) =>
+                        selected
+                          ? [...new Set([...previous, option.value])]
+                          : previous.filter((name) => name !== option.value),
+                      ),
+                    editable,
+                  ),
+                ),
+              ]),
+              c.group("roots-mcp", t("settings.projectRoots.mcp"), [
+                c.action(
+                  "roots-mcp-all",
+                  t("settings.selectAll"),
+                  () =>
+                    setResourceMcpServerIds(
+                      mcpOptions.filter((option) => !option.disabled).map((option) => option.value),
+                    ),
+                  editable,
+                ),
+                c.action(
+                  "roots-mcp-clear",
+                  t("skills.clearSelection"),
+                  () => setResourceMcpServerIds([]),
+                  editable,
+                ),
+                ...mcpOptions.map((option) =>
+                  c.toggle(
+                    `roots-mcp:${option.value}`,
+                    option.label,
+                    resourceMcpServerIds.includes(option.value),
+                    (selected) =>
+                      setResourceMcpServerIds((previous) =>
+                        selected
+                          ? [...new Set([...previous, option.value])]
+                          : previous.filter((id) => id !== option.value),
+                      ),
+                    editable && !option.disabled,
+                  ),
+                ),
+              ]),
+            ]
+          : []),
+      ]),
+      ...(error
+        ? [{ id: "roots-error", kind: "Banner" as const, label: error, status: "error" as const }]
+        : []),
+      {
+        ...c.action("roots-revoke", t("settings.projectRoots.revoke"), revoke, editable),
+        destructive: true,
+      },
+      { ...c.action("roots-save", t("settings.save"), save, editable), prominent: true },
+      ...(saving
+        ? [{ id: "roots-saving", kind: "Progress" as const, label: t("settings.saving") }]
+        : []),
+    ];
+    c.handlers.set("close", {
+      enabled: !saving && !picking,
+      accepts: (value) => value === null,
+      run: () => onBack?.(),
+    });
+    return (
+      <NativeSurface
+        sessionSurface={nativeSettingsSurfaceId}
+        document={{
+          mode: "sheet",
+          title: t("settings.projectRoots.title"),
+          appearance: settings.theme,
+          formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
+          theme: createNativePresentationTheme(settings, isNativeMobileRuntime()),
+          nodes,
+          dismissAction: saving || picking ? undefined : "close",
+        }}
+        handlers={c.handlers}
+        onError={(cause) => setError(cause instanceof Error ? cause.message : String(cause))}
+      />
+    );
+  }
 
   return (
     <VStack gap={4} width="100%">

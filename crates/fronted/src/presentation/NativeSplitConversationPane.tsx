@@ -1,10 +1,13 @@
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { useLocale } from "../i18n";
+import { collectActivityItems } from "../lib/chat/activityTimeline";
 import { selectLatestTaskProgress } from "../lib/chat/taskProgress";
 import type { PendingToolApprovalSummary, ToolApprovalDecision } from "../lib/tools/toolApproval";
 import type { SplitConversationPaneProps } from "../pages/chat/components/SplitConversationPane";
 import { NativeSurface } from "./NativeSurface";
+import { useNativeAskUserQuestions } from "./nativeAskUserQuestions";
 import { createNativeChatTranscript } from "./nativeChatTranscript";
+import { attachReadOnlySyntax, readOnlySyntaxPalette } from "./nativeReadOnlySyntax";
 import { createNativeTaskProgress } from "./nativeTaskProgress";
 import { createNativePresentationTheme } from "./nativeTheme";
 import { createNativeWorkspacePanel } from "./nativeWorkspacePanel";
@@ -30,6 +33,10 @@ export function NativeSplitConversationPane(
     props.liveTranscriptStore.getSnapshot,
   );
   const handlers = new Map<string, PresentationHandler>();
+  const syntaxPalette = useMemo(
+    () => readOnlySyntaxPalette(props.settings, false),
+    [props.settings],
+  );
   const action = (
     id: string,
     run: (value: PresentationValue) => unknown,
@@ -54,18 +61,29 @@ export function NativeSplitConversationPane(
   action("side-close", props.onClose);
   const title = props.record?.title || t("chat.pendingTitle");
   const history = props.record?.state.transcript.items ?? [];
+  const questions = useNativeAskUserQuestions(
+    props.conversationId,
+    collectActivityItems(history, live),
+    t,
+  );
+  for (const [id, handler] of questions.handlers) handlers.set(id, handler);
   const progress = createNativeTaskProgress(
     selectLatestTaskProgress(history, live.liveRounds, props.record?.state.meta?.taskList),
     props.isRunning,
     t,
   );
-  const messages = createNativeChatTranscript(
-    history,
-    live,
-    props.settings.customSettings.appearance.showThinking,
-    t,
-    (id, run) => action(id, run),
-    props.onOpenWorkspaceFile,
+  const messages = attachReadOnlySyntax(
+    createNativeChatTranscript(
+      history,
+      live,
+      props.settings.customSettings.appearance.showThinking,
+      t,
+      (id, run) => action(id, run),
+      props.onOpenWorkspaceFile,
+      questions.nodes,
+    ),
+    handlers,
+    syntaxPalette,
   );
   const content: PresentationNode[] = props.loading
     ? [{ id: "side-loading", kind: "Progress", label: t("chat.split.loading") }]

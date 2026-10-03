@@ -75,7 +75,7 @@ export function MemorySettingsDrawer(props: {
   notice: string | null;
   t: (key: string) => string;
   onClose: () => void;
-  onRequestWipe: () => void | Promise<void>;
+  onRequestWipe: () => boolean | void | Promise<boolean | void>;
   onOrganizerRunQueued?: (runId: string) => void;
   onMemoryChanged?: () => void;
   nativeSettingsSurfaceId?: string;
@@ -345,8 +345,7 @@ export function MemorySettingsDrawer(props: {
               "memory-settings-wipe-confirm-action",
               t("settings.memoryWipeAll"),
               async () => {
-                await onRequestWipe();
-                setDrawerWipeConfirmOpen(false);
+                if ((await onRequestWipe()) !== false) setDrawerWipeConfirmOpen(false);
               },
               !busy,
             ),
@@ -759,7 +758,9 @@ export function MemorySettingsDrawer(props: {
         cancelLabel={t("settings.memoryCancel")}
         actionVariant="destructive"
         isActionLoading={saving}
-        onAction={onRequestWipe}
+        onAction={async () => {
+          await onRequestWipe();
+        }}
       />
     </VStack>
   );

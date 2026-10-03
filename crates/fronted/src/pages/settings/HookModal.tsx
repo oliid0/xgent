@@ -27,6 +27,14 @@ import {
   type HookEvent,
   type HookType,
 } from "../../lib/automation";
+import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
+import type { AppSettings } from "../../lib/settings";
+import { presentationControls } from "../../presentation/controls";
+import { NativeSurface } from "../../presentation/NativeSurface";
+import { nativeHttpRequestEditor } from "../../presentation/nativeHttpRequestEditor";
+import { createNativePresentationTheme } from "../../presentation/nativeTheme";
+import type { PresentationNode } from "../../presentation/types";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import {
   createEmptyRequestDraft,
   type HttpRequestDraft,
@@ -35,17 +43,29 @@ import {
   requestToDraft,
 } from "./httpRequestEditor";
 import { SettingsModalShell } from "./SettingsModalShell";
+import { useAutomationFormOperation } from "./useAutomationFormOperation";
 
 const DEFAULT_HOOK_TIMEOUT_SECONDS = 60;
 
 type HookModalProps = {
+  settings?: AppSettings;
+  nativeSettingsSurfaceId?: string;
+  nativePresentationMode?: "root" | "sheet";
   event?: HookEvent;
   initialData?: HookDef;
   onSave: (data: Omit<HookDef, "id">) => void | Promise<void>;
   onClose: () => void;
 };
 
-export function HookModal({ event, initialData, onSave, onClose }: HookModalProps) {
+export function HookModal({
+  event,
+  initialData,
+  onSave,
+  onClose,
+  settings,
+  nativeSettingsSurfaceId,
+  nativePresentationMode,
+}: HookModalProps) {
   const { t } = useLocale();
   const [name, setName] = useState(initialData?.name ?? "");
   const [selectedEvent, setSelectedEvent] = useState<HookEvent>(
@@ -65,15 +85,17 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const { isSaving, begin, finish } = useAutomationFormOperation();
 
   const isEditing = Boolean(initialData);
   const title = isEditing ? t("settings.hooksEdit") : t("settings.hooksAdd");
   const scriptLineCount = scriptText.split(/\r?\n/).filter((line) => line.trim()).length;
 
   async function handleSave() {
+    const current = begin();
+    if (!current) return;
     try {
-      setIsSaving(true);
+      setFormError(null);
       const trimmedName = name.trim();
       if (!trimmedName) {
         throw new Error(t("settings.hooksNameRequired"));
@@ -104,11 +126,11 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
             ? parsedTimeoutSeconds * 1000
             : undefined,
       });
-      onClose();
+      if (current()) onClose();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : String(error));
+      if (current()) setFormError(error instanceof Error ? error.message : String(error));
     } finally {
-      setIsSaving(false);
+      finish(current);
     }
   }
 
@@ -119,6 +141,175 @@ export function HookModal({ event, initialData, onSave, onClose }: HookModalProp
 
   function clearError() {
     setFormError(null);
+  }
+
+  if (isApplePresentationRuntime()) {
+    const c = presentationControls();
+    const editable = !isSaving;
+    const nodes: PresentationNode[] = [
+      c.group("hook-basic", t("settings.hooksLifecycle"), [
+        c.select(
+          "hook-event",
+          t("settings.hooksLifecycle"),
+          selectedEvent,
+          HOOK_EVENTS.map((value) => ({ value, label: t(HOOK_EVENT_TRANSLATION_KEYS[value]) })),
+          (value) => {
+            clearError();
+            setSelectedEvent(value as HookEvent);
+          },
+          editable,
+        ),
+        c.input(
+          "hook-name",
+          t("settings.hooksName"),
+          name,
+          (value) => {
+            clearError();
+            setName(value);
+          },
+          false,
+          editable,
+        ),
+        c.input(
+          "hook-description",
+          t("settings.hooksDescription"),
+          description,
+          (value) => {
+            clearError();
+            setDescription(value);
+          },
+          false,
+          editable,
+        ),
+        c.select(
+          "hook-type",
+          t("settings.hooksType"),
+          type,
+          [
+            { value: "command", label: t("settings.hooksTypeCommand") },
+            { value: "http", label: t("settings.hooksTypeHttp") },
+          ],
+          (value) => {
+            clearError();
+            setType(value as HookType);
+          },
+          editable,
+        ),
+      ]),
+      ...(type === "command"
+        ? [
+            {
+              id: "hook-script-hint",
+              kind: "Text" as const,
+              text: t("settings.hooksCommandHint"),
+              secondary: true,
+            },
+            {
+              id: "hook-script-lines",
+              kind: "Badge" as const,
+              label: `${scriptLineCount} ${t("settings.hooksScriptLinesCount")} · ${t("settings.hooksSequential")}`,
+            },
+            {
+              ...c.input(
+                "hook-script",
+                t("settings.hooksCommandList"),
+                scriptText,
+                (value) => {
+                  clearError();
+                  setScriptText(value);
+                },
+                false,
+                editable,
+              ),
+              kind: "TextArea" as const,
+              language: "bash",
+              minHeight: 200,
+            },
+            c.input(
+              "hook-timeout",
+              t("settings.hooksTimeout"),
+              timeoutSeconds,
+              (value) => {
+                if (!value || /^\d+$/.test(value)) {
+                  clearError();
+                  setTimeoutSeconds(value);
+                }
+              },
+              false,
+              editable,
+            ),
+          ]
+        : [
+            c.group("hook-http", t("settings.hooksHttpRequests"), [
+              {
+                id: "hook-http-hint",
+                kind: "Text",
+                text: t("settings.hooksHttpHint"),
+                secondary: true,
+              },
+              {
+                id: "hook-http-count",
+                kind: "Badge",
+                label: `${requests.length} ${t("settings.hooksRequestsCount")}`,
+              },
+              ...nativeHttpRequestEditor({
+                controls: c,
+                requests,
+                expanded: expandedRequest,
+                setExpanded: setExpandedRequest,
+                setRequests,
+                clearError,
+                t,
+                enabled: editable,
+                idPrefix: "hook-http",
+              }),
+            ]),
+          ]),
+      ...(formError
+        ? [
+            {
+              id: "hook-form-error",
+              kind: "Banner" as const,
+              label: formError,
+              status: "error" as const,
+            },
+          ]
+        : []),
+      {
+        ...c.action("hook-save", t("settings.save"), handleSave, editable && !!name.trim()),
+        prominent: true,
+      },
+      c.action("hook-cancel", t("settings.cancel"), onClose, editable),
+    ];
+    c.handlers.set("close", {
+      enabled: editable,
+      accepts: (value) => value === null,
+      run: onClose,
+    });
+    return (
+      <NativeSurface
+        sessionSurface={nativeSettingsSurfaceId}
+        document={{
+          mode: nativePresentationMode ?? "sheet",
+          title,
+          appearance: settings?.theme ?? "system",
+          formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
+          ...(settings
+            ? {
+                theme: createNativePresentationTheme(
+                  settings,
+                  isNativeMobileRuntime(),
+                  "workspaceTools",
+                ),
+              }
+            : {}),
+          nodes,
+          dismissAction: editable ? "close" : undefined,
+        }}
+        handlers={c.handlers}
+        onError={(cause) => setFormError(cause instanceof Error ? cause.message : String(cause))}
+      />
+    );
   }
 
   return (

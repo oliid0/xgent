@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, MoreHorizontal, Plus, RefreshCw, SkillIcon } from "../../../components/icons";
 import { Markdown } from "../../../components/Markdown";
 import { useLocale } from "../../../i18n";
+import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
 import { type AppSettings, updateSkills } from "../../../lib/settings";
 import {
   discoverSkills,
@@ -33,17 +34,20 @@ import {
   resolveClawHubSkillOwner,
   searchClawHubSkills,
 } from "../../../lib/skills/clawHub";
+import { stripInstalledSkillPreviewMetadata } from "../../../lib/skills/previewContent";
 import { presentationControls } from "../../../presentation/controls";
 import { NativeSurface } from "../../../presentation/NativeSurface";
 import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
 import type { PresentationNode } from "../../../presentation/types";
 import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
+import { SkillsHubPage } from "../../skills-hub/SkillsHubPage";
 import { MobileHubHeader, MobileHubSearch } from "./MobileHubChrome";
 
 type MobileSkillsPageProps = {
   settings: AppSettings;
   setSettings: (updater: (prev: AppSettings) => AppSettings) => void;
   initialSkills?: SkillSummary[];
+  initialRootDir?: string;
   onOpenSidebar: () => void;
   presentationMode?: "root" | "sheet";
   nativeSettingsSurfaceId?: string;
@@ -51,6 +55,7 @@ type MobileSkillsPageProps = {
 
 type SkillPreview = {
   content: string;
+  truncated: boolean;
   loading: boolean;
   error: string;
 };
@@ -58,6 +63,25 @@ type SkillPreview = {
 const completedStoreJobIds = new Set<string>();
 
 export function MobileSkillsPage(props: MobileSkillsPageProps) {
+  if (isApplePresentationRuntime() && !isNativeMobileRuntime())
+    return (
+      <SkillsHubPage
+        settings={props.settings}
+        setSettings={props.setSettings}
+        initialSkills={props.initialSkills}
+        initialRootDir={props.initialRootDir}
+        isAgentMode={props.settings.system.executionMode !== "text"}
+        sidebarOpen={false}
+        onOpenSidebar={props.onOpenSidebar}
+        onClose={props.onOpenSidebar}
+        nativePresentationMode={props.presentationMode}
+        nativeSurfaceId={props.nativeSettingsSurfaceId}
+      />
+    );
+  return <MobileSkillsPageContent {...props} />;
+}
+
+export function MobileSkillsPageContent(props: MobileSkillsPageProps) {
   const { t } = useLocale();
   const [skills, setSkills] = useState<SkillSummary[]>(props.initialSkills ?? []);
   const [query, setQuery] = useState("");
@@ -73,6 +97,7 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
   const [selected, setSelected] = useState<SkillSummary | null>(null);
   const [preview, setPreview] = useState<SkillPreview>({
     content: "",
+    truncated: false,
     loading: false,
     error: "",
   });
@@ -319,25 +344,32 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
 
   useEffect(() => {
     if (!selected) {
-      setPreview({ content: "", loading: false, error: "" });
+      setPreview({ content: "", truncated: false, loading: false, error: "" });
       return;
     }
     let cancelled = false;
     setPreview({
       content: selected.inlineContent ?? "",
+      truncated: selected.inlineContentTruncated ?? false,
       loading: true,
       error: "",
     });
     void readSkillText({ path: selected.skillFile, offset: 0, length: 10_000 })
       .then((result) => {
         if (!cancelled) {
-          setPreview({ content: result.content, loading: false, error: "" });
+          setPreview({
+            content: result.content,
+            truncated: result.truncated,
+            loading: false,
+            error: "",
+          });
         }
       })
       .catch((cause) => {
         if (!cancelled) {
           setPreview({
             content: selected.inlineContent ?? "",
+            truncated: selected.inlineContentTruncated ?? false,
             loading: false,
             error: cause instanceof Error ? cause.message : String(cause),
           });
@@ -384,7 +416,31 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
           ...(preview.loading
             ? [{ id: "loading", kind: "Progress" as const, label: t("app.loading") }]
             : []),
-          { id: "preview", kind: "Text", text: preview.error || preview.content },
+          ...(preview.error
+            ? [
+                {
+                  id: "preview-error",
+                  kind: "Banner" as const,
+                  status: "error" as const,
+                  label: preview.error,
+                },
+              ]
+            : []),
+          {
+            id: "preview",
+            kind: /\.(md|mdx|markdown)$/i.test(selected.skillFile) ? "Markdown" : "Text",
+            text: stripInstalledSkillPreviewMetadata(preview.content, selected),
+          },
+          ...(preview.truncated
+            ? [
+                {
+                  id: "preview-truncated",
+                  kind: "Banner" as const,
+                  status: "paused" as const,
+                  label: t("settings.skillsInstalledPreviewTruncated").replace("{count}", "10000"),
+                },
+              ]
+            : []),
         ]
       : view === "store"
         ? [
@@ -690,7 +746,16 @@ export function MobileSkillsPage(props: MobileSkillsPageProps) {
             {preview.error ? (
               <Banner status="error" title={preview.error} collapsible={false} />
             ) : null}
-            {preview.content ? <Markdown content={preview.content} /> : null}
+            {preview.content ? (
+              <Markdown content={stripInstalledSkillPreviewMetadata(preview.content, selected)} />
+            ) : null}
+            {preview.truncated ? (
+              <Banner
+                status="warning"
+                title={t("settings.skillsInstalledPreviewTruncated").replace("{count}", "10000")}
+                collapsible={false}
+              />
+            ) : null}
           </VStack>
         </StackItem>
       </VStack>

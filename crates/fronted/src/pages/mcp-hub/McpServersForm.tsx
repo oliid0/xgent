@@ -14,7 +14,7 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
 import { isBrowserRuntime } from "@xgent/runtime";
-import { type FormEvent, memo, useEffect, useMemo, useState } from "react";
+import { type FormEvent, memo, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDeletePopover } from "../../components/astryx/ConfirmActionPopover";
 import { ToolPolicyToggle } from "../../components/hub/ToolPolicyToggle";
 import {
@@ -29,13 +29,25 @@ import {
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
+  blankDraft,
+  buildServerFromDraft,
+  draftFromServer,
+  type ServerDraft,
+} from "../../lib/mcpServerDraft";
+import { removeMcpServer } from "../../lib/mcpServerSettings";
+import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
+import {
   type AppSettings,
   type McpServerConfig,
   type ToolPolicy,
-  updateMcp,
   updateSystem,
 } from "../../lib/settings";
+import { applyMcpOpsToAppSettings } from "../../lib/settings/mcpOps";
 import { toolGroupPolicyKey, toolServerPolicyKey } from "../../lib/tools/toolPolicy";
+import { NativeSurface } from "../../presentation/NativeSurface";
+import { nativeMcpServerEditor } from "../../presentation/nativeMcpServerEditor";
+import { createNativePresentationTheme } from "../../presentation/nativeTheme";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import { SettingsModalShell } from "../settings/SettingsModalShell";
 
 type SetMcpSettingsFn = (updater: (prev: AppSettings) => AppSettings) => void;
@@ -46,154 +58,6 @@ type McpServersFormProps = {
   onAddServer?: () => void;
   onEditServer?: (server: McpServerConfig, idx: number) => void;
 };
-
-type ServerDraft = {
-  id: string;
-  transport: McpServerConfig["transport"];
-  timeoutMs: string;
-  command: string;
-  cwd: string;
-  argsText: string;
-  envText: string;
-  url: string;
-  messageUrl: string;
-  headersText: string;
-};
-
-function formatKeyValueRecord(input: Record<string, string> | undefined) {
-  return input
-    ? Object.entries(input)
-        .map(([key, value]) => `${key}=${value}`)
-        .join("\n")
-    : "";
-}
-
-function parseLineList(input: string) {
-  return input
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
-function parseKeyValueDraft(input: string, errorPrefix: string) {
-  const out: Record<string, string> = {};
-  for (const line of input.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq <= 0) {
-      throw new Error(`${errorPrefix}${trimmed}`);
-    }
-    const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).trim();
-    if (!key || !value) {
-      throw new Error(`${errorPrefix}${trimmed}`);
-    }
-    out[key] = value;
-  }
-  return Object.keys(out).length ? out : undefined;
-}
-
-function suggestServerName(existing: string[]): string {
-  const taken = new Set(existing.map((id) => id.trim()).filter(Boolean));
-  let idx = existing.length + 1;
-  let name = `MCP Server ${idx}`;
-  while (taken.has(name)) {
-    idx += 1;
-    name = `MCP Server ${idx}`;
-  }
-  return name;
-}
-
-function blankDraft(existingIds: string[]): ServerDraft {
-  return {
-    id: suggestServerName(existingIds),
-    transport: "stdio",
-    timeoutMs: "60000",
-    command: "",
-    cwd: "",
-    argsText: "",
-    envText: "",
-    url: "",
-    messageUrl: "",
-    headersText: "",
-  };
-}
-
-function draftFromServer(server: McpServerConfig): ServerDraft {
-  const transport: McpServerConfig["transport"] = server.transport ?? "stdio";
-  return {
-    id: server.id,
-    transport,
-    timeoutMs: String(server.timeoutMs ?? 60_000),
-    command: server.command ?? "",
-    cwd: server.cwd ?? "",
-    argsText: (server.args ?? []).join("\n"),
-    envText: formatKeyValueRecord(server.env),
-    url: server.url ?? "",
-    messageUrl: server.messageUrl ?? "",
-    headersText: formatKeyValueRecord(server.headers),
-  };
-}
-
-function buildServerFromDraft(
-  draft: ServerDraft,
-  base: McpServerConfig | null,
-  existingIds: string[],
-  t: (key: string) => string,
-): McpServerConfig {
-  const id = draft.id.trim();
-  if (!id) {
-    throw new Error(t("mcpHub.invalidName"));
-  }
-  if (existingIds.includes(id)) {
-    throw new Error(t("mcpHub.duplicateName"));
-  }
-
-  const parsedTimeout = Number(draft.timeoutMs);
-  const timeoutMs =
-    Number.isFinite(parsedTimeout) && parsedTimeout > 0 ? Math.floor(parsedTimeout) : 60_000;
-
-  if (draft.transport === "stdio") {
-    const command = draft.command.trim();
-    if (!command) {
-      throw new Error(t("mcpHub.invalidCommand"));
-    }
-    return {
-      ...(base ?? {}),
-      id,
-      enabled: base?.enabled ?? true,
-      transport: "stdio",
-      command,
-      args: parseLineList(draft.argsText),
-      cwd: draft.cwd.trim() || undefined,
-      env: parseKeyValueDraft(draft.envText, `${t("mcpHub.invalidKeyValue")} `),
-      url: "",
-      messageUrl: undefined,
-      headers: undefined,
-      timeoutMs,
-    };
-  }
-
-  const url = draft.url.trim();
-  if (!url) {
-    throw new Error(t("mcpHub.invalidUrl"));
-  }
-  return {
-    ...(base ?? {}),
-    id,
-    enabled: base?.enabled ?? true,
-    transport: draft.transport,
-    command: "",
-    args: [],
-    url,
-    messageUrl: draft.transport === "sse" ? draft.messageUrl.trim() || undefined : undefined,
-    headers: parseKeyValueDraft(draft.headersText, `${t("mcpHub.invalidKeyValue")} `),
-    cwd: undefined,
-    env: undefined,
-    timeoutMs,
-  };
-}
 
 function transportMeta(transport: string) {
   if (transport === "http") {
@@ -223,11 +87,7 @@ const McpServerCard = memo(function McpServerCard(props: {
 
   const patchServer = (patch: Partial<McpServerConfig>) => {
     setSettings((prev) =>
-      updateMcp(prev, {
-        servers: prev.mcp.servers.map((item, index) =>
-          index === idx ? { ...item, ...patch } : item,
-        ),
-      }),
+      applyMcpOpsToAppSettings(prev, [{ kind: "patch", serverId: serverConfig.id, patch }]),
     );
   };
 
@@ -304,16 +164,7 @@ const McpServerCard = memo(function McpServerCard(props: {
           />
           <ConfirmDeletePopover
             name={serverConfig.id || `Server ${idx + 1}`}
-            onConfirm={() =>
-              setSettings((prev) => {
-                const next = updateMcp(prev, {
-                  servers: prev.mcp.servers.filter((_, index) => index !== idx),
-                });
-                const toolPolicies = { ...(next.system.toolPolicies ?? {}) };
-                delete toolPolicies[toolServerPolicyKey(serverConfig.id)];
-                return updateSystem(next, { toolPolicies });
-              })
-            }
+            onConfirm={() => setSettings((prev) => removeMcpServer(prev, serverConfig.id))}
           >
             {(open) => (
               <IconButton
@@ -339,6 +190,9 @@ export function McpServerEditModal(props: {
   allowStdio?: boolean;
   onClose: () => void;
   onSave: (server: McpServerConfig) => void;
+  nativeSettings?: AppSettings;
+  nativeSurfaceId?: string;
+  presentationMode?: "root" | "sheet";
 }) {
   const { mode, initialServer, existingServers, allowStdio = true, onClose, onSave } = props;
   const { t } = useLocale();
@@ -357,30 +211,50 @@ export function McpServerEditModal(props: {
     return !allowStdio && !initialServer ? { ...next, transport: "http" as const } : next;
   }, [allowStdio, existingIdsExcludingCurrent, initialServer]);
   const [draft, setDraft] = useState<ServerDraft>(initialDraft);
+  const latestDraft = useRef(draft);
   const [formError, setFormError] = useState<string | null>(null);
+  const [scope] = useState(() => ({ active: true, busy: false }));
 
   useEffect(() => {
-    setDraft(initialDraft);
-    setFormError(null);
-  }, [initialDraft]);
+    scope.active = true;
+    return () => {
+      scope.active = false;
+    };
+  }, [scope]);
 
   function updateDraft(patch: Partial<ServerDraft>) {
+    if (!scope.active || scope.busy) return;
     setFormError(null);
-    setDraft((prev) => ({ ...prev, ...patch }));
+    latestDraft.current = { ...latestDraft.current, ...patch };
+    setDraft(latestDraft.current);
+  }
+
+  function submit() {
+    if (!scope.active || scope.busy) return;
+    scope.busy = true;
+    try {
+      if (!allowStdio && latestDraft.current.transport === "stdio") {
+        throw new Error(t("mcpHub.mobileNetworkOnly"));
+      }
+      const server = buildServerFromDraft(
+        latestDraft.current,
+        initialServer,
+        existingIdsExcludingCurrent,
+        t,
+      );
+      onSave(server);
+      scope.active = false;
+      onClose();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : String(error));
+    } finally {
+      scope.busy = false;
+    }
   }
 
   function handleSubmit(event: FormEvent<HTMLElement>) {
     event.preventDefault();
-    try {
-      if (!allowStdio && draft.transport === "stdio") {
-        throw new Error(t("mcpHub.mobileNetworkOnly"));
-      }
-      const server = buildServerFromDraft(draft, initialServer, existingIdsExcludingCurrent, t);
-      onSave(server);
-      onClose();
-    } catch (error) {
-      setFormError(error instanceof Error ? error.message : String(error));
-    }
+    submit();
   }
 
   const isStdio = draft.transport === "stdio";
@@ -391,6 +265,44 @@ export function McpServerEditModal(props: {
       ? t("mcpHub.addSubtitle")
       : t("mcpHub.editSubtitle").replace("{name}", initialServer?.id ?? "");
   const submitLabel = mode === "add" ? t("mcpHub.modalAdd") : t("mcpHub.modalSave");
+
+  if (isApplePresentationRuntime() && props.nativeSettings) {
+    const compact = isNativeMobileRuntime();
+    const native = nativeMcpServerEditor({
+      draft,
+      update: updateDraft,
+      allowStdio,
+      browser,
+      t,
+      title,
+      subtitle: subtitleRaw,
+      submitLabel,
+      error: formError,
+      close: () => {
+        if (scope.active) {
+          scope.active = false;
+          onClose();
+        }
+      },
+      submit,
+    });
+    return (
+      <NativeSurface
+        sessionSurface={props.nativeSurfaceId}
+        document={{
+          mode: props.presentationMode ?? "root",
+          title,
+          appearance: props.nativeSettings.theme,
+          formFactor: compact ? "mobile" : "desktop",
+          theme: createNativePresentationTheme(props.nativeSettings, compact, "workspaceTools"),
+          dismissAction: "close",
+          nodes: native.nodes,
+        }}
+        handlers={native.handlers}
+        onError={(error) => setFormError(String(error))}
+      />
+    );
+  }
 
   return (
     <SettingsModalShell onClose={onClose} purpose="form" ariaLabel={title}>

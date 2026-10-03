@@ -23,10 +23,13 @@ test("desktop appearance changes persist through shared reducers, reject invalid
     return result;
   };
   render();
+  assert.equal(controls.nodes[0].children.find(node => node.id === "thinking").text, "settings.ui.showThinkingDesc");
+  assert.equal(controls.nodes[0].children.find(node => node.id === "appearance-customized").text, "settings.ui.customizeDesc");
   assert.equal(controls.nodes[0].children.some(node => node.kind === "ColorInput"), false);
   await dispatch("appearance-preset", "matcha");
   await dispatch("appearance-customized", true);
   assert.equal(controls.nodes[0].children.filter(node => node.kind === "ColorInput").length, 4);
+  assert.equal(controls.nodes[0].children.find(node => node.id === "appearance-color:accentLight").accessibilityHint, "settings.ui.colorFormat");
   const before = structuredClone(settings);
   assert.equal((await dispatch("appearance-color:accentLight", "red")).ok, false);
   assert.equal((await dispatch("appearance-radius", "999")).ok, false);

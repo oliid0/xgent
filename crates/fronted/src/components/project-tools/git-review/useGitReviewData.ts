@@ -110,7 +110,12 @@ export function useGitReviewData(options: UseGitReviewDataOptions) {
   const [busy, setBusy] = useState("");
   const [remoteSetupOpen, setRemoteSetupOpen] = useState(false);
   const [remoteSetupAction, setRemoteSetupAction] = useState<GitRemoteSetupAction>("push");
-  const [remoteSetupUrl, setRemoteSetupUrl] = useState("");
+  const [remoteSetupUrl, setRemoteSetupUrlState] = useState("");
+  const remoteSetupUrlRef = useRef("");
+  const setRemoteSetupUrl = useCallback((value: string) => {
+    remoteSetupUrlRef.current = value;
+    setRemoteSetupUrlState(value);
+  }, []);
   const [remoteSetupError, setRemoteSetupError] = useState("");
   const [operationNotice, setOperationNotice] = useState<GitOperationNotice | null>(null);
   const [selectedPath, setSelectedPath] = useState("");
@@ -895,12 +900,15 @@ export function useGitReviewData(options: UseGitReviewDataOptions) {
     return () => window.clearInterval(interval);
   }, [active, cwd, gitClient, loadHistory, refresh, workspaceActivityClient]);
 
-  const openRemoteSetup = useCallback((action: GitRemoteSetupAction) => {
-    setRemoteSetupAction(action);
-    setRemoteSetupError("");
-    setRemoteSetupUrl("");
-    setRemoteSetupOpen(true);
-  }, []);
+  const openRemoteSetup = useCallback(
+    (action: GitRemoteSetupAction) => {
+      setRemoteSetupAction(action);
+      setRemoteSetupError("");
+      setRemoteSetupUrl("");
+      setRemoteSetupOpen(true);
+    },
+    [setRemoteSetupUrl],
+  );
 
   const dismissOperationNotice = useCallback(() => {
     setOperationNotice(null);
@@ -1084,7 +1092,7 @@ export function useGitReviewData(options: UseGitReviewDataOptions) {
   const saveRemoteAndContinue = useCallback(async () => {
     const operationName = "set_remote";
     if (!gitClient || !cwd.trim() || !canWrite || !beginGitOperation(operationName)) return false;
-    const remoteUrl = remoteSetupUrl.trim();
+    const remoteUrl = remoteSetupUrlRef.current.trim();
     if (!remoteUrl) {
       finishGitOperation(operationName);
       setRemoteSetupError(t("projectTools.gitReview.remoteUrlRequired"));
@@ -1130,7 +1138,7 @@ export function useGitReviewData(options: UseGitReviewDataOptions) {
     loadHistory,
     refresh,
     remoteSetupAction,
-    remoteSetupUrl,
+    setRemoteSetupUrl,
     showOperationNotice,
     t,
   ]);

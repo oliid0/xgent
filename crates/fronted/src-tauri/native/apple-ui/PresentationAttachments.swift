@@ -102,6 +102,11 @@ struct XgentAttachmentPicker: View {
         node.options?.first { $0.value == value }?.disabled == true
     }
 
+    private var configurationPicker: Bool { node.variant == "mcp-config" }
+    private var allowedFileTypes: [UTType] {
+        configurationPicker ? [.json, .plainText, UTType(filenameExtension: "toml", conformingTo: .plainText) ?? .plainText] : [.item]
+    }
+
     var body: some View {
         Menu {
             #if os(iOS)
@@ -132,6 +137,13 @@ struct XgentAttachmentPicker: View {
             }
         } label: {
             if importing { ProgressView().frame(width: controlSize, height: controlSize) }
+            else if configurationPicker {
+                Label(node.label ?? "Import configuration", systemImage: "doc.badge.plus")
+                    .modifier(XgentControlTypography(node: node))
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .frame(minHeight: 44)
+                    .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            }
             else {
                 Image(systemName: "plus")
                     .font(.system(size: min(20, controlSize * 0.56)))
@@ -141,14 +153,16 @@ struct XgentAttachmentPicker: View {
         }
         .menuStyle(.borderlessButton).disabled(importing || node.disabled == true)
         .accessibilityLabel(node.label ?? "Attach files")
-        .fileImporter(isPresented: $pickingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true,
+        .fileImporter(isPresented: $pickingFiles, allowedContentTypes: allowedFileTypes,
+                      allowsMultipleSelection: !configurationPicker,
                       onCompletion: { result in
             guard let owner = fileOwner else { return }
             fileOwner = nil
+            let maximumFiles = owner.node.variant == "mcp-config" ? 1 : 9
             startImport(owner) {
                 let urls = try result.get()
                 return try await XgentAttachmentPayload.prepare {
-                    guard urls.count <= 9 else { throw AttachmentError.limit }
+                    guard urls.count <= maximumFiles else { throw AttachmentError.limit }
                     var batch = XgentAttachmentBatch()
                     for url in urls {
                         try Task.checkCancellation()

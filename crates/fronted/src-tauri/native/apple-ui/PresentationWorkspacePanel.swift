@@ -1,4 +1,5 @@
 #if os(macOS)
+import AppKit
 import SwiftUI
 
 private struct XgentWorkspacePanelWidth: PreferenceKey {
@@ -30,6 +31,9 @@ struct XgentDesktopWorkspaceLayout<Main: View>: View {
     }
     private var selected: XgentDocument? {
         panels.first { $0.surface == state.selectedSurface } ?? panels.last
+    }
+    private var mainDocument: XgentDocument? {
+        model.documents.last { $0.mode == .root && $0.node(id: "workspace-panel-actions") != nil }
     }
 
     var body: some View {
@@ -97,10 +101,24 @@ struct XgentDesktopWorkspaceLayout<Main: View>: View {
                     .onAppear { proxy.scrollTo(document.surface) }
                     .onChange(of: document.surface) { _, id in proxy.scrollTo(id) }
                 }
+                if let mainDocument, let menu = mainDocument.node(id: "workspace-panel-actions") {
+                    Menu {
+                        XgentNativeMenuItems(nodes: menu.children ?? [], document: mainDocument, model: model)
+                    } label: {
+                        Image(systemName: menu.icon ?? "plus").frame(width: 28, height: 28)
+                    }
+                    .menuStyle(.button)
+                    .menuIndicator(.hidden)
+                    .buttonStyle(.plain)
+                    .help(menu.label ?? "")
+                    .accessibilityLabel(menu.accessibilityLabel ?? menu.label ?? "")
+                    .accessibilityIdentifier("xgent-workspace-panel-add")
+                }
                 if canSplit {
                     control(state.expanded ? controls.restoreLabel : controls.expandLabel,
                             icon: state.expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
                             id: "expand") { state.expanded.toggle() }
+                        .keyboardShortcut(KeyEquivalent(Character(String(UnicodeScalar(Int(NSEvent.SpecialKey.f11.rawValue))!))), modifiers: [])
                 }
                 if document.dismissAction != nil {
                     control(controls.closeLabel, icon: "xmark", id: "close") { model.dismiss(document) }

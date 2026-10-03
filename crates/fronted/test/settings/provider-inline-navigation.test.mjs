@@ -53,7 +53,7 @@ test("provider editor and advanced settings drill into the existing settings con
   assert.doesNotMatch(
     providersSource.slice(
       providersSource.indexOf("function ProviderAdvancedSettingsPanel"),
-      providersSource.indexOf("function ccsImportIdentity"),
+      providersSource.indexOf("function CcsProviderRow"),
     ),
     /<Dialog\b/,
   );

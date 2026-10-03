@@ -32,6 +32,7 @@ import {
 } from "streamdown";
 import { type ChatFileLink, parseChatFileLink } from "../lib/chat/chatFileLinks";
 import { normalizeLatexDelimiters } from "../lib/normalizeLatexDelimiters";
+import { CHAT_CODE_COLLAPSE_LINES, CHAT_CODE_MAX_HEIGHT_CSS } from "../lib/readOnlyCode";
 import { cn } from "../lib/shared/utils";
 import { writeClipboardText } from "../lib/system/clipboardText";
 import { AdaptiveDialog } from "./astryx/AdaptiveDialog";
@@ -189,10 +190,10 @@ function CollapsibleCodePre({ children }: MarkdownPreProps) {
       language={language}
       size="sm"
       width="100%"
-      maxHeight="min(60dvh, 36rem)"
+      maxHeight={CHAT_CODE_MAX_HEIGHT_CSS}
       hasCopyButton
       isCollapsible
-      collapsibleThreshold={12}
+      collapsibleThreshold={CHAT_CODE_COLLAPSE_LINES}
     />
   );
 }

@@ -3,6 +3,7 @@ import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Heading as AstryxHeadingCore, Text as AstryxText } from "@astryxdesign/core/Text";
 import { useEffect, useRef, useState } from "react";
+import { useConfirmDialog } from "../../components/astryx/useConfirmDialog";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -23,10 +24,8 @@ import {
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
-  type CronRunRecord,
   type CronTask,
   type CronTaskType,
-  clearCronRuns,
   DEFAULT_CRON_TIMEOUT_SECONDS,
   isManualCronRunFinished,
   listCronRuns,
@@ -36,14 +35,19 @@ import {
   useAutomation,
 } from "../../lib/automation";
 import { useCompactViewport } from "../../lib/responsive/compactViewport";
+import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
+import type { AppSettings } from "../../lib/settings";
 import { presentationControls } from "../../presentation/controls";
 import { NativeSurface } from "../../presentation/NativeSurface";
-import type { PresentationNode } from "../../presentation/types";
+import { nativeCronRunNodes } from "../../presentation/nativeCronRunNodes";
+import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import { SettingsModalShell } from "./SettingsModalShell";
 import { ConfirmActionPopover } from "./shared";
+import { useCronRunHistory } from "./useCronRunHistory";
 
 type CronTaskViewModalProps = {
+  settings?: AppSettings;
   taskId: string;
   nativeSettingsSurfaceId?: string;
   nativePresentationMode?: "root" | "sheet";
@@ -537,70 +541,25 @@ function RightPanel({
   hideClose?: boolean;
 }) {
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
-  const [logs, setLogs] = useState<CronRunRecord[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [isClearing, setIsClearing] = useState(false);
-  const [clearError, setClearError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadLogs() {
-      try {
-        const nextLogs = await listCronRuns(task.id, 100);
-        if (!cancelled) {
-          setLoadError(null);
-          setLogs(Array.isArray(nextLogs) ? nextLogs : []);
-        }
-      } catch (error) {
-        // Keep the last successfully loaded list; a failed fetch must not
-        // masquerade as "no logs".
-        if (!cancelled) {
-          setLoadError(error instanceof Error ? error.message : String(error));
-        }
-      }
-    }
-
-    void loadLogs();
-    const timer = window.setInterval(() => {
-      void loadLogs();
-    }, 5_000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [task.id]);
-
-  const runningCount = logs.filter(
-    (log) => log.state === "pending" || log.state === "leased",
-  ).length;
-  const successCount = logs.filter((log) => log.state === "done" && log.success).length;
-  const failCount = logs.filter(
-    (log) => (log.state === "done" || log.state === "expired") && !log.success,
-  ).length;
-  const clearableCount = successCount + failCount;
-
+  const history = useCronRunHistory(task.id);
+  const {
+    logs,
+    loadError,
+    isClearing,
+    clearError,
+    runningCount,
+    successCount,
+    failCount,
+    clearableCount,
+  } = history;
   async function handleClearLogs() {
-    if (clearableCount === 0 || isClearing) {
-      return;
-    }
-
     try {
-      setIsClearing(true);
-      setClearError(null);
-      await clearCronRuns(task.id);
+      await history.clear();
       setExpandedLogId(null);
-      setLogs((current) =>
-        current.filter((log) => log.state === "pending" || log.state === "leased"),
-      );
     } catch {
-      setClearError(t("settings.cronViewClearLogsFailed"));
-    } finally {
-      setIsClearing(false);
+      /* The shared history displays the failure. */
     }
   }
-
   return (
     <>
       {/* ── Fixed header ── */}
@@ -892,6 +851,7 @@ function RightPanel({
 /* ─────────────────────── Modal shell ─────────────────────── */
 
 export function CronTaskViewModal({
+  settings,
   taskId,
   nativeSettingsSurfaceId,
   nativePresentationMode,
@@ -908,21 +868,26 @@ export function CronTaskViewModal({
   const [runNowError, setRunNowError] = useState<string | null>(null);
   const [compactTab, setCompactTab] = useState<"details" | "logs">("details");
   const runNowLockRef = useRef(false);
-  const [nativeRuns, setNativeRuns] = useState<CronRunRecord[]>([]);
+  const runNowScope = useRef({ active: true, taskId, revision: 0 }).current;
+  if (runNowScope.taskId !== taskId) {
+    runNowScope.taskId = taskId;
+    runNowScope.revision++;
+    runNowLockRef.current = false;
+  }
   useEffect(() => {
-    if (!isApplePresentationRuntime()) return;
-    let active = true;
-    void listCronRuns(taskId, 100)
-      .then((runs) => {
-        if (active) setNativeRuns(runs);
-      })
-      .catch((error) => {
-        if (active) setRunNowError(String(error));
-      });
+    runNowScope.active = true;
+    setIsRunningNow(false);
+    setManualRunStartedAt(null);
+    setRunNowError(null);
     return () => {
-      active = false;
+      runNowScope.active = false;
+      runNowScope.revision++;
+      runNowLockRef.current = false;
     };
-  }, [taskId, isRunningNow]);
+  }, [taskId]);
+  const nativeHistory = useCronRunHistory(taskId, isApplePresentationRuntime());
+  const [nativeExpandedLog, setNativeExpandedLog] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirmDialog();
   // Manual runs are watched for at least the legacy six-minute window, and
   // longer when the task timeout exceeds it (plus scheduler/completion slack).
   const manualRunWatchTimeoutMs = Math.max(
@@ -989,13 +954,20 @@ export function CronTaskViewModal({
 
   async function handleRunNow(selectedTaskId: string) {
     if (runNowLockRef.current) return;
+    if (!runNowScope.active || runNowScope.taskId !== selectedTaskId) return;
+    const revision = runNowScope.revision;
+    const current = () =>
+      runNowScope.active &&
+      runNowScope.taskId === selectedTaskId &&
+      runNowScope.revision === revision;
     runNowLockRef.current = true;
     try {
       setIsRunningNow(true);
       setRunNowError(null);
       const response = await runCronNow(selectedTaskId);
-      setManualRunStartedAt(response.startedAt);
+      if (current()) setManualRunStartedAt(response.startedAt);
     } catch (error) {
+      if (!current()) return;
       runNowLockRef.current = false;
       setIsRunningNow(false);
       setRunNowError(error instanceof Error ? error.message : String(error));
@@ -1005,45 +977,47 @@ export function CronTaskViewModal({
   if (isApplePresentationRuntime()) {
     const c = presentationControls();
     c.handlers.set("close", { enabled: true, accepts: (value) => value === null, run: onClose });
-    const nodes: PresentationNode[] = [
-      c.group("task", task.name, [
-        { id: "description", kind: "Text", text: task.description },
-        { id: "schedule", kind: "Text", text: task.cron },
-        {
-          id: "content",
-          kind: "Text",
-          text: task.prompt || task.script || JSON.stringify(task.requests ?? [], null, 2),
-        },
-        c.action("run", t("settings.cronViewRunNow"), () => handleRunNow(task.id), !isRunningNow),
-      ]),
-      ...(isRunningNow
-        ? [{ id: "running", kind: "Progress" as const, label: t("settings.cronViewRunNow") }]
-        : []),
-      ...(runNowError ? [{ id: "error", kind: "Text" as const, text: runNowError }] : []),
-      ...nativeRuns.map((run) =>
-        c.group(run.id, formatTimestamp(run.startedAt), [
-          {
-            id: `${run.id}:state`,
-            kind: "Text",
-            text: `${run.state} | ${run.success ? "OK" : "Failed"} | ${formatDuration(run.durationMs)}`,
-          },
-          { id: `${run.id}:output`, kind: "Text", text: run.output },
-        ]),
-      ),
-    ];
+    const compact = isNativeMobileRuntime();
+    const viewRevision = runNowScope.revision;
+    const nodes = nativeCronRunNodes({
+      controls: c,
+      task,
+      history: nativeHistory,
+      t,
+      compact,
+      tab: compactTab,
+      setTab: setCompactTab,
+      expanded: nativeExpandedLog,
+      setExpanded: setNativeExpandedLog,
+      running: isRunningNow,
+      runError: runNowError,
+      run: () => handleRunNow(task.id),
+      confirm,
+      current: () =>
+        runNowScope.active &&
+        runNowScope.taskId === task.id &&
+        runNowScope.revision === viewRevision,
+    });
     return (
-      <NativeSurface
-        sessionSurface={nativeSettingsSurfaceId}
-        document={{
-          mode: nativePresentationMode ?? "sheet",
-          title: task.name,
-          appearance: "system",
-          nodes,
-          dismissAction: "close",
-        }}
-        handlers={c.handlers}
-        onError={(error) => setRunNowError(String(error))}
-      />
+      <>
+        <NativeSurface
+          sessionSurface={nativeSettingsSurfaceId}
+          document={{
+            mode: nativePresentationMode ?? "sheet",
+            title: task.name,
+            appearance: settings?.theme ?? "system",
+            formFactor: compact ? "mobile" : "desktop",
+            ...(settings
+              ? { theme: createNativePresentationTheme(settings, compact, "workspaceTools") }
+              : {}),
+            nodes,
+            dismissAction: "close",
+          }}
+          handlers={c.handlers}
+          onError={(error) => setRunNowError(String(error))}
+        />
+        {dialog}
+      </>
     );
   }
 

@@ -1,10 +1,11 @@
+import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { FormLayout } from "@astryxdesign/core/FormLayout";
 import { StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Globe, Shield } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import {
@@ -35,17 +36,65 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
   const [homePage, setHomePage] = useState(props.settings.customSettings.browser.homePage);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState("");
+  const homePageRef = useRef(homePage);
+  const openRef = useRef(props.open);
+  openRef.current = props.open;
+  const lifetime = useRef(0);
+  const mounted = useRef(false);
+  const activeOperation = useRef<symbol | null>(null);
 
   useEffect(() => {
-    if (props.open) setHomePage(props.settings.customSettings.browser.homePage);
+    if (props.open) {
+      homePageRef.current = props.settings.customSettings.browser.homePage;
+      setHomePage(homePageRef.current);
+    }
   }, [props.open, props.settings.customSettings.browser.homePage]);
+  useEffect(() => {
+    mounted.current = true;
+    lifetime.current += 1;
+    activeOperation.current = null;
+    setClearing(false);
+    setError("");
+    return () => {
+      mounted.current = false;
+      lifetime.current += 1;
+      activeOperation.current = null;
+    };
+  }, [props.open]);
+
+  const editHomePage = (value: string) => {
+    if (!mounted.current || !openRef.current) return;
+    homePageRef.current = value;
+    setHomePage(value);
+  };
+  const clearSessions = async () => {
+    if (!mounted.current || !openRef.current || activeOperation.current) return;
+    const token = Symbol("clear-browser-sessions");
+    activeOperation.current = token;
+    const epoch = lifetime.current;
+    const current = () =>
+      openRef.current && epoch === lifetime.current && activeOperation.current === token;
+    setClearing(true);
+    setError("");
+    try {
+      await browserSessionController.closeAllSessions();
+    } catch (cause) {
+      if (current()) setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (current()) {
+        activeOperation.current = null;
+        setClearing(false);
+      }
+    }
+  };
 
   if (!props.open) return null;
 
   const saveHomePage = (event?: FormEvent) => {
     event?.preventDefault();
-    const normalized = normalizeBrowserAddress(homePage);
-    setHomePage(normalized);
+    if (!mounted.current || !openRef.current) return;
+    const normalized = normalizeBrowserAddress(homePageRef.current);
+    editHomePage(normalized);
     browserSessionController.configure({ homePage: normalized });
     props.setSettings((prev) =>
       updateCustomSettings(prev, {
@@ -60,7 +109,17 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
     c.handlers.set("close", {
       enabled: !clearing,
       accepts: (value) => value === null,
-      run: props.onClose,
+      run: () => {
+        if (mounted.current && openRef.current && !activeOperation.current) props.onClose();
+      },
+    });
+    c.handlers.set("browser-home-save", {
+      enabled: !clearing,
+      accepts: (value) => value === null || typeof value === "string",
+      run: (value) => {
+        if (typeof value === "string") editHomePage(value);
+        saveHomePage();
+      },
     });
     const blocked = props.settings.access.blockedLocalCapabilities.includes("browser_automation");
     return (
@@ -74,39 +133,54 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
           dismissAction: clearing ? undefined : "close",
           nodes: [
             c.group("browser-home", t("browser.homePage"), [
-              c.input("browser-home-page", t("browser.homePage"), homePage, setHomePage),
-              c.action("browser-home-save", t("settings.save"), saveHomePage, !clearing),
+              {
+                id: "browser-home-row",
+                kind: "VStack",
+                variant: "browser-home-row",
+                children: [
+                  c.input(
+                    "browser-home-page",
+                    t("browser.homePage"),
+                    homePage,
+                    editHomePage,
+                    false,
+                    !clearing,
+                  ),
+                  {
+                    id: "browser-home-save",
+                    kind: "Button",
+                    label: t("settings.save"),
+                    disabled: clearing,
+                    action: "browser-home-save",
+                  },
+                ],
+              },
             ]),
             c.group("browser-automation", t("browser.automation"), [
-              c.toggle(
-                "browser-automation-blocked",
-                t("settings.accessBlockBrowserAutomation"),
-                blocked,
-                (nextBlocked) =>
-                  props.setSettings((previous) => {
-                    const capabilities = new Set(previous.access.blockedLocalCapabilities);
-                    if (nextBlocked) capabilities.add("browser_automation");
-                    else capabilities.delete("browser_automation");
-                    return updateAccessSettings(previous, {
-                      blockedLocalCapabilities: Array.from(capabilities),
-                    });
-                  }),
-              ),
+              {
+                ...c.toggle(
+                  "browser-automation-blocked",
+                  t("settings.accessBlockBrowserAutomation"),
+                  blocked,
+                  (nextBlocked) =>
+                    props.setSettings((previous) => {
+                      const capabilities = new Set(previous.access.blockedLocalCapabilities);
+                      if (nextBlocked) capabilities.add("browser_automation");
+                      else capabilities.delete("browser_automation");
+                      return updateAccessSettings(previous, {
+                        blockedLocalCapabilities: Array.from(capabilities),
+                      });
+                    }),
+                ),
+                text: t("settings.accessBlockBrowserAutomationHint"),
+              },
             ]),
             c.group("browser-privacy", t("browser.privacy"), [
               {
                 ...c.action(
                   "browser-clear-sessions",
                   t("browser.clearSessions"),
-                  async () => {
-                    setClearing(true);
-                    setError("");
-                    try {
-                      await browserSessionController.closeAllSessions();
-                    } finally {
-                      setClearing(false);
-                    }
-                  },
+                  clearSessions,
                   !clearing,
                 ),
                 destructive: true,
@@ -128,7 +202,10 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
           ],
         }}
         handlers={c.handlers}
-        onError={(cause) => setError(cause instanceof Error ? cause.message : String(cause))}
+        onError={(cause) => {
+          if (mounted.current && openRef.current)
+            setError(cause instanceof Error ? cause.message : String(cause));
+        }}
       />
     );
   }
@@ -162,7 +239,7 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
                   size="lg"
                   width="100%"
                   value={homePage}
-                  onChange={setHomePage}
+                  onChange={editHomePage}
                   onBlur={() => saveHomePage()}
                   placeholder="about:blank"
                 />
@@ -203,10 +280,10 @@ export function MobileBrowserSettingsPanel(props: MobileBrowserSettingsPanelProp
               isLoading={clearing}
               isDisabled={clearing}
               onClick={() => {
-                setClearing(true);
-                void browserSessionController.closeAllSessions().finally(() => setClearing(false));
+                void clearSessions();
               }}
             />
+            {error ? <Banner status="error" title={error} collapsible={false} /> : null}
           </VStack>
         </VStack>
       </StackItem>

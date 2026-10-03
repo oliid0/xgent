@@ -43,7 +43,9 @@ export type FontFamilySettings = {
 
 const MAX_FONT_FAMILY_LENGTH = 200;
 const UNSAFE_FONT_FAMILY_PATTERN = /[;{}<>\\]|url\s*\(|@import|expression\s*\(/i;
-const ALLOWED_FONT_FAMILY_PATTERN = /^[\w\s,"'\-.+]+$/u;
+// Apple font inventories can contain Chinese/Japanese family names. Keep the
+// same safe character set for every UI without limiting letters to ASCII.
+const ALLOWED_FONT_FAMILY_PATTERN = /^[\p{L}\p{N}\p{M}_\s,"'\-.+]+$/u;
 
 type LocalFontData = { family?: string };
 type QueryLocalFonts = () => Promise<LocalFontData[]>;

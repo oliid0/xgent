@@ -83,6 +83,7 @@ import {
   getSkillInstallJobStatus,
   isAlwaysEnabledSkillName,
   isUserSelectableSkill,
+  listSkillInstallJobs,
   manageSkill,
   mergeAlwaysEnabledSkillNames,
   notifySkillsDiscoveryUpdated,
@@ -114,7 +115,16 @@ import {
   isInstalledSkillSort,
   sortInstalledSkillItems,
 } from "../../lib/skills/installedSort";
+import { getInstallProgressPercent, installPhaseLabel } from "../../lib/skills/installPresentation";
+import { stripInstalledSkillPreviewMetadata } from "../../lib/skills/previewContent";
+import {
+  type SkillSelectionUndo,
+  selectSkills,
+  undoSkillSelection,
+} from "../../lib/skills/selection";
 import { writeClipboardText } from "../../lib/system/clipboardText";
+import { NativeSkillsHub } from "../../presentation/NativeSkillsHub";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 
 type SkillsHubView = "installed" | "store" | "import";
 
@@ -213,7 +223,7 @@ type StoreSkillInstallState = {
   progress: number | null;
 };
 
-type InstalledSkillPreviewState = {
+export type InstalledSkillPreviewState = {
   skillFile: string;
   content: string;
   truncated: boolean;
@@ -233,162 +243,6 @@ function emptyInstalledSkillPreviewState(): InstalledSkillPreviewState {
 
 async function copyText(text: string) {
   return writeClipboardText(text);
-}
-
-function normalizePreviewMetadataText(value: string) {
-  return value
-    .trim()
-    .replace(/^#{1,6}\s+/, "")
-    .replace(/[`*_]/g, "")
-    .replace(/\s+/g, " ")
-    .toLowerCase();
-}
-
-function stripLeadingBlankLines(lines: string[]) {
-  let index = 0;
-  while (index < lines.length && !lines[index].trim()) {
-    index += 1;
-  }
-  return lines.slice(index);
-}
-
-function stripReadmeDuplicateSummary(content: string, skill: SkillSummary) {
-  const expectedName = normalizePreviewMetadataText(skill.name);
-  const expectedDescription = normalizePreviewMetadataText(skill.description);
-  let lines = stripLeadingBlankLines(content.split(/\r?\n/));
-
-  if (lines.length > 0 && normalizePreviewMetadataText(lines[0]) === expectedName) {
-    lines = stripLeadingBlankLines(lines.slice(1));
-  }
-
-  if (expectedDescription && lines.length > 0) {
-    const paragraph: string[] = [];
-    let index = 0;
-    while (index < lines.length && lines[index].trim()) {
-      paragraph.push(lines[index]);
-      index += 1;
-    }
-    if (normalizePreviewMetadataText(paragraph.join(" ")) === expectedDescription) {
-      lines = stripLeadingBlankLines(lines.slice(index));
-    }
-  }
-
-  return lines.join("\n").trimStart();
-}
-
-const FRONTMATTER_PREVIEW_METADATA_KEYS = new Set(["name", "description"]);
-
-function hasPreviewMetadataFrontmatterField(frontmatterBody: string) {
-  return frontmatterBody.split(/\r?\n/).some((line) => {
-    if (/^[ \t]/.test(line)) return false;
-    const match = line.match(/^([A-Za-z0-9_-]+)\s*:/);
-    return match ? FRONTMATTER_PREVIEW_METADATA_KEYS.has(match[1].toLowerCase()) : false;
-  });
-}
-
-function hasPreviewMetadataInlineFrontmatterField(frontmatterBody: string) {
-  return Array.from(frontmatterBody.matchAll(/(?:^|\s)([A-Za-z0-9_-]+)\s*:/g)).some((match) =>
-    FRONTMATTER_PREVIEW_METADATA_KEYS.has(match[1].toLowerCase()),
-  );
-}
-
-function hasDisplayableFrontmatterContent(frontmatterBody: string) {
-  return frontmatterBody.split(/\r?\n/).some((line) => {
-    const trimmed = line.trim();
-    return trimmed !== "" && !trimmed.startsWith("#");
-  });
-}
-
-function stripFrontmatterPreviewMetadataFields(frontmatterBody: string) {
-  const lines = frontmatterBody.split(/\r?\n/);
-  const nextLines: string[] = [];
-  let skippingMetadataField = false;
-
-  for (const line of lines) {
-    const isIndented = /^[ \t]/.test(line);
-    const trimmed = line.trim();
-    const keyMatch = isIndented ? null : line.match(/^([A-Za-z0-9_-]+)\s*:/);
-
-    if (keyMatch) {
-      skippingMetadataField = FRONTMATTER_PREVIEW_METADATA_KEYS.has(keyMatch[1].toLowerCase());
-      if (skippingMetadataField) continue;
-    } else if (skippingMetadataField) {
-      if (trimmed === "" || isIndented) continue;
-      skippingMetadataField = false;
-    }
-
-    nextLines.push(line);
-  }
-
-  return nextLines.join("\n").trim();
-}
-
-function stripInlineFrontmatterPreviewMetadataFields(frontmatterBody: string) {
-  const matches = Array.from(frontmatterBody.matchAll(/(?:^|\s)([A-Za-z0-9_-]+)\s*:/g));
-  if (matches.length === 0) return frontmatterBody.trim();
-
-  const fields = matches.map((match, index) => {
-    const rawIndex = match.index ?? 0;
-    const startsWithSpace = /^\s/.test(match[0]);
-    const start = rawIndex + (startsWithSpace ? 1 : 0);
-    const end =
-      index + 1 < matches.length
-        ? (matches[index + 1].index ?? frontmatterBody.length)
-        : frontmatterBody.length;
-    return {
-      key: match[1].toLowerCase(),
-      text: frontmatterBody.slice(start, end).trim(),
-    };
-  });
-
-  return fields
-    .filter((field) => !FRONTMATTER_PREVIEW_METADATA_KEYS.has(field.key))
-    .map((field) => field.text)
-    .join(" ")
-    .trim();
-}
-
-function stripMarkdownSkillMetadata(content: string, skill: SkillSummary) {
-  let next = content.replace(/^\uFEFF/, "");
-  const frontmatter = next.match(/^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/);
-  if (frontmatter && hasPreviewMetadataFrontmatterField(frontmatter[1])) {
-    const frontmatterBody = stripFrontmatterPreviewMetadataFields(frontmatter[1]);
-    const rest = next.slice(frontmatter[0].length);
-    next = hasDisplayableFrontmatterContent(frontmatterBody)
-      ? `---\n${frontmatterBody}\n---\n${rest}`
-      : rest;
-  } else {
-    const inlineFrontmatter = next.match(/^---[ \t]+([\s\S]*?)[ \t]+---[ \t]*/);
-    if (inlineFrontmatter && hasPreviewMetadataInlineFrontmatterField(inlineFrontmatter[1])) {
-      const frontmatterBody = stripInlineFrontmatterPreviewMetadataFields(inlineFrontmatter[1]);
-      const rest = next.slice(inlineFrontmatter[0].length);
-      next = frontmatterBody ? `--- ${frontmatterBody} --- ${rest}` : rest;
-    }
-  }
-  return stripReadmeDuplicateSummary(next, skill);
-}
-
-function stripJsonSkillMetadata(content: string) {
-  try {
-    const parsed = JSON.parse(content) as unknown;
-    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") return content;
-    const next = { ...(parsed as Record<string, unknown>) };
-    delete next.name;
-    delete next.description;
-    return Object.keys(next).length > 0 ? JSON.stringify(next, null, 2) : "";
-  } catch {
-    return content;
-  }
-}
-
-function stripInstalledSkillPreviewMetadata(content: string, skill: SkillSummary) {
-  if (/\.(md|mdx|markdown)$/i.test(skill.skillFile)) {
-    return stripMarkdownSkillMetadata(content, skill);
-  }
-  if (/\.json$/i.test(skill.skillFile)) {
-    return stripJsonSkillMetadata(content);
-  }
-  return content;
 }
 
 function InstalledSkillsList(props: {
@@ -835,6 +689,8 @@ type SkillsHubPageProps = {
   onOpenSidebar: () => void;
   onClose?: () => void;
   embedded?: boolean;
+  nativePresentationMode?: "root" | "sheet";
+  nativeSurfaceId?: string;
 };
 
 export function SkillsHubPage(props: SkillsHubPageProps) {
@@ -852,6 +708,21 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   // Skills are configuration, so their Hub remains manageable in every chat mode.
   // The chat runtime still decides whether a selected skill participates in a turn.
   const lockedByChatMode = false;
+  const lifetimeRef = useRef(0);
+  const activeRef = useRef(false);
+  const refreshRevisionRef = useRef(0);
+  const scanRevisionRef = useRef(0);
+  const importInFlightRef = useRef(false);
+  const deleteInFlightRef = useRef(false);
+  const storeRequestRevisionRef = useRef(0);
+  useEffect(() => {
+    activeRef.current = true;
+    lifetimeRef.current += 1;
+    return () => {
+      activeRef.current = false;
+      lifetimeRef.current += 1;
+    };
+  }, []);
 
   const [skills, setSkills] = useState<SkillSummary[]>(initialSkills ?? []);
   const [rootDir, setRootDir] = useState(initialRootDir ?? "");
@@ -872,7 +743,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   // Temporary multi-select set (not persisted). Independent from enable state.
   const [bulkSelection, setBulkSelection] = useState<ReadonlySet<string>>(() => new Set());
   const bulkAnchorRef = useRef<string | null>(null);
-  const [bulkUndo, setBulkUndo] = useState<{ selected: string[]; count: number } | null>(null);
+  const [bulkUndo, setBulkUndo] = useState<SkillSelectionUndo | null>(null);
   const bulkUndoTimerRef = useRef<number | null>(null);
   const [view, setView] = useState<SkillsHubView>("installed");
   const [storeQuery, setStoreQuery] = useState("");
@@ -916,6 +787,13 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
 
   const refresh = useCallback(
     async (options?: { silent?: boolean }) => {
+      if (!activeRef.current) return;
+      const lifetime = lifetimeRef.current;
+      const revision = ++refreshRevisionRef.current;
+      const current = () =>
+        activeRef.current &&
+        lifetimeRef.current === lifetime &&
+        refreshRevisionRef.current === revision;
       if (lockedByChatMode) {
         setSkills([]);
         setRootDir("");
@@ -931,6 +809,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
       setLoadError(null);
       try {
         const discovery = await discoverSkills({ force: true });
+        if (!current()) return;
         const signature = buildSkillDiscoverySignature(discovery.rootDir, discovery.skills);
         const changed = discoverySignatureRef.current !== signature;
         discoverySignatureRef.current = signature;
@@ -940,11 +819,11 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
           notifySkillsDiscoveryUpdated();
         }
       } catch (err) {
+        if (!current()) return;
         const msg = err instanceof Error ? err.message : String(err);
-        setSkills([]);
         setLoadError(msg || t("settings.skillsHubLoadFailed"));
       } finally {
-        if (!silent) {
+        if (current()) {
           setLoading(false);
         }
       }
@@ -1048,10 +927,16 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   }, [lockedByChatMode, view]);
 
   const rescanExternalSkills = useCallback(async () => {
+    if (!activeRef.current) return;
+    const lifetime = lifetimeRef.current;
+    const revision = ++scanRevisionRef.current;
+    const current = () =>
+      activeRef.current && lifetimeRef.current === lifetime && scanRevisionRef.current === revision;
     setExternalLoading(true);
     setExternalError(null);
     try {
       const scans = await scanExternalSkills();
+      if (!current()) return;
       setExternalScans(scans);
 
       const validBaseDirs = new Set(scans.flatMap((scan) => scan.skills.map((s) => s.baseDir)));
@@ -1060,11 +945,12 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
         return next.size === prev.size ? prev : next;
       });
     } catch (err) {
+      if (!current()) return;
       setExternalScans([]);
       setSelectedExternal(new Set());
       setExternalError(err instanceof Error ? err.message : String(err));
     } finally {
-      setExternalLoading(false);
+      if (current()) setExternalLoading(false);
     }
   }, []);
 
@@ -1144,7 +1030,9 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   );
 
   const importSelectedExternalSkills = useCallback(async () => {
-    if (importProgress) return;
+    if (!activeRef.current || importInFlightRef.current) return;
+    const lifetime = lifetimeRef.current;
+    const current = () => activeRef.current && lifetimeRef.current === lifetime;
     const selectedSkills = (externalScans ?? [])
       .flatMap((scan) => scan.skills)
       .filter((skill) => selectedExternal.has(skill.baseDir));
@@ -1158,30 +1046,37 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
       }
       return;
     }
-    setImportErrors([]);
-    setImportedCount(null);
-    const failures: Array<{ baseDir: string; name: string; message: string }> = [];
-    for (let index = 0; index < targets.length; index += 1) {
-      setImportProgress({ done: index, total: targets.length });
-      try {
-        await manageSkill({
-          action: "install",
-          source: targets[index].baseDir,
-          conflict: "backup",
-        });
-      } catch (err) {
-        failures.push({
-          baseDir: targets[index].baseDir,
-          name: targets[index].name,
-          message: err instanceof Error ? err.message : String(err),
-        });
+    importInFlightRef.current = true;
+    try {
+      setImportErrors([]);
+      setImportedCount(null);
+      const failures: Array<{ baseDir: string; name: string; message: string }> = [];
+      for (let index = 0; index < targets.length; index += 1) {
+        if (!current()) return;
+        setImportProgress({ done: index, total: targets.length });
+        try {
+          await manageSkill({
+            action: "install",
+            source: targets[index].baseDir,
+            conflict: "backup",
+          });
+        } catch (err) {
+          failures.push({
+            baseDir: targets[index].baseDir,
+            name: targets[index].name,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
+      if (!current()) return;
+      setImportProgress(null);
+      setImportErrors(failures);
+      setImportedCount(targets.length - failures.length);
+      setSelectedExternal(new Set());
+      await refresh({ silent: true });
+    } finally {
+      importInFlightRef.current = false;
     }
-    setImportProgress(null);
-    setImportErrors(failures);
-    setImportedCount(targets.length - failures.length);
-    setSelectedExternal(new Set());
-    await refresh({ silent: true });
   }, [
     externalScans,
     selectedExternal,
@@ -1194,7 +1089,9 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
 
   const importLocalSkillBundle = useCallback(
     async (selectedFiles: File[]) => {
-      if (localBundleImporting || selectedFiles.length === 0) return;
+      if (!activeRef.current || importInFlightRef.current || selectedFiles.length === 0) return;
+      const lifetime = lifetimeRef.current;
+      const current = () => activeRef.current && lifetimeRef.current === lifetime;
       if (selectedFiles.length > MAX_LOCAL_SKILL_BUNDLE_FILES) {
         showImportToast(
           t("settings.skillsLocalImportTooMany").replace(
@@ -1215,6 +1112,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
         return;
       }
 
+      importInFlightRef.current = true;
       setLocalBundleImporting(true);
       setImportErrors([]);
       setImportedCount(null);
@@ -1225,14 +1123,17 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
             contentBase64: await readFileAsBase64(file),
           })),
         );
+        if (!current()) return;
         const response = await manageSkill({
           action: "import_bundle",
           conflict: "backup",
           files,
         });
+        if (!current()) return;
         setImportedCount(response.installed?.length ?? 0);
         await refresh({ silent: true });
       } catch (error) {
+        if (!current()) return;
         setImportErrors([
           {
             baseDir: "local-picker",
@@ -1241,7 +1142,8 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
           },
         ]);
       } finally {
-        setLocalBundleImporting(false);
+        importInFlightRef.current = false;
+        if (current()) setLocalBundleImporting(false);
       }
     },
     [localBundleImporting, refresh, showImportToast, t],
@@ -1367,6 +1269,8 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   useEffect(() => {
     if (view !== "store" || lockedByChatMode) return;
     let cancelled = false;
+    storeRequestRevisionRef.current += 1;
+    setStoreLoadingMore(false);
     setStoreLoading(true);
     setStoreError(null);
     setStoreCursor(null);
@@ -1405,6 +1309,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     }, 260);
     return () => {
       cancelled = true;
+      storeRequestRevisionRef.current += 1;
       window.clearTimeout(timer);
     };
   }, [lockedByChatMode, storeQuery, storeSort, t, view]);
@@ -1481,15 +1386,45 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   );
 
   useEffect(() => {
+    let cancelled = false;
+    void listSkillInstallJobs()
+      .then((jobs) => {
+        if (cancelled) return;
+        const recovered: Record<string, SkillInstallJobSnapshot> = {};
+        const byKey: Record<string, string> = {};
+        for (const job of [...jobs].sort((a, b) => b.startedAt - a.startedAt)) {
+          if (!job.slug || !job.ownerHandle) continue;
+          const key = buildClawHubSkillKey({ slug: job.slug, ownerHandle: job.ownerHandle });
+          if (byKey[key] || TERMINAL_INSTALL_PHASES.has(job.phase)) continue;
+          recovered[job.jobId] = job;
+          byKey[key] = job.jobId;
+        }
+        setInstallJobs((prev) => ({ ...recovered, ...prev }));
+        setInstallingByStoreKey((prev) => ({ ...byKey, ...prev }));
+      })
+      .catch((cause) => {
+        if (!cancelled) setStoreError(cause instanceof Error ? cause.message : String(cause));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     const activeJobs = Object.values(installJobs).filter(
       (job) => !TERMINAL_INSTALL_PHASES.has(job.phase),
     );
     if (activeJobs.length === 0) return;
+    let cancelled = false;
+    const inFlight = new Set<string>();
 
     const timer = window.setInterval(() => {
       for (const job of activeJobs) {
+        if (inFlight.has(job.jobId)) continue;
+        inFlight.add(job.jobId);
         void getSkillInstallJobStatus(job.jobId)
           .then((next) => {
+            if (cancelled) return;
             setInstallJobs((prev) => ({ ...prev, [next.jobId]: next }));
             if (TERMINAL_INSTALL_PHASES.has(next.phase)) {
               if (next.phase === "done") {
@@ -1499,6 +1434,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
             }
           })
           .catch((err) => {
+            if (cancelled) return;
             const msg = err instanceof Error ? err.message : String(err);
             setInstallJobs((prev) => ({
               ...prev,
@@ -1509,14 +1445,27 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
                 finishedAt: Date.now(),
               },
             }));
+          })
+          .finally(() => {
+            inFlight.delete(job.jobId);
           });
       }
     }, 600);
 
-    return () => window.clearInterval(timer);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, [enableInstalledSkillsFromJob, installJobs, refresh, t]);
 
   async function loadMoreStore() {
+    if (!activeRef.current) return;
+    const lifetime = lifetimeRef.current;
+    const revision = storeRequestRevisionRef.current;
+    const current = () =>
+      activeRef.current &&
+      lifetimeRef.current === lifetime &&
+      storeRequestRevisionRef.current === revision;
     const cursor = storeCursor;
     if (
       !cursor ||
@@ -1537,19 +1486,24 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
       if (!cached) setStoreLoadingMore(true);
       const results =
         cached ?? (await listClawHubSkills({ sort: storeSort, cursor, limit: STORE_PAGE_LIMIT }));
+      if (!current()) return;
       setStoreItems((current) => dedupeStoreItems([...current, ...results.items]));
       setStoreCursor(results.items.length > 0 ? results.nextCursor : null);
       setPrefetchedStorePage(null);
     } catch (err) {
+      if (!current()) return;
       const msg = err instanceof Error ? err.message : String(err);
       setStoreError(msg || t("settings.skillsHubStoreLoadMoreFailed"));
     } finally {
-      setStoreLoadingMore(false);
+      if (current()) setStoreLoadingMore(false);
       storeLoadMoreInFlightRef.current = false;
     }
   }
 
   async function installStoreSkill(skill: ClawHubSkillCard) {
+    if (!activeRef.current) return;
+    const lifetime = lifetimeRef.current;
+    const current = () => activeRef.current && lifetimeRef.current === lifetime;
     const initialStoreKey = buildClawHubSkillKey(skill);
     const initialJobId = installingByStoreKey[initialStoreKey];
     const initialJob = initialJobId ? installJobs[initialJobId] : undefined;
@@ -1569,6 +1523,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     setStoreError(null);
     try {
       const resolvedSkill = await resolveClawHubSkillOwner(skill);
+      if (!current()) return;
       const storeKey = buildClawHubSkillKey(resolvedSkill);
       const activePendingToken = pendingInstallTokensRef.current.get(storeKey);
       if (activePendingToken && activePendingToken !== pendingToken) return;
@@ -1601,6 +1556,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
         version: resolvedSkill.latestVersion,
         conflict: "backup",
       });
+      if (!current()) return;
       setInstallJobs((prev) => ({ ...prev, [job.jobId]: job }));
       setInstallingByStoreKey((prev) => ({
         ...prev,
@@ -1608,6 +1564,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
         [storeKey]: job.jobId,
       }));
     } catch (err) {
+      if (!current()) return;
       const msg = err instanceof Error ? err.message : String(err);
       setStoreError(msg || t("settings.skillsHubInstallFailed"));
     } finally {
@@ -1617,14 +1574,23 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
         pendingInstallTokensRef.current.delete(storeKey);
         changed = true;
       }
-      if (changed) {
+      if (changed && current()) {
         setPendingInstallKeys(new Set(pendingInstallTokensRef.current.keys()));
       }
     }
   }
 
   async function deleteSkill(skill: SkillSummary) {
-    if (lockedByChatMode || isAlwaysEnabledSkillName(skill.name) || deletingSkillName) return;
+    if (
+      !activeRef.current ||
+      lockedByChatMode ||
+      isAlwaysEnabledSkillName(skill.name) ||
+      deleteInFlightRef.current
+    )
+      return;
+    const lifetime = lifetimeRef.current;
+    const current = () => activeRef.current && lifetimeRef.current === lifetime;
+    deleteInFlightRef.current = true;
     const skillName = skill.name;
     const sourceSlug = skill.source?.registry === "clawhub" ? skill.source.slug?.trim() || "" : "";
     const sourceOwnerHandle =
@@ -1638,6 +1604,8 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
           selected: prev.skills.selected.filter((name) => name !== skillName),
         }),
       );
+      notifySkillsDiscoveryUpdated();
+      if (!current()) return;
       setSkills((prev) => prev.filter((item) => item.name !== skillName));
       setPreviewInstalledSkill((current) => (current?.name === skillName ? null : current));
       if (sourceSlug) {
@@ -1669,20 +1637,21 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
       notifySkillsDiscoveryUpdated();
       await refresh({ silent: true });
     } catch (err) {
+      if (!current()) return;
       const msg = err instanceof Error ? err.message : String(err);
       setLoadError(msg || t("settings.skillsHubDeleteFailed"));
     } finally {
-      setDeletingSkillName(null);
+      deleteInFlightRef.current = false;
+      if (current()) setDeletingSkillName(null);
     }
   }
 
   function toggleSkill(name: string, on: boolean) {
     if (isAlwaysEnabledSkillName(name)) return;
-    const next = new Set(settings.skills.selected);
-    if (on) next.add(name);
-    else next.delete(name);
     requestInstalledSkillFlip("single", [name], on ? [name] : []);
-    setSettings((prev) => updateSkills(prev, { selected: Array.from(next) }));
+    setSettings((prev) =>
+      updateSkills(prev, { selected: selectSkills(prev.skills.selected, [name], on) }),
+    );
   }
 
   const clearBulkUndoTimer = useCallback(() => {
@@ -1761,7 +1730,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
 
       requestInstalledSkillFlip("batch", changedNames, target ? changedNames : []);
       clearBulkUndoTimer();
-      setBulkUndo({ selected: before, count: changed });
+      setBulkUndo({ selected: before, names: changedNames, enabled: target, count: changed });
       bulkUndoTimerRef.current = window.setTimeout(() => {
         setBulkUndo(null);
         bulkUndoTimerRef.current = null;
@@ -1769,14 +1738,9 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
       setBulkSelection(new Set());
       bulkAnchorRef.current = null;
       setSettings((prev) => {
-        const next = new Set(prev.skills.selected);
-        for (const name of names) {
-          if (target) next.add(name);
-          else next.delete(name);
-        }
         return updateSkills(prev, {
           enabled: target ? true : prev.skills.enabled,
-          selected: Array.from(next),
+          selected: selectSkills(prev.skills.selected, names, target),
         });
       });
     },
@@ -1792,7 +1756,7 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   const undoBulkSelection = useCallback(() => {
     clearBulkUndoTimer();
     if (bulkUndo) {
-      const restore = bulkUndo.selected;
+      const restore = undoSkillSelection(settings.skills.selected, bulkUndo);
       const current = new Set(settings.skills.selected);
       const restoreSet = new Set(restore);
       const changedNames = [...new Set([...current, ...restoreSet])].filter(
@@ -1800,7 +1764,9 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
       );
       const followNames = changedNames.filter((name) => restoreSet.has(name) && !current.has(name));
       requestInstalledSkillFlip("batch", changedNames, followNames);
-      setSettings((prev) => updateSkills(prev, { selected: restore }));
+      setSettings((prev) =>
+        updateSkills(prev, { selected: undoSkillSelection(prev.skills.selected, bulkUndo) }),
+      );
     }
     setBulkUndo(null);
   }, [
@@ -1812,72 +1778,83 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
   ]);
 
   async function deleteBulkSelectedInstalledSkills() {
-    if (lockedByChatMode || deletingSkillName || !bulkMode) return;
+    if (!activeRef.current || lockedByChatMode || deleteInFlightRef.current || !bulkMode) return;
     const targets = skills.filter(
       (skill) => bulkSelection.has(skill.name) && !isAlwaysEnabledSkillName(skill.name),
     );
     if (targets.length === 0) return;
-
-    setLoadError(null);
-    const failures: string[] = [];
-    for (const skill of targets) {
-      setDeletingSkillName(skill.name);
-      try {
-        await manageSkill({ action: "delete", name: skill.name });
-        setSettings((prev) =>
-          updateSkills(prev, {
-            selected: prev.skills.selected.filter((name) => name !== skill.name),
-          }),
-        );
-        setSkills((prev) => prev.filter((item) => item.name !== skill.name));
-        setPreviewInstalledSkill((current) => (current?.name === skill.name ? null : current));
-        setBulkSelection((prev) => {
-          if (!prev.has(skill.name)) return prev;
-          const next = new Set(prev);
-          next.delete(skill.name);
-          return next;
-        });
-        const sourceSlug =
-          skill.source?.registry === "clawhub" ? skill.source.slug?.trim() || "" : "";
-        const sourceOwnerHandle =
-          skill.source?.registry === "clawhub" ? skill.source.ownerHandle?.trim() || null : null;
-        if (sourceSlug) {
-          const sourceKey = buildClawHubSkillKey({
-            slug: sourceSlug,
-            ownerHandle: sourceOwnerHandle,
-          });
-          setInstallingByStoreKey((prev) => {
-            if (!(sourceKey in prev)) return prev;
-            const next = { ...prev };
-            delete next[sourceKey];
+    const lifetime = lifetimeRef.current;
+    const current = () => activeRef.current && lifetimeRef.current === lifetime;
+    deleteInFlightRef.current = true;
+    try {
+      setLoadError(null);
+      const failures: string[] = [];
+      for (const skill of targets) {
+        if (!current()) return;
+        setDeletingSkillName(skill.name);
+        try {
+          await manageSkill({ action: "delete", name: skill.name });
+          setSettings((prev) =>
+            updateSkills(prev, {
+              selected: prev.skills.selected.filter((name) => name !== skill.name),
+            }),
+          );
+          notifySkillsDiscoveryUpdated();
+          if (!current()) return;
+          setSkills((prev) => prev.filter((item) => item.name !== skill.name));
+          setPreviewInstalledSkill((current) => (current?.name === skill.name ? null : current));
+          setBulkSelection((prev) => {
+            if (!prev.has(skill.name)) return prev;
+            const next = new Set(prev);
+            next.delete(skill.name);
             return next;
           });
-          setInstallJobs((prev) => {
-            let changed = false;
-            const next = { ...prev };
-            for (const [jobId, job] of Object.entries(prev)) {
-              if (
-                job.slug?.trim() === sourceSlug &&
-                (!sourceOwnerHandle || job.ownerHandle?.trim() === sourceOwnerHandle)
-              ) {
-                delete next[jobId];
-                changed = true;
+          const sourceSlug =
+            skill.source?.registry === "clawhub" ? skill.source.slug?.trim() || "" : "";
+          const sourceOwnerHandle =
+            skill.source?.registry === "clawhub" ? skill.source.ownerHandle?.trim() || null : null;
+          if (sourceSlug) {
+            const sourceKey = buildClawHubSkillKey({
+              slug: sourceSlug,
+              ownerHandle: sourceOwnerHandle,
+            });
+            setInstallingByStoreKey((prev) => {
+              if (!(sourceKey in prev)) return prev;
+              const next = { ...prev };
+              delete next[sourceKey];
+              return next;
+            });
+            setInstallJobs((prev) => {
+              let changed = false;
+              const next = { ...prev };
+              for (const [jobId, job] of Object.entries(prev)) {
+                if (
+                  job.slug?.trim() === sourceSlug &&
+                  (!sourceOwnerHandle || job.ownerHandle?.trim() === sourceOwnerHandle)
+                ) {
+                  delete next[jobId];
+                  changed = true;
+                }
               }
-            }
-            return changed ? next : prev;
-          });
+              return changed ? next : prev;
+            });
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          failures.push(`${skill.name}: ${msg || t("settings.skillsHubDeleteFailed")}`);
         }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        failures.push(`${skill.name}: ${msg || t("settings.skillsHubDeleteFailed")}`);
       }
+      if (!current()) return;
+      setDeletingSkillName(null);
+      if (failures.length > 0) {
+        setLoadError(`${t("settings.skillsHubBulkDeleteFailed")}: ${failures.join("; ")}`);
+      }
+      notifySkillsDiscoveryUpdated();
+      await refresh({ silent: true });
+    } finally {
+      deleteInFlightRef.current = false;
+      if (current()) setDeletingSkillName(null);
     }
-    setDeletingSkillName(null);
-    if (failures.length > 0) {
-      setLoadError(`${t("settings.skillsHubBulkDeleteFailed")}: ${failures.join("; ")}`);
-    }
-    notifySkillsDiscoveryUpdated();
-    await refresh({ silent: true });
   }
 
   useEffect(() => clearBulkUndoTimer, [clearBulkUndoTimer]);
@@ -1971,6 +1948,109 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
     : skillsEnabled
       ? null
       : null;
+  if (isApplePresentationRuntime()) {
+    return (
+      <NativeSkillsHub
+        settings={settings}
+        rootDir={rootDir}
+        mode={props.nativePresentationMode}
+        surfaceId={props.nativeSurfaceId}
+        view={view}
+        onView={setView}
+        onOpenSidebar={onOpenSidebar}
+        onClose={onClose}
+        loading={loading}
+        error={loadError}
+        refresh={() => refresh()}
+        onEnabled={setSkillsEnabled}
+        installed={{
+          items: sortedFiltered,
+          total: selectableSkills.length,
+          selectedCount,
+          selected,
+          query: filter,
+          onQuery: setFilter,
+          category: installedCategory,
+          categoryCounts: installedCategoryCounts,
+          onCategory: setInstalledCategory,
+          sort: installedSort,
+          onSort: setInstalledSort,
+          onToggle: toggleSkill,
+          onOpen: openInstalledSkillPreview,
+          onDelete: deleteSkill,
+          deleting: deletingSkillName,
+        }}
+        bulk={{
+          enabled: bulkMode,
+          selection: bulkSelection,
+          onMode: () => (bulkMode ? exitBulkMode() : enterBulkMode()),
+          onEnter: enterBulkMode,
+          onToggle: toggleBulkSelectionName,
+          onAll: () => setBulkSelectionRange(filteredSelectableInstalledNames, true),
+          onClear: () => {
+            setBulkSelection(new Set());
+            bulkAnchorRef.current = null;
+          },
+          enableCount: bulkEnableChangeCount,
+          disableCount: bulkDisableChangeCount,
+          onEnable: applyBulkEnableState,
+          deleteNames: bulkDeleteNames,
+          deletePreview: bulkDeletePreview,
+          onDelete: deleteBulkSelectedInstalledSkills,
+          undo: bulkUndo,
+          onUndo: undoBulkSelection,
+        }}
+        preview={{
+          skill: previewInstalledSkill,
+          state: installedPreviewState,
+          onClose: () => setPreviewInstalledSkill(null),
+        }}
+        store={{
+          items: storeItems,
+          query: storeQuery,
+          onQuery: setStoreQuery,
+          sort: storeSort,
+          onSort: setStoreSort,
+          loading: storeLoading,
+          loadingMore: storeLoadingMore,
+          error: storeError,
+          cursor: storeCursor,
+          installedKeys: installedStoreKeys,
+          installedSlugs: installedStoreSlugs,
+          pendingKeys: pendingInstallKeys,
+          jobsByKey: installingByStoreKey,
+          jobs: installJobs,
+          onInstall: installStoreSkill,
+          onLoadMore: loadMoreStore,
+        }}
+        import={{
+          scans: externalScans ?? [],
+          loading: externalLoading,
+          error: externalError,
+          query: importQuery,
+          onQuery: setImportQuery,
+          selected: selectedExternal,
+          installedNames: installedSkillNames,
+          progress: importProgress,
+          errors: importErrors,
+          importedCount,
+          localImporting: localBundleImporting,
+          toast: importToast,
+          dismissToast: () => {
+            if (importToastTimerRef.current !== null)
+              window.clearTimeout(importToastTimerRef.current);
+            importToastTimerRef.current = null;
+            setImportToast(null);
+          },
+          toggle: toggleExternalSkill,
+          batchToggle: batchToggleExternalSkills,
+          rescan: rescanExternalSkills,
+          import: importSelectedExternalSkills,
+          importLocal: importLocalSkillBundle,
+        }}
+      />
+    );
+  }
   return (
     <VStack
       data-hub-embedded={embedded ? "true" : undefined}
@@ -3940,31 +4020,4 @@ function formatFullStoreDate(value: number) {
     month: "short",
     day: "numeric",
   }).format(new Date(value));
-}
-
-function getInstallProgressPercent(job: SkillInstallJobSnapshot) {
-  if (job.phase === "done") return 100;
-  if (!job.totalBytes || job.totalBytes <= 0) return null;
-  return Math.max(2, Math.min(100, Math.round((job.downloadedBytes / job.totalBytes) * 100)));
-}
-
-function installPhaseLabel(job: SkillInstallJobSnapshot | undefined, t: (key: string) => string) {
-  switch (job?.phase) {
-    case "queued":
-      return t("settings.skillsStorePhaseQueued");
-    case "downloading":
-      return t("settings.skillsStorePhaseDownloading");
-    case "extracting":
-      return t("settings.skillsStorePhaseExtracting");
-    case "validating":
-      return t("settings.skillsStorePhaseValidating");
-    case "installing":
-      return t("settings.skillsStorePhaseInstalling");
-    case "done":
-      return t("settings.skillsStoreInstalled");
-    case "error":
-      return t("settings.skillsStorePhaseError");
-    default:
-      return t("settings.skillsStorePhasePreparing");
-  }
 }

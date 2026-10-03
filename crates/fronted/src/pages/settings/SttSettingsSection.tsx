@@ -7,7 +7,6 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { useState } from "react";
 import { Mic } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
@@ -16,9 +15,9 @@ import {
   type SttProviderId,
   type SttProviderSettings,
 } from "../../lib/settings";
-import { desktopSttSettingsService } from "../../lib/stt/desktopSttSettingsService";
-import type { SttSecretField } from "../../lib/stt/types";
+import { STT_PROVIDER_FIELDS } from "../../lib/stt/providerFields";
 import type { SettingsSectionProps } from "./types";
+import { useSttConnectionTest } from "./useSttConnectionTest";
 
 const PROVIDER_LABELS: Record<SttProviderId, string> = {
   aliyun_dashscope: "阿里云 DashScope",
@@ -28,54 +27,17 @@ const PROVIDER_LABELS: Record<SttProviderId, string> = {
   baidu_cloud: "百度智能云 ASR",
 };
 
-type Field = {
-  key: keyof SttProviderSettings;
-  label: string;
-  secret?: SttSecretField;
-  placeholder?: string;
-};
-
-const PROVIDER_FIELDS: Record<SttProviderId, Field[]> = {
-  aliyun_dashscope: [
-    { key: "websocketUrl", label: "WebSocket URL" },
-    { key: "model", label: "Model" },
-    { key: "apiKey", label: "API Key", secret: "apiKey" },
-  ],
-  tencent_cloud: [
-    { key: "appId", label: "AppId" },
-    { key: "engineModelType", label: "Engine Model Type" },
-    { key: "secretId", label: "SecretId", secret: "secretId" },
-    { key: "secretKey", label: "SecretKey", secret: "secretKey" },
-  ],
-  volcengine_v2: [
-    { key: "websocketUrl", label: "WebSocket URL" },
-    { key: "appId", label: "App ID" },
-    { key: "cluster", label: "Cluster" },
-    { key: "accessToken", label: "Access Token", secret: "accessToken" },
-  ],
-  volcengine_seed_v3: [
-    { key: "websocketUrl", label: "WebSocket URL" },
-    { key: "appId", label: "App ID" },
-    { key: "resourceId", label: "Resource ID" },
-    { key: "accessToken", label: "Access Token", secret: "accessToken" },
-  ],
-  baidu_cloud: [
-    { key: "websocketUrl", label: "WebSocket URL" },
-    { key: "baiduAppId", label: "App ID" },
-    { key: "devPid", label: "dev_pid" },
-    { key: "baiduApiKey", label: "API Key", secret: "baiduApiKey" },
-  ],
-};
-
 export function SttSettingsSection({ settings, setSettings }: SettingsSectionProps) {
   const { t } = useLocale();
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const { testing, testResult, testConnection, clearFeedback } = useSttConnectionTest(
+    settings.stt,
+    t,
+  );
   const providerId = settings.stt.provider;
   const provider = settings.stt.providers[providerId];
 
   const patchProvider = (patch: Partial<SttProviderSettings>) => {
-    setTestResult(null);
+    clearFeedback();
     setSettings((prev) =>
       normalizeSettings({
         ...prev,
@@ -88,24 +50,6 @@ export function SttSettingsSection({ settings, setSettings }: SettingsSectionPro
         },
       }),
     );
-  };
-
-  const testConnection = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      await desktopSttSettingsService.update(settings.stt);
-      const result = await desktopSttSettingsService.test(providerId);
-      const ok = result.result === "connected" || result.result === "connected_no_speech";
-      setTestResult({
-        ok,
-        message: result.message || t(`settings.stt.test.${result.result}`),
-      });
-    } catch (error) {
-      setTestResult({ ok: false, message: error instanceof Error ? error.message : String(error) });
-    } finally {
-      setTesting(false);
-    }
   };
 
   return (
@@ -140,7 +84,7 @@ export function SttSettingsSection({ settings, setSettings }: SettingsSectionPro
             onChange={(value) => {
               const next = value as SttProviderId;
               if (!STT_PROVIDER_IDS.includes(next)) return;
-              setTestResult(null);
+              clearFeedback();
               setSettings((prev) =>
                 normalizeSettings({ ...prev, stt: { ...prev.stt, provider: next } }),
               );
@@ -150,16 +94,14 @@ export function SttSettingsSection({ settings, setSettings }: SettingsSectionPro
           />
 
           <Grid columns={{ minWidth: 240, max: 2, repeat: "fit" }} gap={3} width="100%">
-            {PROVIDER_FIELDS[providerId].map((field) => (
+            {STT_PROVIDER_FIELDS[providerId].map((field) => (
               <GridSpan key={field.key} columns={field.key === "websocketUrl" ? "full" : 1}>
                 <TextInput
                   label={field.label}
                   type={field.secret ? "password" : "text"}
                   value={typeof provider[field.key] === "string" ? String(provider[field.key]) : ""}
                   placeholder={
-                    field.secret && provider.configured
-                      ? t("settings.stt.secretSaved")
-                      : field.placeholder
+                    field.secret && provider.configured ? t("settings.stt.secretSaved") : undefined
                   }
                   onChange={(value) => patchProvider({ [field.key]: value })}
                   width="100%"

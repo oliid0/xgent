@@ -58,9 +58,15 @@ test("native themes resolve Astryx tokens, CSS lengths, and per-surface font sca
     customSettings: {
       appearance: {},
       fontScale: { sidebar: 0.9, chat: 1.2, workspaceTools: 1 },
+      interfaceFontFamily: "Arial",
+      chatFontFamily: '"Helvetica Neue", Arial',
+      codeFontFamily: "Menlo",
     },
   };
   const theme = createNativePresentationTheme(settings, true, "chat");
+  assert.equal(theme.fontFamily, '"Helvetica Neue", Arial');
+  assert.equal(theme.codeFontFamily, "Menlo");
+  assert.equal(createNativePresentationTheme(settings, false, "sidebar").fontFamily, "Arial");
   assert.equal(theme.light.accent, "#112233");
   assert.equal(theme.dark.accent, "#aabbcccc");
   assert.equal(theme.dark.background, "#111213");

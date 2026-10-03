@@ -249,13 +249,19 @@ struct XgentIOSNode: View {
 
     @ViewBuilder private var identified: some View {
         switch node.kind {
-        case .textInput:
+        case .textInput, .colorInput:
             rendered
         case .navigationRow where node.variant == "sidebar-conversation-row":
             rendered
+        case .selector where node.variant == "workspace-file-sheets":
+            rendered.accessibilityElement(children: .contain)
+        case .numberInput where node.variant == "document-annotation-page":
+            rendered.accessibilityElement(children: .contain)
+        case .mediaPreview where node.variant == "workspace-image-preview":
+            rendered.accessibilityElement(children: .contain)
         case .vStack, .hStack, .scrollView, .card, .section, .list,
              .settingsGroup, .settingsLayout, .composer, .chatLayout,
-             .browserLayout, .chatMessage:
+             .browserLayout, .chatMessage, .spreadsheetGrid, .terminalToolbar:
             // Container identifiers propagate to descendants in SwiftUI.
             // Keep each actionable child addressable in the live AX hierarchy.
             rendered.accessibilityElement(children: .contain)
@@ -279,9 +285,106 @@ struct XgentIOSNode: View {
     @ViewBuilder private var rendered: some View {
         switch node.kind {
         case .vStack:
-            VStack(alignment: .leading, spacing: node.spacing.map { CGFloat($0) }) { children }
+            if node.variant == "workspace-editor-tabs" {
+                XgentWorkspaceEditorTabs(node: node, document: document, model: model)
+            } else if node.variant == "workspace-editor-close-all" {
+                XgentWorkspaceCloseAll(node: node, document: document, model: model).id(node.id)
+            } else if node.variant == "workspace-editor-run-output" {
+                XgentWorkspaceRunOutput(node: node, document: document, model: model)
+                    .id(node.value?.text ?? node.id)
+            } else if node.variant == "workspace-file-annotations" {
+                XgentDocumentAnnotationsEditor(node: node, document: document, model: model)
+            } else if node.variant == "workspace-file-layout" {
+                XgentWorkspaceFileLayout(node: node, document: document, model: model)
+            } else if node.variant == "terminal-rename-editor" {
+                XgentTerminalRenameEditor(node: node, document: document, model: model)
+            } else if node.variant == "browser-navigation" {
+                XgentBrowserNavigation(node: node, document: document, model: model)
+            } else if node.variant == "browser-tabs" {
+                XgentBrowserTabs(node: node, document: document, model: model)
+            } else if node.variant == "browser-header" {
+                XgentBrowserHeader(node: node, document: document, model: model)
+            } else if node.variant == "browser-error" {
+                XgentBrowserError(node: node, document: document, model: model)
+            } else if node.variant == "browser-address-entry" || node.variant == "browser-home-row" {
+                XgentBrowserAddressEntry(node: node, document: document, model: model)
+            } else if node.variant == "skills-hub-layout" {
+                XgentSkillsHubLayout(node: node, document: document, model: model)
+            } else if node.variant == "skills-hub-main" {
+                XgentSkillsHubMain(node: node, document: document, model: model)
+            } else if node.variant == "skills-hub-toolbar" {
+                XgentSkillsHubToolbar(node: node, document: document, model: model)
+            } else if node.variant == "skill-hub-controls" || node.variant == "skill-bulk-actions" {
+                XgentSkillHubControls(node: node, document: document, model: model)
+            } else if node.variant == "skill-installed-row" || node.variant == "skill-store-card" {
+                XgentSkillRow(node: node, document: document, model: model)
+            } else if node.variant == "skill-row-actions" {
+                XgentSkillRowActions(node: node, document: document, model: model)
+            } else if node.variant == "skill-tags" {
+                XgentSkillTags(node: node, document: document, model: model)
+            } else if node.variant == "skill-store-grid" {
+                XgentSkillStoreGrid(node: node, document: document, model: model)
+            } else if node.variant == "skill-preview" {
+                XgentSkillPreview(node: node, document: document, model: model)
+            } else if node.variant == "skill-detail-value" {
+                XgentSkillDetailValue(node: node)
+            } else if node.variant == "skill-import-row" {
+                XgentSkillImportRow(node: node, document: document, model: model)
+            } else if node.variant == "mcp-server-editor" {
+                XgentMCPServerEditor(node: node, document: document, model: model)
+            } else if node.variant == "mcp-connection-fields" {
+                XgentMCPConnectionFields(node: node, document: document, model: model)
+            } else if node.variant == "mcp-editor-footer" {
+                XgentMCPEditorFooter(node: node, document: document, model: model)
+            } else if node.variant == "mcp-server-row" {
+                XgentMCPServerRow(node: node, document: document, model: model)
+            } else if node.variant == "mcp-server-metadata" {
+                XgentMCPMetadata(node: node, document: document, model: model)
+            } else if node.variant == "mcp-server-actions" {
+                XgentMCPServerActions(node: node, document: document, model: model)
+            } else if node.variant == "mcp-import-row" {
+                XgentMCPImportRow(node: node, document: document, model: model)
+            } else if node.variant == "question-card" {
+                XgentQuestionCard(node: node, document: document, model: model)
+            } else if node.variant == "question-footer" {
+                XgentQuestionFooter(node: node, document: document, model: model)
+            } else if node.variant == "tool-policy-row" {
+                XgentToolPolicyRow(node: node, document: document, model: model)
+            } else if node.variant == "tool-category-actions" {
+                XgentToolCategoryActions(node: node, document: document, model: model)
+            } else if node.variant == "tool-policy-help" {
+                XgentToolPolicyHelp(node: node)
+            } else if node.variant == "voice-credentials" {
+                XgentVoiceCredentials(node: node, document: document, model: model)
+            } else if node.variant == "cron-detail-layout" {
+                XgentCronDetailLayout(node: node, document: document, model: model)
+            } else if node.variant == "cron-detail-value" {
+                XgentCronDetailValue(node: node)
+            } else if node.variant == "cron-run-row" {
+                XgentCronRunRow(node: node, document: document, model: model)
+            } else if node.variant == "backup-connection-fields" {
+                XgentBackupConnectionFields(node: node, document: document, model: model)
+            } else if node.variant == "backup-transfer-actions" {
+                XgentBackupTransferActions(node: node, document: document, model: model)
+            } else if node.variant == "automation-row" {
+                XgentAutomationRow(node: node, document: document, model: model)
+            } else if node.variant == "hook-lifecycle" {
+                XgentHookLifecycle(node: node)
+            } else if node.variant == "http-request-editor" {
+                XgentHTTPRequestEditorRow(node: node, document: document, model: model)
+            } else if node.variant == "http-request-fields" || node.variant == "http-request-address" {
+                XgentHTTPRequestFields(node: node, document: document, model: model)
+            } else if node.variant == "provider-model-row" {
+                XgentProviderModelRow(node: node, document: document, model: model)
+            } else if node.variant == "provider-import-row" {
+                XgentProviderImportRow(node: node, document: document, model: model)
+            } else {
+                VStack(alignment: .leading, spacing: node.spacing.map { CGFloat($0) }) { children }
+            }
         case .hStack:
-            XgentHorizontalControls(node: node) { children }
+            if node.variant == "workspace-file-metadata" {
+                XgentWorkspaceFileMetadata(node: node, document: document, model: model)
+            } else { XgentHorizontalControls(node: node) { children } }
         case .scrollView:
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: CGFloat(theme.spacing.md)) { children }
@@ -295,7 +398,7 @@ struct XgentIOSNode: View {
             section
         case .text:
             Text(node.text ?? "")
-                .font(.system(size: CGFloat(theme.typography.body * theme.fontScale * bodyScale)))
+                .font(XgentFonts.body(theme.fontFamily, size: CGFloat(theme.typography.body * theme.fontScale * bodyScale)))
                 .foregroundStyle(Color(xgentHex: node.secondary == true ? palette.secondaryText : palette.text))
                 .textSelection(.enabled)
         case .heading:
@@ -306,28 +409,47 @@ struct XgentIOSNode: View {
                 Text(node.text ?? node.label ?? "")
                     .lineLimit(node.maxLines)
             }
-            .font(.system(size: CGFloat(theme.typography.body * theme.fontScale * bodyScale), weight: .semibold))
+            .font(XgentFonts.body(theme.fontFamily, size: CGFloat(theme.typography.body * theme.fontScale * bodyScale), weight: .semibold))
             .foregroundStyle(Color(xgentHex: palette.text))
             .accessibilityAddTraits(.isHeader)
         case .button:
-            actionButton
+            if node.variant == "workspace-source-action" {
+                XgentWorkspaceSourceAction(node: node, document: document, model: model)
+            } else if node.variant == "workspace-editor-bulk-action" {
+                XgentWorkspaceBulkAction(node: node, document: document, model: model)
+            } else if node.variant == "workspace-image-save" {
+                XgentWorkspaceImageSaveButton(node: node, document: document, model: model)
+            } else if node.variant == "workspace-file-save" {
+                XgentWorkspaceFileSaveButton(node: node, document: document, model: model)
+            } else if node.variant == "question-option" {
+                XgentQuestionOptionButton(node: node, document: document, model: model)
+            } else { actionButton }
         case .textInput:
             textInput
+        case .shortcutRecorder:
+            Text(node.text ?? "").foregroundStyle(.secondary)
         case .colorInput:
-            ColorPicker(node.label ?? "", selection: colorBinding, supportsOpacity: false)
-                .frame(minHeight: 44)
+            XgentColorInput(node: node, document: document, model: model)
         case .timeInput:
             XgentTimeInput(node: node, document: document, model: model)
         case .textArea:
-            textArea
+            if node.variant == "document-annotation" {
+                XgentDocumentAnnotationText(node: node, document: document, model: model)
+            } else { textArea }
         case .toggle:
             XgentSwitch(node: node, document: document, model: model)
         case .selector:
-            selector
+            if node.variant == "workspace-file-sheets" {
+                XgentSpreadsheetSheets(node: node, document: document, model: model)
+            } else if node.variant == "terminal-session-tabs" {
+                XgentTerminalSessionTabs(node: node, document: document, model: model)
+            } else { selector }
         case .segmentedControl:
             XgentSegmentedControl(node: node, document: document, model: model)
         case .menu:
-            nativeMenu
+            if node.variant == "workspace-file-open" {
+                XgentWorkspaceFileOpenMenu(node: node, document: document, model: model)
+            } else { nativeMenu }
         case .divider:
             Divider()
         case .progress:
@@ -336,7 +458,7 @@ struct XgentIOSNode: View {
             progressBar
         case .badge:
             Text(node.label ?? node.text ?? "")
-                .font(.system(size: CGFloat(theme.typography.caption * theme.fontScale * captionScale), weight: .medium))
+                .font(XgentFonts.body(theme.fontFamily, size: CGFloat(theme.typography.caption * theme.fontScale * captionScale), weight: .medium))
                 .foregroundStyle(statusColor)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -353,22 +475,29 @@ struct XgentIOSNode: View {
             HStack(spacing: 7) {
                 Circle().fill(statusColor).frame(width: 8, height: 8)
                 Text(node.label ?? node.text ?? "")
-                    .font(.system(size: CGFloat(theme.typography.supporting * theme.fontScale * supportingScale)))
+                    .font(XgentFonts.body(theme.fontFamily, size: CGFloat(theme.typography.supporting * theme.fontScale * supportingScale)))
                     .foregroundStyle(Color(xgentHex: palette.secondaryText))
             }
         case .slider:
             XgentSlider(node: node, document: document, model: model)
         case .numberInput:
-            XgentNumberInput(node: node, document: document, model: model)
+            if node.variant == "workspace-image-rotation" {
+                XgentImageRotationButton(node: node, document: document, model: model)
+            } else if node.variant == "document-annotation-page" {
+                XgentDocumentAnnotationPage(node: node, document: document, model: model)
+            } else { XgentNumberInput(node: node, document: document, model: model) }
         case .collapsible:
             XgentDisclosure(node: node, document: document, model: model)
                 .id(node.value?.text ?? node.id)
         case .markdown:
-            XgentMarkdown(text: node.text ?? "")
+            XgentMarkdown(text: node.text ?? "", codeConfiguration: .decode(node.value?.text, fallback: .markdown),
+                          highlightCode: { source, language in await model.highlightCode(node, in: document, source: source, language: language) })
         case .codeBlock:
             codeBlock
         case .list:
             list
+        case .providerList:
+            XgentProviderListView(node: node, document: document, model: model)
         case .treeRow, .navigationRow:
             if node.variant == "sidebar-conversation-row" {
                 XgentSidebarConversationRow(node: node, document: document, model: model)
@@ -394,7 +523,9 @@ struct XgentIOSNode: View {
                     textView.keyboardDismissMode = .interactive
                     textView.showsVerticalScrollIndicator = false
                 }
-        case .chatLayout, .browserLayout:
+        case .browserLayout:
+            XgentBrowserLayout(node: node, document: document, model: model)
+        case .chatLayout:
             VStack(spacing: 0) { children }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .chatMessage:
@@ -406,9 +537,9 @@ struct XgentIOSNode: View {
         case .activityPreview:
             activityPreview
         case .taskProgress:
-            taskProgress
+            XgentTaskProgressChip(node: node, document: document, model: model)
         case .taskStep:
-            taskStep
+            XgentTaskProgressStep(node: node)
         case .browserViewport:
             browserViewport
         case .terminalLayout:
@@ -418,18 +549,26 @@ struct XgentIOSNode: View {
         case .terminalViewport:
             XgentTerminalViewport(node: node, document: document, model: model)
         case .mediaPreview:
-            mediaPreview
+            if node.variant == "workspace-image-preview" {
+                XgentWorkspaceImagePreview(node: node, document: document, model: model)
+            } else { mediaPreview }
+        case .spreadsheetGrid:
+            XgentSpreadsheetGrid(node: node, document: document, model: model)
         case .htmlPreview:
             XgentHTMLPreview(source: node.text ?? "", encoded: node.value?.text ?? "", label: node.label ?? "HTML preview")
         case .filePicker:
-            XgentAttachmentPicker(
-                node: node,
-                document: document,
-                model: model,
-                controlSize: max(44, CGFloat(theme.control.small))
-            )
-                .id(node.action)
-                .buttonStyle(.plain)
+            if node.variant == "skill-bundle" {
+                XgentSkillBundlePicker(node: node, document: document, model: model)
+            } else {
+                XgentAttachmentPicker(
+                    node: node,
+                    document: document,
+                    model: model,
+                    controlSize: max(44, CGFloat(theme.control.small))
+                )
+                    .id(node.action)
+                    .buttonStyle(.plain)
+            }
         }
     }
 
@@ -493,43 +632,8 @@ struct XgentIOSNode: View {
         XgentTextInput(node: node, document: document, model: model)
     }
 
-    private var colorBinding: Binding<Color> {
-        Binding(
-            get: { Color(xgentHex: model.value(node, in: document).text) },
-            set: { color in
-                let resolved = UIColor(color)
-                var red: CGFloat = 0
-                var green: CGFloat = 0
-                var blue: CGFloat = 0
-                var alpha: CGFloat = 0
-                guard resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return }
-                let value = String(
-                    format: "#%02x%02x%02x",
-                    Int(red * 255), Int(green * 255), Int(blue * 255)
-                )
-                model.send(node, in: document, value: .string(value), editing: true)
-            }
-        )
-    }
-
     private var textArea: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            XgentFieldLabel(node: node)
-            if let language = node.language, !language.isEmpty {
-                XgentCodeEditor(text: textBinding, language: language, label: node.label ?? language,
-                                enabled: node.disabled != true, wrapText: node.wrap ?? true)
-                    .id("\(document.surface):\(node.id)")
-            } else {
-                TextEditor(text: textBinding)
-                    .scrollContentBackground(.hidden)
-                    .introspect(.textEditor, on: .iOS(.v26)) { textView in
-                        textView.keyboardDismissMode = .interactive
-                    }
-                    .frame(minHeight: 112)
-                    .modifier(XgentFieldSurface(node: node))
-                    .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
-            }
-        }
+        XgentTextArea(node: node, document: document, model: model)
     }
 
     @ViewBuilder private var selector: some View {
@@ -620,7 +724,9 @@ struct XgentIOSNode: View {
     }
 
     private var codeBlock: some View {
-        XgentCodeBlock(text: node.text ?? "", language: node.language, label: node.label)
+        XgentCodeBlock(text: node.text ?? "", language: node.language, label: node.label,
+                       configuration: .decode(node.value?.text, fallback: .plain),
+                       highlightCode: { source, language in await model.highlightCode(node, in: document, source: source, language: language) })
     }
 
     private var navigationRow: some View {
@@ -784,43 +890,6 @@ struct XgentIOSNode: View {
         .overlay {
             RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
                 .stroke(Color(xgentHex: palette.border), lineWidth: 1)
-        }
-    }
-
-    private var taskProgress: some View {
-        DisclosureGroup(isExpanded: $expanded) {
-            VStack(alignment: .leading, spacing: 9) { children }.padding(.top, 8)
-        } label: {
-            HStack(spacing: 8) {
-                statusIcon
-                Text(node.label ?? "Tasks").lineLimit(1)
-                Spacer(minLength: 8)
-                if let current = node.current, let total = node.total {
-                    Text("\(Int(current))/\(Int(total))")
-                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                }
-            }
-        }
-        .font(.system(size: CGFloat(theme.typography.supporting * theme.fontScale)))
-        .padding(.horizontal, 10).padding(.vertical, 8)
-        .background(Color(xgentHex: palette.surface).opacity(0.78), in: RoundedRectangle(
-            cornerRadius: CGFloat(theme.radius.element), style: .continuous
-        ))
-        .overlay {
-            RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
-                .stroke(Color(xgentHex: palette.border), lineWidth: 1)
-        }
-    }
-
-    private var taskStep: some View {
-        HStack(alignment: .top, spacing: 9) {
-            statusIcon
-            VStack(alignment: .leading, spacing: 2) {
-                Text(node.label ?? "").font(.subheadline.weight(node.status == "running" ? .semibold : .regular))
-                if let text = node.text, !text.isEmpty {
-                    Text(text).font(.caption).foregroundStyle(.secondary)
-                }
-            }
         }
     }
 

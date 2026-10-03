@@ -12,7 +12,7 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
 import { invoke } from "@xgent/runtime";
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   FileText,
@@ -64,6 +64,8 @@ type GitHistoryEntry = {
 
 type GitIdentity = { name: string; email: string };
 
+class RetiredGitRequest extends Error {}
+
 type MobileGitReviewPanelProps = {
   open: boolean;
   workdir: string;
@@ -86,27 +88,76 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
   const [selectedPath, setSelectedPath] = useState("");
   const [selectedCommit, setSelectedCommit] = useState<GitHistoryEntry | null>(null);
   const [detail, setDetail] = useState("");
-  const [commitMessage, setCommitMessage] = useState("");
+  const [commitMessage, setCommitMessageState] = useState("");
   const [identity, setIdentity] = useState<GitIdentity | null>(null);
-  const [authorName, setAuthorName] = useState("");
-  const [authorEmail, setAuthorEmail] = useState("");
+  const [authorName, setAuthorNameState] = useState("");
+  const [authorEmail, setAuthorEmailState] = useState("");
+  const drafts = useRef({ message: "", name: "", email: "" });
+  const setCommitMessage = useCallback((value: string) => {
+    drafts.current.message = value;
+    setCommitMessageState(value);
+  }, []);
+  const setAuthorName = useCallback((value: string) => {
+    drafts.current.name = value;
+    setAuthorNameState(value);
+  }, []);
+  const setAuthorEmail = useCallback((value: string) => {
+    drafts.current.email = value;
+    setAuthorEmailState(value);
+  }, []);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notRepository, setNotRepository] = useState(false);
   const [notice, setNotice] = useState("");
   const [discardPath, setDiscardPath] = useState("");
+  const scopeKey = JSON.stringify([open, workdir]);
+  const scope = useRef({
+    key: scopeKey,
+    revision: 0,
+    active: true,
+    request: 0,
+    busy: false,
+    mutating: false,
+  }).current;
+  if (scope.key !== scopeKey) {
+    scope.key = scopeKey;
+    scope.revision++;
+    scope.request++;
+    scope.busy = false;
+    scope.mutating = false;
+  }
+  const revision = scope.revision;
+  const current = useCallback(
+    () => open && scope.active && scope.key === scopeKey && scope.revision === revision,
+    [open, scope, scopeKey, revision],
+  );
+  useEffect(() => {
+    scope.active = true;
+    return () => {
+      scope.active = false;
+      scope.request++;
+    };
+  }, [scope, scopeKey]);
   const run = useCallback(
     async <T,>(label: string, action: () => Promise<T>): Promise<T> => {
+      if (!current() || scope.busy) throw new RetiredGitRequest();
       if (!workdir.trim()) throw new Error(t("chat.mobileTerminal.noWorkspace"));
+      const request = ++scope.request;
+      scope.busy = true;
       setBusy(label);
       setError("");
       try {
-        return await action();
+        const result = await action();
+        if (!current() || scope.request !== request) throw new RetiredGitRequest();
+        return result;
       } finally {
-        setBusy("");
+        if (current() && scope.request === request) {
+          scope.busy = false;
+          setBusy("");
+        }
       }
     },
-    [t, workdir],
+    [current, scope, t, workdir],
   );
 
   const refreshStatus = useCallback(async () => {
@@ -125,13 +176,14 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
       );
       setError("");
     } catch (cause) {
+      if (!current() || cause instanceof RetiredGitRequest) return;
       const message = cause instanceof Error ? cause.message : String(cause);
       setSnapshot(null);
       setIdentity(null);
       setNotRepository(message.toLowerCase().includes("not a git repository"));
       setError(message);
     }
-  }, [run, workdir]);
+  }, [current, run, workdir]);
 
   const refreshHistory = useCallback(async () => {
     try {
@@ -140,13 +192,20 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
       );
       setError("");
     } catch (cause) {
+      if (!current() || cause instanceof RetiredGitRequest) return;
       setHistory([]);
       setError(cause instanceof Error ? cause.message : String(cause));
     }
-  }, [run, workdir]);
+  }, [current, run, workdir]);
 
   useEffect(() => {
-    if (!open) return;
+    setBusy("");
+    setError("");
+    setSnapshot(null);
+    setIdentity(null);
+    setHistory([]);
+    setDiscardPath("");
+    setCommitMessage("");
     setView("changes");
     setHistoryLoaded(false);
     setDetail("");
@@ -156,8 +215,8 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
     setNotRepository(false);
     setAuthorName("");
     setAuthorEmail("");
-    void refreshStatus();
-  }, [open, refreshStatus]);
+    if (open) void refreshStatus();
+  }, [open, refreshStatus, setCommitMessage, setAuthorName, setAuthorEmail]);
 
   useEffect(() => {
     if (!open || view !== "history" || historyLoaded) return;
@@ -178,19 +237,22 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
 
   const openChange = useCallback(
     async (change: GitChange) => {
+      if (!current() || scope.busy) return;
       setSelectedPath(change.path);
       setSelectedCommit(null);
       setDiscardPath("");
+      setDetail("");
       try {
         const output = await run("diff", () =>
           invoke<string>("mobile_git_diff", { workdir, path: change.path }),
         );
         setDetail(output.trim() || t("projectTools.gitReview.noDiff"));
       } catch (cause) {
+        if (!current() || cause instanceof RetiredGitRequest) return;
         setError(cause instanceof Error ? cause.message : String(cause));
       }
     },
-    [run, t, workdir],
+    [current, scope, run, t, workdir],
   );
 
   const mutate = useCallback(
@@ -201,6 +263,8 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
       success: string,
       message?: string,
     ): Promise<boolean> => {
+      if (!current() || scope.busy || scope.mutating) return false;
+      scope.mutating = true;
       try {
         await run(label, () =>
           invoke<string>("mobile_git_mutate", {
@@ -208,8 +272,8 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
             operation,
             path,
             message: message ?? null,
-            author_name: operation === "commit" ? authorName.trim() || null : null,
-            author_email: operation === "commit" ? authorEmail.trim() || null : null,
+            author_name: operation === "commit" ? drafts.current.name.trim() || null : null,
+            author_email: operation === "commit" ? drafts.current.email.trim() || null : null,
           }),
         );
         setNotice(success);
@@ -217,19 +281,24 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
         setSelectedPath("");
         setDiscardPath("");
         await refreshStatus();
-        return true;
+        return current();
       } catch (cause) {
+        if (!current() || cause instanceof RetiredGitRequest) return false;
         setError(cause instanceof Error ? cause.message : String(cause));
         return false;
+      } finally {
+        if (current()) scope.mutating = false;
       }
     },
-    [authorEmail, authorName, refreshStatus, run, workdir],
+    [current, scope, refreshStatus, run, workdir],
   );
 
   const openCommit = useCallback(
     async (entry: GitHistoryEntry) => {
+      if (!current() || scope.busy) return;
       setSelectedCommit(entry);
       setSelectedPath("");
+      setDetail("");
       try {
         setDetail(
           await run("commit-detail", () =>
@@ -237,15 +306,22 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
           ),
         );
       } catch (cause) {
+        if (!current() || cause instanceof RetiredGitRequest) return;
         setError(cause instanceof Error ? cause.message : String(cause));
       }
     },
-    [run, workdir],
+    [current, scope, run, workdir],
   );
 
   const commitNow = async () => {
-    const message = commitMessage.trim();
-    if (!canCommit) return;
+    const message = drafts.current.message.trim();
+    if (
+      !current() ||
+      !stagedCount ||
+      !message ||
+      (needsIdentity && (!drafts.current.name.trim() || !drafts.current.email.trim()))
+    )
+      return;
     if (
       await mutate(
         "commit",
@@ -255,7 +331,7 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
         message,
       )
     ) {
-      setCommitMessage("");
+      if (current() && drafts.current.message.trim() === message) setCommitMessage("");
     }
   };
   const commit = async (event: FormEvent) => {
@@ -264,14 +340,19 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
   };
 
   const remoteOperation = async (operation: "fetch" | "pull" | "push") => {
+    if (!current() || scope.busy || scope.mutating) return;
+    scope.mutating = true;
     try {
       await run(operation, () => invoke("mobile_git_remote", { workdir, operation }));
       setNotice(t(`projectTools.gitReview.${operation}SuccessMessage`));
       await refreshStatus();
       if (view === "history") await refreshHistory();
     } catch (cause) {
+      if (!current() || cause instanceof RetiredGitRequest) return;
       setError(cause instanceof Error ? cause.message : String(cause));
       setNotice("");
+    } finally {
+      if (current()) scope.mutating = false;
     }
   };
 
@@ -279,7 +360,13 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
     await mutate("init", "init", null, t("projectTools.gitReview.initSuccessMessage"));
   };
 
-  const close = () => onClose();
+  const close = () => {
+    if (!current()) return;
+    scope.active = false;
+    scope.revision++;
+    scope.request++;
+    onClose();
+  };
 
   if (!open) return null;
 
@@ -293,7 +380,11 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
       accepts: (value: PresentationValue) => boolean,
       enabled = true,
     ) => {
-      handlers.set(id, { run: runAction, accepts, enabled });
+      handlers.set(id, {
+        run: (value) => (current() ? runAction(value) : undefined),
+        accepts,
+        enabled: enabled && current(),
+      });
       return id;
     };
     const button = (
@@ -639,7 +730,9 @@ export function MobileGitReviewPanel(props: MobileGitReviewPanelProps) {
           nodes,
         }}
         handlers={handlers}
-        onError={(cause) => setError(cause instanceof Error ? cause.message : String(cause))}
+        onError={(cause) => {
+          if (current()) setError(cause instanceof Error ? cause.message : String(cause));
+        }}
       />
     );
   }

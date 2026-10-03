@@ -92,3 +92,44 @@ test("SSH authentication errors retire the prompt and permit a fresh connection"
   h.render().cancel(); await retrying;
   h.unmount();
 });
+
+test("SSH submits the latest acknowledged secret once before publishing a new document", async () => {
+  const answers = [], reply = deferred();
+  const h = harness({
+    createSsh: async () => ({ prompt: { id: "auth", kind: "auth", answerEcho: false } }),
+    answerSshPrompt: answer => { answers.push(answer); return reply.promise; },
+  });
+  const connecting = h.render().connect(params); await settle();
+  h.render().setAnswer("old");
+  const surface = h.render();
+  surface.setAnswer("最后一字 🔑");
+  surface.submit(); surface.submit();
+  surface.setAnswer("late edit after submit");
+  await settle();
+  assert.deepEqual(answers, [{ promptId: "auth", answer: "最后一字 🔑" }]);
+  assert.equal(h.render().answer, "");
+  h.render().cancel();
+  assert.deepEqual(h.calls, [["cancel", "auth"]]);
+  reply.resolve({ snapshot });
+  assert.equal(await connecting, null);
+  assert.ok(h.calls.some(call => call[0] === "close"));
+  h.unmount();
+});
+
+test("retired SSH handlers cannot connect, edit or cancel after leaving and returning to a workspace", async () => {
+  const h = harness({ createSsh: async () => ({ prompt: { id: "auth", kind: "auth" } }) });
+  const first = h.render().connect(params); await settle();
+  const old = h.render();
+  h.props.key = "/other"; h.render();
+  assert.equal(await first, null);
+  h.props.key = "/project"; h.render();
+  const current = h.render().connect(params); await settle();
+  const surface = h.render(); surface.setAnswer("current password");
+  old.setAnswer("obsolete"); old.submit(); old.cancel(); old.retire();
+  assert.equal(await old.connect(params), null);
+  assert.equal(h.render().answer, "current password");
+  assert.equal(h.calls.filter(call => call[0] === "cancel").length, 1);
+  h.render().submit();
+  assert.equal(await current, snapshot);
+  h.unmount();
+});

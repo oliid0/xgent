@@ -34,14 +34,33 @@ export function NativeDesktopTerminalPanel(props: {
   const selection = useRef(selectedId);
   selection.current = selectedId;
   const [shells, setShells] = useState<TerminalShellOption[]>([]);
-  const [shell, setShell] = useState("");
+  const [shell, setShellState] = useState("");
+  const shellDraft = useRef("");
+  const setShell = (value: string | ((previous: string) => string)) => {
+    shellDraft.current = typeof value === "function" ? value(shellDraft.current) : value;
+    setShellState(shellDraft.current);
+  };
   const [loading, setLoading] = useState(false);
   const [operationBusy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [renameId, setRenameId] = useState("");
-  const [title, setTitle] = useState("");
-  const [hostId, setHostId] = useState("");
+  const [title, setTitleState] = useState("");
+  const titleDraft = useRef("");
+  const renameTarget = useRef("");
+  const setTitle = (value: string) => {
+    titleDraft.current = value;
+    setTitleState(value);
+  };
+  const [hostId, setHostIdState] = useState("");
+  const hostDraft = useRef("");
+  const cancelHostConnection = useRef<(() => void) | null>(null);
+  const setHostId = (value: string | ((previous: string) => string)) => {
+    const next = typeof value === "function" ? value(hostDraft.current) : value;
+    if (next !== hostDraft.current) cancelHostConnection.current?.();
+    hostDraft.current = next;
+    setHostIdState(hostDraft.current);
+  };
   const scope = useRef({
     open: props.open,
     key: props.projectPathKey,
@@ -76,9 +95,10 @@ export function NativeDesktopTerminalPanel(props: {
   const stream = useNativeTerminalStream(props.client, session, props.open);
   const ssh = useNativeSshConnection(
     props.client,
-    JSON.stringify([props.workdir, props.projectPathKey, kind, hostId]),
+    JSON.stringify([props.workdir, props.projectPathKey, kind]),
     props.open && kind === "ssh",
   );
+  cancelHostConnection.current = ssh.cancel;
   const busy = operationBusy || ssh.connecting;
   const ready = Boolean(props.workdir.trim() && props.projectPathKey.trim());
   const hosts = useMemo(
@@ -106,6 +126,7 @@ export function NativeDesktopTerminalPanel(props: {
     setSelectedId("");
     setError("");
     setRenameId("");
+    renameTarget.current = "";
     setTitle("");
     operation.current = false;
     setBusy(false);
@@ -165,7 +186,14 @@ export function NativeDesktopTerminalPanel(props: {
   }, [props.client, props.open, props.projectPathKey, props.workdir, kind, ready, refresh, cancel]);
 
   const create = async () => {
-    if (!ready || loading || operation.current || !scope.current.open || (kind === "ssh" && !host))
+    const targetHost = hosts.find((item) => item.id === hostDraft.current);
+    if (
+      !ready ||
+      loading ||
+      operation.current ||
+      !scope.current.open ||
+      (kind === "ssh" && !targetHost)
+    )
       return;
     const revision = scope.current.revision;
     operation.current = true;
@@ -177,7 +205,7 @@ export function NativeDesktopTerminalPanel(props: {
           ? await ssh.connect({
               cwd: props.workdir,
               projectPathKey: props.projectPathKey,
-              hostId,
+              hostId: targetHost!.id,
               cols: 80,
               rows: 24,
               sftpEnabled: true,
@@ -185,7 +213,7 @@ export function NativeDesktopTerminalPanel(props: {
           : await props.client.create({
               cwd: props.workdir,
               projectPathKey: props.projectPathKey,
-              ...(shell ? { shell } : {}),
+              ...(shellDraft.current ? { shell: shellDraft.current } : {}),
               cols: 80,
               rows: 24,
             });
@@ -241,10 +269,13 @@ export function NativeDesktopTerminalPanel(props: {
       }
     }
   };
-  const rename = async () => {
-    const target = sessions.find((item) => item.id === renameId);
-    const name = title.trim();
+  const rename = async (submitted?: string) => {
+    const target = sessions.find(
+      (item) => item.id === renameId && renameTarget.current === item.id,
+    );
+    const name = (submitted ?? titleDraft.current).trim();
     if (!target || !name || name.length > 200 || operation.current || !scope.current.open) return;
+    if (submitted !== undefined) setTitle(submitted);
     const revision = scope.current.revision;
     const current = () => scope.current.open && scope.current.revision === revision;
     operation.current = true;
@@ -255,6 +286,7 @@ export function NativeDesktopTerminalPanel(props: {
       if (!current()) return;
       setSessions((items) => items.map((item) => (item.id === renamed.id ? renamed : item)));
       setRenameId("");
+      renameTarget.current = "";
     } catch (failure) {
       if (current()) setError(failure instanceof Error ? failure.message : String(failure));
     } finally {
@@ -307,18 +339,31 @@ export function NativeDesktopTerminalPanel(props: {
     {
       id: "terminal-selectors",
       kind: "TerminalToolbar",
+      variant: "terminal-connection-fields",
       label: panelTitle,
       spacing: 12,
       padding: 12,
       children: [
-        controls.select(
-          "terminal-session",
-          t("projectTools.terminalTitle"),
-          session?.id ?? "",
-          sessions.map((item) => ({ value: item.id, label: item.title || item.shell || item.id })),
-          setSelectedId,
-          !busy && sessions.length > 0,
-        ),
+        {
+          ...controls.select(
+            "terminal-session",
+            t("projectTools.terminalTitle"),
+            session?.id ?? "",
+            sessions.map((item) => ({
+              value: item.id,
+              label: item.title || item.shell || item.id,
+            })),
+            setSelectedId,
+            !busy && sessions.length > 0,
+          ),
+          variant: "terminal-session-tabs",
+          children: sessions.map((item) => ({
+            id: `terminal-session-state:${item.id}`,
+            kind: "StatusDot" as const,
+            label: `${item.cwd} · ${item.running ? item.shell : `${t("projectTools.terminalTitle")} (${item.exitCode ?? "—"})`}`,
+            status: item.running ? ("running" as const) : ("completed" as const),
+          })),
+        },
         kind === "ssh"
           ? controls.select(
               "terminal-host",
@@ -358,6 +403,7 @@ export function NativeDesktopTerminalPanel(props: {
           t("projectTools.fileTree.rename"),
           () => {
             if (!session) return;
+            renameTarget.current = session.id;
             setRenameId(session.id);
             setTitle(session.title || session.shell);
           },
@@ -522,6 +568,7 @@ export function NativeDesktopTerminalPanel(props: {
           {
             id: "terminal-rename-form",
             kind: "VStack" as const,
+            variant: "terminal-rename-editor",
             spacing: 8,
             padding: 12,
             children: [
@@ -538,16 +585,21 @@ export function NativeDesktopTerminalPanel(props: {
                 kind: "HStack" as const,
                 spacing: 8,
                 children: [
-                  controls.action(
-                    "terminal-name-save",
-                    t("projectTools.fileTree.rename"),
-                    rename,
-                    Boolean(title.trim()) && title.trim().length <= 200 && !busy,
-                  ),
+                  {
+                    id: "terminal-name-save",
+                    kind: "Button" as const,
+                    label: t("projectTools.fileTree.rename"),
+                    action: "terminal-name-save",
+                    disabled: busy,
+                  },
                   controls.action(
                     "terminal-name-cancel",
                     t("chat.cancel"),
-                    () => setRenameId(""),
+                    () => {
+                      if (operation.current) return;
+                      renameTarget.current = "";
+                      setRenameId("");
+                    },
                     !busy,
                   ),
                 ],
@@ -620,6 +672,12 @@ export function NativeDesktopTerminalPanel(props: {
         : []),
   ];
   controls.handlers.set("close", { enabled: true, accepts: (value) => value === null, run: close });
+  if (renameId)
+    controls.handlers.set("terminal-name-save", {
+      enabled: !busy,
+      accepts: (value) => value === null || typeof value === "string",
+      run: (value) => rename(typeof value === "string" ? value : undefined),
+    });
   if (session)
     controls.handlers.set(`terminal-events:${session.id}`, {
       enabled: Boolean(stream.packet),

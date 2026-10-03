@@ -3,6 +3,8 @@ import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 import { createReactHookHarness } from "../helpers/react-hook-harness.mjs";
 
+const allNodes = (nodes) => nodes.flatMap(node => [node, ...allNodes(node.children ?? [])]);
+
 function harness(options = {}) {
   const hooks = createReactHookHarness();
   const calls = [];
@@ -40,6 +42,7 @@ function harness(options = {}) {
     "../../../lib/runtimePlatform": { inferRuntimePlatform: () => options.platform ?? "ios" },
     "../../../components/icons": {},
     "../../../presentation/NativeSurface": { NativeSurface: "NativeSurface" },
+    "../../../presentation/nativeTheme": { createNativePresentationTheme: () => ({ fixture: true }) },
     "../../../runtime/applePresentation": { isApplePresentationRuntime: () => options.apple !== false },
     "./MobilePanelScaffold": { MobileFullscreenPanel: "MobileFullscreenPanel" },
   } });
@@ -76,6 +79,32 @@ test("mobile terminal sends compound cd commands and Shell syntax unchanged", as
   }
 });
 
+test("iOS command terminal separates streamed output from the input and uses the workspace appearance", () => {
+  const h = harness();
+  h.props.settings = { theme: "dark" };
+  const document = h.render().document;
+  assert.equal(document.appearance, "dark");
+  assert.equal(document.formFactor, "mobile");
+  assert.deepEqual(document.theme, { fixture: true });
+  const layout = document.nodes[0];
+  assert.equal(layout.kind, "TerminalLayout");
+  const [output, input] = layout.children;
+  assert.equal(output.id, "mobile-terminal-output");
+  assert.equal(input.id, "mobile-terminal-input");
+  assert.ok(output.children.some(node => node.id === "cwd"));
+  assert.ok(!output.children.some(node => node.id === "command"));
+  assert.ok(input.children.some(node => node.id === "command"));
+  assert.ok(input.children.some(node => node.id === "cancel"));
+});
+
+test("native terminal submission sees the final edit before a new React document is published", async () => {
+  const h = harness();
+  const previousDocument = h.render();
+  previousDocument.handlers.get("command").run("printf final-character");
+  await previousDocument.handlers.get("run").run(null);
+  assert.equal(h.calls.find(call => call.command === "shell_run").args.command, "printf final-character");
+});
+
 test("mobile terminal persists successful literal cd and restores the previous directory", async () => {
   const h = harness();
   assert.equal((await h.run("cd 'source files'")).cwd, "source files");
@@ -102,7 +131,7 @@ test("Android PRoot terminal navigates the guest rootfs and retains the director
   const h = harness({ native: true, platform: "android" });
   assert.equal((await h.run("cd /etc")).cwd, "/etc");
   assert.equal((await h.run("ls apk")).cwd, "/etc");
-  assert.equal(h.render().document.nodes.find(node => node.id === "cwd").text, "/etc");
+  assert.equal(allNodes(h.render().document.nodes).find(node => node.id === "cwd").text, "/etc");
   assert.equal((await h.run("cd ../root")).cwd, "/root");
   assert.equal((await h.run("cd -")).cwd, "/etc");
   assert.equal((await h.run("cd ../../..")).cwd, "/");
@@ -223,8 +252,8 @@ test("mobile terminal presents ANSI output and CR progress as readable text on b
   const apple = harness();
   apple.setResponse({ exitCode: 0, stdout: raw, stderr: "", cancelled: false });
   await apple.run("printf output");
-  const nativeOutput = apple.render().document.nodes.flatMap(node => node.children ?? [])
-    .find(node => node.id?.endsWith(":output"));
+  const nativeOutput = allNodes(apple.render().document.nodes)
+    .find(node => node.id?.endsWith(":stdout"));
   assert.equal(nativeOutput?.text, readable);
 
   const android = harness({ apple: false });
@@ -234,6 +263,26 @@ test("mobile terminal presents ANSI output and CR progress as readable text on b
   assert.equal(android.find("CodeBlock", value => value.title === "stdout")?.props.code, readable);
   assert.equal(android.find("CodeBlock", value => value.title === "stdout")?.props["aria-label"],
     `stdout:\n${readable}`);
+});
+
+test("both terminal surfaces keep stderr separate and show localized cancellation and timeout states", async () => {
+  const response = { exitCode: 137, stdout: "partial output", stderr: "process stopped", cancelled: true, timedOut: true };
+  const apple = harness();
+  apple.setResponse(response);
+  await apple.run("long command");
+  const nodes = allNodes(apple.render().document.nodes);
+  assert.equal(nodes.find(node => node.id.endsWith(":stdout")).text, "partial output");
+  assert.equal(nodes.find(node => node.id.endsWith(":stderr")).text, "process stopped");
+  assert.equal(nodes.find(node => node.id.endsWith(":exit")).status, "error");
+  assert.equal(nodes.find(node => node.id.endsWith(":cancelled")).label, "chat.mobileTerminal.cancelled");
+  assert.equal(nodes.find(node => node.id.endsWith(":timed-out")).label, "chat.mobileTerminal.timedOut");
+  const android = harness({ apple: false });
+  android.setResponse(response);
+  android.find("TextInput").props.onChange("long command");
+  await android.find("HStack", value => value.as === "form").props.onSubmit({ preventDefault() {} });
+  assert.equal(android.find("CodeBlock", value => value.title === "stderr").props.code, "process stopped");
+  assert.ok(android.find("Token", value => value.label === "chat.mobileTerminal.cancelled"));
+  assert.ok(android.find("Token", value => value.label === "chat.mobileTerminal.timedOut"));
 });
 
 test("old terminal results and errors cannot overwrite a new workspace run", async () => {
@@ -377,6 +426,19 @@ function inputHarness(apple, extra = {}) {
     writes: () => h.calls.filter(c => c.command === "plugin:mobile-execution|write_input"),
     ready: runId => h.emitOutput({ runId, ready: true }) });
 }
+
+test("native stdin submission preserves the final edit before publishing the next document", async () => {
+  const h = inputHarness(true);
+  const { running, runId } = await h.start();
+  h.ready(runId);
+  const previousDocument = h.render();
+  previousDocument.handlers.get("program-input").run("final Unicode 字符");
+  await previousDocument.handlers.get("send-input").run(null);
+  assert.equal(Buffer.from(h.writes()[0].args.request.dataBase64, "base64").toString(), "final Unicode 字符\n");
+  h.command.resolve({ exitCode: 0, stdout: "done", stderr: "", cancelled: false });
+  await running;
+  h.unmount();
+});
 
 test("iOS and Android send Unicode stdin and empty lines, then explicit EOF to the same local run", async () => {
   for (const apple of [true, false]) {

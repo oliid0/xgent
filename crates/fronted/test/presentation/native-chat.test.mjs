@@ -22,6 +22,34 @@ function assistantWork(transcript, id) {
   return work.children;
 }
 
+test("native chat carries authoritative editor sessions without adding a visible control or another surface", () => {
+  const snapshot = { scope: "editor-workspace", open: [JSON.stringify(["a", 1]), JSON.stringify(["b", 2])], revision: 4 };
+  const h = harness({ editorSessions: snapshot });
+  try {
+    const root = h.render().nodes.find(node => node.id === "chat");
+    assert.equal(root.kind, "ChatLayout");
+    assert.deepEqual(JSON.parse(root.text), { editorSessions: snapshot });
+    assert.equal(root.children.some(node => node.id.startsWith("workspace-editor-session")), false);
+  } finally { h.unmount?.(); }
+});
+
+test("desktop and mobile native transcript nodes dispatch the shared read-only tokenizer without a visible action button", async () => {
+  for (const mobile of [false, true]) {
+    const h = harness({}, { mobile });
+    try {
+      h.props.historyItems = [{ kind: "user", key: "user-code", timestamp: 1, attachments: [], text: "```json\n42\n```" }];
+      const transcript = h.render().nodes[0].children.find(node => node.id === "transcript");
+      const markdown = transcript.children.find(node => node.id === "user-code").children[0];
+      assert.equal(markdown.kind, "Markdown");
+      assert.match(JSON.parse(markdown.value).syntaxTheme, /^read-only-syntax-/);
+      const reply = await h.dispatch(markdown.action, JSON.stringify({ source: "{\"value\":42}\n", language: "json" }));
+      assert.equal(reply.ok, true);
+      assert.ok(JSON.parse(reply.acceptedValue).runs.length > 0);
+      assert.equal(markdown.children?.some(node => node.kind === "Button"), undefined);
+    } finally { h.unmount(); }
+  }
+});
+
 // Exercise the adapter and real action/composer stores without an Apple SDK.
 // Only React mounting and the native publication boundary are substituted.
 function harness(overrides = {}, options = {}) {
@@ -106,7 +134,7 @@ function harness(overrides = {}, options = {}) {
   };
   render();
   return {
-    props, render,
+    props, render, loader,
     documents: () => lastSurfaces.map((surface) => surface.props.document),
     dispatch: (action, value = null, surface = "chat") =>
       registry.dispatch({ action, value, surface, requestId: String(++request) }),
@@ -136,6 +164,25 @@ test("native edits reach the shared composer used by send and conversation draft
   h.unmount();
   assert.equal(h.props.composerRef.current, null);
   assert.equal((await h.dispatch("send")).ok, false);
+});
+
+test("native main chat publishes a working question card outside work and resumes the shared task", async () => {
+  const h = harness();
+  const ask = h.loader.loadModule("src/lib/tools/askUserQuestionTools.ts");
+  const toolCall = { id: "main-question", name: "AskUserQuestion", arguments: { questions: [
+    { id: "format", prompt: "选择输出格式", options: [{ label: "HTML", recommended: true }, { label: "PDF" }] },
+  ] } };
+  const pending = ask.createAskUserQuestionTools({ conversationId: "conversation" }).executeToolCall(toolCall);
+  h.props.liveTranscriptStore.updateLiveRounds(() => [{ round: 1, key: "r", blocks: [{ kind: "tool", item: { toolCall } }], runningToolCallIds: [toolCall.id] }]);
+  const transcript = h.render().nodes[0].children.find(node => node.id === "transcript");
+  const assistant = transcript.children.find(node => node.id === "live:assistant");
+  assert.ok(assistant.children.some(node => node.variant === "question-card"));
+  const prefix = "question:conversation:main-question";
+  assert.equal((await h.dispatch(`${prefix}:option:0:1`)).ok, true);
+  h.render();
+  assert.equal((await h.dispatch(`${prefix}:submit`)).ok, true);
+  assert.equal((await pending).details.answers[0].selectedLabel, "PDF");
+  h.unmount();
 });
 
 test("native mobile can queue a new draft while generation remains stoppable", async () => {
@@ -560,6 +607,7 @@ test("native chat and activity preserve file edit evidence from tool results", a
   const argumentsNode = tool.children.find((node) => node.id.endsWith(":arguments"));
   assert.equal(argumentsNode.label, "chat.toolDetails.arguments");
   assert.deepEqual(JSON.parse(argumentsNode.text), { path: "report.md" });
+  assert.equal(JSON.parse(argumentsNode.value).maxHeight, 160);
   assert.equal(tool.children.find((node) => node.id.endsWith(":result")).label, "chat.toolDetails.result");
   assert.equal(tool.children.find((node) => node.language === "text").text, "File edited successfully");
   const diff = tool.children.find((node) => node.language === "diff");
@@ -577,6 +625,7 @@ test("native chat and activity preserve file edit evidence from tool results", a
   h.render();
   const activity = h.documents().find((document) => document.title === "chat.activity.title");
   assert.equal(activity.nodes[0].children.find((node) => node.language === "diff").text, diff.text);
+  assert.equal(JSON.parse(activity.nodes[0].children.find((node) => node.language === "diff").value).maxHeight, 224);
   h.unmount();
 });
 
@@ -780,6 +829,12 @@ test("native sidebar routes skills, MCP, files, workspaces, recents, new chat an
   });
   assert.equal((await h.dispatch("sidebar")).ok, true);
   h.render();
+  const desktopSidebar = h.documents().find(item => item.mode === "sidebar").nodes[0];
+  assert.equal(desktopSidebar.children.find(node => node.id === "sidebar-close").action, "close");
+  const desktopTools = desktopSidebar.children.find(node => node.id === "sidebar-list").children;
+  for (const id of ["skills", "mcp", "files", "create-project"]) {
+    assert.ok(desktopTools.find(node => node.id === id).icon, `${id} has a desktop navigation icon`);
+  }
   for (const action of ["skills", "mcp", "files", "create-project", "new-chat", "settings"]) {
     assert.equal((await h.dispatch(action, null, "sidebar")).ok, true);
   }
@@ -789,7 +844,35 @@ test("native sidebar routes skills, MCP, files, workspaces, recents, new chat an
   assert.deepEqual(opened, ["skills", "mcp", "files", "new-workspace", "new-chat", "settings"]);
   assert.deepEqual(selected, ["project", "recent"]);
   assert.deepEqual(modes, ["tools"]);
+  assert.equal((await h.dispatch("close", null, "sidebar")).ok, true);
+  h.render();
+  assert.ok(!h.documents().some(document => document.mode === "sidebar"));
   h.unmount();
+});
+
+test("desktop workspace add menu opens shared browser, terminal, side conversation, Git and SSH controllers", async () => {
+  const opened = [];
+  const h = harness({
+    onOpenBrowser: () => opened.push("browser"), onOpenTerminal: () => opened.push("terminal"),
+    onNewSideConversation: () => opened.push("side-chat"), onOpenGitReview: () => opened.push("git"),
+    onOpenRemote: () => opened.push("ssh"),
+  });
+  try {
+    const menu = h.render().nodes[0].children.find(node => node.id === "workspace-panel-actions");
+    assert.equal(menu.kind, "Menu");
+    assert.deepEqual(menu.children.map(node => node.id), [
+      "workspace-open-browser", "workspace-open-terminal", "workspace-new-chat", "workspace-open-git", "workspace-open-ssh",
+    ]);
+    for (const node of menu.children) assert.equal((await h.dispatch(node.action)).ok, true);
+    assert.deepEqual(opened, ["browser", "terminal", "side-chat", "git", "ssh"]);
+    h.props.onNewSideConversation = undefined; h.render();
+    assert.equal((await h.dispatch("workspace-new-chat")).ok, false);
+  } finally { h.unmount(); }
+  const mobile = harness({}, { mobile: true });
+  try {
+    assert.ok(!mobile.render().nodes[0].children.some(node => node.id === "workspace-panel-actions"));
+    assert.equal((await mobile.dispatch("workspace-open-browser")).ok, false);
+  } finally { mobile.unmount(); }
 });
 
 test("native sidebar keeps workspace conversations nested above ordinary recent chats", async () => {

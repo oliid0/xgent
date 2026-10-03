@@ -31,46 +31,17 @@ import {
   Wifi,
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
+import { browserSessionController } from "../../lib/browser/browserSessionController";
 import {
-  browserSessionController,
-  normalizeBrowserAddress,
-} from "../../lib/browser/browserSessionController";
+  type CloudSecretVaultStatus,
+  type LanPcClientStatus,
+  type LocalAccessStatus,
+  normalizeComparableLanUrl,
+  normalizeLanControlUrl,
+} from "../../lib/localAccess";
 import type { AppSettings } from "../../lib/settings";
 import { writeClipboardText } from "../../lib/system/clipboardText";
 import type { SettingsSectionProps } from "./types";
-
-type LocalAccessStatus = {
-  enabled: boolean;
-  running: boolean;
-  bindAddress: string;
-  port: number;
-  urls: string[];
-  pairedDevices: number;
-  devices: LocalAccessDevice[];
-  pairingCode?: string | null;
-  pairingCodeExpiresAt?: number | null;
-  lastError?: string | null;
-};
-
-type LocalAccessDevice = {
-  deviceId: string;
-  label: string;
-  createdAt: number;
-  lastSeenAt: number;
-  expiresAt: number;
-};
-
-type CloudSecretVaultStatus = {
-  githubTokenConfigured: boolean;
-  githubUsername?: string | null;
-};
-
-type LanPcClientStatus = {
-  paired: boolean;
-  baseUrl?: string | null;
-  deviceId?: string | null;
-  expiresAt?: number | null;
-};
 
 const EMPTY_LOCAL_STATUS: LocalAccessStatus = {
   enabled: false,
@@ -128,28 +99,6 @@ function CopyButton({ value, label }: { value: string; label: string }) {
       }}
     />
   );
-}
-
-function normalizeLanControlUrl(value: string) {
-  const normalized = normalizeBrowserAddress(value);
-  const url = new URL(normalized);
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("The computer address must use HTTP or HTTPS.");
-  }
-  if (url.protocol === "http:" && !url.port) url.port = "28367";
-  url.pathname = "/";
-  url.search = "";
-  url.hash = "";
-  return url.toString();
-}
-
-function normalizeComparableLanUrl(value?: string | null) {
-  if (!value?.trim()) return "";
-  try {
-    return normalizeLanControlUrl(value).replace(/\/$/, "");
-  } catch {
-    return "";
-  }
 }
 
 export function AccessSection({ settings, setSettings, nativeMobile }: AccessSectionProps) {

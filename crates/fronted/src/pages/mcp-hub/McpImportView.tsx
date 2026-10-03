@@ -15,6 +15,7 @@ import { Token } from "@astryxdesign/core/Token";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FileText, Folder, Globe2, Server, Terminal } from "../../components/icons";
 import { useLocale } from "../../i18n";
+import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import { type AppSettings, type McpServerConfig, updateMcp } from "../../lib/settings";
 import {
   type ExternalMcpServerEntry,
@@ -22,6 +23,10 @@ import {
   scanExternalMcpServers,
   scanMcpConfigContent,
 } from "../../lib/skills";
+import { NativeSurface } from "../../presentation/NativeSurface";
+import { nativeMcpImport } from "../../presentation/nativeMcpImport";
+import { createNativePresentationTheme } from "../../presentation/nativeTheme";
+import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 
 const EXTERNAL_MCP_TOOL_LABELS: Record<string, string> = {
   "claude-code": "Claude Code",
@@ -66,6 +71,10 @@ export function McpImportView(props: {
   settings: AppSettings;
   setSettings: (updater: (prev: AppSettings) => AppSettings) => void;
   allowStdio?: boolean;
+  nativeSurfaceId?: string;
+  presentationMode?: "root" | "sheet";
+  onChangeView?: (view: "installed" | "store" | "import") => void;
+  onOpenSidebar?: () => void;
 }) {
   const { settings, setSettings, allowStdio = true } = props;
   const { t } = useLocale();
@@ -80,6 +89,13 @@ export function McpImportView(props: {
   const [importedCount, setImportedCount] = useState<number | null>(null);
   const [activeTool, setActiveTool] = useState<string>("claude-code");
   const userChoseToolRef = useRef(false);
+  const [scope] = useState(() => ({
+    active: true,
+    scanBusy: false,
+    fileBusy: false,
+    scanRevision: 0,
+    fileRevision: 0,
+  }));
 
   const allScans = useMemo(
     () => (fileScan ? [...(scans ?? []), fileScan] : (scans ?? [])),
@@ -91,10 +107,15 @@ export function McpImportView(props: {
   );
 
   const rescan = useCallback(async () => {
+    if (!scope.active || scope.scanBusy) return;
+    scope.scanBusy = true;
+    const revision = ++scope.scanRevision;
+    const current = () => scope.active && scope.scanRevision === revision;
     setLoading(true);
     setError(null);
     try {
       const result = await scanExternalMcpServers();
+      if (!current()) return;
       setScans(result);
       setSelected((previous) => {
         const valid = new Set(
@@ -108,15 +129,26 @@ export function McpImportView(props: {
         return next.size === previous.size ? previous : next;
       });
     } catch (scanError) {
-      setError(scanError instanceof Error ? scanError.message : String(scanError));
+      if (current()) setError(scanError instanceof Error ? scanError.message : String(scanError));
     } finally {
-      setLoading(false);
+      if (current()) {
+        scope.scanBusy = false;
+        setLoading(false);
+      }
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
-    if (scans === null && !loading) void rescan();
-  }, [loading, rescan, scans]);
+    scope.active = true;
+    void rescan();
+    return () => {
+      scope.active = false;
+      scope.scanBusy = false;
+      scope.fileBusy = false;
+      scope.scanRevision++;
+      scope.fileRevision++;
+    };
+  }, [rescan, scope]);
 
   useEffect(() => {
     if (userChoseToolRef.current || !scans || scans.length === 0) return;
@@ -127,28 +159,44 @@ export function McpImportView(props: {
     if (preferred && preferred.tool !== activeTool) setActiveTool(preferred.tool);
   }, [activeTool, scans]);
 
-  const scanSelectedFile = useCallback(async (file: File) => {
-    setFileError(null);
-    setFilePicking(true);
-    try {
-      if (file.size > MAX_MCP_CONFIG_FILE_BYTES) {
-        throw new Error(`File is larger than ${MAX_MCP_CONFIG_FILE_BYTES / 1024 / 1024} MiB`);
+  const scanSelectedFile = useCallback(
+    async (file: File) => {
+      if (!scope.active || scope.fileBusy || scope.scanBusy) return;
+      scope.fileBusy = true;
+      const revision = ++scope.fileRevision;
+      const current = () => scope.active && scope.fileRevision === revision;
+      setFileError(null);
+      setFilePicking(true);
+      try {
+        if (file.size > MAX_MCP_CONFIG_FILE_BYTES) {
+          throw new Error(`File is larger than ${MAX_MCP_CONFIG_FILE_BYTES / 1024 / 1024} MiB`);
+        }
+        const content = await file.text();
+        if (!current()) return;
+        const scan = await scanMcpConfigContent(file.name, content);
+        if (!current()) return;
+        setSelected((previous) => {
+          const next = new Set(
+            [...previous].filter((key) => !key.startsWith(`${LOCAL_FILE_TOOL}:`)),
+          );
+          return next.size === previous.size ? previous : next;
+        });
+        setFileScan(scan);
+        userChoseToolRef.current = true;
+        setActiveTool(LOCAL_FILE_TOOL);
+      } catch (scanError) {
+        if (current())
+          setFileError(scanError instanceof Error ? scanError.message : String(scanError));
+      } finally {
+        if (current()) {
+          scope.fileBusy = false;
+          setFilePicking(false);
+          setSelectedFile(null);
+        }
       }
-      const scan = await scanMcpConfigContent(file.name, await file.text());
-      setSelected((previous) => {
-        const next = new Set([...previous].filter((key) => !key.startsWith(`${LOCAL_FILE_TOOL}:`)));
-        return next.size === previous.size ? previous : next;
-      });
-      setFileScan(scan);
-      userChoseToolRef.current = true;
-      setActiveTool(LOCAL_FILE_TOOL);
-    } catch (scanError) {
-      setFileError(scanError instanceof Error ? scanError.message : String(scanError));
-    } finally {
-      setFilePicking(false);
-      setSelectedFile(null);
-    }
-  }, []);
+    },
+    [scope],
+  );
 
   const activeScan = allScans.find((scan) => scan.tool === activeTool);
   const importableInActive = useMemo(
@@ -167,6 +215,7 @@ export function McpImportView(props: {
     importableInActive.length > 0 && selectedInActive === importableInActive.length;
 
   function toggleServer(tool: string, server: ExternalMcpServerEntry) {
+    if (!scope.active || installedIds.has(server.id.trim().toLowerCase())) return;
     if (!allowStdio && server.transport === "stdio") return;
     const key = externalServerKey(tool, server);
     setSelected((previous) => {
@@ -190,6 +239,7 @@ export function McpImportView(props: {
   }
 
   function importSelected() {
+    if (!scope.active || scope.scanBusy || scope.fileBusy) return;
     const targets = allScans.flatMap((scan) =>
       scan.servers.filter(
         (server) =>
@@ -217,6 +267,59 @@ export function McpImportView(props: {
     });
     setSelected(new Set());
     setImportedCount(added);
+  }
+
+  if (isApplePresentationRuntime()) {
+    const compact = isNativeMobileRuntime();
+    const native = nativeMcpImport({
+      t,
+      scans: allScans,
+      activeScan,
+      activeTool,
+      sourceLabel: (scan) =>
+        scan.tool === LOCAL_FILE_TOOL
+          ? fileScanLabel(scan, t("mcpHub.importFileTab"))
+          : (EXTERNAL_MCP_TOOL_LABELS[scan.tool] ?? scan.tool),
+      chooseSource: (tool) => {
+        userChoseToolRef.current = true;
+        setActiveTool(tool);
+      },
+      error,
+      fileError,
+      importedCount,
+      loading,
+      filePicking,
+      installedIds,
+      allowStdio,
+      selected,
+      selectedInActive,
+      importableCount: importableInActive.length,
+      allActiveSelected,
+      toggleAllActive,
+      toggleServer,
+      rescan,
+      importSelected,
+      pickFile: scanSelectedFile,
+      onChangeView: props.onChangeView,
+      onOpenSidebar: props.onOpenSidebar,
+    });
+    return (
+      <NativeSurface
+        sessionSurface={props.nativeSurfaceId}
+        document={{
+          mode: props.presentationMode ?? "root",
+          title: t("mcpHub.tabImport"),
+          appearance: settings.theme,
+          formFactor: compact ? "mobile" : "desktop",
+          theme: createNativePresentationTheme(settings, compact, "workspaceTools"),
+          nodes: native.nodes,
+          dismissAction:
+            props.presentationMode === "sheet" && props.onOpenSidebar ? "close" : undefined,
+        }}
+        handlers={native.handlers}
+        onError={(cause) => setFileError(String(cause))}
+      />
+    );
   }
 
   return (

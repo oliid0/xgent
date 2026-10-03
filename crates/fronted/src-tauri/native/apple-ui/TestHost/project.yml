@@ -41,7 +41,12 @@ targets:
   XgentNativeUITests:
     type: bundle.unit-test
     platform: iOS
-    sources: ../Tests
+    sources:
+      - path: ../Tests
+        excludes: [Fixtures]
+      - path: ../Tests/Fixtures
+        type: folder
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.xgent.native-ui-tests

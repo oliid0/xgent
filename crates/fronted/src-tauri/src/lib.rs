@@ -54,6 +54,7 @@ macro_rules! app_invoke_handler {
         tauri::generate_handler![
             commands::app_commands::apple_ui::apple_ui_update,
             commands::app_commands::apple_ui::apple_ui_action_result,
+            commands::app_commands::apple_ui::apple_ui_font_families,
             // Chat history
             commands::chat_history::chat_history_list,
             commands::chat_history::chat_history_workdirs,
@@ -224,6 +225,7 @@ macro_rules! app_invoke_handler {
             commands::cua::cua_preview,
             commands::cua::component::cua_status,
             commands::cua::component::cua_set_enabled,
+            commands::cua::component::cua_request_permission,
             commands::cua::external_driver::cua_driver_probe,
             commands::cua::external_driver::cua_driver_install_command,
             commands::cua::external_driver::cua_driver_install,
@@ -383,6 +385,7 @@ macro_rules! app_invoke_handler {
         tauri::generate_handler![
             commands::app_commands::apple_ui::apple_ui_update,
             commands::app_commands::apple_ui::apple_ui_action_result,
+            commands::app_commands::apple_ui::apple_ui_font_families,
             commands::chat_history::chat_history_list,
             commands::chat_history::chat_history_workdirs,
             commands::chat_history::chat_history_search,

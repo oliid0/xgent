@@ -53,7 +53,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function mobileSshHarness(invoke) {
+function mobileSshHarness(invoke, options = {}) {
   const hooks = createReactHookHarness();
   const calls = [];
   let closes = 0;
@@ -80,10 +80,10 @@ function mobileSshHarness(invoke) {
     } },
     "../../../components/icons": {},
     "../../../i18n": { useLocale: () => ({ t: key => key }) },
-    "../../../lib/runtimePlatform": { isNativeMobileRuntime: () => true },
-    "../../../lib/terminal/runNativeSshCommand": { runNativeSshCommand() {
+    "../../../lib/runtimePlatform": { isNativeMobileRuntime: () => options.mobile !== false },
+    "../../../lib/terminal/runNativeSshCommand": { runNativeSshCommand: options.runNativeSshCommand ?? (() => {
       throw new Error("desktop SSH should not be used on mobile");
-    } },
+    }) },
     "../../../presentation/NativeSurface": { NativeSurface: "NativeSurface" },
     "../../../runtime/applePresentation": { isApplePresentationRuntime: () => true },
     "./MobilePanelScaffold": { MobileFullscreenPanel: "MobileFullscreenPanel" },
@@ -150,4 +150,60 @@ test("closing or unmounting mobile SSH cancels pending runs without reviving old
     await running;
     if (leave === "close") assert.equal(JSON.stringify(h.render().document).includes("stale"), false);
   }
+});
+
+test("mobile SSH uses the latest command and keyboard response before a document refresh", async () => {
+  const pending = deferred();
+  const h = mobileSshHarness(command => command === "shell_cancel" ? Promise.resolve({}) : pending.promise);
+  h.props.hosts[0].authType = "keyboardInteractive";
+  h.selectHost();
+  h.render().handlers.get("command").run("old command");
+  h.render().handlers.get("challenge").run("old password");
+  const surface = h.render();
+  assert.equal(surface.handlers.get("run").enabled, true);
+  surface.handlers.get("command").run("printf '最后一字 🔑'");
+  surface.handlers.get("challenge").run("验证码 123456");
+  const running = surface.handlers.get("run").run(null);
+  await surface.handlers.get("run").run(null);
+  assert.equal(h.calls.filter(call => call.command === "mobile_ssh_exec").length, 1);
+  assert.equal(h.calls[0].args.remote_command, "printf '最后一字 🔑'");
+  assert.equal(h.calls[0].args.keyboard_response, "验证码 123456");
+  const waiting = h.render();
+  assert.equal(JSON.stringify(waiting.document).includes("验证码 123456"), false);
+  pending.resolve({ exitCode: 7, stdout: "stdout", stderr: "stderr", cancelled: true, timedOut: true });
+  await running;
+  const rendered = h.render();
+  const nodes = rendered.document.nodes.flatMap(function walk(node) { return [node, ...(node.children ?? []).flatMap(walk)]; });
+  assert.equal(nodes.find(node => node.id === "mobile-ssh-layout").kind, "TerminalLayout");
+  assert.ok(nodes.some(node => node.kind === "CodeBlock" && node.text === "stdout"));
+  assert.ok(nodes.some(node => node.kind === "CodeBlock" && node.text === "stderr"));
+  assert.ok(nodes.some(node => node.kind === "Badge" && node.label === "chat.mobileTerminal.cancelled"));
+  assert.ok(nodes.some(node => node.kind === "Badge" && node.label === "chat.mobileTerminal.timedOut"));
+  assert.equal(rendered.handlers.get("clear").enabled, true);
+  rendered.handlers.get("clear").run(null);
+  assert.equal(JSON.stringify(h.render().document).includes("stdout"), false);
+  h.unmount();
+});
+
+test("command SSH authentication consumes the latest secret once and clears it after submission", async () => {
+  const answers = [], completed = deferred();
+  const h = mobileSshHarness(() => Promise.resolve({}), {
+    mobile: false,
+    async runNativeSshCommand(options) {
+      answers.push(await options.prompt({ id: "password", kind: "auth", message: "Password", answerEcho: false }));
+      return completed.promise;
+    },
+  });
+  h.selectHost(); h.render().handlers.get("command").run("pwd");
+  const running = h.render().handlers.get("run").run(null);
+  const surface = h.render();
+  surface.handlers.get("ssh-answer").run("最后密码 🔑");
+  surface.handlers.get("ssh-confirm").run(null);
+  surface.handlers.get("ssh-confirm").run(null);
+  await Promise.resolve();
+  assert.deepEqual(answers, [{ answer: "最后密码 🔑" }]);
+  assert.equal(JSON.stringify(h.render().document).includes("最后密码 🔑"), false);
+  completed.resolve({ exitCode: 0, stdout: "ready", stderr: "", cancelled: false });
+  await running;
+  h.unmount();
 });

@@ -78,6 +78,8 @@ jobs:
       - name: Test frontend modules
         timeout-minutes: 10
         working-directory: crates/fronted
+        env:
+          XGENT_REQUIRE_BROWSER_TESTS: "true"
         run: pnpm test:frontend
 
       - name: Test release scripts
@@ -204,6 +206,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Compile the macOS computer permission bridge through the production command
+        run: |
+          set -o pipefail
+          xcrun swiftc -swift-version 5 -O -emit-library -static -module-name XgentComputerUse \
+            -target arm64-apple-macosx15.0 -sdk "$(xcrun --sdk macosx --show-sdk-path)" \
+            ../computer-use/macos/*.swift -o "$RUNNER_TEMP/libXgentComputerUse.a" \
+            2>&1 | tee "$RUNNER_TEMP/native-computer-use.log"
+          xcrun nm -g "$RUNNER_TEMP/libXgentComputerUse.a" > "$RUNNER_TEMP/native-computer-use-symbols.txt"
+          grep -Eq ' [Tt] _xgent_cua_permissions$' "$RUNNER_TEMP/native-computer-use-symbols.txt"
+
       - name: Test macOS package
         run: |
           set -o pipefail
@@ -251,6 +263,8 @@ jobs:
           test -s "$binary_path/libXgentNativeUI.a"
           xcrun nm -g "$binary_path/libXgentNativeUI.a" > "$RUNNER_TEMP/native-symbols.txt"
           grep -q 'xgent_native_ui_reset' "$RUNNER_TEMP/native-symbols.txt"
+          grep -Eq ' [Tt] _xgent_native_ui_font_families$' "$RUNNER_TEMP/native-symbols.txt"
+          grep -Eq ' [Tt] _xgent_native_ui_font_families_free$' "$RUNNER_TEMP/native-symbols.txt"
 
       - name: Export native screenshots
         if: ${{ always() }}
@@ -273,6 +287,7 @@ jobs:
             crates/fronted/src-tauri/native/apple-ui/Package.resolved
             ${{ runner.temp }}/native-*.log
             ${{ runner.temp }}/native-symbols.txt
+            ${{ runner.temp }}/native-computer-use-symbols.txt
             ${{ runner.temp }}/native-screenshots
             ${{ runner.temp }}/native-desktop-screenshots
           retention-days: 3

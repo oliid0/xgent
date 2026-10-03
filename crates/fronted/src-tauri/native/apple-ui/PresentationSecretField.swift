@@ -43,7 +43,9 @@ struct XgentIOSSecretField: UIViewRepresentable {
         if field.text != text && field.markedTextRange == nil { field.text = text }
         field.placeholder = node.text
         field.isEnabled = enabled
-        field.font = .systemFont(ofSize: CGFloat(theme.typography.body * theme.fontScale) * scale)
+        let fontSize = CGFloat(theme.typography.body * theme.fontScale) * scale
+        field.font = XgentFonts.name(for: theme.fontFamily).flatMap { UIFont(name: $0, size: fontSize) }
+            ?? .systemFont(ofSize: fontSize)
         field.textColor = UIColor(Color(xgentHex: theme.palette(for: colorScheme).text))
         field.tintColor = UIColor(Color(xgentHex: theme.palette(for: colorScheme).accent))
         field.accessibilityIdentifier = node.id

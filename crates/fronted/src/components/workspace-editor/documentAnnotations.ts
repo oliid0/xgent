@@ -4,6 +4,7 @@ import { PDFDocument, PDFHexString, PDFName } from "pdf-lib";
 const PRESENTATION = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const DRAWING = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const RELATIONSHIP = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const PACKAGE_RELATIONSHIP = "http://schemas.openxmlformats.org/package/2006/relationships";
 
 function parseXml(source: string) {
   const document = new DOMParser().parseFromString(source, "application/xml");
@@ -52,14 +53,20 @@ export async function annotateDocument(
   const slide = presentation.getElementsByTagNameNS(PRESENTATION, "sldId")[pageNumber - 1];
   if (!slide) throw new Error("Slide number is outside this presentation");
   const relationships = await xml("ppt/_rels/presentation.xml.rels");
-  const relationship = Array.from(relationships.getElementsByTagName("Relationship")).find(
-    (item) => item.getAttribute("Id") === slide.getAttributeNS(RELATIONSHIP, "id"),
-  );
+  const relationship = Array.from(
+    relationships.getElementsByTagNameNS(PACKAGE_RELATIONSHIP, "Relationship"),
+  ).find((item) => item.getAttribute("Id") === slide.getAttributeNS(RELATIONSHIP, "id"));
   const target = relationship?.getAttribute("Target");
   if (!target || relationship?.getAttribute("TargetMode") === "External")
     throw new Error("Invalid slide relationship");
-  const path = new URL(target, "https://package.invalid/ppt/presentation.xml").pathname.slice(1);
-  if (!path.startsWith("ppt/slides/")) throw new Error("Unsupported slide part location");
+  const location = new URL(target, "https://package.invalid/ppt/presentation.xml");
+  const path = decodeURIComponent(location.pathname.slice(1));
+  if (
+    location.origin !== "https://package.invalid" ||
+    !path.startsWith("ppt/slides/") ||
+    path.split("/").some((part) => part === "." || part === "..")
+  )
+    throw new Error("Unsupported slide part location");
   const document = await xml(path);
   const tree = document.getElementsByTagNameNS(PRESENTATION, "spTree")[0];
   if (!tree) throw new Error("Slide has no shape tree");
@@ -68,11 +75,9 @@ export async function annotateDocument(
   const height = Number(size?.getAttribute("cy"));
   if (!(width > 0 && height > 0)) throw new Error("Invalid presentation dimensions");
   const id =
-    Math.max(
+    Array.from(document.getElementsByTagNameNS(PRESENTATION, "cNvPr")).reduce(
+      (maximum, item) => Math.max(maximum, Number(item.getAttribute("id")) || 0),
       0,
-      ...Array.from(document.getElementsByTagNameNS(PRESENTATION, "cNvPr")).map(
-        (item) => Number(item.getAttribute("id")) || 0,
-      ),
     ) + 1;
   const note = parseXml(`<p:sp xmlns:p="${PRESENTATION}" xmlns:a="${DRAWING}">
     <p:nvSpPr><p:cNvPr id="${id}" name="Xgent annotation ${id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>

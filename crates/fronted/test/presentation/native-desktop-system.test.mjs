@@ -68,6 +68,7 @@ test("native desktop shell discovery and tray settings use the real shared clien
   enabled = true;
   render();
   assert.equal(node("terminal-shell").disabled, true);
+  assert.equal(node("terminal-shell").text, "settings.terminalShellDesc");
   assert.equal((await dispatch("terminal-shell", "bash")).ok, false);
   resolveInitial({ options: [{ id: "bash", label: "Bash", command: "/bin/bash" }], default_shell: "bash" });
   await settle();

@@ -13,9 +13,10 @@ import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } fro
 import { GitBranch, Key, Send, Square, Terminal, Trash2, X } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import { inferRuntimePlatform } from "../../../lib/runtimePlatform";
-import type { SshHostConfig } from "../../../lib/settings";
+import type { AppSettings, SshHostConfig } from "../../../lib/settings";
 import { presentationControls } from "../../../presentation/controls";
 import { NativeSurface } from "../../../presentation/NativeSurface";
+import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
 import type { PresentationNode } from "../../../presentation/types";
 import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import { MobileFullscreenPanel } from "./MobilePanelScaffold";
@@ -48,6 +49,7 @@ export type MobileShellPanelMode = "terminal" | "git" | "ssh";
 type MobileTerminalPanelProps = {
   open: boolean;
   workdir: string;
+  settings?: AppSettings;
   preferLanPcExecution?: boolean;
   mode?: MobileShellPanelMode;
   sshHosts?: SshHostConfig[];
@@ -209,10 +211,22 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
     mode === "terminal" &&
     isTauriRuntime() &&
     ["android", "ios"].includes(inferRuntimePlatform());
-  const [command, setCommand] = useState(initialCommand);
+  const [command, setCommandValue] = useState(initialCommand);
   const [entries, setEntries] = useState<TerminalEntry[]>([]);
   const [activeRunId, setActiveRunId] = useState("");
-  const [inputText, setInputText] = useState("");
+  const [inputText, setInputValue] = useState("");
+  // Native edits and a keyboard submit can arrive before React publishes the
+  // next document. Commands/stdin must read the draft accepted by that edit.
+  const drafts = useRef({ command: initialCommand, input: "" });
+  const setCommand = useCallback((next: string) => {
+    drafts.current.command = next;
+    setCommandValue(next);
+  }, []);
+  const setInputText = useCallback((next: string | ((previous: string) => string)) => {
+    const value = typeof next === "function" ? next(drafts.current.input) : next;
+    drafts.current.input = value;
+    setInputValue(value);
+  }, []);
   const [inputReady, setInputReady] = useState(false);
   const [inputBusy, setInputBusy] = useState(false);
   const [inputError, setInputError] = useState("");
@@ -447,6 +461,8 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
       runScopeKey,
       guestFilesystem,
       liveInputEnabled,
+      setCommand,
+      setInputText,
     ],
   );
 
@@ -505,7 +521,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    await runCommand(command);
+    await runCommand(drafts.current.command);
   };
 
   const cancel = async () => {
@@ -541,7 +557,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
   const sendInput = async (eof = false) => {
     const id = inputState.runId;
     if (!isCurrentRun(id) || !inputState.ready || inputState.busy) return;
-    const text = inputText;
+    const text = drafts.current.input;
     const bytes = new TextEncoder().encode(eof ? "" : `${text}\n`);
     if (bytes.length > 16 * 1024) {
       setInputError(t("chat.mobileTerminal.inputTooLarge"));
@@ -613,37 +629,59 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
           !activeRunId && isCurrentScope(),
         ),
       ),
-      ...entries.map(
-        (entry): PresentationNode =>
-          c.group(entry.id, `$ ${entry.command}`, [
-            {
-              id: `${entry.id}:output`,
-              kind: "Text",
-              text: entry.error
-                ? displayTerminalOutput(
-                    [entry.liveStdout, entry.liveStderr, entry.error].filter(Boolean).join("\n"),
-                  )
-                : displayTerminalOutput(
-                    [
-                      entry.response?.stdout ?? entry.liveStdout,
-                      entry.response?.stderr ?? entry.liveStderr,
-                    ]
-                      .filter(Boolean)
-                      .join("\n"),
-                  ),
-            },
-            ...(entry.response
+      ...entries.map((entry): PresentationNode => {
+        const exitCode = entry.response?.exitCode ?? entry.response?.exit_code;
+        const streams = [
+          ["stdout", entry.response?.stdout ?? entry.liveStdout],
+          ["stderr", entry.response?.stderr ?? entry.liveStderr],
+          ["error", entry.error],
+        ] as const;
+        return c.group(entry.id, `$ ${entry.command}`, [
+          ...streams.flatMap(([stream, raw]): PresentationNode[] =>
+            raw
               ? [
                   {
-                    id: `${entry.id}:exit`,
-                    kind: "Text" as const,
-                    text: `Exit: ${entry.response.exitCode ?? entry.response.exit_code}${entry.response.cancelled ? " ? Cancelled" : ""}${(entry.response.timedOut ?? entry.response.timed_out) ? " ? Timed out" : ""}`,
-                    secondary: true,
+                    id: `${entry.id}:${stream}`,
+                    kind: "CodeBlock",
+                    label: stream,
+                    language: "plaintext",
+                    text: displayTerminalOutput(raw),
                   },
                 ]
-              : []),
-          ]),
-      ),
+              : [],
+          ),
+          ...(exitCode !== undefined
+            ? [
+                {
+                  id: `${entry.id}:exit`,
+                  kind: "Badge" as const,
+                  label: t("chat.mobileTerminal.exitCode").replace("{code}", String(exitCode)),
+                  status: exitCode === 0 ? ("completed" as const) : ("error" as const),
+                },
+              ]
+            : []),
+          ...(entry.response?.cancelled
+            ? [
+                {
+                  id: `${entry.id}:cancelled`,
+                  kind: "Badge" as const,
+                  label: t("chat.mobileTerminal.cancelled"),
+                  status: "paused" as const,
+                },
+              ]
+            : []),
+          ...((entry.response?.timedOut ?? entry.response?.timed_out)
+            ? [
+                {
+                  id: `${entry.id}:timed-out`,
+                  kind: "Badge" as const,
+                  label: t("chat.mobileTerminal.timedOut"),
+                  status: "error" as const,
+                },
+              ]
+            : []),
+        ]);
+      }),
       ...(activeRunId
         ? [{ id: "running", kind: "Progress" as const, label: t("chat.mobileTerminal.running") }]
         : []),
@@ -680,7 +718,7 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
         : []),
       c.input(
         "command",
-        "Command",
+        commandLabel,
         command,
         (value) => {
           if (isCurrentScope()) setCommand(value);
@@ -690,11 +728,11 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
       ),
       c.action(
         "run",
-        t("chat.send"),
-        () => runCommand(command),
+        t("chat.mobileTerminal.run"),
+        () => runCommand(drafts.current.command),
         !!command.trim() && !!workdir.trim() && !activeRunId && isCurrentScope(),
       ),
-      c.action("cancel", t("chat.stopGeneration"), cancel, !!activeRunId),
+      c.action("cancel", t("chat.mobileTerminal.stop"), cancel, !!activeRunId),
       c.action(
         "clear",
         t("chat.mobileTerminal.clear"),
@@ -709,8 +747,37 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
         document={{
           mode: "sheet",
           title: panelTitle,
-          appearance: "system",
-          nodes,
+          appearance: props.settings?.theme ?? "system",
+          formFactor: "mobile",
+          theme: props.settings
+            ? createNativePresentationTheme(props.settings, true, "workspaceTools")
+            : undefined,
+          nodes: [
+            {
+              id: "mobile-terminal-layout",
+              kind: "TerminalLayout",
+              fill: true,
+              children: [
+                {
+                  id: "mobile-terminal-output",
+                  kind: "VStack",
+                  spacing: 12,
+                  children: nodes.filter(
+                    (node) =>
+                      !["live-input", "command", "run", "cancel", "clear"].includes(node.id),
+                  ),
+                },
+                {
+                  id: "mobile-terminal-input",
+                  kind: "VStack",
+                  spacing: 8,
+                  children: nodes.filter((node) =>
+                    ["live-input", "command", "run", "cancel", "clear"].includes(node.id),
+                  ),
+                },
+              ],
+            },
+          ],
           dismissAction: "close",
         }}
         handlers={c.handlers}
@@ -879,6 +946,16 @@ export function MobileTerminalPanel(props: MobileTerminalPanelProps) {
                           color={exitCode === 0 ? "green" : "red"}
                           size="sm"
                         />
+                      ) : null}
+                      {response?.cancelled ? (
+                        <Token
+                          label={t("chat.mobileTerminal.cancelled")}
+                          color="orange"
+                          size="sm"
+                        />
+                      ) : null}
+                      {(response?.timedOut ?? response?.timed_out) ? (
+                        <Token label={t("chat.mobileTerminal.timedOut")} color="red" size="sm" />
                       ) : null}
                     </VStack>
                   </Card>

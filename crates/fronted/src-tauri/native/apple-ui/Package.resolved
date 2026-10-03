@@ -1,6 +1,15 @@
 {
   "pins" : [
     {
+      "identity" : "keyboardshortcuts",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sindresorhus/KeyboardShortcuts",
+      "state" : {
+        "revision" : "64e598b88ee7551fc905e0fc2b97669cef681848",
+        "version" : "3.0.1"
+      }
+    },
+    {
       "identity" : "codeeditorview",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mchakravarty/CodeEditorView",

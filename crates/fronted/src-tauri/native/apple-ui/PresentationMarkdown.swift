@@ -13,6 +13,9 @@ import AppKit
 struct XgentMarkdown: View {
     let text: String
     var secondary = false
+    var codeConfiguration = XgentCodeBlockConfiguration.markdown
+    var highlightCode: ((String, String) async -> String?)? = nil
+    @StateObject private var codeStore = XgentMarkdownCodeStore()
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .body) private var bodySize: CGFloat = 15
@@ -20,9 +23,10 @@ struct XgentMarkdown: View {
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
 
     var body: some View {
-        Markdown(text)
+        Markdown(codeStore.prepare(text))
             .markdownTheme(.gitHub)
             .markdownTextStyle {
+                if let name = XgentFonts.name(for: theme.fontFamily) { FontFamily(.custom(name)) }
                 FontSize(bodySize * CGFloat(theme.fontScale * theme.typography.body / 15))
                 ForegroundColor(Color(xgentHex: secondary ? palette.secondaryText : palette.text))
                 BackgroundColor(nil)
@@ -35,9 +39,11 @@ struct XgentMarkdown: View {
             }
             .markdownImageProvider(XgentMarkdownImageFallback())
             .markdownInlineImageProvider(XgentMarkdownImageFallback())
-            .markdownCodeSyntaxHighlighter(XgentSwiftHighlighter(dark: colorScheme == .dark))
             .markdownBlockStyle(\.codeBlock) { configuration in
-                XgentCodeBlock(text: configuration.content, language: configuration.language)
+                let entry = codeStore.entry(content: configuration.content, language: configuration.language)
+                XgentCodeBlock(text: entry?.code.source ?? (configuration.content.isEmpty ? "" : configuration.content + "\n"),
+                               language: XgentMarkdownCodeEntry.languageName(configuration.language) ?? "markdown",
+                               configuration: codeConfiguration, retainedState: entry?.state, highlightCode: highlightCode)
                     .markdownMargin(top: 0, bottom: 12)
             }
             .markdownBlockStyle(\.table) { configuration in
@@ -57,12 +63,13 @@ struct XgentMarkdown: View {
 
 @MainActor
 enum XgentCodeClipboard {
-    static func copy(_ text: String) {
+    @discardableResult static func copy(_ text: String) -> Bool {
         #if os(iOS)
         UIPasteboard.general.string = text
+        return true
         #else
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        return NSPasteboard.general.setString(text, forType: .string)
         #endif
     }
 }

@@ -5,6 +5,7 @@ import { AdaptiveDialog } from "../../../components/astryx/AdaptiveDialog";
 import { FolderTree } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
 import type { AppSettings, WorkspaceProject } from "../../../lib/settings";
+import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
 import { ProjectRootsSection } from "../../settings/ProjectRootsSection";
 import type { SettingsSectionProps } from "../../settings/types";
 
@@ -16,6 +17,17 @@ export function WorkspaceProjectSettingsDialog(props: {
 }) {
   const { project, settings, setSettings, onClose } = props;
   const { t } = useLocale();
+
+  if (isApplePresentationRuntime())
+    return (
+      <ProjectRootsSection
+        settings={settings}
+        setSettings={setSettings}
+        selectedProjectId={project.id}
+        showProjectSelector={false}
+        onBack={onClose}
+      />
+    );
 
   return (
     <AdaptiveDialog

@@ -12,8 +12,11 @@ export function createNativeTaskProgress(
         kind: "TaskProgress",
         label:
           taskProgress.tasks.find((task) => task.status === "in_progress")?.activeForm ||
-          taskProgress.tasks.find((task) => task.status !== "completed")?.subject ||
-          t("chat.tasks.completed"),
+          taskProgress.tasks.find((task) => task.status === "in_progress")?.subject ||
+          (taskProgress.tasks.every((task) => task.status === "completed")
+            ? t("chat.tasks.completed")
+            : t("chat.tasks.ready")),
+        accessibilityLabel: t("chat.tasks.todo"),
         text: `${taskProgress.tasks.filter((task) => task.status === "completed").length}/${taskProgress.tasks.length}`,
         current: taskProgress.tasks.filter((task) => task.status === "completed").length,
         total: taskProgress.tasks.length,
@@ -28,6 +31,13 @@ export function createNativeTaskProgress(
           label: task.subject,
           text: task.status === "in_progress" ? task.activeForm : task.description,
           status: task.status === "in_progress" ? (running ? "running" : "paused") : task.status,
+          accessibilityValue: t(
+            task.status === "completed"
+              ? "chat.tasks.completed"
+              : task.status === "in_progress"
+                ? "chat.mobileActivity.working"
+                : "chat.tasks.todo",
+          ),
         })),
       }
     : undefined;

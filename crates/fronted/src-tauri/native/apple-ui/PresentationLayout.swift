@@ -176,12 +176,14 @@ extension XgentNodeView {
     }
 
     var nativeMarkdown: some View {
-        XgentMarkdown(text: node.text ?? "")
+        XgentMarkdown(text: node.text ?? "", codeConfiguration: .decode(node.value?.text, fallback: .markdown),
+                      highlightCode: { source, language in await model.highlightCode(node, in: document, source: source, language: language) })
     }
 
     var nativeCodeBlock: some View {
-        XgentCodeBlock(text: node.text ?? "", language: node.language, label: node.label)
-            .accessibilityLabel(node.label ?? node.language ?? "Code")
+        XgentCodeBlock(text: node.text ?? "", language: node.language, label: node.label,
+                       configuration: .decode(node.value?.text, fallback: .plain),
+                       highlightCode: { source, language in await model.highlightCode(node, in: document, source: source, language: language) })
     }
 
     var nativeBadge: some View {
@@ -406,47 +408,6 @@ extension XgentNodeView {
         }
     }
 
-    var nativeTaskProgress: some View {
-        DisclosureGroup(isExpanded: $expanded) {
-            VStack(alignment: .leading, spacing: 9) { children }.padding(.top, 8)
-        } label: {
-            HStack(spacing: 8) {
-                semanticStatusIcon
-                Text(node.label ?? "Tasks").lineLimit(1)
-                Spacer(minLength: 8)
-                if let current = node.current, let total = node.total {
-                    Text("\(Int(current))/\(Int(total))")
-                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                }
-            }
-        }
-        .font(.system(size: CGFloat(presentationTheme.typography.supporting * presentationTheme.fontScale)))
-        .padding(.horizontal, 10).padding(.vertical, 8)
-        .background(
-            Color(xgentHex: palette.surface).opacity(0.78),
-            in: RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element),
-                                 style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: CGFloat(presentationTheme.radius.element), style: .continuous)
-                .stroke(Color(xgentHex: palette.border), lineWidth: 1)
-        }
-        .accessibilityValue(node.text ?? "")
-    }
-
-    var nativeTaskStep: some View {
-        HStack(alignment: .top, spacing: 9) {
-            semanticStatusIcon
-            VStack(alignment: .leading, spacing: 2) {
-                Text(node.label ?? "").font(.subheadline.weight(node.status == "running" ? .semibold : .regular))
-                if let text = node.text, !text.isEmpty {
-                    Text(text).font(.caption).foregroundStyle(Color(xgentHex: palette.secondaryText))
-                }
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
     private func reportBrowserViewport(_ rect: CGRect, visible: Bool) {
         guard rect.origin.x.isFinite, rect.origin.y.isFinite,
               rect.width.isFinite, rect.height.isFinite else { return }
@@ -468,11 +429,6 @@ extension XgentNodeView {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityLabel(node.label ?? "Browser content")
-    }
-
-    var nativeBrowserLayout: some View {
-        VStack(spacing: 0) { children }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var mediaData: Data? {
@@ -583,47 +539,12 @@ extension XgentNodeView {
         .buttonStyle(.plain)
         .opacity(node.secondary == true ? 0.62 : 1)
     }
-    private var colorBinding: Binding<Color> {
-        Binding(
-            get: { Color(xgentHex: model.value(node, in: document).text) },
-            set: { color in
-                #if os(iOS)
-                let resolved = UIColor(color)
-                var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
-                guard resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return }
-                #else
-                guard let resolved = NSColor(color).usingColorSpace(.sRGB) else { return }
-                let red = resolved.redComponent, green = resolved.greenComponent
-                let blue = resolved.blueComponent
-                #endif
-                let value = String(format: "#%02x%02x%02x", Int(red * 255), Int(green * 255), Int(blue * 255))
-                model.send(node, in: document, value: .string(value), editing: true)
-            }
-        )
-    }
-
     var nativeColorInput: some View {
-        ColorPicker(node.label ?? "", selection: colorBinding, supportsOpacity: false)
-            .frame(minHeight: 44)
+        XgentColorInput(node: node, document: document, model: model)
     }
 
     var nativeTextArea: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            XgentFieldLabel(node: node)
-            if let language = node.language, !language.isEmpty {
-                XgentCodeEditor(text: textBinding, language: language, label: node.label ?? language,
-                                enabled: node.disabled != true,
-                                wrapText: node.wrap ?? (document.formFactor != .desktop),
-                                showsMinimap: document.formFactor == .desktop)
-                    .id("\(document.surface):\(node.id)")
-            } else {
-                TextEditor(text: textBinding)
-                    .scrollContentBackground(.hidden)
-                    .frame(minHeight: 112)
-                    .modifier(XgentFieldSurface(node: node))
-                    .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
-            }
-        }
+        XgentTextArea(node: node, document: document, model: model)
     }
 
     @ViewBuilder var nodeLabel: some View {
@@ -658,7 +579,7 @@ extension XgentNodeView {
 
     var chatLayout: some View {
         VStack(spacing: 0) {
-            ForEach((node.children ?? []).filter { $0.kind != .composer }) { child in
+            ForEach((node.children ?? []).filter { $0.kind != .composer && $0.id != "workspace-panel-actions" }) { child in
                 XgentNodeView(node: child, document: document, model: model)
             }
         }
@@ -705,6 +626,19 @@ struct XgentRootLayout: View {
     }
 
     @ViewBuilder private func content(_ document: XgentDocument) -> some View {
+        #if os(macOS)
+        if document.mode == .sidebar && document.nodes.contains(where: { $0.id == "sidebar-layout" }) {
+            XgentDesktopSidebar(document: document, model: model)
+                .preferredColorScheme(document.colorScheme)
+                .modifier(XgentPresentationThemeModifier(theme: document.theme ?? .fallback,
+                                                        appearance: document.appearance))
+        } else { genericContent(document) }
+        #else
+        genericContent(document)
+        #endif
+    }
+
+    private func genericContent(_ document: XgentDocument) -> some View {
         XgentNodeChildren(nodes: document.nodes, document: document, model: model)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background { XgentThemeBackground() }
@@ -722,6 +656,7 @@ struct XgentRootLayout: View {
             }
             application
         }
+        .modifier(XgentCodeBlockViewport())
     }
 
     @ViewBuilder private var application: some View {

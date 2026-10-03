@@ -4,6 +4,7 @@ import {
   Suspense,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -53,6 +54,7 @@ import type { ChatQueueTurnPreview } from "../pages/chat/components/ChatComposer
 import { createNativeComposerStore } from "./composerStore";
 import { presentationControls } from "./controls";
 import { NativeSurface } from "./NativeSurface";
+import { useNativeAskUserQuestions } from "./nativeAskUserQuestions";
 import { toolEvidenceNodes } from "./nativeChatEvidence";
 import { createNativeChatRuntimeControls } from "./nativeChatRuntimeControls";
 import { createNativeChatTranscript } from "./nativeChatTranscript";
@@ -61,8 +63,11 @@ import {
   mutateNativeConversation,
 } from "./nativeConversationActions";
 import { decodeNativeFiles } from "./nativeFiles";
+import { nativeReadOnlyCodeNodes } from "./nativeReadOnlyCode";
+import { attachReadOnlySyntax, readOnlySyntaxPalette } from "./nativeReadOnlySyntax";
 import { createNativeTaskProgress } from "./nativeTaskProgress";
 import { createNativePresentationTheme } from "./nativeTheme";
+import type { NativeWorkspaceEditorSessions } from "./nativeWorkspaceEditorSessions";
 import type { PresentationHandler, PresentationNode, PresentationValue } from "./types";
 
 const NativeDesktopTrajectory = lazy(() => import("./NativeDesktopTrajectory"));
@@ -81,6 +86,7 @@ function activityIcon(toolName: string) {
 }
 
 export type NativeChatPageProps = {
+  editorSessions?: NativeWorkspaceEditorSessions;
   conversationId: string;
   uploadWorkdir: string;
   settings: AppSettings;
@@ -273,6 +279,10 @@ export function NativeChatPage(props: NativeChatPageProps) {
       if (props.composerRef.current === composer.handle) props.composerRef.current = null;
     };
   }, [composer, props.composerRef]);
+  const syntaxPalette = useMemo(
+    () => readOnlySyntaxPalette(props.settings, compact),
+    [props.settings, compact],
+  );
   if (failure) throw failure;
 
   const handlers = new Map<string, PresentationHandler>();
@@ -314,13 +324,23 @@ export function NativeChatPage(props: NativeChatPageProps) {
     arguments: t("chat.toolDetails.arguments"),
     result: t("chat.toolDetails.result"),
   };
-  const messages = createNativeChatTranscript(
-    props.historyItems,
-    live,
-    showThinking,
-    t,
-    action,
-    props.onOpenWorkspaceFile,
+  const activityItems = collectActivityItems(props.historyItems, live).filter(
+    (item) => !isTaskToolBlock({ kind: "tool", item }),
+  );
+  const questions = useNativeAskUserQuestions(props.conversationId, activityItems, t);
+  for (const [id, handler] of questions.handlers) handlers.set(id, handler);
+  const messages = attachReadOnlySyntax(
+    createNativeChatTranscript(
+      props.historyItems,
+      live,
+      showThinking,
+      t,
+      action,
+      props.onOpenWorkspaceFile,
+      questions.nodes,
+    ),
+    handlers,
+    syntaxPalette,
   );
   const taskProgress = selectLatestTaskProgress(
     props.historyItems,
@@ -328,9 +348,6 @@ export function NativeChatPage(props: NativeChatPageProps) {
     props.taskList,
   );
   const taskProgressNode = createNativeTaskProgress(taskProgress, props.isSending, t);
-  const activityItems = collectActivityItems(props.historyItems, live).filter(
-    (item) => !isTaskToolBlock({ kind: "tool", item }),
-  );
   const activeActivity = [...activityItems].reverse().find((item) => item.running);
   const latestActivity = activeActivity ?? activityItems.at(-1);
   const latestActivityFrame = latestActivity
@@ -462,8 +479,59 @@ export function NativeChatPage(props: NativeChatPageProps) {
     {
       id: "chat",
       kind: "ChatLayout",
+      text: props.editorSessions
+        ? JSON.stringify({ editorSessions: props.editorSessions })
+        : undefined,
       fill: true,
       children: [
+        ...(!compact
+          ? [
+              {
+                id: "workspace-panel-actions",
+                kind: "Menu" as const,
+                label: t("chat.workspacePanel.open"),
+                icon: "plus",
+                children: [
+                  {
+                    ...button("workspace-open-browser", t("browser.title"), props.onOpenBrowser),
+                    icon: "globe",
+                  },
+                  {
+                    ...button(
+                      "workspace-open-terminal",
+                      t("chat.mobileMenu.terminal"),
+                      props.onOpenTerminal,
+                    ),
+                    icon: "terminal",
+                  },
+                  ...(props.onNewSideConversation
+                    ? [
+                        {
+                          ...button(
+                            "workspace-new-chat",
+                            t("chat.newConversation"),
+                            props.onNewSideConversation,
+                          ),
+                          icon: "bubble.left",
+                        },
+                      ]
+                    : []),
+                  {
+                    ...button(
+                      "workspace-open-git",
+                      t("chat.mobileMenu.gitReview"),
+                      props.onOpenGitReview,
+                    ),
+                    icon: "arrow.triangle.branch",
+                  },
+                  {
+                    ...button("workspace-open-ssh", t("chat.mobileMenu.ssh"), props.onOpenRemote),
+                    icon: "server.rack",
+                  },
+                ],
+              },
+            ]
+          : []),
         {
           id: "toolbar",
           kind: "HStack",
@@ -882,6 +950,17 @@ export function NativeChatPage(props: NativeChatPageProps) {
       kind: "NavigationRow",
       label,
       action: id,
+      icon: compact
+        ? undefined
+        : (
+            {
+              skills: "link",
+              mcp: "point.3.connected.trianglepath.dotted",
+              files: "folder",
+              trajectory: "clock.arrow.circlepath",
+              "create-project": "plus",
+            } as Record<string, string>
+          )[id],
       variant: compact ? "sidebar" : undefined,
     };
   };
@@ -1076,32 +1155,36 @@ export function NativeChatPage(props: NativeChatPageProps) {
     setTrajectoryOpen(true);
   };
   const activityControls = presentationControls();
+  for (const [id, handler] of questions.handlers) activityControls.handlers.set(id, handler);
   activityControls.handlers.set("close", {
     enabled: true,
     accepts: (value) => value === null,
     run: () => setActivityOpen(false),
   });
   const activityNodes: PresentationNode[] = activityItems.length
-    ? activityItems.map((item) => ({
-        id: `activity:${item.toolCall.id}`,
-        kind: "ToolCall",
-        label: item.toolCall.name,
-        text: summarizeToolCall(item.toolCall, { includeName: false }),
-        status: item.running
-          ? "running"
-          : item.toolResult?.isError
-            ? "error"
-            : item.toolResult
-              ? "completed"
-              : "pending",
-        children: toolEvidenceNodes(
-          item.toolResult,
-          `activity:${item.toolCall.id}`,
-          safeStringify(item.toolCall.arguments),
-          contentLabels,
-          item.toolCall.arguments,
-        ),
-      }))
+    ? activityItems.map(
+        (item) =>
+          questions.nodes.get(item.toolCall.id) ?? {
+            id: `activity:${item.toolCall.id}`,
+            kind: "ToolCall",
+            label: item.toolCall.name,
+            text: summarizeToolCall(item.toolCall, { includeName: false }),
+            status: item.running
+              ? "running"
+              : item.toolResult?.isError
+                ? "error"
+                : item.toolResult
+                  ? "completed"
+                  : "pending",
+            children: toolEvidenceNodes(
+              item.toolResult,
+              `activity:${item.toolCall.id}`,
+              safeStringify(item.toolCall.arguments),
+              contentLabels,
+              item.toolCall.arguments,
+            ),
+          },
+      )
     : [
         {
           id: "activity-empty",
@@ -1215,6 +1298,18 @@ export function NativeChatPage(props: NativeChatPageProps) {
                 padding: 16,
                 children: [
                   { id: "sidebar-title", kind: "Heading" as const, text: "Xgent" },
+                  ...(!compact
+                    ? [
+                        {
+                          id: "sidebar-close",
+                          kind: "IconButton" as const,
+                          label: t("sidebar.closeSidebar"),
+                          icon: "sidebar.leading",
+                          action: "close",
+                          variant: "ghost",
+                        },
+                      ]
+                    : []),
                   {
                     id: "sidebar-execution-mode",
                     kind: compact ? "Selector" : "SegmentedControl",
@@ -1492,7 +1587,11 @@ export function NativeChatPage(props: NativeChatPageProps) {
             formFactor: compact ? "mobile" : "desktop",
             theme: createNativePresentationTheme(props.settings, compact, "workspaceTools"),
             dismissAction: "close",
-            nodes: activityNodes,
+            nodes: attachReadOnlySyntax(
+              nativeReadOnlyCodeNodes(activityNodes, t),
+              activityControls.handlers,
+              syntaxPalette,
+            ),
           }}
           handlers={activityControls.handlers}
           onError={setFailure}

@@ -6,7 +6,7 @@
 // Shared by every frontend runtime. Platform differences belong in the
 // runtime boundary, never in this data hook.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   formatMemoryError,
   type MemoryMeta,
@@ -75,11 +75,20 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [organizerWatchRunId, setOrganizerWatchRunId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<MemoryEditDraft>({
+  const [editDraft, setEditDraftState] = useState<MemoryEditDraft>({
     description: "",
     body: "",
     appendBody: "",
   });
+  const editDraftRef = useRef(editDraft);
+  const setEditDraft = useCallback(
+    (update: MemoryEditDraft | ((current: MemoryEditDraft) => MemoryEditDraft)) => {
+      const next = typeof update === "function" ? update(editDraftRef.current) : update;
+      editDraftRef.current = next;
+      setEditDraftState(next);
+    },
+    [],
+  );
 
   async function reload(keepEntry?: string | null) {
     if (!scope.active) return false;
@@ -185,6 +194,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
   async function saveSelected() {
     if (!selected || !scope.active || scope.mutating) return;
     const epoch = scope.epoch;
+    const submittedDraft = editDraftRef.current;
     scope.mutating = true;
     setSaving(true);
     setError(null);
@@ -196,8 +206,8 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         scope: selected.scope,
         workdir: selectedEntryWorkdir(selectedEntry, workdir),
         workdirHash: selectedEntry?.scope === "project" ? selectedEntry.workdirHash : undefined,
-        description: isDaily ? undefined : editDraft.description,
-        body: isDaily ? editDraft.appendBody : editDraft.body,
+        description: isDaily ? undefined : submittedDraft.description,
+        body: isDaily ? submittedDraft.appendBody : submittedDraft.body,
         mode: isDaily ? "append" : "replace",
         actor: "user",
       });
@@ -245,7 +255,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
   }
 
   async function deleteSelected() {
-    if (!selected || !scope.active || scope.mutating) return;
+    if (!selected || !scope.active || scope.mutating) return false;
     const epoch = scope.epoch;
     scope.mutating = true;
     setSaving(true);
@@ -259,12 +269,14 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
         workdirHash: selectedEntry?.scope === "project" ? selectedEntry.workdirHash : undefined,
         actor: "user",
       });
-      if (!scope.active || scope.epoch !== epoch) return;
+      if (!scope.active || scope.epoch !== epoch) return false;
       setSelected(null);
       setSelectedEntry(null);
       if (await reload()) setNotice(t("settings.memoryDeleted"));
+      return scope.active && scope.epoch === epoch;
     } catch (err) {
       if (scope.active && scope.epoch === epoch) setError(formatMemoryError(err));
+      return false;
     } finally {
       if (scope.active && scope.epoch === epoch) {
         scope.mutating = false;
@@ -274,7 +286,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
   }
 
   async function wipeAll() {
-    if (!scope.active || scope.mutating) return;
+    if (!scope.active || scope.mutating) return false;
     const epoch = scope.epoch;
     scope.mutating = true;
     setSaving(true);
@@ -282,7 +294,7 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
     setNotice(null);
     try {
       const info = await memoryWipeAll();
-      if (!scope.active || scope.epoch !== epoch) return;
+      if (!scope.active || scope.epoch !== epoch) return false;
       setPathsInfo(info);
       setEntries([]);
       setQuota((prev) =>
@@ -297,8 +309,10 @@ export function useMemoryPanelData(input: { workdir?: string; t: (key: string) =
       setSelected(null);
       setSelectedEntry(null);
       setNotice(t("settings.memoryCleared"));
+      return true;
     } catch (err) {
       if (scope.active && scope.epoch === epoch) setError(formatMemoryError(err));
+      return false;
     } finally {
       if (scope.active && scope.epoch === epoch) {
         scope.mutating = false;

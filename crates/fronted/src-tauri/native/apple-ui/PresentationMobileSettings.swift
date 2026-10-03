@@ -52,7 +52,7 @@ struct XgentIOSSettingsForm: View {
                 } header: {
                     if !section.labels.isEmpty {
                         Text(section.labels.joined(separator: " / "))
-                            .font(.system(size: CGFloat(theme.typography.supporting * theme.fontScale) * headerScale))
+                            .font(XgentFonts.body(theme.fontFamily, size: CGFloat(theme.typography.supporting * theme.fontScale) * headerScale))
                             .fixedSize(horizontal: false, vertical: true)
                             .textCase(nil)
                             .accessibilityAddTraits(.isHeader)
@@ -62,6 +62,7 @@ struct XgentIOSSettingsForm: View {
         }
         .formStyle(.grouped)
         .environment(\.xgentIOSFormRow, true)
+        .environment(\.xgentSettingsRow, true)
         .scrollContentBackground(.hidden)
         .scrollDismissesKeyboard(.interactively)
         .id("\(document.id):\(route)")

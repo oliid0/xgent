@@ -6,22 +6,35 @@ type SshAnswer = { answer?: string; trustHostKey?: boolean };
 /** Uses the same host-key and authentication exchange as the desktop SSH registry. */
 export function useNativeSshConnection(client: TerminalClient, scopeKey: string, open: boolean) {
   const [prompt, setPrompt] = useState<TerminalSshPrompt | null>(null);
-  const [answer, setAnswer] = useState("");
+  const [answer, setAnswerState] = useState("");
+  const answerRef = useRef("");
+  const setAnswer = useCallback((value: string) => {
+    answerRef.current = value;
+    setAnswerState(value);
+  }, []);
   const [connecting, setConnecting] = useState(false);
   const [answering, setAnswering] = useState(false);
-  const scope = useRef({ key: scopeKey, open });
+  const scope = useRef({ key: scopeKey, open, revision: 0 });
   const previous = useRef({ key: scopeKey, open });
   if (previous.current.key !== scopeKey || previous.current.open !== open) {
     previous.current = { key: scopeKey, open };
-    scope.current = { key: scopeKey, open };
+    scope.current = { key: scopeKey, open, revision: scope.current.revision + 1 };
   }
+  const revision = scope.current.revision;
+  const isCurrentScope = () =>
+    scope.current.open && scope.current.key === scopeKey && scope.current.revision === revision;
   const sequence = useRef(0);
   const active = useRef(false);
-  const pending = useRef<{ id: string; resolve: (answer: SshAnswer | null) => void } | null>(null);
+  const pending = useRef<{
+    id: string;
+    submitted: boolean;
+    resolve: (answer: SshAnswer | null) => void;
+  } | null>(null);
 
   const retire = useCallback(() => {
     sequence.current += 1;
     active.current = false;
+    setAnswer("");
     const waiting = pending.current;
     pending.current = null;
     waiting?.resolve(null);
@@ -29,9 +42,9 @@ export function useNativeSshConnection(client: TerminalClient, scopeKey: string,
       void client.cancelSshPrompt(waiting.id).catch((error: unknown) => {
         console.error("SSH prompt cancellation failed", error);
       });
-  }, [client]);
+  }, [client, setAnswer]);
   useEffect(() => {
-    scope.current = { key: scopeKey, open };
+    scope.current.open = open;
     setPrompt(null);
     setAnswer("");
     setConnecting(false);
@@ -40,15 +53,14 @@ export function useNativeSshConnection(client: TerminalClient, scopeKey: string,
       scope.current.open = false;
       retire();
     };
-  }, [scopeKey, open, retire]);
+  }, [scopeKey, open, retire, setAnswer]);
 
   const connect = async (
     params: Parameters<TerminalClient["createSsh"]>[0],
   ): Promise<TerminalSnapshot | null> => {
-    if (active.current || !scope.current.open) return null;
+    if (active.current || !isCurrentScope()) return null;
     const token = ++sequence.current;
-    const current = () =>
-      scope.current.open && scope.current.key === scopeKey && sequence.current === token;
+    const current = () => isCurrentScope() && sequence.current === token;
     active.current = true;
     setConnecting(true);
     try {
@@ -68,7 +80,7 @@ export function useNativeSshConnection(client: TerminalClient, scopeKey: string,
         setAnswer("");
         setAnswering(false);
         const response = await new Promise<SshAnswer | null>((resolve) => {
-          pending.current = { id: question.id, resolve };
+          pending.current = { id: question.id, submitted: false, resolve };
         });
         if (!response || !current()) return null;
         setAnswering(true);
@@ -95,18 +107,25 @@ export function useNativeSshConnection(client: TerminalClient, scopeKey: string,
   return {
     prompt,
     answer,
-    setAnswer,
+    setAnswer: (value: string) => {
+      if (isCurrentScope() && pending.current && !pending.current.submitted) setAnswer(value);
+    },
     connecting,
     answering,
     connect,
     submit: () => {
-      if (!prompt || !pending.current || pending.current.id !== prompt.id || answering) return;
+      const waiting = pending.current;
+      if (!isCurrentScope() || !prompt || !waiting || waiting.id !== prompt.id || waiting.submitted)
+        return;
+      const response = answerRef.current;
+      waiting.submitted = true;
       // Retire the UI answer immediately, including saved passwords/passphrases.
       setAnswer("");
       setAnswering(true);
-      pending.current.resolve(prompt.kind === "hostKey" ? { trustHostKey: true } : { answer });
+      waiting.resolve(prompt.kind === "hostKey" ? { trustHostKey: true } : { answer: response });
     },
     cancel: () => {
+      if (!isCurrentScope()) return;
       retire();
       setPrompt(null);
       setAnswer("");
@@ -114,6 +133,7 @@ export function useNativeSshConnection(client: TerminalClient, scopeKey: string,
       setAnswering(false);
     },
     retire: () => {
+      if (!isCurrentScope()) return;
       scope.current.open = false;
       retire();
     },

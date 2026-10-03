@@ -46,6 +46,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
     "../pages/settings/BackupSyncSection": { BackupSyncSection: "BackupSyncSection" },
     "../pages/settings/NativeProviderRuntimeSettings": { NativeProviderRuntimeSettings: "NativeProviderRuntimeSettings" },
     "../pages/settings/NativeProviderModelSettings": { NativeProviderModelSettings: "NativeProviderModelSettings" },
+    "../pages/settings/NativeProviderRequestSettings": { NativeProviderRequestSettings: "NativeProviderRequestSettings" },
     "./SettingsModalShell": { SettingsModalShell: "SettingsModalShell" },
     "../pages/settings/useCodexOAuthAccounts": { useCodexOAuthAccounts: () => ({ status: { accounts: [] }, loaded: true, locked: false }) },
   } });
@@ -117,6 +118,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(settings.theme, "light", "system navigation preserves the root appearance selection");
   await dispatch("back");
   await dispatch("nav:providers");
+  await dispatch("provider-vendor", "codex");
   const count = settings.customProviders.length;
   assert.equal((await dispatch("add-provider")).ok, true);
   assert.equal(settings.customProviders.length, count + 1);
@@ -135,6 +137,8 @@ test("native settings mirrors compact navigation and persists shared system, pro
   await dispatch("provider-url", "https://example.test/v1");
   const modelsUrlEdit = await dispatch("provider-models-url", " https://catalog.example.test/v1/models ");
   assert.equal(modelsUrlEdit.acceptedValue, "https://catalog.example.test/v1/models");
+  assert.equal(rendered.props.handlers.get("fetch-models").enabled, false, "model refresh requires a configured credential like the desktop editor");
+  await dispatch("provider-key", "test-catalogue-key");
   discoveryError = new Error("Model list request timed out after 10 seconds");
   assert.equal((await dispatch("fetch-models")).ok, false);
   assert.equal(document.nodes.find(node => node.id === "error").label, discoveryError.message);
@@ -157,7 +161,12 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(discoveryOptions.customHeaders[0].value, "account-routing-id");
   await dispatch("provider-auth", "api-key");
   assert.equal(settings.customProviders.at(-1).customHeaders.length, 0);
-  assert.ok(settings.customProviders.at(-1).activeModels.includes("fetched-model"));
+  assert.ok(!settings.customProviders.at(-1).activeModels.includes("fetched-model"), "catalogue refresh preserves enabled models like the desktop editor");
+  await dispatch(`model:${settings.customProviders.at(-1).id}:fetched-model`, true);
+  // Choosing a model is a separate action from refreshing its catalogue.
+  settings = { ...settings, selectedModel: {
+    customProviderId: settings.customProviders.at(-1).id, model: "fetched-model",
+  } };
   assert.deepEqual(settings.selectedModel, {
     customProviderId: settings.customProviders.at(-1).id,
     model: "fetched-model",
@@ -172,12 +181,15 @@ test("native settings mirrors compact navigation and persists shared system, pro
   await dispatch("back");
   assert.ok(!document.nodes.some(node => node.id === "busy"), "pending work on a detail page must not lock the settings root");
   const otherProvider = settings.customProviders.find(item => item.id !== fetchingProviderId);
+  await dispatch("provider-vendor", otherProvider.type);
   await dispatch(`provider:${otherProvider.id}`);
+  await dispatch("provider-key", "other-provider-credential");
   assert.ok(rendered.props.handlers.get("fetch-models").enabled, "one provider request must not disable another provider");
   releaseDiscovery();
   await pendingDiscovery;
   discoveryPause = undefined;
   await dispatch("back");
+  await dispatch("provider-vendor", "codex");
   await dispatch(`provider:${fetchingProviderId}`);
   await dispatch("model-id", "example-model");
   assert.equal((await dispatch("add-model")).ok, true);
@@ -201,6 +213,12 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(rendered.props.providerType, provider.type);
   rendered.props.onBack(); render();
   assert.ok(rendered.props.handlers.has("fetch-models"), "Back returns to the same provider detail");
+  assert.equal((await dispatch("provider-request-settings")).ok, true);
+  assert.equal(rendered.type, "NativeProviderRequestSettings");
+  assert.equal(rendered.props.providerId, provider.id);
+  assert.equal(rendered.props.nativeSettingsSurfaceId, settingsSurface);
+  rendered.props.onBack(); render();
+  assert.ok(rendered.props.handlers.has("provider-request-settings"));
   await dispatch("back");
   await dispatch("back");
   await dispatch("nav:mobileAssistant");
@@ -210,7 +228,8 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.ok(document.nodes.some((node) => node.id === "personal-access"));
   await dispatch("back");
   await dispatch("nav:toolPermissions");
-  assert.ok(document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === "policy:Bash"));
+  const allPolicyNodes = nodes => nodes.flatMap(node => [node, ...allPolicyNodes(node.children ?? [])]);
+  assert.ok(allPolicyNodes(document.nodes).some(node => node.id === "policy:Bash" && node.kind === "Selector"));
   assert.equal((await dispatch("policy:Bash", "deny")).ok, true);
   assert.equal(settings.system.toolPolicies.Bash, "deny");
   assert.equal(settings.system.toolPolicies["personal:clipboard"], "deny");
@@ -232,6 +251,10 @@ test("native settings mirrors compact navigation and persists shared system, pro
   render();
   assert.equal(document.formFactor, "desktop");
   const flatten = nodes => nodes.flatMap(node => [node, ...flatten(node.children ?? [])]);
+  assert.deepEqual(flatten(document.nodes).filter(node =>
+    ["execution-mode", "desktop-terminal", "general", "desktop-appearance"].includes(node.id)).map(node => node.id),
+    ["execution-mode", "desktop-terminal", "general", "desktop-appearance"]);
+  assert.ok(["settings.chatModeDesc", "settings.agentModeDesc"].includes(flatten(document.nodes).find(node => node.id === "mode").text));
   assert.ok(flatten(document.nodes).some(node => node.id === "desktop-appearance"), "default macOS system route exposes appearance");
   for (const id of ["terminal-shell", "tray-show-titles", "tray-running-badge", "proxy-host", "proxy-password", "proxy-enabled"]) {
     assert.ok(flatten(document.nodes).some(node => node.id === id), `default macOS system route exposes ${id}`);

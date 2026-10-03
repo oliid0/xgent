@@ -6,6 +6,7 @@ import {
 } from "../runtime/applePresentation";
 import { createPresentationActionRegistry } from "./actionRegistry";
 import { createPresentationDocumentChannel } from "./documentChannel";
+import { setNativeSettingsChrome, withNativeSettingsChrome } from "./nativeSettingsChrome";
 import type { PresentationDocument, PresentationHandler } from "./types";
 import { validatePresentationDocument } from "./validateDocument";
 
@@ -45,6 +46,7 @@ export function removeNativeSurfaceSession(surface: string, onError: (error: unk
     setTimeout(() => {
       sessionRemovalTimers.delete(surface);
       actions.remove(surface);
+      setNativeSettingsChrome(surface);
       const channel = sessionChannels.get(surface);
       if (!channel) return;
       void channel
@@ -104,14 +106,15 @@ export function NativeSurface(props: {
   }, [surface]);
 
   useLayoutEffect(() => {
-    actions.register(surface, props.handlers);
+    const prepared = withNativeSettingsChrome(surface, props.document, props.handlers);
+    actions.register(surface, prepared.handlers);
     const document: PresentationDocument = {
-      ...props.document,
+      ...prepared.document,
       version: 1,
       surface,
       revision: props.sessionSurface ? nextSessionRevision(surface) : ++revision.current,
     };
-    validatePresentationDocument(document, props.handlers);
+    validatePresentationDocument(document, prepared.handlers);
     void channel.publish(document).catch((error) => onError.current(error));
   }, [surface, props.document, props.handlers, channel]);
 
