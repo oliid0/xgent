@@ -30,6 +30,7 @@ final class XgentCodeHost {
     let identity: XgentCodeSessionIdentity
     private let state = XgentCodeHostState()
     private let parking = XgentCodeHostParking()
+    private let nativeInput: XgentCodeNativeInput
     var evidence: [String: String] {
         var result = parking.evidence
         result["scope"] = identity.scope
@@ -54,7 +55,8 @@ final class XgentCodeHost {
     #endif
     init(session: XgentCodeSessionIdentity, content: String) {
         identity = session; source = XgentCodeHostSource(content)
-        hosting.rootView = AnyView(XgentCodeHostRoot(source: source, state: state, parking: parking).id(identity.cacheKey))
+        nativeInput = XgentCodeNativeInput(content: content)
+        hosting.rootView = AnyView(XgentCodeHostRoot(source: source, state: state, parking: parking, nativeInput: nativeInput).id(identity.cacheKey))
     }
     #if os(iOS)
     func rememberWindow(_ mount: UIView) { parking.remember(mount) }
@@ -72,6 +74,7 @@ final class XgentCodeHost {
         }
         state.schedule(.init(lease: lease, configuration: configuration, environment: environment), source: source)
         parking.resume()
+        nativeInput.view.isEditable = configuration.enabled && environment.enabled
     }
     func detach(_ lease: UUID) {
         guard source.owns(lease) else { return }
@@ -92,6 +95,7 @@ final class XgentCodeHost {
         #endif
     }
     func retire() {
+        nativeInput.retire()
         source.retire(); undo.removeAllActions()
         state.clear()
         #if os(iOS)

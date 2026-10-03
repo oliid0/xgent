@@ -46,6 +46,7 @@ struct XgentCodeEditor: View {
     var find: XgentCodeFindConfiguration? = nil
     var syntax: XgentCodeSyntaxConfiguration? = nil
     var findAction: ((XgentCodeFindAction) -> Void)? = nil
+    var nativeInput: XgentCodeNativeInput? = nil
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .body) private var fontSize: CGFloat = 13
@@ -77,6 +78,28 @@ struct XgentCodeEditor: View {
         "\(colorScheme)-\(fontSize)-\(theme.fontScale)-\(theme.codeFontFamily ?? "")-\(palette.text)-\(palette.surface)"
     }
 
+    @ViewBuilder private var input: some View {
+        if let nativeInput {
+            HStack(spacing: 0) {
+                XgentReusableCodeInput(input: nativeInput, text: $text, position: positionBinding, wrap: wrapText,
+                    fontName: XgentFonts.name(for: theme.codeFontFamily), fontSize: fontSize * CGFloat(theme.fontScale),
+                    palette: palette, label: label)
+                #if os(macOS)
+                if showsMinimap {
+                    XgentCodeMinimap(input: nativeInput, text: text, color: palette.secondaryText)
+                        .frame(width: 64).accessibilityHidden(true)
+                }
+                #endif
+            }
+        } else {
+            CodeEditor(text: $text, position: positionBinding, messages: $messages,
+                       language: XgentCodeLanguages.configuration(language))
+                .environment(\.codeEditorTheme, editorTheme)
+                .environment(\.codeEditorLayoutConfiguration,
+                             CodeEditor.LayoutConfiguration(showMinimap: showsMinimap, wrapText: wrapText))
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if enabled, let editingLabels {
@@ -92,11 +115,7 @@ struct XgentCodeEditor: View {
                 Divider()
             }
             if enabled {
-                CodeEditor(text: $text, position: positionBinding, messages: $messages,
-                           language: XgentCodeLanguages.configuration(language))
-                    .environment(\.codeEditorTheme, editorTheme)
-                    .environment(\.codeEditorLayoutConfiguration,
-                                 CodeEditor.LayoutConfiguration(showMinimap: showsMinimap, wrapText: wrapText))
+                input
                     .modifier(XgentCodeSessionViewport(session: session, store: sessionStore, owner: sessionOwner.id, reveal: reveal))
                     .modifier(XgentCodeRevealModifier(location: reveal, text: text, session: session, store: sessionStore, owner: sessionOwner.id))
                     .modifier(XgentCodeEditingTarget(commands: editingCommands))
@@ -142,9 +161,10 @@ struct XgentCodeEditor: View {
         findAction?(XgentCodeFindAction(command: command, content: snapshot.content, query: draft.query,
                                        replacement: draft.replacement, options: draft.options, selections: snapshot.selections))
     }
-    func retained(binding: Binding<String>) -> Self {
+    func retained(binding: Binding<String>, nativeInput: XgentCodeNativeInput) -> Self {
         var next = self
         next._text = binding
+        next.nativeInput = nativeInput
         // Read-only state is applied to the existing native editor rather than
         // replacing its view (and therefore losing its undo operations).
         next.enabled = true

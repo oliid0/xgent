@@ -13,6 +13,14 @@ private typealias CodeHostTestEditor = NSTextView
 @testable import XgentNativeUI
 
 final class CodeHostTests: XCTestCase {
+    func testNativeLineNumbersFollowUTF16CRLFAndTheTrailingEmptyLine() {
+        let index = XgentCodeLineIndex("A😀\r\nB\n")
+        XCTAssertEqual(index.starts, [0, 5, 7])
+        XCTAssertEqual([0, 3, 4, 5, 6, 7].map(index.number(at:)), [1, 1, 1, 2, 2, 3])
+        XCTAssertEqual(XgentCodeLineIndex("").starts, [0])
+        XCTAssertEqual(XgentCodeLineIndex("one\rtwo").starts, [0, 4])
+    }
+
     @MainActor func testDetachedAndRetiredSourceBindingsCannotChangeAnotherMount() {
         let source = XgentCodeHostSource("Initial"), a = UUID(), b = UUID()
         var first: [String] = [], second: [String] = []
@@ -112,6 +120,7 @@ final class CodeHostTests: XCTestCase {
         #endif
         try await settle()
         let a = try XCTUnwrap(editor(in: root))
+        XCTAssertNotNil(a.textLayoutManager, "Workspace editors must keep TextKit 2 syntax and find rendering")
         #if os(iOS)
         a.becomeFirstResponder(); a.selectedRange = NSRange(location: a.text.utf16.count, length: 0); a.insertText(" // A")
         #else

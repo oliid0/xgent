@@ -838,3 +838,19 @@ settings entries in the behavioral fixture. Native settings use the existing
 224-point sidebar and 640-point content width, center the content/header, and
 render close icons as icon buttons. These changes still await remote native
 rendering and do not prove full visual or task-completion parity.
+
+CI #253 completed both native suites: macOS ran 160 tests with 14 failed
+assertions and iOS ran 164 tests with two. All accessibility interaction fixtures
+passed, and UIKit containment exceptions stopped. The remaining editor failures
+show that parking a hosting root still replaces its internally owned input on
+macOS; iOS also failed restoration and finding the next active input.
+
+Workspace files now own a persistent TextKit 2 input and its undo manager
+independently of SwiftUI hosting lifetime. SwiftUI remounts that same native
+input; the existing shared lexer, find decorations, replacements, editing
+toolbar and native selection/viewport bridge remain responsible for those
+behaviors. Native line numbers follow TextKit fragments, including wrapped
+paragraphs and CRLF/UTF-16 offsets; the desktop overview supports drag navigation.
+Other code surfaces continue to use CodeEditorView. Real input identity, undo,
+redo, disk reload and independent-file history assertions remain mandatory.
+This change requires remote SDK execution and does not establish full parity.
