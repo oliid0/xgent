@@ -72,7 +72,7 @@ def verify_files(files, keyboard):
 
 
 def verify(source, ios):
-    if ios:
+    if ios and source.is_file():
         with zipfile.ZipFile(source) as archive:
             roots = {entry.filename.split("/", 2)[1] for entry in archive.infolist()
                      if entry.filename.startswith("Payload/") and len(entry.filename.split("/", 2)) == 3
