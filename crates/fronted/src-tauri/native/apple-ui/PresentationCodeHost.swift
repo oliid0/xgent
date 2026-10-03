@@ -17,7 +17,8 @@ import AppKit
 final class XgentCodeHostingView: NSHostingView<AnyView> {
     let sessionUndo = UndoManager()
     override var undoManager: UndoManager? { sessionUndo }
-    init() { super.init(rootView: AnyView(EmptyView())) }
+    required init(rootView: AnyView) { super.init(rootView: rootView) }
+    convenience init() { self.init(rootView: AnyView(EmptyView())) }
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("Use init()") }
 }

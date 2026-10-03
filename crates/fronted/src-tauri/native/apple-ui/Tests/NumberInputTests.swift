@@ -33,7 +33,7 @@ final class NumberInputTests: XCTestCase {
     }
 
     @MainActor
-    func testNativeNumericEntryAndStepperRenderAtNarrowAndWideWidths() async throws {
+    func testNativeNumericDraftEntryRendersAtNarrowAndWideWidths() async throws {
         #if os(iOS)
         let widths: [CGFloat] = [320, 768]
         #else

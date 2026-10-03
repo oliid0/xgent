@@ -616,3 +616,13 @@ the complete parity objective is finished, and requested Windows/Linux iteration
 alongside Apple work. This supersedes the earlier push-after-completion schedule.
 The overall goal remains active, with complete complex workflows and measured
 visual parity still unproven. No local build/dev/install/Cargo/Swift compile was run.
+
+The accumulated 416-file batch was pushed as `8d3c6e8`. [CI #242](https://github.com/oliid0/xgent/actions/runs/37127949415)
+passed frontend build/lint, 1,755 frontend tests and 33 release tests with zero
+failures/skips, workflow validation, architecture and diff hygiene. The production
+macOS computer permission bridge compiled. Native package module emission failed
+because the code host omitted NSHostingView's required `init(rootView:)`; the host
+now implements that initializer and delegates its empty convenience initializer.
+No native test or screenshot result is claimed from this failed build. The runner's
+resolved Cargo.lock has been reviewed and incorporated for existing mobile git2
+dependencies and bridge test serialization. Native validation continues in Actions.
