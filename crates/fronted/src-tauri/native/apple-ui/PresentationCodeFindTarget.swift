@@ -83,9 +83,9 @@ struct XgentCodeFindTarget: ViewModifier {
     func body(content: Content) -> some View {
         content
             #if os(iOS)
-            .introspect(.textEditor, on: .iOS(.v26)) { view in configure(); state.apply(configuration, to: view, acknowledge: acknowledge) }
+            .introspect(.xgentCodeEditor, on: .iOS(.v26)) { view in configure(); state.apply(configuration, to: view, acknowledge: acknowledge) }
             #else
-            .introspect(.textEditor, on: .macOS(.v15, .v26)) { view in configure(); state.apply(configuration, to: view, acknowledge: acknowledge) }
+            .introspect(.xgentCodeEditor, on: .macOS(.v15, .v26)) { view in configure(); state.apply(configuration, to: view, acknowledge: acknowledge) }
             #endif
     }
     private func configure() { state.session = session; state.store = store; state.owner = owner }

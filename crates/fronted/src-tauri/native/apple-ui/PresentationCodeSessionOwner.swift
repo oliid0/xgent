@@ -8,10 +8,10 @@ final class XgentCodeSessionOwner: ObservableObject {
 
     func prepare(_ session: XgentCodeSessionIdentity?, store: XgentCodeSessionStore?) {
         guard !prepared, let session, let store else { return }
-        prepared = true; store.prepare(session, owner: id)
+        prepared = true; store.prepare(session, owner: id, restoring: true)
     }
     func appear(_ session: XgentCodeSessionIdentity?, store: XgentCodeSessionStore?) {
         guard let session, let store else { return }
-        prepared = true; store.prepare(session, owner: id)
+        prepared = true; store.prepare(session, owner: id, restoring: true)
     }
 }

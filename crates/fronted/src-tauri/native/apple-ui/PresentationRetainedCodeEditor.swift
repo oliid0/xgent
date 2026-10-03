@@ -17,6 +17,7 @@ struct XgentRetainedCodeEditor: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeUIViewController(context: Context) -> UIViewController {
         let container = UIViewController()
+        container.view = XgentCodeMountView()
         container.view.backgroundColor = .clear
         install(in: container, coordinator: context.coordinator)
         return container
@@ -29,6 +30,7 @@ struct XgentRetainedCodeEditor: UIViewControllerRepresentable {
             coordinator.entry?.detach(coordinator.lease); coordinator.entry = nil; return
         }
         if coordinator.entry !== entry { coordinator.entry?.detach(coordinator.lease); coordinator.entry = entry }
+        if let mount = container.view as? XgentCodeMountView { mount.entry = entry; mount.lease = coordinator.lease }
         entry.update(lease: coordinator.lease, configuration: configuration, content: content, environment: environment, changed: changed)
         let host = entry.hosting
         if host.parent !== container {
@@ -67,7 +69,7 @@ struct XgentRetainedCodeEditor: NSViewRepresentable {
     }
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeNSView(context: Context) -> NSView {
-        let container = NSView()
+        let container = XgentCodeMountView()
         install(in: container, coordinator: context.coordinator)
         return container
     }
@@ -77,6 +79,7 @@ struct XgentRetainedCodeEditor: NSViewRepresentable {
             coordinator.entry?.detach(coordinator.lease); coordinator.entry = nil; return
         }
         if coordinator.entry !== entry { coordinator.entry?.detach(coordinator.lease); coordinator.entry = entry }
+        if let mount = container as? XgentCodeMountView { mount.entry = entry; mount.lease = coordinator.lease }
         entry.update(lease: coordinator.lease, configuration: configuration, content: content, environment: environment, changed: changed)
         let host = entry.hosting
         if host.superview !== container {

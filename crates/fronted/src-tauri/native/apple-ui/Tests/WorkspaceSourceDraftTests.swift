@@ -25,7 +25,11 @@ final class WorkspaceSourceDraftTests: XCTestCase {
         XCTAssertEqual(actions.last?.value, .string(encoded))
         model.dismiss(document)
         XCTAssertEqual(actions.last?.action, "close")
-        XCTAssertEqual(actions.last?.value, .string(encoded))
+        guard case let .string(dismissed)? = actions.last?.value else {
+            return XCTFail("Closing must include the complete native source draft")
+        }
+        let dismissedDraft = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(dismissed.utf8)) as? [String: String])
+        XCTAssertEqual(dismissedDraft, decoded)
         model.invalidate()
         XCTAssertNil(XgentWorkspaceSourceDraft.current(for: save, in: document, model: model))
     }

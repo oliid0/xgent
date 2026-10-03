@@ -8,6 +8,8 @@ import XCTest
 
 final class DesktopSidebarTests: XCTestCase {
     @MainActor func testDesktopNavigationOrderBoundsAndActualButtonActions() async throws {
+        let accessibilitySession = try NativeMacAccessibilitySession()
+        defer { accessibilitySession.restore() }
         for width in [CGFloat(280), 480] {
             for size in [DynamicTypeSize.large, .accessibility3] {
                 let document = try fixture()

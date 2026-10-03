@@ -10,6 +10,26 @@ import AppKit
 @testable import XgentNativeUI
 
 final class CodeEditorSessionTests: XCTestCase {
+    @MainActor func testInitialNativeCallbacksCannotOverwriteTheSavedViewportBeforeRestoration() {
+        let store = XgentCodeSessionStore()
+        let session = XgentCodeSessionIdentity(scope: "workspace", key: "a:1", open: ["a:1"])
+        let old = UUID(), mounted = UUID()
+        store.prepare(session, owner: old)
+        let saved = CodeEditor.Position(selections: [NSRange(location: 3, length: 0)], verticalScrollPosition: 240)
+        store.save(saved, session: session, owner: old, text: "abcdef")
+        store.release(session, owner: old)
+        store.prepare(session, owner: mounted, restoring: true)
+        store.save(CodeEditor.Position(), session: session, owner: mounted, text: "abcdef")
+        XCTAssertEqual(store.position(session, text: "abcdef").selections, saved.selections)
+        XCTAssertEqual(store.position(session, text: "abcdef").verticalScrollPosition, 240)
+        store.finishRestoring(session, owner: old)
+        store.save(CodeEditor.Position(), session: session, owner: mounted, text: "abcdef")
+        XCTAssertEqual(store.position(session, text: "abcdef").verticalScrollPosition, 240)
+        store.finishRestoring(session, owner: mounted)
+        store.save(CodeEditor.Position(), session: session, owner: mounted, text: "abcdef")
+        XCTAssertEqual(store.position(session, text: "abcdef").verticalScrollPosition, 0)
+    }
+
     @MainActor func testSessionPositionsAreIsolatedPrunedAndProtectedFromRetiredViews() {
         let store = XgentCodeSessionStore()
         let a = XgentCodeSessionIdentity(scope: "workspace", key: "a:1", open: ["a:1", "b:2"])

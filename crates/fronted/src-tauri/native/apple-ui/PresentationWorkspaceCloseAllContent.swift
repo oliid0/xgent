@@ -7,6 +7,14 @@ struct XgentWorkspaceCloseAllContent: View {
     @ObservedObject var model: XgentPresentationModel
 
     var body: some View {
+        GeometryReader { geometry in
+            content
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
+        }
+        .accessibilityIdentifier(node.id)
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(node.label ?? "").modifier(XgentControlTypography(node: node))
                 .fontWeight(.semibold).accessibilityAddTraits(.isHeader)
@@ -44,6 +52,5 @@ struct XgentWorkspaceCloseAllContent: View {
         }
         .padding(16)
         .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .accessibilityIdentifier(node.id)
     }
 }

@@ -7,6 +7,8 @@ import XCTest
 
 final class ComputerUsePermissionTests: XCTestCase {
     @MainActor func testNativeForegroundRefreshAndPermissionButtonsSendTheSharedActions() async throws {
+        let accessibilitySession = try NativeMacAccessibilitySession()
+        defer { accessibilitySession.restore() }
         let document = try fixture()
         let model = XgentPresentationModel()
         model.update(document)

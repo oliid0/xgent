@@ -7,9 +7,9 @@ struct XgentCodeEditingTarget: ViewModifier {
     func body(content: Content) -> some View {
         content
             #if os(iOS)
-            .introspect(.textEditor, on: .iOS(.v26)) { commands.attach($0) }
+            .introspect(.xgentCodeEditor, on: .iOS(.v26)) { commands.attach($0) }
             #else
-            .introspect(.textEditor, on: .macOS(.v15, .v26)) { commands.attach($0) }
+            .introspect(.xgentCodeEditor, on: .macOS(.v15, .v26)) { commands.attach($0) }
             #endif
     }
 }

@@ -8,6 +8,8 @@ import XCTest
 
 final class DesktopGitTests: XCTestCase {
     @MainActor func testGitNarrowNavigationAndWideSplitKeepCommitBarReachable() async throws {
+        let accessibilitySession = try NativeMacAccessibilitySession()
+        defer { accessibilitySession.restore() }
         for width in [CGFloat(360), 960] {
             let document = try fixture()
             let model = XgentPresentationModel()

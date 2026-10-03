@@ -735,3 +735,31 @@ Editor selection/scroll restoration and the iOS HTML preview cold-load timeout
 remain under investigation; this batch requires SDK execution before its effect
 on the #248 failure baseline can be established. No local build/install/dev or
 Cargo/Swift compile command was run.
+
+[CI #249](https://github.com/oliid0/xgent/actions/runs/37132851336) compiled and
+executed both SDK suites: macOS ran 158 tests with 16 failed assertions, and
+iOS ran 162 tests with 14 failed assertions. Annotation decoding/rendering,
+image save acknowledgement, syntax restoration, iOS question button traits and
+automation controls passed. The HTML preview passed on this run, so the earlier
+cold-load failure remains a reliability observation rather than a proven fix.
+The production device archive, frontend and Rust jobs passed again. Downloaded
+screenshots confirm the desktop switches now occupy the trailing edge of rows.
+
+The following batch addresses the remaining native editor lifetime, viewport
+restoration, macOS find target, and iOS close-all sizing failures together. Open
+editors are parked in a hidden container in their application window, captured
+before their mount leaves that window, and resumed with their native undo stack.
+Parked editors cannot accept edits or appear in the accessibility tree. The
+editor selector resolves the text input inside its own AppKit scroll view and
+excludes field editors/minimaps. Initial native callbacks cannot erase a saved
+viewport while restoration is in progress. Hosting state/source notifications
+are deferred beyond render transactions. The close-all layout takes its actual
+available height from GeometryReader while the file list scrolls within it.
+
+Hosted macOS accessibility fixtures now also request AXEnhancedUserInterface
+from NSApplication, matching the actual GitHub reference fixture; setting the
+SwiftUI environment alone yielded only empty native view identifiers in #249.
+All press, bounds and enabled-state assertions remain. Closing source draft
+tests compare complete decoded JSON payloads, since dictionary key order is not
+a contract. These repairs still require the next remote SDK run; passing static
+checks cannot establish full functional or visual parity.

@@ -15,6 +15,8 @@ final class QuestionCardRenderingTests: XCTestCase {
         #if os(iOS)
         let widths: [CGFloat] = [320, 430, 768]
         #else
+        let accessibilitySession = try NativeMacAccessibilitySession()
+        defer { accessibilitySession.restore() }
         let widths: [CGFloat] = [480, 1040]
         #endif
         for width in widths {

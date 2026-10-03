@@ -14,12 +14,12 @@ struct XgentCodeFindHighlightModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             #if os(iOS)
-            .introspect(.textEditor, on: .iOS(.v26)) { view in
+            .introspect(.xgentCodeEditor, on: .iOS(.v26)) { view in
                 guard configuration != nil || syntax != nil else { highlighting.detach(); return }
                 configure(); highlighting.attach(view); highlighting.update(configuration, syntax: syntax, colorScheme: colorScheme)
             }
             #else
-            .introspect(.textEditor, on: .macOS(.v15, .v26)) { view in
+            .introspect(.xgentCodeEditor, on: .macOS(.v15, .v26)) { view in
                 guard configuration != nil || syntax != nil else { highlighting.detach(); return }
                 configure(); highlighting.attach(view); highlighting.update(configuration, syntax: syntax, colorScheme: colorScheme)
             }

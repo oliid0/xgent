@@ -55,9 +55,9 @@ struct XgentCodeRevealModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             #if os(iOS)
-            .introspect(.textEditor, on: .iOS(.v26)) { view in configure(); state.apply(location, text: text, to: view) }
+            .introspect(.xgentCodeEditor, on: .iOS(.v26)) { view in configure(); state.apply(location, text: text, to: view) }
             #else
-            .introspect(.textEditor, on: .macOS(.v15, .v26)) { view in configure(); state.apply(location, text: text, to: view) }
+            .introspect(.xgentCodeEditor, on: .macOS(.v15, .v26)) { view in configure(); state.apply(location, text: text, to: view) }
             #endif
     }
     private func configure() { state.session = session; state.store = store; state.owner = owner }

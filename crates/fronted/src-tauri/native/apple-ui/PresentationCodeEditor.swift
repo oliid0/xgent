@@ -65,8 +65,12 @@ struct XgentCodeEditor: View {
             }
             return position
         }, set: { value in
-            position = XgentCodeSessionPosition.clamp(value, in: text)
-            if let session, let sessionStore { sessionStore.save(position, session: session, owner: sessionOwner.id, text: text) }
+            let next = XgentCodeSessionPosition.clamp(value, in: text)
+            if let session, let sessionStore {
+                sessionStore.save(next, session: session, owner: sessionOwner.id, text: text)
+            } else {
+                position = next
+            }
         })
     }
     private var styleKey: String {

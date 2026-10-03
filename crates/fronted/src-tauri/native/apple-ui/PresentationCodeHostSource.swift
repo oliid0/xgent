@@ -1,8 +1,13 @@
 import SwiftUI
+import Combine
 
 @MainActor
 final class XgentCodeHostSource: ObservableObject {
-    @Published private(set) var content: String
+    let objectWillChange = ObservableObjectPublisher()
+    private(set) var content: String {
+        didSet { if content != oldValue { publishContentChange() } }
+    }
+    private var notificationQueued = false
     private var lease: UUID?
     private var editable = false
     private var active = true
@@ -12,6 +17,19 @@ final class XgentCodeHostSource: ObservableObject {
     private var resetInputUndo: (() -> Void)?
     var inputContent: String? { readInput?() }
     init(_ content: String) { self.content = content }
+
+    private func publishContentChange() {
+        guard !notificationQueued else { return }
+        notificationQueued = true
+        // Source actions must read the latest text immediately, but observing
+        // hosting roots must update outside a representable render transaction.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.notificationQueued = false
+            guard self.active else { return }
+            self.objectWillChange.send()
+        }
+    }
 
     @discardableResult
     func activate(_ lease: UUID, content: String, editable: Bool, changed: @escaping (String) -> Void) -> Bool {

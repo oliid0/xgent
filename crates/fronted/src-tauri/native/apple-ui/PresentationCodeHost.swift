@@ -29,6 +29,7 @@ final class XgentCodeHost {
     let source: XgentCodeHostSource
     let identity: XgentCodeSessionIdentity
     private let state = XgentCodeHostState()
+    private let parking = XgentCodeHostParking()
     #if os(iOS)
     let hosting = XgentCodeHostingController()
     var undo: UndoManager { hosting.sessionUndo }
@@ -38,7 +39,7 @@ final class XgentCodeHost {
     #endif
     init(session: XgentCodeSessionIdentity, content: String) {
         identity = session; source = XgentCodeHostSource(content)
-        hosting.rootView = AnyView(XgentCodeHostRoot(source: source, state: state).id(identity.cacheKey))
+        hosting.rootView = AnyView(XgentCodeHostRoot(source: source, state: state, parking: parking).id(identity.cacheKey))
     }
     func update(lease: UUID, configuration: XgentCodeEditor, content: String, environment: XgentCodeHostEnvironment,
                 changed: @escaping (String) -> Void) {
@@ -49,26 +50,30 @@ final class XgentCodeHost {
             undo.removeAllActions()
             source.clearInputUndo()
         }
-        state.snapshot = .init(lease: lease, configuration: configuration, environment: environment)
+        state.schedule(.init(lease: lease, configuration: configuration, environment: environment), source: source)
+        parking.resume()
     }
     func detach(_ lease: UUID) {
         guard source.owns(lease) else { return }
         source.commitCurrent()
+        parking.suspend()
         source.detach(lease)
         #if os(iOS)
         hosting.view.endEditing(true)
+        if parking.park(hosting) { return }
         if hosting.parent != nil { hosting.willMove(toParent: nil) }
         hosting.view.removeFromSuperview(); hosting.removeFromParent()
         #else
         if let responder = hosting.window?.firstResponder as? NSView, responder.isDescendant(of: hosting) {
             hosting.window?.makeFirstResponder(nil)
         }
+        if parking.park(hosting) { return }
         hosting.removeFromSuperview()
         #endif
     }
     func retire() {
         source.retire(); undo.removeAllActions()
-        state.snapshot = nil
+        state.clear()
         #if os(iOS)
         hosting.view.endEditing(true)
         if hosting.parent != nil { hosting.willMove(toParent: nil) }
@@ -77,5 +82,6 @@ final class XgentCodeHost {
         hosting.removeFromSuperview()
         #endif
         hosting.rootView = AnyView(EmptyView())
+        parking.clear()
     }
 }

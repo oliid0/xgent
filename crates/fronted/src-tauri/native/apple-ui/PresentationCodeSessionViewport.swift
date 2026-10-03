@@ -36,7 +36,7 @@ private final class XgentCodeSessionViewportState: ObservableObject {
     func restore() {
         guard !restored, let view, view.window != nil, let session, let store, let owner, store.owns(session, owner: owner) else { return }
         restored = true
-        if freshReference { return }
+        if freshReference { store.finishRestoring(session, owner: owner); return }
         if saved.verticalScrollPosition > 0, let manager = view.textLayoutManager, let range = manager.textContentManager?.documentRange {
             manager.ensureLayout(for: range)
         }
@@ -55,6 +55,7 @@ private final class XgentCodeSessionViewportState: ObservableObject {
                              y: min(saved.verticalScrollPosition, max(0, view.bounds.height - scroll.contentSize.height)))
         scroll.contentView.scroll(to: offset); scroll.reflectScrolledClipView(scroll.contentView)
         #endif
+        store.finishRestoring(session, owner: owner)
     }
 
     func capture() {
@@ -67,7 +68,22 @@ private final class XgentCodeSessionViewportState: ObservableObject {
         store.save(CodeEditor.Position(selections: view.selectedRanges.map(\.rangeValue), verticalScrollPosition: offset.y),
                    session: session, owner: owner, text: view.string, horizontal: offset.x)
         #endif
+        #if os(iOS)
+        saved = store.position(session, text: view.text ?? "")
+        #else
+        saved = store.position(session, text: view.string)
+        #endif
+        horizontal = store.horizontal(session)
+        restored = false
+        freshReference = false
         store.release(session, owner: owner)
+    }
+
+    func resume() {
+        guard let session, let store, let owner else { return }
+        store.prepare(session, owner: owner, restoring: true)
+        restored = false
+        Task { @MainActor [weak self] in await Task.yield(); self?.restore() }
     }
 }
 
@@ -78,15 +94,29 @@ struct XgentCodeSessionViewport: ViewModifier {
     let owner: UUID
     let reveal: XgentCodeLocation?
     @StateObject private var state = XgentCodeSessionViewportState()
+    @Environment(\.xgentCodeHostParking) private var parking
 
     func body(content: Content) -> some View {
         content
             #if os(iOS)
-            .introspect(.textEditor, on: .iOS(.v26)) { state.attach($0, session: session, store: store, owner: owner, reveal: reveal) }
+            .introspect(.xgentCodeEditor, on: .iOS(.v26)) { view in
+                state.attach(view, session: session, store: store, owner: owner, reveal: reveal)
+                registerViewport()
+            }
             #else
-            .introspect(.textEditor, on: .macOS(.v15, .v26)) { state.attach($0, session: session, store: store, owner: owner, reveal: reveal) }
+            .introspect(.xgentCodeEditor, on: .macOS(.v15, .v26)) { view in
+                state.attach(view, session: session, store: store, owner: owner, reveal: reveal)
+                registerViewport()
+            }
             #endif
             .onGeometryChange(for: CGSize.self) { $0.size } action: { _ in state.restore() }
+            .onAppear {
+                Task { @MainActor in await Task.yield(); state.restore() }
+            }
             .onDisappear { state.capture() }
+    }
+
+    private func registerViewport() {
+        parking?.viewport(suspend: { [weak state] in state?.capture() }, resume: { [weak state] in state?.resume() })
     }
 }

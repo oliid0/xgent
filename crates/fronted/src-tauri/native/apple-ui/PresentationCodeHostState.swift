@@ -10,4 +10,21 @@ final class XgentCodeHostState: ObservableObject {
         let environment: XgentCodeHostEnvironment
     }
     @Published var snapshot: Snapshot?
+    private var generation = 0
+
+    func schedule(_ next: Snapshot, source: XgentCodeHostSource) {
+        generation += 1
+        let revision = generation
+        // Representable updates occur inside a SwiftUI render transaction.
+        // Publish after it finishes and reject a superseded mount's update.
+        Task { @MainActor [weak self, weak source] in
+            await Task.yield()
+            guard let self, self.generation == revision, source?.owns(next.lease) == true else { return }
+            self.snapshot = next
+        }
+    }
+    func clear() {
+        generation += 1
+        snapshot = nil
+    }
 }
