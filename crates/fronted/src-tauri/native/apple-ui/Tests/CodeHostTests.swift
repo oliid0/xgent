@@ -165,7 +165,7 @@ final class CodeHostTests: XCTestCase {
     }
     @MainActor private func editor(in view: CodeHostTestView) -> CodeHostTestEditor? {
         if let input = view as? CodeHostTestEditor, input.isEditable { return input }
-        return view.subviews.lazy.compactMap { editor(in: $0) }.first
+        return view.subviews.lazy.compactMap { self.editor(in: $0) }.first
     }
     @MainActor private func source(_ editor: CodeHostTestEditor) -> String {
         #if os(iOS)

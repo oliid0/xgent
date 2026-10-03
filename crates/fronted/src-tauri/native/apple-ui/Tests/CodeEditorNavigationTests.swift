@@ -70,7 +70,7 @@ final class CodeEditorNavigationTests: XCTestCase {
 
     @MainActor private func editor(in view: NSView) -> NSTextView? {
         if let text = view as? NSTextView, text.isEditable { return text }
-        return view.subviews.lazy.compactMap { editor(in: $0) }.first
+        return view.subviews.lazy.compactMap { self.editor(in: $0) }.first
     }
 
     private func fixture(_ content: String, revision: Int = 1, location: String) throws -> XgentDocument {

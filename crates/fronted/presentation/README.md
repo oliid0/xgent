@@ -696,3 +696,14 @@ The computer permission export is likewise logged. Raw symbol tables were not
 present in the downloaded #246 device artifact, so these uploaded logs improve
 direct inspection of the interface after compilation. Native test execution,
 rendered screenshots and complete task/visual parity remain pending.
+
+[CI #247](https://github.com/oliid0/xgent/actions/runs/37130804350) again passed the
+device production archive and defined export checks (248.54 seconds). The six
+missing test initializer arguments no longer blocked compilation. Both hosted
+test targets then reported implicit self in five recursive native view lookup
+closures. Those helpers now capture their XCTest instance explicitly, following
+LazySequenceProtocol.compactMap's escaping transform requirement confirmed through
+Swift MCP and the Swift standard-library source. The remaining lazy lookups were
+reviewed: local recursive functions need no instance capture, and other instance
+helpers already use explicit self. Assertions and production views are unchanged
+by this test compilation repair; actual SDK test execution remains pending.

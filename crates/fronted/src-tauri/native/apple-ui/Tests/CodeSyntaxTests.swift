@@ -109,7 +109,7 @@ final class CodeSyntaxTests: XCTestCase {
     }
     @MainActor private func editor(in view: SyntaxTestView) -> XgentFindHighlightTextView? {
         if let input = view as? XgentFindHighlightTextView, input.isEditable { return input }
-        return view.subviews.lazy.compactMap { editor(in: $0) }.first
+        return view.subviews.lazy.compactMap { self.editor(in: $0) }.first
     }
     @MainActor private func validate(_ manager: NSTextLayoutManager) {
         guard let storage = manager.textContentManager as? NSTextContentStorage else { return }

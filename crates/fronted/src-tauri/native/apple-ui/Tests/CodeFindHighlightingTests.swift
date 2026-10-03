@@ -103,7 +103,7 @@ final class CodeFindHighlightingTests: XCTestCase {
     }
     @MainActor private func editor(in view: HighlightTestView) -> XgentFindHighlightTextView? {
         if let input = view as? XgentFindHighlightTextView, input.isEditable { return input }
-        return view.subviews.lazy.compactMap { editor(in: $0) }.first
+        return view.subviews.lazy.compactMap { self.editor(in: $0) }.first
     }
     private func configuration(_ source: String, ranges: [NSRange], scopes: [NSRange] = []) throws -> XgentCodeFindConfiguration {
         let labels = ["query", "replacement", "matchCase", "wholeWord", "regex", "selection", "preserveCase", "next", "previous", "replace", "replaceAll", "close", "invalid", "rejected", "noSelection"]
