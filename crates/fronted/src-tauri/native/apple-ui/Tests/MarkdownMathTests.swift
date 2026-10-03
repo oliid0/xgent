@@ -8,12 +8,70 @@ import XCTest
 #if os(iOS)
 import AccessibilitySnapshotParser
 import UIKit
+private typealias MathSnapshotImage = UIImage
 #else
 import AppKit
+private typealias MathSnapshotImage = NSImage
 #endif
 @testable import XgentNativeUI
 
 final class MarkdownMathTests: XCTestCase {
+    @MainActor func testMountedInlineFormulaAddsVisiblePixelsAfterReadinessUpdates() async throws {
+        #if os(macOS)
+        _ = NSApplication.shared
+        #endif
+        for width: CGFloat in [320, 768] {
+            for size in [DynamicTypeSize.large, .accessibility3] {
+                func content(_ text: String) -> AnyView {
+                    AnyView(ScrollView { XgentMarkdown(text: text).padding(16) }
+                        .frame(width: width, height: 240).dynamicTypeSize(size)
+                        .background(.white)
+                        .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: .light)))
+                }
+                #if os(iOS)
+                let host = UIHostingController(rootView: content("Answer ."))
+                let window = UIWindow(frame: CGRect(x: 0, y: 0, width: width, height: 240))
+                window.rootViewController = host; window.makeKeyAndVisible()
+                defer { window.isHidden = true; window.rootViewController = nil }
+                host.view.layoutIfNeeded()
+                let strategy = Snapshotting<UIView, UIImage>.image(size: CGSize(width: width, height: 240))
+                let native = host.view!
+                #else
+                let host = NSHostingView(rootView: content("Answer ."))
+                host.frame = CGRect(x: 0, y: 0, width: width, height: 240)
+                let window = NSWindow(contentRect: host.frame, styleMask: [.titled], backing: .buffered, defer: false)
+                window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
+                defer { window.close() }
+                host.layoutSubtreeIfNeeded()
+                let strategy = Snapshotting<NSView, NSImage>.image(size: CGSize(width: width, height: 240))
+                let native = host
+                #endif
+                func capture() async -> MathSnapshotImage {
+                    await withCheckedContinuation { continuation in
+                        strategy.snapshot(native).run { continuation.resume(returning: $0) }
+                    }
+                }
+                try await Task.sleep(for: .milliseconds(100))
+                let proseInk = try mathInkPixels(await capture())
+                XCTAssertGreaterThan(proseInk, 50, "The comparison must contain actual rendered prose")
+                host.rootView = content("Answer $$x^2 + y^2$$.")
+                var screenshot = await capture()
+                var ink = try mathInkPixels(screenshot)
+                let deadline = ContinuousClock.now + .seconds(3)
+                while ink <= proseInk * 6 / 5 && ContinuousClock.now < deadline {
+                    try await Task.sleep(for: .milliseconds(60))
+                    screenshot = await capture()
+                    ink = try mathInkPixels(screenshot)
+                }
+                let attachment = XCTAttachment(image: screenshot)
+                attachment.name = "native-inline-math-pixels-\(Int(width))-\(size)"
+                attachment.lifetime = .keepAlways; add(attachment)
+                XCTAssertGreaterThan(ink, proseInk * 6 / 5,
+                    "The mounted formula must add visible ink; a restored accessibility label alone is insufficient")
+            }
+        }
+    }
+
     @MainActor func testAccessibleParagraphKeepsProseAndOnlyUsesActuallyRasterizedFormulas() async throws {
         let formula = XgentMathFormula(source: #"x^2 + \frac{a_b}{2}"#, display: false)
         let content = XgentMathAccessibilityText(markdown: "**Answer** \(formula.markdown). [Details](https://example.com)")
@@ -118,6 +176,9 @@ final class MarkdownMathTests: XCTestCase {
                 } while !labels.contains(where: { $0.contains("y^2") }) && ContinuousClock.now < deadline
                 try attachNativeAccessibilityEvidence(labels, name: "native-math-labels-\(Int(width))-\(size)")
                 XCTAssertTrue(labels.contains(where: { $0.contains("y^2") }), "A ready formula must appear in the real first paragraph, not only in a separate raster test")
+                // The provider callback precedes MarkdownUI publishing its
+                // image dictionary. Capture the next rendered frame too.
+                try await Task.sleep(for: .milliseconds(100))
                 let snapshot = await withCheckedContinuation { continuation in
                     strategy.snapshot(native).run { continuation.resume(returning: $0) }
                 }
@@ -127,4 +188,24 @@ final class MarkdownMathTests: XCTestCase {
             }
         }
     }
+}
+
+private func mathInkPixels(_ snapshot: MathSnapshotImage) throws -> Int {
+    #if os(iOS)
+    let image = try XCTUnwrap(snapshot.cgImage)
+    #else
+    let image = try XCTUnwrap(snapshot.cgImage(forProposedRect: nil, context: nil, hints: nil))
+    #endif
+    let context = try XCTUnwrap(CGContext(data: nil, width: image.width, height: image.height,
+        bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
+    context.draw(image, in: CGRect(x: 0, y: 0, width: CGFloat(image.width), height: CGFloat(image.height)))
+    let pixels = try XCTUnwrap(context.data).assumingMemoryBound(to: UInt8.self)
+    var count = 0
+    for offset in stride(from: 0, to: image.width * image.height * 4, by: 4) {
+        if pixels[offset] < 100 && pixels[offset + 1] < 100 && pixels[offset + 2] < 100 && pixels[offset + 3] > 200 {
+            count += 1
+        }
+    }
+    return count
 }

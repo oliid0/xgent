@@ -47,11 +47,11 @@ struct XgentMathParagraphAccessibility: ViewModifier {
     @ObservedObject var store: XgentMathAccessibilityStore
     let text: XgentMathAccessibilityText
 
-    @ViewBuilder func body(content: Content) -> some View {
-        if !text.urls.isEmpty && text.urls.allSatisfy({ store.rendered.contains($0) }) {
-            content.accessibilityLabel(Text(text.label))
-        } else {
-            content
-        }
+    func body(content: Content) -> some View {
+        // Keep InlineText's identity while its image task is completing. A
+        // conditional content branch would discard its loaded images when
+        // the provider publishes readiness, then start the image task again.
+        content.accessibilityLabel(text.label,
+            isEnabled: !text.urls.isEmpty && text.urls.allSatisfy { store.rendered.contains($0) })
     }
 }
