@@ -679,3 +679,20 @@ Fixtures now follow the real strict document contract; production decoding and
 test assertions were not relaxed. These repairs allow the existing SDK tests to
 reach their actual controls after compilation succeeds. Shared frontend sources
 are unchanged in this batch, so unchanged full Node suites were not rerun.
+
+[CI #246](https://github.com/oliid0/xgent/actions/runs/37130132493) successfully
+built the production arm64 iOS static archive (207.87 seconds), and its device
+symbol checks passed. The downloaded device log records archiving libXgentNativeUI.a;
+this is concrete production Swift compilation evidence, not device interaction
+or visual evidence. macOS/iOS package production sources compiled, but their test
+sources failed at six result initializers omitting the required error parameter.
+NumberCommitBatchTests and ReadOnlySyntaxTests now supply explicit nil errors;
+the production result type and assertions remain unchanged. The terminal teardown
+also explicitly discards the first-responder method's return value.
+
+CI now verifies reset/update as defined exported symbols, alongside font family
+allocation/free, and records these exact shared Rust FFI exports in a compact log.
+The computer permission export is likewise logged. Raw symbol tables were not
+present in the downloaded #246 device artifact, so these uploaded logs improve
+direct inspection of the interface after compilation. Native test execution,
+rendered screenshots and complete task/visual parity remain pending.

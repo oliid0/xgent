@@ -220,6 +220,8 @@ jobs:
             2>&1 | tee "$RUNNER_TEMP/native-computer-use.log"
           xcrun nm -g "$RUNNER_TEMP/libXgentComputerUse.a" > "$RUNNER_TEMP/native-computer-use-symbols.txt"
           grep -Eq ' [Tt] _xgent_cua_permissions$' "$RUNNER_TEMP/native-computer-use-symbols.txt"
+          grep -E ' [Tt] _xgent_cua_permissions$' "$RUNNER_TEMP/native-computer-use-symbols.txt" \
+            | tee "$RUNNER_TEMP/native-computer-use-exports.log"
 
       - name: Test macOS package
         if: ${{ !cancelled() && matrix.platform == 'macos' }}
@@ -274,9 +276,12 @@ jobs:
             --triple arm64-apple-ios26.0 --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" --show-bin-path)"
           test -s "$binary_path/libXgentNativeUI.a"
           xcrun nm -g "$binary_path/libXgentNativeUI.a" > "$RUNNER_TEMP/native-symbols.txt"
-          grep -q 'xgent_native_ui_reset' "$RUNNER_TEMP/native-symbols.txt"
+          grep -Eq ' [Tt] _xgent_native_ui_reset$' "$RUNNER_TEMP/native-symbols.txt"
+          grep -Eq ' [Tt] _xgent_native_ui_update$' "$RUNNER_TEMP/native-symbols.txt"
           grep -Eq ' [Tt] _xgent_native_ui_font_families$' "$RUNNER_TEMP/native-symbols.txt"
           grep -Eq ' [Tt] _xgent_native_ui_font_families_free$' "$RUNNER_TEMP/native-symbols.txt"
+          grep -E ' [Tt] _xgent_native_ui_(reset|update|font_families|font_families_free)$' "$RUNNER_TEMP/native-symbols.txt" \
+            | tee "$RUNNER_TEMP/native-exports.log"
 
       - name: Export native screenshots
         if: ${{ always() }}

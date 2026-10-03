@@ -49,8 +49,8 @@ final class ReadOnlySyntaxTests: XCTestCase {
         await fulfillment(of: [emitted], timeout: 2)
         let action = try XCTUnwrap(actions.first)
         XCTAssertTrue(model.busy.isEmpty); XCTAssertTrue(model.edits.isEmpty); XCTAssertNil(model.error)
-        model.complete(.init(surface: "other", requestId: action.requestId, ok: true, acceptedValue: .string("wrong")))
-        model.complete(.init(surface: document.surface, requestId: action.requestId, ok: true, acceptedValue: .string("actual")))
+        model.complete(.init(surface: "other", requestId: action.requestId, ok: true, error: nil, acceptedValue: .string("wrong")))
+        model.complete(.init(surface: document.surface, requestId: action.requestId, ok: true, error: nil, acceptedValue: .string("actual")))
         let result = await pending.value
         XCTAssertEqual(result, "actual")
         XCTAssertTrue(model.busy.isEmpty); XCTAssertTrue(model.edits.isEmpty); XCTAssertNil(model.error)
@@ -79,7 +79,7 @@ final class ReadOnlySyntaxTests: XCTestCase {
             let result = await pending.value
             XCTAssertNil(result)
             XCTAssertTrue(model.edits.isEmpty); XCTAssertTrue(model.busy.isEmpty); XCTAssertNil(model.error)
-            model.complete(.init(surface: document.surface, requestId: emittedAction.requestId, ok: true, acceptedValue: .string("late")))
+            model.complete(.init(surface: document.surface, requestId: emittedAction.requestId, ok: true, error: nil, acceptedValue: .string("late")))
             XCTAssertNil(model.error)
             model.invalidate()
         }

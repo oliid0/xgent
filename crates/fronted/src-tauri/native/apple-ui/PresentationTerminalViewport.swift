@@ -57,7 +57,7 @@ struct XgentPlatformTerminal: UIViewRepresentable {
     static func dismantleUIView(_ view: TerminalView, coordinator: XgentTerminalCoordinator) {
         coordinator.retire()
         view.terminalDelegate = nil
-        view.resignFirstResponder()
+        _ = view.resignFirstResponder()
     }
 }
 #else

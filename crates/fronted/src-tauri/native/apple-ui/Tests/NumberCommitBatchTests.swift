@@ -17,10 +17,10 @@ final class NumberCommitBatchTests: XCTestCase {
         XCTAssertNil(state.draft.pending)
         let commit = try XCTUnwrap(emitted.first)
         XCTAssertEqual(commit.value, .number(123))
-        model.complete(.init(surface: "other", requestId: commit.requestId, ok: true))
+        model.complete(.init(surface: "other", requestId: commit.requestId, ok: true, error: nil))
         XCTAssertEqual(emitted.count, 1)
         model.update(try fixture(revision: 2, value: 123))
-        model.complete(.init(surface: document.surface, requestId: commit.requestId, ok: true, acceptedValue: .number(123)))
+        model.complete(.init(surface: document.surface, requestId: commit.requestId, ok: true, error: nil, acceptedValue: .number(123)))
         XCTAssertEqual(emitted.map(\.action), ["timeout", "save"])
         XCTAssertFalse(model.hasNumberCommitBatch(in: document))
         XCTAssertTrue(model.edits.isEmpty)
@@ -60,7 +60,7 @@ final class NumberCommitBatchTests: XCTestCase {
         model.actionSink = { action in
             emitted.append(action)
             if action.action == "timeout" {
-                model.complete(.init(surface: action.surface, requestId: action.requestId, ok: true, acceptedValue: action.value))
+                model.complete(.init(surface: action.surface, requestId: action.requestId, ok: true, error: nil, acceptedValue: action.value))
             }
         }
         model.send(document.nodes[1], in: document)
