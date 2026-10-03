@@ -83,10 +83,13 @@ export function nativeDiagramSvg(source: string): string {
       element.removeAttribute("style");
       for (const [name, value] of Object.entries(resolved[index]))
         if (value) {
+          // Computed CSS serializes dash lengths with px. SwiftDraw's SVG
+          // number-list parser consumes unitless numbers, including commas.
+          const nativeValue = name === "stroke-dasharray" ? value.replace(/px\b/g, "") : value;
           // A local fragment remains valid after crossing the native boundary.
           element.setAttribute(
             name,
-            value.replace(/url\(["']?[^#)]*#([^"')]+)["']?\)/g, "url(#$1)"),
+            nativeValue.replace(/url\(["']?[^#)]*#([^"')]+)["']?\)/g, "url(#$1)"),
           );
         }
       for (const position of ["start", "mid", "end"]) element.removeAttribute(`marker-${position}`);

@@ -49,6 +49,10 @@ final class MarkdownMathTests: XCTestCase {
     }
 
     @MainActor func testNativeFormulaFontsRasterizationAndChatWidths() async throws {
+        #if os(macOS)
+        let accessibility = try NativeMacAccessibilitySession()
+        defer { accessibility.restore() }
+        #endif
         XCTAssertTrue(XgentMathFonts.available, "SDK rendering must use the packaged KaTeX font bundle")
         let font = KaTeXFontProvider.shared.font(for: .mainRegular, size: 20)
         XCTAssertTrue((CTFontCopyPostScriptName(font) as String).hasPrefix("KaTeX"), "System-font fallback does not verify math parity")

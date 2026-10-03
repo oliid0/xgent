@@ -32,12 +32,6 @@ struct XgentMarkdown: View {
     var body: some View {
         Markdown(codeStore.prepare(XgentMarkdownMath.prepare(text,
             renderKey: "\(mathProvider.fontSize)-\(secondary ? palette.secondaryText : palette.text)")))
-            .markdownTheme(MarkdownUI.Theme.gitHub.text {
-                if let name = XgentFonts.name(for: theme.fontFamily) { FontFamily(.custom(name)) }
-                FontSize(bodySize * CGFloat(theme.fontScale * theme.typography.body / 15))
-                ForegroundColor(Color(xgentHex: secondary ? palette.secondaryText : palette.text))
-                BackgroundColor(nil)
-            })
             .markdownTextStyle(\.link) { ForegroundColor(Color(xgentHex: palette.accentText)) }
             .markdownBlockStyle(\.image) { configuration in
                 if let formula = XgentMathFormula.block(in: configuration.content.renderMarkdown()) {
@@ -73,6 +67,15 @@ struct XgentMarkdown: View {
                 }
                 .markdownMargin(top: 0, bottom: 12)
             }
+            // The complete theme must be outside the per-block overrides.
+            // An inner theme replaces those environment values and silently
+            // restores the package's code/table/image renderers.
+            .markdownTheme(MarkdownUI.Theme.gitHub.text {
+                if let name = XgentFonts.name(for: theme.fontFamily) { FontFamily(.custom(name)) }
+                FontSize(bodySize * CGFloat(theme.fontScale * theme.typography.body / 15))
+                ForegroundColor(Color(xgentHex: secondary ? palette.secondaryText : palette.text))
+                BackgroundColor(nil)
+            })
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

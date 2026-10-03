@@ -26,7 +26,7 @@ final class MermaidDiagramTests: XCTestCase {
         let fixtures = try fixtures()
         XCTAssertEqual(fixtures.count, 10)
         for fixture in fixtures {
-            let image = try XCTUnwrap(fixture.image(source: fixture.source, dark: fixture.dark))
+            let image = try XCTUnwrap(fixture.image(source: fixture.source, dark: fixture.dark), fixture.source)
             XCTAssertGreaterThan(image.size.width, 20); XCTAssertGreaterThan(image.size.height, 20)
             let data = try XCTUnwrap(fixture.svg?.data(using: .utf8))
             let decoder = try XCTUnwrap(XgentSVGImageDecoder(data: data, maximumPixelSize: 512))
@@ -71,6 +71,10 @@ final class MermaidDiagramTests: XCTestCase {
     }
 
     @MainActor func testRealNativeMarkdownDiagramWidthsAndThemeReplies() async throws {
+        #if os(macOS)
+        let accessibility = try NativeMacAccessibilitySession()
+        defer { accessibility.restore() }
+        #endif
         let fixtures = try fixtures()
         for width: CGFloat in [320, 768] {
             for dark in [false, true] {

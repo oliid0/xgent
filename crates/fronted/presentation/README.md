@@ -964,6 +964,10 @@ and verification. Release #125 was dispatched from that exact revision; its
 actual installed applications remain under verification. The earlier successful
 DMGs did not contain the repair.
 
+The previously dispatched Release #125/#126 records now return HTTP 404;
+their final results cannot be verified. Locally retained #125 ARM DMG inspection
+does confirm bundled shortcut localization and terminal shader resources.
+
 Native Markdown reuses the shared LaTeX delimiter normalization before
 recognizing multi-dollar inline and fenced display math,
 using pinned SwaTex 0.5.0's native KaTeX engine and font resources. Handwritten
@@ -1009,3 +1013,11 @@ replaces the theme's default text style directly, using the app's font/scale and
 transparent background; setting only an outer text modifier had not cleared the
 theme background. Existing mounted math/diagram screenshots verify this change
 in remote CI.
+
+CI #267 exposed that a complete inner Markdown theme erased the custom block
+styles. The theme now wraps the block overrides, allowing the handwritten
+code/diagram/table/display-math views to run. Browser-computed SVG dash arrays
+also require unitless numbers for SwiftDraw; the converter normalizes their
+pixel units and real shared-engine fixtures are refreshed. Native graph and
+math tests retain their actual-display assertions, with macOS enhanced
+accessibility initialized before traversal. These corrections await remote CI.
