@@ -14,7 +14,7 @@ struct XgentCodeHostAvailability: ViewModifier {
                     guard let view, view.window != nil else { return false }
                     if view.markedTextRange != nil { view.unmarkText() }
                     return true
-                })
+                }, resetUndo: { [weak view] in view?.undoManager?.removeAllActions() })
             }
             #else
             .introspect(.textEditor, on: .macOS(.v15, .v26)) { view in
@@ -23,7 +23,7 @@ struct XgentCodeHostAvailability: ViewModifier {
                     guard let view, view.window != nil else { return false }
                     if view.hasMarkedText() { view.unmarkText() }
                     return true
-                })
+                }, resetUndo: { [weak view] in view?.undoManager?.removeAllActions() })
             }
             #endif
     }

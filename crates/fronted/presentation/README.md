@@ -642,3 +642,24 @@ MCP, skills, speech/tool settings, browser/terminal/workspace tabs and task deta
 The shared serialized formFactor strings remain unchanged. This concentrated SDK
 repair and lockfile update require renewed Actions compilation; no native test
 execution or screenshot success is inferred from the previous failed runs.
+
+[CI #244](https://github.com/oliid0/xgent/actions/runs/37128874376) passed frontend,
+workflow, architecture and diff checks, and the complete Rust job: 77 history
+tests and one mobile execution bridge test passed. Native compilation advanced
+to the retained editor root and rejected writing SwiftUI's read-only undoManager
+environment value. That injection and unused root parameter are removed. The
+native hosting responder still supplies a per-session undo manager; disk reload
+and retirement now also clear the actual text control's manager through a weak
+callback, covering UIKit controls with their own manager. The mounted CodeHost
+test additionally checks retained editor identity, reloaded source, cleared local
+undo and preservation of the other file's undo history. Apple execution is pending.
+
+CI native verification now uses independent macos/ios/device matrix jobs with
+fail-fast disabled. A macOS failure no longer skips iOS compilation and hosted
+tests, and device release archive errors are captured in native-device.log.
+Each job retains its failure status and uploads an individually named verification
+artifact. This collects both platforms' failures from one batch; it does not turn
+failed checks into successes. The workflow change follows GitHub's documented
+matrix failure handling. Local release checks pass 33/33, native contract remains
+55 kinds/42 properties, and architecture/whitespace checks pass. No local Apple,
+Cargo, install, dev or build command was executed. Overall parity remains active.

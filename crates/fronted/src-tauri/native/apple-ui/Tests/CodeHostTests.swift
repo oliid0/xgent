@@ -146,6 +146,14 @@ final class CodeHostTests: XCTestCase {
         host.rootView = AnyView(render(returned, model)); try await settle()
         XCTAssertTrue(editor(in: root) === a)
         XCTAssertTrue(try XCTUnwrap(a.undoManager).canUndo)
+
+        let reloaded = try fixture(surface: "reloaded", key: "a:1", content: "let count = 99")
+        model.update(reloaded); host.rootView = AnyView(render(reloaded, model)); try await settle()
+        let reloadInput = try XCTUnwrap(editor(in: root))
+        XCTAssertTrue(reloadInput === a, "Disk reload keeps the existing native editor")
+        XCTAssertEqual(source(reloadInput), "let count = 99")
+        XCTAssertFalse(try XCTUnwrap(reloadInput.undoManager).canUndo, "Undo cannot restore the pre-reload file")
+        XCTAssertTrue(try XCTUnwrap(b.undoManager).canUndo, "Reload must not erase another file's undo history")
     }
 
     @MainActor private func settle() async throws { try await Task.sleep(nanoseconds: 350_000_000) }

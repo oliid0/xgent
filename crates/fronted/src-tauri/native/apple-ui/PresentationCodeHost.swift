@@ -45,9 +45,10 @@ final class XgentCodeHost {
         let alreadyInNativeView = source.inputContent == content
         if source.activate(lease, content: content, editable: configuration.enabled && environment.enabled, changed: changed) && !alreadyInNativeView {
             undo.removeAllActions()
+            source.clearInputUndo()
         }
         let root = XgentCodeHostRoot(source: source, lease: lease, configuration: configuration,
-                                     environment: environment, undo: undo)
+                                     environment: environment)
         hosting.rootView = AnyView(root.id(identity.cacheKey))
     }
     func detach(_ lease: UUID) {

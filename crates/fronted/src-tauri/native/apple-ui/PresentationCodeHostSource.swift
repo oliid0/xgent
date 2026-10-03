@@ -9,6 +9,7 @@ final class XgentCodeHostSource: ObservableObject {
     private var changed: ((String) -> Void)?
     private var readInput: (() -> String?)?
     private var commitInput: (() -> Bool)?
+    private var resetInputUndo: (() -> Void)?
     var inputContent: String? { readInput?() }
     init(_ content: String) { self.content = content }
 
@@ -25,10 +26,15 @@ final class XgentCodeHostSource: ObservableObject {
         guard owns(lease) else { return }
         self.lease = nil; changed = nil; editable = false
     }
-    func retire() { active = false; lease = nil; changed = nil; editable = false; readInput = nil; commitInput = nil }
-    func attachInput(read: @escaping () -> String?, commit: @escaping () -> Bool) {
+    func retire() {
+        resetInputUndo?()
+        active = false; lease = nil; changed = nil; editable = false
+        readInput = nil; commitInput = nil; resetInputUndo = nil
+    }
+    func clearInputUndo() { resetInputUndo?() }
+    func attachInput(read: @escaping () -> String?, commit: @escaping () -> Bool, resetUndo: (() -> Void)? = nil) {
         guard active else { return }
-        readInput = read; commitInput = commit
+        readInput = read; commitInput = commit; resetInputUndo = resetUndo
     }
     func commitCurrent() {
         guard active, editable, let lease, commitInput?() == true, let value = readInput?() else { return }

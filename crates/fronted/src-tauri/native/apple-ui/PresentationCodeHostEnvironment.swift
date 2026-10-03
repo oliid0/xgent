@@ -15,7 +15,6 @@ struct XgentCodeHostRoot: View {
     let lease: UUID
     let configuration: XgentCodeEditor
     let environment: XgentCodeHostEnvironment
-    let undo: UndoManager
 
     var body: some View {
         configuration.retained(binding: source.binding(lease))
@@ -25,7 +24,6 @@ struct XgentCodeHostRoot: View {
             .environment(\.colorScheme, environment.colorScheme)
             .environment(\.locale, environment.locale)
             .environment(\.layoutDirection, environment.layoutDirection)
-            .environment(\.undoManager, undo)
             .dynamicTypeSize(environment.dynamicTypeSize)
     }
 }
