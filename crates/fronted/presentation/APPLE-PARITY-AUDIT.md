@@ -68,6 +68,13 @@ not been measured or established.
   regression covers repeated staging and unchanged source permissions.
 - New Swift rendering/commit tests will run remotely. Installed iOS shell cancel,
   installer behavior, screenshots and actual macOS screenshots remain pending.
+- CI 275 / `0610e27`: frontend, device archive and guards passed; macOS/iOS SDK
+  test compilation failed because an untyped mixed-numeric array in the expanded
+  sidebar fixture inferred `Any` and selected the wrong `flatMap` overload.
+  The fixture now declares explicit tuple element types. No SDK pass is claimed
+  for this failed run. The follow-up also matches the shared collapsed archive
+  group and disables archived selection while preserving its restore menu;
+  actual accessibility checks cover both controls at narrow/large-text sizes.
 - Local checks for this batch: 512 shared/native presentation tests and five
   Apple resource CLI tests passed, with no skipped cases. TypeScript no-emit,
   architecture and the 55-kind/44-property native contract checks also passed.

@@ -220,6 +220,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const [activityOpen, setActivityOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [sidebarSearchVisible, setSidebarSearchVisible] = useState(false);
+  const [archivedGroupOpen, setArchivedGroupOpen] = useState(false);
   const [expandedProjectIds, setExpandedProjectIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -233,6 +234,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
     for (const project of props.projects) {
       if (
         expandedProjectIds.has(project.id) &&
+        !props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)) &&
         !sidebar.workspaceHistory.has(workspaceProjectPathKey(project.path))
       ) {
         void props.sidebarStore.loadWorkspaceHistory(project.path);
@@ -241,6 +243,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
   }, [
     expandedProjectIds,
     props.projects,
+    props.archivedProjectPathKeys,
     props.sidebarStore,
     sidebar.workspaceHistory,
     sidebarOpen,
@@ -962,8 +965,13 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const finishSidebarAction = () => {
     if (compact) setSidebarOpen(false);
   };
-  const sidebarButton = (id: string, label: string, run: () => unknown): PresentationNode => {
-    sidebarHandlers.set(id, { enabled: true, accepts: (value) => value === null, run });
+  const sidebarButton = (
+    id: string,
+    label: string,
+    run: () => unknown,
+    enabled = true,
+  ): PresentationNode => {
+    sidebarHandlers.set(id, { enabled, accepts: (value) => value === null, run });
     return {
       id,
       kind: "NavigationRow",
@@ -1027,16 +1035,21 @@ export function NativeChatPage(props: NativeChatPageProps) {
     const visible = conversations.slice(0, state?.limit ?? 10);
     return [
       {
-        ...sidebarButton(`project:${project.id}`, project.name, () => {
-          if (archived) return;
-          setExpandedProjectIds((current) => {
-            const next = new Set(current);
-            if (next.has(project.id)) next.delete(project.id);
-            else next.add(project.id);
-            return next;
-          });
-          props.onSelectProject(project);
-        }),
+        ...sidebarButton(
+          `project:${project.id}`,
+          project.name,
+          () => {
+            if (archived) return;
+            setExpandedProjectIds((current) => {
+              const next = new Set(current);
+              if (next.has(project.id)) next.delete(project.id);
+              else next.add(project.id);
+              return next;
+            });
+            props.onSelectProject(project);
+          },
+          !archived,
+        ),
         icon: expanded ? "folder.fill" : "folder",
         variant: "sidebar-workspace-row",
         selected: workspaceProjectPathKey(props.uploadWorkdir) === key,
@@ -1147,23 +1160,31 @@ export function NativeChatPage(props: NativeChatPageProps) {
     )
       ? [
           {
-            id: "archived-projects-label",
-            kind: "Heading" as const,
-            text: t("chat.workspaceArchivedGroup").replace(
-              "{count}",
-              String(
-                props.projects.filter((project) =>
-                  props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)),
-                ).length,
+            ...sidebarButton(
+              "archived-projects-label",
+              t("chat.workspaceArchivedGroup").replace(
+                "{count}",
+                String(
+                  props.projects.filter((project) =>
+                    props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)),
+                  ).length,
+                ),
               ),
+              () => setArchivedGroupOpen((current) => !current),
+            ),
+            icon: archivedGroupOpen ? "chevron.down" : "chevron.right",
+            accessibilityValue: t(
+              archivedGroupOpen ? "chat.workspaceCollapse" : "chat.workspaceExpand",
             ),
           },
-          ...sidebarProjects
-            .filter((project) =>
-              props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)),
-            )
-            .filter((project) => project.name.toLocaleLowerCase().includes(projectQuery))
-            .flatMap((project) => projectSidebarRows(project)),
+          ...(archivedGroupOpen
+            ? sidebarProjects
+                .filter((project) =>
+                  props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)),
+                )
+                .filter((project) => project.name.toLocaleLowerCase().includes(projectQuery))
+                .flatMap((project) => projectSidebarRows(project))
+            : []),
         ]
       : []),
   ];

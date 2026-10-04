@@ -13,10 +13,13 @@ import AppKit
 final class SidebarConversationRenderingTests: XCTestCase {
     @MainActor
     func testConversationMenusRemainSeparateFromLongTitlesAtNarrowAndAccessibleWidths() async throws {
-        let cases = [false, true].flatMap { workspace in [CGFloat(240), 320].map { (workspace, $0) } }
-        for (workspace, width) in cases {
+        let cases: [(workspace: Bool, width: CGFloat, archived: Bool)] = [
+            (false, 240, false), (false, 320, false), (true, 240, false), (true, 320, false),
+            (true, 240, true), (true, 320, true),
+        ]
+        for (workspace, width, archived) in cases {
             for size in [DynamicTypeSize.large, .accessibility3] {
-                let document = try fixture(workspace: workspace)
+                let document = try fixture(workspace: workspace, archived: archived)
                 let model = XgentPresentationModel()
                 model.update(document)
                 let view = ScrollView {
@@ -60,7 +63,7 @@ final class SidebarConversationRenderingTests: XCTestCase {
                 }
                 #endif
                 let attachment = XCTAttachment(image: image)
-                attachment.name = "sidebar-\(workspace ? "workspace" : "conversation")-actions-\(Int(width))-\(size == .large ? "standard" : "large-dark")"
+                attachment.name = "sidebar-\(archived ? "archived" : workspace ? "workspace" : "conversation")-actions-\(Int(width))-\(size == .large ? "standard" : "large-dark")"
                 attachment.lifetime = .keepAlways
                 add(attachment)
                 #if os(iOS)
@@ -76,6 +79,8 @@ final class SidebarConversationRenderingTests: XCTestCase {
                 for id in ["selected", "running", "ordinary"] {
                     let selection = try XCTUnwrap(elements.first { $0.identifier == id && $0.traits.contains(.button) })
                     let menu = try XCTUnwrap(elements.first { $0.identifier == "\(id):menu" && $0.traits.contains(.button) })
+                    XCTAssertEqual(selection.traits.contains(.notEnabled), archived)
+                    XCTAssertFalse(menu.traits.contains(.notEnabled), "Archiving must preserve a usable restore menu")
                     let selectionFrame = selection.shape.bezierPath.bounds
                     let menuFrame = menu.shape.bezierPath.bounds
                     XCTAssertGreaterThanOrEqual(selectionFrame.height, 43.5)
@@ -95,10 +100,10 @@ final class SidebarConversationRenderingTests: XCTestCase {
         }
     }
 
-    private func fixture(workspace: Bool = false) throws -> XgentDocument {
+    private func fixture(workspace: Bool = false, archived: Bool = false) throws -> XgentDocument {
         let nodes = ["selected", "running", "ordinary"].map { id -> [String: Any] in
             ["id": id, "kind": "NavigationRow", "variant": workspace ? "sidebar-workspace-row" : "sidebar-conversation-row", "label": "\(id): Review browser results and prepare the workspace presentation",
-             "action": id, "selected": id == "selected", "status": id == "running" ? "running" : "completed",
+             "action": id, "selected": id == "selected", "status": id == "running" ? "running" : "completed", "secondary": archived,
              "icon": "pin.fill", "children": [["id": "\(id):menu", "kind": "Menu", "variant": "compact", "icon": "ellipsis", "label": "Actions for \(id)", "children": [
                 ["id": "\(id):rename", "kind": "Button", "label": "Rename", "action": "\(id):rename", "disabled": id == "running"],
                 ["id": "\(id):delete", "kind": "Button", "label": "Delete", "action": "\(id):delete", "destructive": true, "disabled": id == "running"],

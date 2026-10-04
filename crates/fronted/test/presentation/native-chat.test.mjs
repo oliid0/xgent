@@ -525,6 +525,33 @@ test("native sidebar keeps root folders visible and nests grouped workspaces and
   h.unmount();
 });
 
+test("native archived workspaces start folded, reject selection and retain working restore menus", async () => {
+  const restored = [], selected = [];
+  const project = { id: "archived", name: "Archived project", path: "/archived" };
+  const h = harness({
+    projects: [{ id: "active", name: "Active", path: "/active" }, project],
+    archivedProjectPathKeys: new Set([project.path]),
+    onSelectProject: item => selected.push(item.id),
+    onUnarchiveProject: item => restored.push(item.id),
+  }, { mobile: true });
+  await h.dispatch("sidebar");
+  const rows = () => h.render().nodes[0] && h.documents().find(item => item.mode === "sidebar")
+    .nodes[0].children.find(node => node.id === "sidebar-list").children;
+  assert.ok(rows().some(node => node.id === "archived-projects-label" && node.kind === "NavigationRow"));
+  assert.equal(rows().some(node => node.id === "project:archived"), false);
+  assert.equal((await h.dispatch("archived-projects-label", null, "sidebar")).ok, true);
+  const row = rows().find(node => node.id === "project:archived");
+  assert.equal(row.secondary, true);
+  assert.notEqual(row.disabled, true, "only selection is disabled, rather than the entire row and its restore menu");
+  assert.equal((await h.dispatch("project:archived", null, "sidebar")).ok, false);
+  assert.deepEqual(selected, []);
+  assert.equal((await h.dispatch("project-actions:archived:unarchive", null, "sidebar")).ok, true);
+  assert.deepEqual(restored, ["archived"]);
+  assert.equal((await h.dispatch("archived-projects-label", null, "sidebar")).ok, true);
+  assert.equal(rows().some(node => node.id === "project:archived"), false);
+  h.unmount();
+});
+
 test("native work stays visible while running and folds only after completion", () => {
   const h = harness({}, { mobile: true });
   const item = {

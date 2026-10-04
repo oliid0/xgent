@@ -63,7 +63,10 @@ struct XgentSidebarConversationRow: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(node.disabled == true || model.isBusy(node, in: document))
+            // Archived project selection is disabled; the sibling restore menu stays usable.
+            .disabled(node.disabled == true ||
+                      (node.variant == "sidebar-workspace-row" && node.secondary == true) ||
+                      model.isBusy(node, in: document))
             .contextMenu {
                 if let menu {
                     XgentNativeMenuItems(nodes: menu.children ?? [], document: document, model: model)
