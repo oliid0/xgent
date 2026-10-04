@@ -352,3 +352,22 @@ was checked through Swift MCP.
   WebView descendants and marks the window Disabled. Intel timed out during
   accessibility queries. iOS simulator smoke compilation is still in progress.
   These failures are unresolved and the release is not reported as successful.
+
+- The macOS host now owns accessibility children at the plain Tauri container,
+  retaining native siblings and excluding the execution WebView before remote
+  WebKit traversal. Detaching or removing the native root restores AppKit's
+  computed children. The execution view remains mounted and visible underneath.
+- A production-host integration check mounts a real WKWebView and calls the
+  exported native update/reset entry points. It checks native pointer routing,
+  the container's accessibility children, real JS execution and native action
+  delivery/acknowledgement. The packaged test also rejects transport WebViews
+  in the initial native chat; its hittability assertion remains unchanged.
+  These checks require remote compilation and do not yet establish a release fix.
+- Packaged macOS diagnostics additionally capture a process sample and runner
+  screen when an application remains alive after a failed UI test. This is to
+  diagnose Intel's unresponsive main thread, whose cause remains unconfirmed.
+
+Research: [AppKit accessibility children](https://developer.apple.com/documentation/appkit/nsaccessibilityprotocol/setaccessibilitychildren(_:))
+and [an upstream hidden WKWebView implementation](https://github.com/isaaclins/spotiglass/blob/main/Spotiglass/Playback/HiddenPlaybackWebView.swift)
+were inspected through Swift/GitHub MCP. A local hidden flag alone does not
+exclude the remote descendants observed in Release 129's actual hierarchy.

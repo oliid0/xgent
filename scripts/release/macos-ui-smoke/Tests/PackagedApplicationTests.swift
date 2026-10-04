@@ -21,8 +21,9 @@ final class PackagedApplicationTests: XCTestCase {
         app.launch()
         let draft = app.descendants(matching: .any)["draft"].firstMatch
         XCTAssertTrue(draft.waitForExistence(timeout: 60), "The actual SwiftUI chat must render after packaged launch")
-        XCTAssertTrue(draft.isHittable, "The composer must remain reachable")
         record(app, name: "macos-packaged-chat")
+        XCTAssertEqual(app.webViews.count, 0, "The covered execution host must be excluded from native accessibility")
+        XCTAssertTrue(draft.isHittable, "The composer must remain reachable")
 
         let settings = app.buttons["settings"].firstMatch
         if !settings.exists { click(app.buttons["sidebar"].firstMatch) }

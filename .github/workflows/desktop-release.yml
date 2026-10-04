@@ -264,6 +264,11 @@ jobs:
       - name: Export actual macOS application screenshots
         if: always() && (github.event_name == 'push' || inputs.publish == true || inputs.smoke == true)
         run: |
+          app_pid="$(pgrep -x xgent | head -n 1)"
+          if [ -n "$app_pid" ]; then
+            sample "$app_pid" 5 -file "$RUNNER_TEMP/xgent-macos-process-sample.log" || true
+            screencapture -x "$RUNNER_TEMP/xgent-macos-runner-screen.png" || true
+          fi
           if [ -d "$RUNNER_TEMP/xgent-macos-interactions.xcresult" ]; then
             xcrun xcresulttool export attachments --path "$RUNNER_TEMP/xgent-macos-interactions.xcresult" \
               --output-path "$RUNNER_TEMP/xgent-macos-interactions"
@@ -277,6 +282,7 @@ jobs:
           name: xgent-macos-${{ matrix.suffix }}-launch-evidence
           path: |
             ${{ runner.temp }}/xgent-macos-*.log
+            ${{ runner.temp }}/xgent-macos-runner-screen.png
             ${{ runner.temp }}/xgent-macos-interactions
           if-no-files-found: error
 

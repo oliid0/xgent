@@ -17,6 +17,7 @@ private final class XgentPresentationHost: NSObject {
     let controller: UIHostingController<XgentPresentationView>
     #else
     let controller: NSHostingController<XgentPresentationView>
+    private let accessibilityBoundary: XgentPresentationAccessibilityBoundary
     #endif
 
     init?(webview: WKWebView, parent: UnsafeMutableRawPointer?) {
@@ -29,6 +30,7 @@ private final class XgentPresentationHost: NSObject {
         #else
         guard let container = webview.superview else { return nil }
         controller = NSHostingController(rootView: XgentPresentationView(model: model))
+        accessibilityBoundary = XgentPresentationAccessibilityBoundary(transport: webview)
         #endif
         super.init()
         model.webview = webview
@@ -68,6 +70,7 @@ private final class XgentPresentationHost: NSObject {
         webview.isUserInteractionEnabled = true
         webview.accessibilityElementsHidden = false
         #else
+        accessibilityBoundary.reset()
         webview.setAccessibilityHidden(false)
         #endif
         webview.isHidden = false
@@ -83,7 +86,7 @@ private final class XgentPresentationHost: NSObject {
         model.webview?.isUserInteractionEnabled = !nativeRoot
         model.webview?.accessibilityElementsHidden = nativeRoot
         #else
-        model.webview?.setAccessibilityHidden(nativeRoot)
+        accessibilityBoundary.update(nativeRoot: nativeRoot)
         #endif
     }
 }
