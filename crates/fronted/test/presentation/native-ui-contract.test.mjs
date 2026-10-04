@@ -82,7 +82,11 @@ test("the complete iOS application surface is handwritten and bypasses generated
   assert.doesNotMatch(nativeMobileSource, /ToolbarItem\(placement:/);
   assert.match(nativeMobileSource, /\.frame\(minHeight: 68\)/);
   assert.match(nativeMobileSource, /geometry\.size\.width \* 0\.85/);
-  assert.match(nativeMobileSource, /\.safeAreaBar\(edge: \.bottom/);
+  const sidebarSource = nativeMobileSource.slice(
+    nativeMobileSource.indexOf("private struct XgentIOSSidebarPresentation"),
+    nativeMobileSource.indexOf("private struct XgentIOSSidebarFooter"),
+  );
+  assert.doesNotMatch(sidebarSource, /\.safeAreaBar\(edge: \.bottom/);
   assert.match(nativeMobileSource, /\.onScrollGeometryChange\(for: Bool\.self\)/);
   assert.match(nativeMobileSource, /\.onScrollPhaseChange/);
   assert.match(nativeMobileSource, /if grouped \{\s*XgentIOSSettingsForm\(nodes: contentNodes/);
