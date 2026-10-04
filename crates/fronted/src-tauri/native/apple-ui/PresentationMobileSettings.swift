@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import UIKit
 
 // Native Form sections own spacing and surfaces. A nested Shell workspace group
 // must not become another rounded card inside an already grouped form row.
@@ -65,13 +66,15 @@ struct XgentIOSSettingsForm: View {
                             .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                             .listRowBackground(section.hasControls
                                 ? Color(xgentHex: theme.palette(for: colorScheme).card) : Color.clear)
-                            .listRowSeparator(section.hasControls ? .visible : .hidden)
+                            .listRowSeparator(.hidden, edges: .top)
+                            .listRowSeparator(section.hasControls && row.id != section.controlRows.last?.id
+                                ? .visible : .hidden, edges: .bottom)
                     }
                 } header: {
                     if !section.labels.isEmpty {
                         Text(section.labels.joined(separator: " / "))
                             .font(XgentFonts.body(theme.fontFamily, size: CGFloat(15 * theme.fontScale) * headerScale, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color(uiColor: .secondaryLabel))
                             .fixedSize(horizontal: false, vertical: true)
                             .textCase(nil)
                             .accessibilityAddTraits(.isHeader)
@@ -80,6 +83,7 @@ struct XgentIOSSettingsForm: View {
                 } footer: {
                     notes(section.trailingNotes)
                 }
+                .listSectionSeparator(.hidden)
             }
         }
         .formStyle(.grouped)

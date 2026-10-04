@@ -776,6 +776,8 @@ struct XgentIOSNode: View {
         }
         .buttonStyle(.plain)
         .modifier(XgentControlTypography(node: node))
+        .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
+        .accessibilityHint(node.accessibilityHint ?? node.text ?? "")
         .accessibilityAddTraits(node.selected == true ? .isSelected : [])
     }
 

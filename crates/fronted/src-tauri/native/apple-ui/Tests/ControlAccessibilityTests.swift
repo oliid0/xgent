@@ -7,6 +7,35 @@ import XCTest
 
 final class ControlAccessibilityTests: XCTestCase {
     @MainActor
+    func testSettingsNavigationSeparatesDestinationNameFromItsExplanation() async throws {
+        let payload: [String: Any] = ["version": 1, "surface": "settings-navigation", "revision": 1,
+            "mode": "root", "title": "Settings", "appearance": "light", "formFactor": "mobile",
+            "nodes": [["id": "nav:system", "kind": "NavigationRow", "label": "System",
+                       "text": "Language, execution mode and appearance", "icon": "slider.horizontal.3", "action": "system"]]]
+        let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
+        let model = XgentPresentationModel()
+        model.update(document)
+        for size in [DynamicTypeSize.large, .accessibility3] {
+            let view = XgentIOSNode(node: document.nodes[0], document: document, model: model)
+                .frame(width: 320)
+                .dynamicTypeSize(size)
+            let host = UIHostingController(rootView: view)
+            let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 720))
+            window.rootViewController = host
+            window.makeKeyAndVisible()
+            defer { window.isHidden = true; window.rootViewController = nil }
+            host.view.layoutIfNeeded()
+            try await Task.sleep(nanoseconds: 150_000_000)
+            let elements = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view).flattenToElements()
+            let row = try XCTUnwrap(elements.first { $0.identifier == "nav:system" && $0.traits.contains(.button) })
+            XCTAssertEqual(row.label, "System", "VoiceOver and native navigation use the destination name")
+            XCTAssertEqual(row.hint, "Language, execution mode and appearance")
+            XCTAssertGreaterThanOrEqual(row.shape.bezierPath.bounds.height, 43.5)
+            XCTAssertLessThanOrEqual(row.shape.bezierPath.bounds.maxX, 321)
+        }
+    }
+
+    @MainActor
     func testRealControlsExposeLabelsDisabledStateAndUsableActivationAreas() async throws {
         let widths: [CGFloat] = [320, 768]
         for width in widths {

@@ -152,6 +152,20 @@ and [Flow](https://swiftpackageindex.com/tevelee/SwiftUI-Flow) were consulted.
 Existing pinned packages provide those capabilities; no unneeded dependency was
 added to simulate native glass.
 
-New-head remote compilation, installed screenshots, dark/largest-text traversal,
-shell cancellation and end-to-end service parity remain required. This pass does
-not claim 90% measured visual similarity or identical complex task completion.
+- CI 279 / `834dbcc`: all eight jobs passed, including 177 macOS and 183 iOS
+  SDK tests, the device archive and shared frontend. The exported 320-point
+  standard/accessibility-dark native Form images were inspected against the
+  references: nested field outlines are gone, long labels wrap, the selected
+  authentication value is visible and controls do not overlap. These are hosted
+  SDK images, not screenshots of the packaged Rust-backed app.
+- Those images exposed section-edge separators outside rounded cards and a
+  doubly subdued native section label. The follow-up hides only section/outer
+  row edges, retains internal row dividers and uses Apple's adaptive secondary
+  label color. It also separates navigation destination labels from explanatory
+  accessibility hints, with a mounted 320-point standard/large-text AX test.
+  The parser's pinned 0.13.1 `AccessibilityElement.hint` API was verified from
+  its upstream source. Follow-up compilation and images remain pending.
+
+Installed screenshots, dark/largest-text traversal, shell cancellation and
+end-to-end service parity remain required. This pass does not claim 90% measured
+visual similarity or identical complex task completion.
