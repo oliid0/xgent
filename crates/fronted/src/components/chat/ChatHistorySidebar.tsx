@@ -870,17 +870,17 @@ const ProjectRow = memo(function ProjectRow(props: {
       ) : (
         <AstryxStack direction="horizontal" className="min-w-0 items-center">
           {!isArchived && onToggleExpanded ? (
-            <AstryxButton
+            <IconButton
               variant="ghost"
-              label={project.name}
+              label={`${t(expanded ? "chat.workspaceCollapse" : "chat.workspaceExpand")} ${project.name}`}
+              tooltip={project.name}
+              icon={<ProjectFolderIcon className="h-4 w-4" />}
+              size={touchActions ? "lg" : "md"}
               type="button"
-              aria-label={`${t(expanded ? "chat.workspaceCollapse" : "chat.workspaceExpand")} ${project.name}`}
               aria-expanded={expanded}
               onClick={() => onToggleExpanded(project)}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
-            >
-              <ProjectFolderIcon className="h-4 w-4" />
-            </AstryxButton>
+              className="workspace-disclosure-control shrink-0 text-muted-foreground hover:text-foreground"
+            />
           ) : null}
           <SideNavItem
             label={project.name}
@@ -899,7 +899,7 @@ const ProjectRow = memo(function ProjectRow(props: {
             onClick={() => {
               if (!isArchived) {
                 onSelectProject(project);
-                if (!expanded) onToggleExpanded?.(project);
+                onToggleExpanded?.(project);
               }
             }}
           />
@@ -2203,23 +2203,6 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                           placement="below"
                           alignment="end"
                           items={[
-                            {
-                              type: "section",
-                              id: "workspace-switcher",
-                              title: t("chat.workspaceSection"),
-                              items: activeProjects.map((project) => ({
-                                id: project.id,
-                                label: project.name,
-                                icon:
-                                  project.id === selectedWorkspaceProject?.id ? (
-                                    <Check aria-hidden="true" />
-                                  ) : (
-                                    <FolderClosed aria-hidden="true" />
-                                  ),
-                                onClick: () => handleSelectProject(project),
-                              })),
-                            },
-                            { type: "divider" },
                             ...(selectedWorkspaceProject && onOpenWorkspaceSettings
                               ? [
                                   {
@@ -2768,10 +2751,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
               </AstryxStack>
             </AstryxStack>
           </AstryxGrid>
-          <AstryxStack
-            direction="vertical"
-            className="chat-sidebar-footer shrink-0 border-t border-border bg-body px-2 py-1.5"
-          >
+          <AstryxStack direction="vertical" className="chat-sidebar-footer shrink-0 px-2 py-1.5">
             <AstryxGrid className="mobile-chat-sidebar-footer grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
               {mobileExperience ? (
                 <Button

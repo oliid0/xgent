@@ -84,13 +84,13 @@ def with_symbols(binary, entries):
     struct.pack_into('<II', header, 16, count + 1, size + 24)
     return bytes(header) + binary[32:] + struct.pack('<6I', 2, 24, start, len(entries), start + len(records), len(names)) + records + names
 
-def symbol_ipa(exported, weak=False):
+def symbol_ipa(exported, weak=False, startup_dash=False, transitive_dash=False):
     data = io.BytesIO()
     with zipfile.ZipFile(data, 'w') as z:
         z.writestr('Payload/Xgent.app/Info.plist', plistlib.dumps({'CFBundleExecutable': 'Xgent'}))
-        z.writestr('Payload/Xgent.app/Xgent', macho([(12, '@rpath/dash.framework/dash')], ['@executable_path/Frameworks']))
+        z.writestr('Payload/Xgent.app/Xgent', macho([(12, '@rpath/dash.framework/dash' if startup_dash else '@rpath/ios_system.framework/ios_system')], ['@executable_path/Frameworks']))
         dash = with_symbols(macho([(12, '@rpath/ios_system.framework/ios_system')]), [('_ios_storeInteractive', 1, 0x100 | (0x40 if weak else 0))])
-        core = with_symbols(macho(), [(name, 15, 0) for name in exported])
+        core = with_symbols(macho([(module.LC_LOAD_WEAK_DYLIB, '@rpath/dash.framework/dash')] if transitive_dash else []), [(name, 15, 0) for name in exported])
         for name, binary in [('dash', dash), ('ios_system', core)]:
             root = 'Payload/Xgent.app/Frameworks/' + name + '.framework/'
             z.writestr(root + 'Info.plist', plistlib.dumps({'CFBundleExecutable': name}))
@@ -104,6 +104,13 @@ try:
     raise AssertionError('Incompatible ios_system ABI was accepted')
 except ValueError as error:
     assert '_ios_storeInteractive' in str(error) and 'dash.framework' in str(error)
+for archive in [symbol_ipa(['_ios_storeInteractive'], startup_dash=True),
+                symbol_ipa(['_ios_storeInteractive'], transitive_dash=True)]:
+    try:
+        module.inspect_ipa(archive)
+        raise AssertionError('A startup-linked dash interpreter was accepted')
+    except ValueError as error:
+        assert 'dash.framework must be embedded without startup linking' in str(error)
 print('device dependency graph cases passed')
 `, fileURLToPath(new URL("../../../../scripts/release/inspect-ios-dependencies.py", import.meta.url))], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr || result.error?.message);
@@ -116,4 +123,19 @@ test("the app embedding manifest uses the same verified iOS binaries as the plug
   const binaries = source => [...source.matchAll(/name: "([^"]+)",\s*url: "([^"]+)",\s*checksum: "([^"]+)"/g)].map(([, name, url, checksum]) => [name, { url, checksum }]);
   const actual = new Map(binaries(embedded));
   for (const [name, expected] of binaries(plugin)) assert.deepEqual(actual.get(name), expected, name);
+});
+
+test("dash interpreters remain signed embedded runtime dependencies", () => {
+  const plugin = readFileSync(new URL("../../../mobile-execution/ios/Package.swift", import.meta.url), "utf8");
+  const host = readFileSync(new URL("../../../mobile-execution/ios-frameworks/Package.swift", import.meta.url), "utf8");
+  const project = readFileSync(new URL("../../src-tauri/ios.project.yml", import.meta.url), "utf8");
+  assert.doesNotMatch(plugin, /name: "dash"|"dash",/);
+  const linked = host.match(/private let nativeTargetNames = \[([\s\S]*?)\n\]/)?.[1];
+  assert.ok(linked);
+  assert.doesNotMatch(linked, /"dash[A-E]?"/);
+  assert.match(host, /name: "XgentDashRuntime",\s*targets: dashRuntimeTargets/);
+  assert.match(project, /product: XgentDashRuntime\s+link: false\s+embed: true\s+codeSign: true/);
+  for (const name of ["dash", "dashA", "dashB", "dashC", "dashD", "dashE"]) {
+    assert.ok(host.includes(`name: "${name}"`), `${name} remains available as a verified binary`);
+  }
 });

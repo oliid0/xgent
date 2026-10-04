@@ -74,7 +74,18 @@ export const ChatHeader = memo(function ChatHeader(props: {
           align="center"
           style={{ gridTemplateColumns: "minmax(0, 1fr) auto" }}
         >
-          <HStack gap={1} vAlign="center" hAlign="start" />
+          <HStack gap={1} vAlign="center" hAlign="start">
+            {!sidebarOpen ? (
+              <IconButton
+                label={t("tooltip.openSidebar")}
+                tooltip={t("tooltip.openSidebar")}
+                icon={<MobileMenu size={20} />}
+                variant="ghost"
+                size="lg"
+                onClick={onOpenSidebar}
+              />
+            ) : null}
+          </HStack>
 
           <HStack gap={1} vAlign="center" hAlign="end" style={{ minWidth: "max-content" }}>
             {trailingActions}

@@ -1,4 +1,3 @@
-import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon, type IconType } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -20,8 +19,8 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
-  ArrowLeft,
   Brain,
+  ChevronLeft,
   ChevronRight,
   Cloud,
   Cpu,
@@ -51,6 +50,7 @@ import { MemoryPanel } from "./settings/memory/MemoryPanel";
 import { OtherSettingsSection } from "./settings/OtherSettingsSection";
 import { ProjectRootsSection } from "./settings/ProjectRootsSection";
 import { ProviderSettingsSection } from "./settings/ProviderSettingsSection";
+import { SettingsDetailHeader } from "./settings/SettingsDetailHeader";
 import { SettingsDetailLayerProvider } from "./settings/SettingsModalShell";
 import { SoulSection } from "./settings/SoulSection";
 import { SttSettingsSection } from "./settings/SttSettingsSection";
@@ -110,6 +110,7 @@ type SaveStatusProps = {
 };
 
 function SaveStatus({ indicator }: SaveStatusProps) {
+  if (indicator.variant !== "error") return null;
   return (
     <HStack
       gap={1}
@@ -124,8 +125,8 @@ function SaveStatus({ indicator }: SaveStatusProps) {
         isPulsing={indicator.isPulsing}
         tooltip={indicator.title}
       />
-      <Text type="supporting" color="secondary" maxLines={1}>
-        {indicator.text}
+      <Text type="supporting" color="secondary" wordBreak="break-word">
+        {indicator.title || indicator.text}
       </Text>
     </HStack>
   );
@@ -464,7 +465,7 @@ export function SettingsPage(props: SettingsPageProps) {
             header={
               detailLayerDepth > 0 || !mobileDetailOpen ? undefined : (
                 <VStack className="mobile-panel-header" width="100%" gap={0}>
-                  <DialogHeader
+                  <SettingsDetailHeader
                     title={sectionLabels[section]}
                     hasDivider={false}
                     startContent={
@@ -472,13 +473,12 @@ export function SettingsPage(props: SettingsPageProps) {
                         className="settings-navigation-control"
                         label={t("settings.mobile.backToSettings")}
                         tooltip={t("settings.mobile.backToSettings")}
-                        icon={<Icon icon={ArrowLeft} size="md" color="inherit" />}
+                        icon={<Icon icon={ChevronLeft} size="md" color="inherit" />}
                         variant="ghost"
                         size="lg"
                         onClick={() => setMobileDetailOpen(false)}
                       />
                     }
-                    endContent={<SaveStatus indicator={saveIndicator} />}
                   />
                 </VStack>
               )
@@ -490,7 +490,7 @@ export function SettingsPage(props: SettingsPageProps) {
                   data-settings-section={section}
                   padding={4}
                   isScrollable={!sheetScrollsAccess && !sectionManagesScroll}
-                  className="settings-section-enter"
+                  className="settings-section-enter settings-detail-content"
                 >
                   <VStack
                     width="100%"
@@ -500,6 +500,7 @@ export function SettingsPage(props: SettingsPageProps) {
                     className="settings-section-shell"
                     style={{ marginInline: "auto" }}
                   >
+                    <SaveStatus indicator={saveIndicator} />
                     {sectionContent}
                   </VStack>
                 </LayoutContent>
@@ -511,6 +512,7 @@ export function SettingsPage(props: SettingsPageProps) {
                     gap={5}
                     style={{ marginInline: "auto" }}
                   >
+                    <SaveStatus indicator={saveIndicator} />
                     <SettingsRowGroup
                       title={t("settings.native.theme")}
                       titleEndContent={

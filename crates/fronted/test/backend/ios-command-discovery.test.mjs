@@ -57,7 +57,7 @@ test("native iOS execution does not search the simulator host for shell commands
   const environment = plugin.slice(plugin.indexOf("private func configureCommandEnvironment"), plugin.indexOf("private func isCancelled"));
   assert.doesNotMatch(environment, /applicationBin\).*:\/usr\/bin|applicationBin\).*:\/bin/);
   assert.match(environment, /documentsBin\):\\\(applicationBin\)"/);
-  assert.match(plugin, /installationVerificationVersion = "ios-a-shell-v5"/);
+  assert.match(plugin, /installationVerificationVersion = "ios-a-shell-v6"/);
   assert.match(plugin, /Missing native a-Shell command marker/);
   const prepare = read("../../../../scripts/mobile/prepare-ios-shell-resources.sh");
   assert.match(prepare, /prepare-ios-command-markers\.py/);

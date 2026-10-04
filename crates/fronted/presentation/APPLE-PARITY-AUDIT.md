@@ -371,3 +371,48 @@ Research: [AppKit accessibility children](https://developer.apple.com/documentat
 and [an upstream hidden WKWebView implementation](https://github.com/isaaclins/spotiglass/blob/main/Spotiglass/Playback/HiddenPlaybackWebView.swift)
 were inspected through Swift/GitHub MCP. A local hidden flag alone does not
 exclude the remote descendants observed in Release 129's actual hierarchy.
+
+- Latest layout pass: desktop chat retains a real sidebar-open button after
+  compact-to-wide transitions. Workspace labels now toggle in both directions,
+  folder disclosure uses an appropriately sized IconButton, and the workspace
+  More menu no longer repeats the project-folder switcher. File-tree click and
+  keyboard expansion persist from current state, including rapid repeat input.
+- Astryx settings detail routes now share balanced 44-point Back/title chrome;
+  provider editing/advanced settings, imports, Hooks, Cron, SSH and memory
+  nested routes use it. Compact section cards keep their internal padding;
+  detail content has safe-area-aware horizontal margins. Organizer history
+  stacks its columns on narrow screens. Cron's two tabs remain two columns.
+- Successful auto-save badges are removed from both presentations. Actual save
+  failures remain visible below the header, including the backend error text.
+  Native settings details have one Back control and no top grabber; the index
+  retains its section-first structure. Sidebar footer buttons have no bottom
+  material bar, and their native action identifiers are explicitly preserved.
+- Local behavior checks passed: 174 focused settings/presentation tests, 1,025
+  chat/presentation tests, TypeScript checking and modified-source Biome checks.
+  Another 19 release/backend checks cover the runtime packaging follow-up.
+  New native live-window assertions cover footer visibility with a long history
+  and accessibility text size, centered detail navigation and save failures.
+  Native changes and actual Astryx visual results still require remote evidence.
+- CI 290 / `0cc4b86`: seven jobs passed, including iOS. The new macOS host test
+  could not locate its action identifier; compilation passed. Its fixture now
+  has a containing VStack and captures the actual accessibility tree before the
+  same pointer/action/JS assertions. This remains an unverified follow-up.
+- Release 129 has finished unsuccessfully. Windows/Linux/Android passed; iOS
+  compiled the IPA and simulator app but installed-app smoke failed. Its visible
+  Settings button exposed `gearshape` rather than the stable `settings` action
+  identifier. Shell initialization completed six commands, then stopped when
+  ios_system reused dash slot zero for the seventh probe. No Shell success or
+  whole-app functional parity is established by those artifacts.
+- Packaging investigation found all six dash libraries in the app's linked
+  product, whereas a-Shell embeds them without linking. The new runtime-only
+  product explicitly embeds/signs them without app startup references; the
+  plugin no longer autolinks dash. IPA verification rejects direct, transitive
+  and weak startup references to dash while retaining ABI/dependency checks.
+  All nine real installation probes remain required. This diagnosis is an
+  inference from the logs/configuration; its fix awaits installed-app smoke.
+
+Research: [a-Shell embedding configuration](https://github.com/holzschu/a-shell/blob/master/a-Shell.xcodeproj/project.pbxproj),
+[ios_system 3.0.4 loading and cleanup](https://github.com/holzschu/ios_system/blob/v3.0.4/ios_system.m),
+[XcodeGen dependency options](https://github.com/yonaskolb/XcodeGen/blob/master/Docs/ProjectSpec.md)
+and [Apple dynamic library lifecycle](https://developer.apple.com/library/archive/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/DynamicLibraryUsageGuidelines.html)
+were inspected through GitHub/Swift MCP and official documentation.

@@ -146,6 +146,26 @@ def inspect_ipa(path):
                 if not weak and not any(candidate in binaries for candidate in candidates):
                     errors.append(f"{binary}: missing {dependency}")
                 resolved[binary, ordinal] = next((candidate for candidate in candidates if candidate in binaries), None)
+        # dash is an embedded command, not an app dependency. Its parser has
+        # process-global state; a startup reference prevents ios_system's
+        # dlclose from resetting it when the six interpreter slots are reused.
+        # Check the whole startup closure, including transitive/weak imports.
+        startup = [executable]
+        visited = set()
+        while startup:
+            binary = startup.pop()
+            if binary in visited:
+                continue
+            visited.add(binary)
+            for ordinal, _ in enumerate(commands[binary][0], 1):
+                provider = resolved.get((binary, ordinal))
+                if provider is None:
+                    continue
+                framework = posixpath.basename(posixpath.dirname(provider))
+                if framework in {f"{name}.framework" for name in
+                                 ("dash", "dashA", "dashB", "dashC", "dashD", "dashE")}:
+                    errors.append(f"{binary}: {framework} must be embedded without startup linking")
+                startup.append(provider)
         # ios_system is the shared ABI used by separately released command
         # frameworks. The supplied device crash had all libraries present but
         # dash imported _ios_storeInteractive from an incompatible older core.

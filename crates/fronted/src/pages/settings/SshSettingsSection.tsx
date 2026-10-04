@@ -3,7 +3,6 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
-import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { FileInput } from "@astryxdesign/core/FileInput";
 import { FormLayout } from "@astryxdesign/core/FormLayout";
@@ -29,7 +28,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { invoke, isBrowserRuntime } from "@xgent/runtime";
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowLeft,
+  ChevronLeft,
   Key,
   Lock,
   Pencil,
@@ -57,6 +56,7 @@ import { NativeSurface } from "../../presentation/NativeSurface";
 import type { PresentationNode } from "../../presentation/types";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import { SecretTextInput } from "./SecretTextInput";
+import { SettingsDetailHeader } from "./SettingsDetailHeader";
 import { SettingsModalShell } from "./SettingsModalShell";
 import { ConfirmActionPopover, ConfirmDeletePopover } from "./shared";
 import type { SettingsSectionProps } from "./types";
@@ -341,7 +341,7 @@ function SshHostModal(props: {
       <Layout
         height="fill"
         header={
-          <DialogHeader
+          <SettingsDetailHeader
             title={isEditing ? t("settings.sshEdit") : t("settings.sshAdd")}
             subtitle={t("settings.sshDesc")}
             startContent={
@@ -349,16 +349,16 @@ function SshHostModal(props: {
                 label={t("settings.cancel")}
                 tooltip={t("settings.cancel")}
                 variant="ghost"
-                size="sm"
-                icon={<ArrowLeft aria-hidden="true" />}
+                size="lg"
+                icon={<ChevronLeft aria-hidden="true" />}
                 onClick={onClose}
               />
             }
           />
         }
         content={
-          <LayoutContent isScrollable>
-            <VStack gap={5}>
+          <LayoutContent padding={4} isScrollable>
+            <VStack gap={5} width="100%" style={{ minWidth: 0 }}>
               {!isEditing && onImport ? (
                 <Collapsible
                   trigger={t("settings.sshImport")}

@@ -188,7 +188,7 @@ private func iosToolchainPayload(
 final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private let installationPreferenceKey = "xgent.mobileExecution.iosShellInstalled"
     private let installationVerificationKey = "xgent.mobileExecution.iosShellVerification"
-    private let installationVerificationVersion = "ios-a-shell-v5"
+    private let installationVerificationVersion = "ios-a-shell-v6"
     private let installationDirectoryName = "environment-v3"
     private let installationMarkerName = ".xgent-environment"
     private let installationProbeToken = "xgent-ios-shell-ready"

@@ -59,11 +59,6 @@ let package = Package(
             checksum: "190597a3ec09d6bc250e31caa8b08ecc2b6f27ecbd6b24fda84065ccd2be309e"
         ),
         .binaryTarget(
-            name: "dash",
-            url: "https://github.com/holzschu/ios_system/releases/download/Auxiliary/dash.xcframework.zip",
-            checksum: "9a30ac6b3780dd68d2268d10467902214e32333e980c59090faa6099f0d250fc"
-        ),
-        .binaryTarget(
             name: "vim",
             url: "https://github.com/holzschu/vim/releases/download/ios_1.0/vim.xcframework.zip",
             checksum: "02acb74bec3e6b4ba9c120873a19a770773e3c3e2d141365808a9342ddf41fe7"
@@ -95,7 +90,6 @@ let package = Package(
                 "tar",
                 "text",
                 "ssh_cmd",
-                "dash",
                 "vim",
                 "lg2",
                 "ffmpeg",

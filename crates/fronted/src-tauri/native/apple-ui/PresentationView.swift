@@ -526,7 +526,9 @@ struct XgentSheetView: View {
         return sheets[index + 1]
     }
 
-    private var visibleNodes: [XgentNode] { document.nodes.filter { $0.id != "back" } }
+    private var visibleNodes: [XgentNode] {
+        document.nodes.filter { $0.id != "back" && !($0.id == "save-status" && $0.secondary == true) }
+    }
     private var usesGroupedForm: Bool {
         document.formFactor == .mobile && visibleNodes.contains { $0.kind == .settingsGroup }
     }

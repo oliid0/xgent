@@ -2,12 +2,12 @@ import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Button as AstryxButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
-import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { VStack } from "@astryxdesign/core/Layout";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Text as AstryxText } from "@astryxdesign/core/Text";
+import { SettingsDetailHeader } from "../SettingsDetailHeader";
 // Organizer run-history modal. All protocol parsing goes through the typed
 // run report in lib/memory/organizer/runRecord — v4 reports round-trip
 // unchanged; pre-v4 runs degrade to a read-only legacy view (summaries and
@@ -62,7 +62,7 @@ import {
   organizerTriggerLabel,
   rejectionBucketEntries,
 } from "./panelModel";
-import { ArrowLeft, BrushCleaning, Button, DrawerSelect } from "./platform";
+import { BrushCleaning, Button, ChevronLeft, DrawerSelect } from "./platform";
 import { useOrganizeRunHistory } from "./useMemoryPanelData";
 
 export function OrganizerHistoryModal(props: {
@@ -469,24 +469,23 @@ export function OrganizerHistoryModal(props: {
           direction="vertical"
           className="flex h-full min-h-0 w-full flex-col overflow-hidden"
         >
-          <DialogHeader
+          <SettingsDetailHeader
             title={t("settings.memoryOrganizerHistory")}
             subtitle={t("settings.memoryOrganizerHistoryDescription")}
             startContent={
-              <AstryxButton
+              <IconButton
                 label={t("settings.memorySettingsClose")}
                 tooltip={t("settings.memorySettingsClose")}
                 type="button"
                 onClick={onClose}
-                aria-label={t("settings.memorySettingsClose")}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </AstryxButton>
+                size="lg"
+                variant="ghost"
+                icon={<ChevronLeft />}
+              />
             }
           />
 
-          <AstryxGrid className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)]">
+          <AstryxGrid className="settings-organizer-history-columns grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)]">
             <AstryxStack
               direction="vertical"
               as="aside"

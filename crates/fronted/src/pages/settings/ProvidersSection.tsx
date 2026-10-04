@@ -6,7 +6,6 @@ import {
   Button,
 } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
-import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
@@ -32,7 +31,7 @@ import { invoke } from "@xgent/runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmActionPopover } from "../../components/astryx/ConfirmActionPopover";
 import {
-  ArrowLeft,
+  ChevronLeft,
   ClaudeIcon,
   Download,
   Eye,
@@ -128,6 +127,7 @@ import {
 } from "./providerUtils";
 import { RetryErrorSection } from "./RetryErrorSection";
 import { SecretTextInput } from "./SecretTextInput";
+import { SettingsDetailHeader } from "./SettingsDetailHeader";
 import { SettingsModalShell } from "./SettingsModalShell";
 import { ConfirmDeletePopover } from "./shared";
 import type { SettingsSectionProps } from "./types";
@@ -735,30 +735,20 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
           : null;
   return (
     <VStack height="100%" minHeight={0} gap={0}>
-      <Toolbar
-        label={isEditing ? t("settings.editProvider") : t("settings.addProvider")}
-        size="md"
-        dividers={["bottom"]}
+      <SettingsDetailHeader
+        title={isEditing ? t("settings.editProvider") : t("settings.addProvider")}
+        subtitle={`${typeLabel} ${t("settings.compatible")}`}
         startContent={
-          <HStack gap={2} vAlign="center">
-            <IconButton
-              label={t("settings.providerDialogNavigation")}
-              tooltip={t("settings.providerDialogNavigation")}
-              variant="ghost"
-              icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
-              onClick={onClose}
-            />
-            <ProviderBrandIcon type={providerType} />
-            <VStack gap={0.5}>
-              <Heading level={3}>
-                {isEditing ? t("settings.editProvider") : t("settings.addProvider")}
-              </Heading>
-              <Text type="supporting" color="secondary">
-                {typeLabel} {t("settings.compatible")}
-              </Text>
-            </VStack>
-          </HStack>
+          <IconButton
+            label={t("settings.providerDialogNavigation")}
+            tooltip={t("settings.providerDialogNavigation")}
+            variant="ghost"
+            icon={<Icon icon={ChevronLeft} size="md" color="inherit" />}
+            size="lg"
+            onClick={onClose}
+          />
         }
+        endContent={<ProviderBrandIcon type={providerType} />}
       />
 
       <StackItem size="fill">
@@ -2120,26 +2110,18 @@ function ProviderAdvancedSettingsPanel(
 
   return (
     <VStack height="100%" minHeight={0} gap={0}>
-      <Toolbar
-        label={t("settings.customSettings")}
-        size="md"
-        dividers={["bottom"]}
+      <SettingsDetailHeader
+        title={t("settings.customSettings")}
+        subtitle={t("settings.conversationTitleModelHint")}
         startContent={
-          <HStack gap={2} vAlign="center">
-            <IconButton
-              label={t("settings.closeCustomSettings")}
-              tooltip={t("settings.closeCustomSettings")}
-              variant="ghost"
-              icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
-              onClick={onClose}
-            />
-            <VStack gap={0.5}>
-              <Heading level={3}>{t("settings.customSettings")}</Heading>
-              <Text type="supporting" color="secondary">
-                {t("settings.conversationTitleModelHint")}
-              </Text>
-            </VStack>
-          </HStack>
+          <IconButton
+            label={t("settings.closeCustomSettings")}
+            tooltip={t("settings.closeCustomSettings")}
+            variant="ghost"
+            icon={<Icon icon={ChevronLeft} size="md" color="inherit" />}
+            size="lg"
+            onClick={onClose}
+          />
         }
       />
 
@@ -2386,7 +2368,7 @@ function CcsImportModal(props: {
   return (
     <SettingsModalShell onClose={onClose} purpose="form" ariaLabel="CC Switch">
       <VStack width="100%" height="100%" minHeight={0} gap={0}>
-        <DialogHeader
+        <SettingsDetailHeader
           title="从 CC Switch 导入"
           subtitle="选择要导入的供应商配置；导入后会自动获取并激活模型。"
           startContent={
@@ -2394,8 +2376,8 @@ function CcsImportModal(props: {
               label="返回"
               tooltip="返回供应商配置"
               variant="ghost"
-              size="sm"
-              icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
+              size="lg"
+              icon={<Icon icon={ChevronLeft} size="md" color="inherit" />}
               isDisabled={submitting}
               onClick={onClose}
             />

@@ -29,7 +29,12 @@ function OtherAreaScope(props: {
   return (
     <StackItem
       size={active ? "fill" : "static"}
-      style={{ display: hidden ? "none" : undefined, minHeight: active ? 0 : undefined }}
+      style={{
+        display: hidden ? "none" : undefined,
+        minHeight: active ? 0 : undefined,
+        minWidth: 0,
+        width: "100%",
+      }}
     >
       <VStack
         width="100%"

@@ -1,7 +1,6 @@
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxNativeButton } from "@astryxdesign/core/Button";
-import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -12,6 +11,7 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { type ISOTimeString, TimeInput } from "@astryxdesign/core/TimeInput";
+import { SettingsDetailHeader } from "../SettingsDetailHeader";
 // Memory settings drawer: organizer model/schedule/scope/mode, extraction
 // summary model, Run Now, quota-ladder banner and the wipe-all danger zone.
 //
@@ -51,7 +51,7 @@ import {
   memoryScopeLabel,
 } from "./panelModel";
 import {
-  ArrowLeft,
+  ChevronLeft,
   canRunOrganizerLocally,
   ModelPicker,
   parseModelValue,
@@ -537,7 +537,7 @@ export function MemorySettingsDrawer(props: {
         className="relative flex h-full w-full flex-col overflow-hidden"
       >
         <VStack paddingBlockStart={2}>
-          <DialogHeader
+          <SettingsDetailHeader
             title={t("settings.memorySettingsTitle")}
             subtitle={t("settings.memorySettingsLocalOnly")}
             startContent={
@@ -545,8 +545,8 @@ export function MemorySettingsDrawer(props: {
                 label={t("settings.memorySettingsClose")}
                 tooltip={t("settings.memorySettingsClose")}
                 variant="ghost"
-                size="sm"
-                icon={<ArrowLeft />}
+                size="lg"
+                icon={<ChevronLeft />}
                 onClick={onClose}
               />
             }

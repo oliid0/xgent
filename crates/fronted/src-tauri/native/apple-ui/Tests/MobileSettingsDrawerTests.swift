@@ -7,6 +7,51 @@ import XCTest
 
 final class MobileSettingsDrawerTests: XCTestCase {
     @MainActor
+    func testSidebarFooterKeepsIdentifiedActionsVisibleBelowLongHistory() async throws {
+        let model = XgentPresentationModel()
+        model.update(try document(surface: "chat", mode: "root", title: "Chat", nodes: [
+            node("conversation", "Text", ["text": "Conversation"]),
+        ]))
+        let host = UIHostingController(rootView: XgentPresentationView(model: model)
+            .dynamicTypeSize(.accessibility2))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 844))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
+        let history = (0..<40).map { index in
+            node("conversation:\(index)", "NavigationRow", ["label": "Recent conversation \(index)",
+                "variant": "sidebar-conversation", "action": "open:\(index)"])
+        }
+        model.update(try document(surface: "sidebar", mode: "sidebar", title: "Xgent", nodes: [
+            node("sidebar-layout", "VStack", ["children": [
+                node("sidebar-title", "Heading", ["text": "Xgent"]),
+                node("sidebar-list", "List", ["children": history]),
+                node("sidebar-footer", "HStack", ["children": [
+                    node("new-chat", "Button", ["label": "New chat", "action": "new"]),
+                    node("settings", "IconButton", ["label": "Settings", "icon": "gearshape", "action": "settings"]),
+                ]]),
+            ]]),
+        ]))
+        try await waitFor("settings", in: window)
+        host.view.layoutIfNeeded()
+        let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: window)
+        let elements = hierarchy.flattenToElements()
+        let settings = try XCTUnwrap(elements.first { $0.identifier == "settings" && $0.traits.contains(.button) })
+        let newChat = try XCTUnwrap(elements.first { $0.identifier == "new-chat" && $0.traits.contains(.button) })
+        for action in [settings, newChat] {
+            let bounds = action.shape.bezierPath.bounds
+            XCTAssertGreaterThanOrEqual(bounds.height, 44)
+            XCTAssertGreaterThanOrEqual(bounds.minX, -1)
+            XCTAssertGreaterThanOrEqual(bounds.minY, -1)
+            XCTAssertLessThanOrEqual(bounds.maxX, 320 * 0.85 + 1)
+            XCTAssertLessThanOrEqual(bounds.maxY, 845)
+        }
+        XCTAssertFalse(settings.shape.bezierPath.bounds.intersects(newChat.shape.bezierPath.bounds))
+        try attachNativeAccessibilityEvidence(hierarchy, name: "sidebar-footer-long-history-320-accessible")
+        try attachCompositedNativeScreenshot(of: window, name: "sidebar-footer-long-history-320-accessible")
+    }
+
+    @MainActor
     func testMountedSettingsIndexStartsWithSectionsAndKeepsDetailNavigation() async throws {
         for (width, size) in [(CGFloat(320), DynamicTypeSize.large), (390, .large), (320, .accessibility3)] {
             let model = XgentPresentationModel()
@@ -44,6 +89,7 @@ final class MobileSettingsDrawerTests: XCTestCase {
             // index section and adding Back must restore the detail header.
             model.update(try document(title: "General", revision: 2, nodes: [
                 node("back", "Button", ["label": "Back", "action": "back"]),
+                node("save-status", "Text", ["text": "Saved", "secondary": true]),
                 node("system-settings", "SettingsGroup", ["label": "App", "children": [
                     node("language", "Selector", ["label": "App language", "value": "en", "action": "language",
                         "options": [["value": "en", "label": "English"]]]),
@@ -55,9 +101,27 @@ final class MobileSettingsDrawerTests: XCTestCase {
             let title = try XCTUnwrap(detailElements.first { $0.identifier == "presentation-sheet-title" })
             let back = try XCTUnwrap(detailElements.first { $0.identifier == "back" && $0.traits.contains(.button) })
             XCTAssertEqual(title.label, "General")
+            XCTAssertFalse(detailElements.contains { $0.identifier == "save-status" },
+                "Successful automatic saves must not occupy the settings header")
+            XCTAssertFalse(detailElements.contains { $0.identifier == "presentation-sheet-close" },
+                "The detail header needs one Back control and a centered title")
+            XCTAssertGreaterThanOrEqual(back.shape.bezierPath.bounds.height, 44)
             XCTAssertFalse(title.shape.bezierPath.bounds.intersects(back.shape.bezierPath.bounds))
             try attachNativeAccessibilityEvidence(detail, name: "\(name)-detail")
             try attachCompositedNativeScreenshot(of: window, name: "\(name)-detail")
+            model.update(try document(title: "General", revision: 3, nodes: [
+                node("back", "Button", ["label": "Back", "action": "back"]),
+                node("save-status", "Text", ["text": "Could not save settings", "secondary": false]),
+                node("system-settings", "SettingsGroup", ["label": "App", "children": [
+                    node("notifications", "Switch", ["label": "Push", "value": true, "action": "notifications"]),
+                ]]),
+            ]))
+            try await waitFor("save-status", in: window)
+            let failed = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: window).flattenToElements()
+            let failure = try XCTUnwrap(failed.first { $0.identifier == "save-status" })
+            XCTAssertEqual(failure.label, "Could not save settings")
+            let failureTitle = try XCTUnwrap(failed.first { $0.identifier == "presentation-sheet-title" })
+            XCTAssertFalse(failure.shape.bezierPath.bounds.intersects(failureTitle.shape.bezierPath.bounds))
         }
     }
 

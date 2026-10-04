@@ -104,6 +104,13 @@ targets:
         embed: false
       - package: XgentMobileShellFrameworks
         product: XgentMobileShellFrameworks
+      # These C interpreters must unload between runs, as in a-Shell's host.
+      # An app load command pins their parser state after the first six runs.
+      - package: XgentMobileShellFrameworks
+        product: XgentDashRuntime
+        link: false
+        embed: true
+        codeSign: true
       {{~#each ios-libraries}}
       - framework: {{this}}
         embed: false{{/each}}{{#if ios-vendor-frameworks}}{{~#each ios-vendor-frameworks}}

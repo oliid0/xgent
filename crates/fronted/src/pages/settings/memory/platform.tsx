@@ -12,6 +12,7 @@ export {
   BrushCleaning,
   Check,
   ChevronDown,
+  ChevronLeft,
   Folder,
   Globe2,
   History,

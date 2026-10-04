@@ -86,7 +86,7 @@ test("mobile navigation and settings retain Astryx drawer and bottom-sheet hiera
     appSource,
     /<BottomSheet[\s\S]*?className="settings-bottom-sheet"[\s\S]*?paddingBlockStart=\{0\}[\s\S]*?<SettingsPage/,
   );
-  assert.match(settingsSource, /<DialogHeader[\s\S]*?hasDivider=\{false\}/);
+  assert.match(settingsSource, /<SettingsDetailHeader/);
   assert.doesNotMatch(settingsSource, /settings-section-balanced-inset/);
   for (const panelSource of [mobileTerminalSource, mobileSshSource, mobileGitSource]) {
     assert.match(panelSource, /bg-\[var\(--color-background-surface\)\]/);

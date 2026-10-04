@@ -1,6 +1,5 @@
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
-import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { FormLayout } from "@astryxdesign/core/FormLayout";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -18,7 +17,7 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
 import { type FormEvent, useState } from "react";
-import { ArrowLeft, Globe, Terminal } from "../../components/icons";
+import { ChevronLeft, Globe, Terminal } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import {
   HOOK_EVENT_TRANSLATION_KEYS,
@@ -42,6 +41,7 @@ import {
   parseHttpRequestDrafts,
   requestToDraft,
 } from "./httpRequestEditor";
+import { SettingsDetailHeader } from "./SettingsDetailHeader";
 import { SettingsModalShell } from "./SettingsModalShell";
 import { useAutomationFormOperation } from "./useAutomationFormOperation";
 
@@ -315,14 +315,15 @@ export function HookModal({
   return (
     <SettingsModalShell onClose={onClose} purpose="form" ariaLabel={title}>
       <VStack as="form" onSubmit={handleSubmit} height="100%" minHeight={0} gap={0}>
-        <DialogHeader
+        <SettingsDetailHeader
           title={title}
           subtitle={t(HOOK_EVENT_TRANSLATION_KEYS[selectedEvent])}
           startContent={
             <IconButton
               label={t("settings.cancel")}
               tooltip={t("settings.cancel")}
-              icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
+              icon={<Icon icon={ChevronLeft} size="md" color="inherit" />}
+              size="lg"
               variant="ghost"
               onClick={onClose}
             />

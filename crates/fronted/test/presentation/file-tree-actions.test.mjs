@@ -77,6 +77,44 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
+test("directory row and chevron toggles use the latest state before React rerenders", t => {
+  const h = harness(t);
+  const row = h.find("TreeList").props.items[0].children.find(item => item.id === "nested");
+  row.onClick();
+  assert.deepEqual(h.state.expandedPaths, [""]);
+  row.onClick();
+  assert.deepEqual(h.state.expandedPaths, ["", "nested"]);
+  const tree = h.find("Section", props => !!props.onClickCapture);
+  const item = { dataset: { treeId: "nested" } };
+  const target = { closest: selector => selector === "[data-tree-toggle]" ? {} : item };
+  tree.props.onClickCapture({ target });
+  assert.deepEqual(h.state.expandedPaths, [""]);
+  tree.props.onClickCapture({ target });
+  assert.deepEqual(h.state.expandedPaths, ["", "nested"]);
+});
+
+test("keyboard collapse and expand persist while navigation arrows and leaf rows leave state intact", t => {
+  const h = harness(t);
+  const capture = h.find("Section", props => !!props.onKeyDownCapture).props.onKeyDownCapture;
+  let expanded = "true", path = "nested";
+  const item = { dataset: { get treeId() { return path; } }, getAttribute: () => expanded };
+  const event = key => ({ key, target: { closest: () => item } });
+  capture(event("ArrowLeft"));
+  assert.deepEqual(h.state.expandedPaths, [""]);
+  expanded = "false";
+  const patches = h.patches.length;
+  capture(event("ArrowLeft"));
+  assert.equal(h.patches.length, patches, "Left on a collapsed row moves focus only");
+  capture(event("ArrowRight"));
+  assert.deepEqual(h.state.expandedPaths, ["", "nested"]);
+  path = "nested/report.swift";
+  capture(event("ArrowLeft"));
+  assert.deepEqual(h.state.expandedPaths, ["", "nested"]);
+  path = "nested";
+  capture({ ...event("ArrowLeft"), ctrlKey: true });
+  assert.deepEqual(h.state.expandedPaths, ["", "nested"]);
+});
+
 test("shared file forms preserve their directory and reserve duplicate submissions before rerender", async t => {
   const result = deferred(), h = harness(t, { mutate: () => result.promise });
   h.render(); h.replayEffects();

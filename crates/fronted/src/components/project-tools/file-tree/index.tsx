@@ -18,6 +18,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { TreeList, type TreeListItemData } from "@astryxdesign/core/TreeList";
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   useCallback,
   useEffect,
@@ -174,8 +175,8 @@ export function FileTreePanel(props: {
   );
 
   const toggleDirectory = useCallback(
-    (path: string, isExpanded: boolean) => {
-      if (isExpanded) {
+    (path: string) => {
+      if (expandedRef.current.includes(path)) {
         setExpanded(removeExpandedPath(expandedRef.current, path));
       } else {
         setExpanded(addExpandedPaths(expandedRef.current, [path]));
@@ -316,9 +317,42 @@ export function FileTreePanel(props: {
       const item = target.closest<HTMLElement>("[data-tree-id]");
       const path = item?.dataset.treeId;
       if (path === undefined || nodesRef.current[path]?.kind !== "dir") return;
-      toggleDirectory(path, expandedSet.has(path));
+      toggleDirectory(path);
     },
-    [expandedSet, toggleDirectory],
+    [toggleDirectory],
+  );
+
+  const syncTreeKeyboardToggle = useCallback(
+    (event: ReactKeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey
+      )
+        return;
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      const item = (event.target as HTMLElement).closest<HTMLElement>("[data-tree-id]");
+      if (!item) return;
+      const path = item?.dataset.treeId;
+      if (path === undefined || nodesRef.current[path]?.kind !== "dir") return;
+      const expanded = item.getAttribute("aria-expanded");
+      // TreeList handles focus and its visual state. Persist only the arrow
+      // that changes expansion; the other arrow moves focus.
+      if (
+        (event.key === "ArrowLeft" && expanded === "true") ||
+        (event.key === "ArrowRight" && expanded === "false")
+      ) {
+        const next =
+          event.key === "ArrowRight"
+            ? addExpandedPaths(expandedRef.current, [path])
+            : removeExpandedPath(expandedRef.current, path);
+        setExpanded(next);
+        if (event.key === "ArrowRight") void loadChildren(path);
+      }
+    },
+    [loadChildren, setExpanded],
   );
 
   const startAction = useCallback(
@@ -545,7 +579,7 @@ export function FileTreePanel(props: {
         onClick: () => {
           selectPath(node.path);
           if (node.kind === "dir") {
-            toggleDirectory(node.path, expandedSet.has(node.path));
+            toggleDirectory(node.path);
             return;
           }
           handleOpenFile(node.path);
@@ -813,6 +847,7 @@ export function FileTreePanel(props: {
             minHeight="100%"
             onContextMenu={openContextMenuFromTree}
             onClickCapture={syncTreeChevronToggle}
+            onKeyDownCapture={syncTreeKeyboardToggle}
           >
             <TreeList
               key={`${projectPathKey}:${syncState.revision}`}

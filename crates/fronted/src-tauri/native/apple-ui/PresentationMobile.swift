@@ -412,8 +412,6 @@ private struct XgentIOSSidebarPresentation: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        }
-        .safeAreaBar(edge: .bottom, spacing: 0) {
             if let footer { XgentIOSSidebarFooter(node: footer, document: document, model: model) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -447,10 +445,12 @@ private struct XgentIOSSidebarFooter: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(newChat.accessibilityLabel ?? newChat.label ?? "")
+                .accessibilityIdentifier(newChat.id)
             }
             if let settings {
                 Button { model.send(settings, in: document) } label: {
                     Image(systemName: settings.icon ?? "gearshape")
+                        .accessibilityHidden(true)
                         .font(.system(size: 18, weight: .medium))
                         .frame(width: 44, height: 44)
                         .background(Color(xgentHex: palette.surface), in: Circle())
@@ -458,6 +458,7 @@ private struct XgentIOSSidebarFooter: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(settings.label ?? "")
+                .accessibilityIdentifier(settings.id)
             }
         }
         .padding(.horizontal, 8)
@@ -545,9 +546,11 @@ struct XgentIOSSheetPresentation: View {
         return sheets[index + 1]
     }
     private var back: XgentNode? { document.nodes.first { $0.id == "back" } }
-    private var saveStatus: XgentNode? { document.nodes.first { $0.id == "save-status" } }
+    private var saveStatus: XgentNode? {
+        document.nodes.first { $0.id == "save-status" && $0.secondary != true }
+    }
     private var visibleNodes: [XgentNode] {
-        document.nodes.filter { $0.id != "back" && ($0.id != "save-status" || back == nil) }
+        document.nodes.filter { $0.id != "back" && $0.id != "save-status" }
     }
     private var grouped: Bool { visibleNodes.contains { $0.kind == .settingsGroup } }
     private var list: XgentNode? {
@@ -580,7 +583,7 @@ struct XgentIOSSheetPresentation: View {
     }
 
     @ViewBuilder private var trailingNavigation: some View {
-        if document.dismissAction != nil && (saveStatus == nil || back == nil) {
+        if document.dismissAction != nil && (document.surface != "settings" || back == nil) {
             Button { model.dismiss(document) } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 17, weight: .semibold))
@@ -623,25 +626,12 @@ struct XgentIOSSheetPresentation: View {
                         trailingNavigation
                     }
                     title.fixedSize(horizontal: false, vertical: true)
-                    if let saveStatus, back != nil {
-                        statusText(saveStatus)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
                 }
             } else {
                 HStack(spacing: 8) {
                     leadingNavigation
-                        .frame(width: saveStatus != nil && back != nil ? 72 : 44, alignment: .leading)
                     title.lineLimit(2)
-                    if let saveStatus, back != nil {
-                        statusText(saveStatus)
-                            .lineLimit(2)
-                            .frame(width: 72)
-                    } else {
-                        trailingNavigation
-                    }
+                    trailingNavigation
                 }
             }
         }
@@ -652,13 +642,21 @@ struct XgentIOSSheetPresentation: View {
     var body: some View {
         VStack(spacing: 0) {
             if !isSettingsIndex {
-                Capsule()
-                    .fill(Color.secondary.opacity(0.32))
-                    .frame(width: 40, height: 4)
-                    .padding(.top, 10)
-                    .padding(.bottom, 2)
-                    .accessibilityHidden(true)
+                if document.surface != "settings" {
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.32))
+                        .frame(width: 40, height: 4)
+                        .padding(.top, 10)
+                        .padding(.bottom, 2)
+                        .accessibilityHidden(true)
+                }
                 header
+            }
+            if let saveStatus {
+                statusText(saveStatus)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
             }
             if grouped {
                 XgentIOSSettingsForm(nodes: contentNodes, document: document, model: model,

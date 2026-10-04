@@ -34,10 +34,10 @@ final class PresentationTransportTests: XCTestCase {
             """)
         let document: [String: Any] = ["version": 1, "surface": "page", "revision": 1,
             "mode": "root", "title": "Native host", "formFactor": "desktop", "appearance": "light",
-            "nodes": [
+            "nodes": [["id": "host-controls", "kind": "VStack", "children": [
                 ["id": "draft", "kind": "TextInput", "label": "Message", "value": "Draft", "action": "edit"],
                 ["id": "native-action", "kind": "Button", "label": "Native action", "action": "send"],
-            ]]
+            ]]]]
         let data = try JSONSerialization.data(withJSONObject: document)
         let status = try XCTUnwrap(String(data: data, encoding: .utf8)).withCString {
             xgentNativeUIUpdate(pointer, nil, $0, false)
@@ -52,7 +52,18 @@ final class PresentationTransportTests: XCTestCase {
         XCTAssertTrue(transport.window === window)
         XCTAssertFalse(transport.isHidden, "The shared execution host must continue running")
 
-        let action = try XCTUnwrap(nativeMacAccessibilityTree(native).first { $0.accessibilityIdentifier() == "native-action" })
+        let renderDeadline = ContinuousClock.now + .seconds(5)
+        var nativeElements = nativeMacAccessibilityTree(native)
+        while !nativeElements.contains(where: { $0.accessibilityIdentifier() == "native-action" }),
+              ContinuousClock.now < renderDeadline {
+            try await Task.sleep(for: .milliseconds(50))
+            native.layoutSubtreeIfNeeded()
+            nativeElements = nativeMacAccessibilityTree(native)
+        }
+        try attachNativeAccessibilityEvidence(nativeElements.map {
+            ["id": $0.accessibilityIdentifier() ?? "", "label": $0.accessibilityText() ?? ""]
+        }, name: "actual-transport-host")
+        let action = try XCTUnwrap(nativeElements.first { $0.accessibilityIdentifier() == "native-action" })
         let frame = action.accessibilityFrame()
         XCTAssertGreaterThan(frame.width, 0)
         let windowPoint = window.convertPoint(fromScreen: NSPoint(x: frame.midX, y: frame.midY))

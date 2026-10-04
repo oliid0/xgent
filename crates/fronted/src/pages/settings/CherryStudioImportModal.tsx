@@ -1,7 +1,6 @@
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button as AstryxNativeButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
-import { DialogHeader } from "@astryxdesign/core/Dialog";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Icon } from "@astryxdesign/core/Icon";
@@ -14,7 +13,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft,
+  ChevronLeft,
   ClaudeIcon,
   FolderOpen,
   GeminiIcon,
@@ -23,6 +22,7 @@ import {
   Settings,
 } from "../../components/icons";
 import type { CodexRequestFormat, ProviderId } from "../../lib/settings";
+import { SettingsDetailHeader } from "./SettingsDetailHeader";
 import { SettingsModalShell } from "./SettingsModalShell";
 
 export type CherryProviderImportItem = {
@@ -257,7 +257,7 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
         purpose="form"
         ariaLabel="Cherry Studio 数据目录"
       >
-        <DialogHeader
+        <SettingsDetailHeader
           title="Cherry Studio 数据目录"
           subtitle={
             dataPath
@@ -269,8 +269,8 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
               label="返回"
               tooltip="返回同步设置"
               variant="ghost"
-              size="sm"
-              icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
+              size="lg"
+              icon={<Icon icon={ChevronLeft} size="md" color="inherit" />}
               onClick={() => setPathDialogOpen(false)}
             />
           }
@@ -319,7 +319,7 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
   return (
     <SettingsModalShell onClose={onClose} purpose="form" ariaLabel="Cherry Studio 同步">
       <VStack width="100%" height="100%" minHeight={0} gap={0}>
-        <DialogHeader
+        <SettingsDetailHeader
           title="从 Cherry Studio 同步"
           subtitle="仅同步 Base URL 和 API Key；模型由 Xgent 获取并激活。左侧可切换供应商类型。"
           startContent={
@@ -327,8 +327,8 @@ export function CherryStudioImportModal(props: CherryStudioImportModalProps) {
               label="返回"
               tooltip="返回供应商配置"
               variant="ghost"
-              size="sm"
-              icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
+              size="lg"
+              icon={<Icon icon={ChevronLeft} size="md" color="inherit" />}
               isDisabled={importing}
               onClick={onClose}
             />

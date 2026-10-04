@@ -7,7 +7,6 @@ import {
   Layout,
   LayoutContent,
   LayoutFooter,
-  LayoutHeader,
   Section,
   StackItem,
   VStack,
@@ -20,7 +19,7 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { useState } from "react";
 import {
-  ArrowLeft,
+  ChevronLeft,
   Folder,
   FolderOpen,
   Globe,
@@ -54,6 +53,7 @@ import {
   requestToDraft,
 } from "./httpRequestEditor";
 import { ModelPicker, type ModelPickerOption } from "./modelPicker";
+import { SettingsDetailHeader } from "./SettingsDetailHeader";
 import { SettingsModalShell } from "./SettingsModalShell";
 import { useAutomationFormOperation } from "./useAutomationFormOperation";
 
@@ -506,26 +506,20 @@ export function CronTaskModal({
       <Layout
         height="fill"
         header={
-          <LayoutHeader hasDivider>
-            <HStack gap={3} vAlign="center">
+          <SettingsDetailHeader
+            title={modalTitle}
+            subtitle={t("settings.cronExpressionHint")}
+            startContent={
               <IconButton
                 label={t("settings.cancel")}
                 tooltip={t("settings.cancel")}
-                icon={<ArrowLeft aria-hidden="true" />}
+                icon={<ChevronLeft aria-hidden="true" />}
                 variant="ghost"
-                size="sm"
+                size="lg"
                 onClick={onClose}
               />
-              <StackItem size="fill">
-                <VStack gap={0.5}>
-                  <Heading level={3}>{modalTitle}</Heading>
-                  <Text type="supporting" color="secondary">
-                    {t("settings.cronExpressionHint")}
-                  </Text>
-                </VStack>
-              </StackItem>
-            </HStack>
-          </LayoutHeader>
+            }
+          />
         }
         content={
           <LayoutContent padding={0} isScrollable>

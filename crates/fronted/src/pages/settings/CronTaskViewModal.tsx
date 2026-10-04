@@ -1,15 +1,16 @@
 import { Button as AstryxButton } from "@astryxdesign/core/Button";
 import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Heading as AstryxHeadingCore, Text as AstryxText } from "@astryxdesign/core/Text";
 import { useEffect, useRef, useState } from "react";
 import { useConfirmDialog } from "../../components/astryx/useConfirmDialog";
 import {
   AlertTriangle,
-  ArrowLeft,
   BrushCleaning,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   Clock3,
   Folder,
   Globe,
@@ -42,6 +43,7 @@ import { NativeSurface } from "../../presentation/NativeSurface";
 import { nativeCronRunNodes } from "../../presentation/nativeCronRunNodes";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
+import { SettingsDetailHeader } from "./SettingsDetailHeader";
 import { SettingsModalShell } from "./SettingsModalShell";
 import { ConfirmActionPopover } from "./shared";
 import { useCronRunHistory } from "./useCronRunHistory";
@@ -1032,22 +1034,21 @@ export function CronTaskViewModal({
         className="settings-cron-view-panel flex h-full min-h-0 w-full overflow-hidden"
       >
         {compactViewport ? (
-          <AstryxStack
-            direction="horizontal"
-            as="header"
-            className="flex min-h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 pt-[env(safe-area-inset-top,0px)]"
-          >
-            <AstryxButton
-              variant="ghost"
-              label={t("settings.cronViewClose")}
-              type="button"
-              onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground active:bg-muted"
-              aria-label={t("settings.cronViewClose")}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </AstryxButton>
-            <AstryxGrid className="grid min-w-0 flex-1 grid-cols-2 rounded-lg bg-muted p-0.5">
+          <AstryxStack direction="vertical" className="shrink-0">
+            <SettingsDetailHeader
+              title={task.name}
+              startContent={
+                <IconButton
+                  variant="ghost"
+                  label={t("settings.cronViewClose")}
+                  tooltip={t("settings.cronViewClose")}
+                  size="lg"
+                  icon={<ChevronLeft />}
+                  onClick={onClose}
+                />
+              }
+            />
+            <AstryxGrid className="settings-cron-view-tabs grid min-w-0 grid-cols-2 rounded-lg bg-muted p-0.5 mx-4 mb-3">
               <AstryxButton
                 variant="ghost"
                 label={t("settings.cronViewConfig")}

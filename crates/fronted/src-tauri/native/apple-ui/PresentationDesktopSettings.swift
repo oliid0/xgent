@@ -17,7 +17,9 @@ struct XgentDesktopSettingsLayout: View {
     private var search: XgentNode? { sidebar?.children?.first { $0.id == "settings-search" } }
     private var searchEmpty: XgentNode? { sidebar?.children?.first { $0.id == "settings-search-empty" } }
     private var close: XgentNode? { sidebar?.children?.first { $0.id == "settings-close" } }
-    private var saveStatus: XgentNode? { detail?.children?.first { $0.id == "save-status" } }
+    private var saveStatus: XgentNode? {
+        detail?.children?.first { $0.id == "save-status" && $0.secondary != true }
+    }
     private var titleNode: XgentNode? { detail?.children?.first { $0.id == "settings-detail-title" } }
     private var sectionTitle: String { navigation.first { $0.selected == true }?.label ?? document.title }
 

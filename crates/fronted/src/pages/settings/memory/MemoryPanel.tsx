@@ -28,6 +28,7 @@ import type { MemoryMeta } from "../../../lib/memory/api";
 import { MEMORY_TYPES, type MemoryType } from "../../../lib/memory/schema";
 import type { AppSettings } from "../../../lib/settings";
 import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
+import { SettingsDetailHeader } from "../SettingsDetailHeader";
 import { SettingsModalShell } from "../SettingsModalShell";
 import { MemorySettingsDrawer } from "./MemorySettingsDrawer";
 import { NativeMemoryPanel } from "./NativeMemoryPanel";
@@ -47,7 +48,7 @@ import {
   selectedTitle,
   strongestQuotaLevel,
 } from "./panelModel";
-import { ArrowLeft, buildModelOptions, Folder, Plus, Settings2 } from "./platform";
+import { buildModelOptions, ChevronLeft, Folder, Plus, Settings2 } from "./platform";
 import { type MemoryCreateDraft, useMemoryPanelData } from "./useMemoryPanelData";
 
 const EMPTY_CREATE_DRAFT: MemoryCreateDraft = {
@@ -473,32 +474,29 @@ export function MemoryPanel(props: {
               !compactDetailOpen ? "settings-memory-compact-hidden" : ""
             }`}
           >
-            <HStack
-              width="100%"
-              gap={2}
-              vAlign="center"
+            <SettingsDetailHeader
               className="settings-memory-compact-toolbar"
-              padding={2}
-            >
-              <IconButton
-                label={t("settings.memoryTitle")}
-                tooltip={t("settings.memoryTitle")}
-                variant="ghost"
-                size="sm"
-                icon={<ArrowLeft />}
-                onClick={() => {
-                  setCompactDetailOpen(false);
-                  setShowCreate(false);
-                }}
-              />
-              <Text>
-                {showCreate
+              title={
+                showCreate
                   ? t("settings.memoryNew")
                   : selected
                     ? selectedTitle(selected)
-                    : t("settings.memoryTitle")}
-              </Text>
-            </HStack>
+                    : t("settings.memoryTitle")
+              }
+              startContent={
+                <IconButton
+                  label={t("settings.memoryTitle")}
+                  tooltip={t("settings.memoryTitle")}
+                  variant="ghost"
+                  size="lg"
+                  icon={<ChevronLeft />}
+                  onClick={() => {
+                    setCompactDetailOpen(false);
+                    setShowCreate(false);
+                  }}
+                />
+              }
+            />
             {showCreate ? (
               <AstryxStack direction="vertical" className="shrink-0 border-b border-border/40 p-4">
                 {error ? <Banner status="error" title={error} collapsible={false} /> : null}
