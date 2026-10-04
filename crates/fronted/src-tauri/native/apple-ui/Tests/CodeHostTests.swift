@@ -97,6 +97,41 @@ final class CodeHostTests: XCTestCase {
         XCTAssertFalse(store.owns(identity, owner: owner))
     }
 
+    #if os(iOS)
+    @MainActor func testLateRepresentableUpdateCannotReplaceTheReturningFilesEditDestination() async throws {
+        let source = XgentCodeHostSource("let count = 1"), old = UUID(), current = UUID()
+        var edits: [String] = []
+        source.activate(old, content: source.content, editable: true) { _ in XCTFail("Retired mount received input") }
+        let staleBinding = source.binding(old)
+        let input = XgentCodeNativeInput(content: source.content)
+        input.rebind(text: staleBinding)
+        source.activate(current, content: source.content, editable: true) { edits.append($0) }
+        input.rebind(text: source.binding(current))
+        // SwiftUI may deliver this cached configuration after reparenting.
+        input.update(text: staleBinding, position: .constant(.init(selections: [], verticalScrollPosition: 0)),
+                     wrap: true, fontName: nil, fontSize: 14,
+                     palette: XgentPresentationTheme.fallback.light, label: "Example.swift")
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 400))
+        let controller = UIViewController()
+        window.rootViewController = controller
+        input.view.frame = window.bounds
+        controller.view.addSubview(input.view)
+        window.makeKeyAndVisible()
+        defer { input.retire(); window.isHidden = true; window.rootViewController = nil }
+        XCTAssertTrue(input.view.becomeFirstResponder())
+        input.view.selectedRange = NSRange(location: source.content.utf16.count, length: 0)
+        input.view.insertText(" // returned")
+        try await settle()
+        XCTAssertEqual(source.content, "let count = 1 // returned")
+        XCTAssertEqual(edits.last, "let count = 1 // returned")
+        input.view.undoManager?.undo()
+        try await settle()
+        XCTAssertEqual(input.view.text, "let count = 1")
+        XCTAssertEqual(source.content, "let count = 1")
+        XCTAssertEqual(edits.last, "let count = 1")
+    }
+    #endif
+
     @MainActor func testRealTextViewsAndUndoStayWithTheirFilesAcrossHideSwitchAndFreshSurface() async throws {
         let model = XgentPresentationModel()
         var actions: [XgentAction] = []; model.actionSink = { actions.append($0) }
@@ -157,6 +192,17 @@ final class CodeHostTests: XCTestCase {
         window.makeFirstResponder(resumed)
         #endif
         resumed.undoManager?.undo(); try await settle()
+        #if os(iOS)
+        try attachNativeAccessibilityEvidence([[
+            "editable": String(resumed.isEditable), "firstResponder": String(resumed.isFirstResponder),
+            "markedInput": String(resumed.markedTextRange != nil),
+            "canUndo": String(resumed.undoManager?.canUndo ?? false),
+            "canRedo": String(resumed.undoManager?.canRedo ?? false),
+            "groupingLevel": String(resumed.undoManager?.groupingLevel ?? -1),
+            "lastSurface": actions.last?.surface ?? "nil",
+            "nativeMatchesUndoneSource": String(source(resumed) == "let count = 1"),
+        ]], name: "code-host-returned-after-undo")
+        #endif
         XCTAssertEqual(source(resumed), "let count = 1"); XCTAssertEqual(source(b), "let count = 2 // B")
         #if os(iOS)
         XCTAssertEqual(resumed.selectedRange, NSRange(location: "let count = 1".utf16.count, length: 0))

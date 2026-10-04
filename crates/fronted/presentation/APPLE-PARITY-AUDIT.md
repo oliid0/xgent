@@ -554,3 +554,13 @@ were inspected through GitHub/Swift MCP and official documentation.
   Sizing now retains 300 points whenever at least 140 points remain for controls,
   and adapts only when that arrangement cannot fit. The original assertions
   remain unchanged. All-eight-job validation is still required on the new SHA.
+- CI 304 / `5a54ba3`: seven jobs passed; all terminal frame/output checks now
+  pass on iOS as well. Hosted iOS completed 189 tests, with five assertions in
+  the retained file editor's return/undo test failing. The returned native input
+  is the same object, mounted and not parked. Source review found that an older
+  representable configuration can overwrite the current mount's explicitly
+  rebound edit destination. Native input now keeps that current binding across
+  style updates. A real UIKit input test deliberately supplies a stale lease
+  after rebinding and requires both typing and undo to reach the returning file.
+  Original lifetime, content, selection and action assertions remain unchanged;
+  the next remote run must establish whether this fixes the integration failure.

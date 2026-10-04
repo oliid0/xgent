@@ -19,6 +19,7 @@ final class XgentCodeNativeInput: NSObject {
     private var scrollObserver: NSObjectProtocol?
     #endif
     private var text: Binding<String>?
+    private var mountedText: Binding<String>?
     private var position: Binding<CodeEditor.Position>?
     private var updating = false
     private var storageObserver: NSObjectProtocol?
@@ -92,12 +93,16 @@ final class XgentCodeNativeInput: NSObject {
                 fontName: String?, fontSize: CGFloat, palette: XgentPalette, label: String) {
         updating = true
         defer { updating = false }
-        self.text = text; self.position = position
+        // A retained hosting root can publish its previous lease after the
+        // file has returned on a new surface. Only the current mount may
+        // choose the edit destination; style updates cannot replace it.
+        let activeText = mountedText ?? text
+        self.text = activeText; self.position = position
         #if os(iOS)
-        if view.text != text.wrappedValue {
-            view.text = text.wrappedValue
-            history.reset(text.wrappedValue, selection: view.selectedRange)
-            view.lineIndex = XgentCodeLineIndex(text.wrappedValue)
+        if view.text != activeText.wrappedValue {
+            view.text = activeText.wrappedValue
+            history.reset(activeText.wrappedValue, selection: view.selectedRange)
+            view.lineIndex = XgentCodeLineIndex(activeText.wrappedValue)
         }
         let font = fontName.flatMap { UIFont(name: $0, size: fontSize) } ?? .monospacedSystemFont(ofSize: fontSize, weight: .regular)
         let color = UIColor(Color(xgentHex: palette.text))
@@ -108,9 +113,9 @@ final class XgentCodeNativeInput: NSObject {
         view.textContainer.widthTracksTextView = wrap
         view.textContainer.size.width = wrap ? max(1, view.bounds.width - 52) : CGFloat.greatestFiniteMagnitude
         #else
-        if view.string != text.wrappedValue {
-            view.string = text.wrappedValue
-            view.lineIndex = XgentCodeLineIndex(text.wrappedValue)
+        if view.string != activeText.wrappedValue {
+            view.string = activeText.wrappedValue
+            view.lineIndex = XgentCodeLineIndex(activeText.wrappedValue)
         }
         view.font = fontName.flatMap { NSFont(name: $0, size: fontSize) } ?? .monospacedSystemFont(ofSize: fontSize, weight: .regular)
         view.textColor = NSColor(Color(xgentHex: palette.text))
@@ -128,11 +133,12 @@ final class XgentCodeNativeInput: NSObject {
     func rebind(text: Binding<String>) {
         // A returning input must route edits through its new surface lease
         // immediately, before the hosting graph publishes its next snapshot.
+        mountedText = text
         self.text = text
     }
 
     func retire() {
-        text = nil; position = nil
+        mountedText = nil; text = nil; position = nil
         view.isEditable = false
         view.fileUndo.removeAllActions()
     }
