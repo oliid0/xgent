@@ -520,8 +520,8 @@ export function SettingsPage(props: SettingsPageProps) {
                       titleEndContent={
                         <IconButton
                           className="settings-navigation-control settings-index-close"
-                          label={t("settings.backToChat")}
-                          tooltip={t("settings.backToChat")}
+                          label={t("settings.close")}
+                          tooltip={t("settings.close")}
                           icon={<Icon icon={X} size="md" color="inherit" />}
                           variant="ghost"
                           size="lg"
