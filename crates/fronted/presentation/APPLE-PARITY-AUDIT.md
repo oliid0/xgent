@@ -525,3 +525,18 @@ were inspected through GitHub/Swift MCP and official documentation.
   accessibility roles directly. Screenshots and role/frame diagnostics are
   attached before checking the menu, so a failure preserves the actual view.
   All other macOS tests passed; this remains an unsuccessful CI run.
+- Reviewing terminal bounds found a 480-point minimum on a panel hosted in
+  windows whose actual minimum height is 360. Its preferred 300-point PTY
+  minimum could also overflow after allocating toolbar space. Terminal layout
+  now owns the viewport directly, reserves output space within the available
+  height and keeps connection forms in their bounded scroll area. The existing
+  narrow/wide/authentication test additionally hosts 360-point layouts; all
+  original 640-point frame and minimum-output assertions remain intact. Actual
+  frame containment and rendered output must pass on both Apple platforms.
+- CI 301 / `eeced13`: the macOS job passed, including all 180 package tests and
+  both packaged-app harness compiles. The real settings host now passes its
+  Shell menu-width check, inner-panel exclusion, hosting pointer routing and
+  close-action assertions at 640/1040. The corrected click position avoids
+  window resize chrome; the actual dismissal requirement was preserved. This
+  does not validate the newer terminal follow-up or replace all-eight-job and
+  installed-application checks on the final commit.

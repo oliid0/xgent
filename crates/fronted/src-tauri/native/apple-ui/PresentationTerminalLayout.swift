@@ -27,6 +27,8 @@ struct XgentTerminalLayout: View {
 
     private var ptyLayout: some View {
         GeometryReader { geometry in
+            let viewportReserve = min(max(0, geometry.size.height - 44),
+                min(300, max(120, geometry.size.height * 0.6)))
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) { nodes(chrome) }
@@ -36,15 +38,21 @@ struct XgentTerminalLayout: View {
                         })
                 }
                 .frame(height: viewport == nil ? geometry.size.height :
-                    min(chromeHeight, max(0, geometry.size.height - 300)))
+                    min(chromeHeight, max(0, geometry.size.height - viewportReserve)))
                 if let viewport {
-                    nodes([viewport]).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // A PTY must fit the remaining viewport, including windows
+                    // shorter than the document's preferred 300-point minimum.
+                    XgentTerminalViewport(node: viewport, document: document, model: model)
+                        .disabled(viewport.disabled == true)
+                        .accessibilityIdentifier(viewport.id)
+                        .modifier(XgentAccessibilityModifier(node: viewport))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
         .onPreferenceChange(XgentTerminalChromeHeight.self) { chromeHeight = $0 }
         .frame(idealWidth: 960, maxWidth: .infinity,
-               minHeight: 480, idealHeight: 640, maxHeight: .infinity)
+               idealHeight: 640, maxHeight: .infinity)
     }
 
     @ViewBuilder private func nodes(_ nodes: [XgentNode]) -> some View {

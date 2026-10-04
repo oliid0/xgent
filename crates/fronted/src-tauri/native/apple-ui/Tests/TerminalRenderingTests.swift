@@ -19,7 +19,7 @@ final class TerminalRenderingTests: XCTestCase {
         #else
         let widths: [CGFloat] = [360, 1040]
         #endif
-        for width in widths {
+        for (width, height) in widths.flatMap({ width in [CGFloat(360), 640].map { (width, $0) } }) {
             for challenge in [false, true] {
                 let document = try fixture(dark: challenge, challenge: challenge)
                 let model = XgentPresentationModel()
@@ -28,7 +28,7 @@ final class TerminalRenderingTests: XCTestCase {
                     .dynamicTypeSize(challenge ? .accessibility3 : .large)
                     .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: document.appearance))
                     .preferredColorScheme(document.colorScheme)
-                let size = CGSize(width: width, height: 640)
+                let size = CGSize(width: width, height: height)
                 #if os(iOS)
                 let controller = UIHostingController(rootView: content)
                 let window = UIWindow(frame: CGRect(origin: .zero, size: size))
@@ -56,7 +56,13 @@ final class TerminalRenderingTests: XCTestCase {
                 XCTAssertEqual(red, CGFloat(challenge ? 0x4a : 0x1f) / 255, accuracy: 0.002)
                 XCTAssertEqual(green, CGFloat(challenge ? 0xde : 0x29) / 255, accuracy: 0.002)
                 XCTAssertEqual(blue, CGFloat(challenge ? 0x80 : 0x33) / 255, accuracy: 0.002)
-                XCTAssertGreaterThanOrEqual(view.bounds.height, 290, "Forms must leave a usable terminal viewport")
+                if height == 640 {
+                    XCTAssertGreaterThanOrEqual(view.bounds.height, 290, "Forms must leave a usable terminal viewport")
+                } else {
+                    XCTAssertGreaterThanOrEqual(view.bounds.height, 120, "Short windows must keep terminal output usable")
+                }
+                XCTAssertLessThanOrEqual(view.bounds.height, height - 44,
+                    "The terminal must leave visible space for its controls")
                 let frame = view.convert(view.bounds, to: root)
                 XCTAssertGreaterThanOrEqual(frame.minX, -1)
                 XCTAssertGreaterThanOrEqual(frame.minY, -1)
@@ -78,7 +84,7 @@ final class TerminalRenderingTests: XCTestCase {
                 XCTAssertGreaterThan(try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).count, 2_000)
                 #endif
                 let attachment = XCTAttachment(image: image)
-                attachment.name = "terminal-\(Int(width))-\(challenge ? "authentication" : "output")"
+                attachment.name = "terminal-\(Int(width))-\(Int(height))-\(challenge ? "authentication" : "output")"
                 attachment.lifetime = .keepAlways
                 add(attachment)
                 model.invalidate()
