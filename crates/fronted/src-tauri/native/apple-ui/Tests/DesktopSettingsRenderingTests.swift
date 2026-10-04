@@ -38,6 +38,17 @@ final class DesktopSettingsRenderingTests: XCTestCase {
             host.cacheDisplay(in: host.bounds, to: image)
             let attachment = XCTAttachment(image: NSImage(cgImage: try XCTUnwrap(image.cgImage), size: host.bounds.size))
             attachment.name = "settings-actual-presentation-\(Int(width))"; attachment.lifetime = .keepAlways; add(attachment)
+            func descendants(_ view: NSView) -> [NSView] {
+                [view] + view.subviews.flatMap { descendants($0) }
+            }
+            let backdrop = try XCTUnwrap(descendants(host).compactMap { $0 as? XgentDesktopSettingsDismissView }.first)
+            let outside = backdrop.convert(NSPoint(x: 8, y: 8), from: host)
+            XCTAssertTrue(backdrop.hitTest(backdrop.convert(outside, to: backdrop.superview)) === backdrop)
+            let inside = NSPoint(x: backdrop.bounds.midX, y: backdrop.bounds.midY)
+            XCTAssertNil(backdrop.hitTest(backdrop.convert(inside, to: backdrop.superview)),
+                "Settings content and empty panel space must never be a dismissal target")
+            XCTAssertTrue(host.hitTest(NSPoint(x: 8, y: 8)) === backdrop,
+                "The actual hosting hierarchy must route the outside pointer to the dismissal target")
             // This point is outside the centered dialog and must dismiss it.
             let click = try [NSEvent.EventType.leftMouseDown, .leftMouseUp].map { type in
                 try XCTUnwrap(NSEvent.mouseEvent(with: type, location: NSPoint(x: 8, y: 8),

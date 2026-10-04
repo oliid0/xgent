@@ -100,7 +100,7 @@ struct XgentDesktopSettingsLayout: View {
                         .foregroundStyle(Color(xgentHex: item.selected == true ? palette.accentText : palette.secondaryText))
                         .accessibilityHidden(true)
                 }
-                Text(item.label ?? "").fixedSize(horizontal: false, vertical: true)
+                Text(item.label ?? "").fixedSize(horizontal: false, vertical: true).layoutPriority(1)
                 Spacer(minLength: 0)
             }
             .modifier(XgentControlTypography(node: item))

@@ -60,7 +60,11 @@ struct XgentSettingsValueRow<Content: View>: View {
             else {
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .center, spacing: 12) {
+                        #if os(macOS)
+                        label.frame(minWidth: 180, alignment: .leading).layoutPriority(1)
+                        #else
                         label.fixedSize(horizontal: true, vertical: false)
+                        #endif
                         Spacer(minLength: 12)
                         content.fixedSize(horizontal: true, vertical: false)
                     }

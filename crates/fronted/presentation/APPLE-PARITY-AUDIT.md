@@ -479,3 +479,15 @@ were inspected through GitHub/Swift MCP and official documentation.
   macOS log stopped at the new mouse-down fixture until the newer push canceled
   it; that supports the event-tracking diagnosis above. It is not a green CI
   run and must not authorize release.
+- CI 296 / `70f0d13`: seven jobs passed, including hosted iOS and device,
+  frontend and Rust. macOS compiled and completed 180 tests, but both actual
+  settings outside-click assertions failed. The downloaded host screenshots
+  confirm the centered dialog and twelve destinations; they do not establish
+  dismissal behavior. No release is authorized by this failed run.
+- The dismissal background now receives initial mouse events through AppKit,
+  including an inactive window's first click, and excludes the rounded settings
+  panel from its hit region. The real-window test retains its close-action
+  assertion and now diagnoses pointer routing and exclusion of panel content.
+  Desktop descriptions can wrap beside the value menu, navigation text keeps
+  its available width, and dialog sizing preserves gutters in short windows.
+  These native follow-ups require the next remote compile and rendering tests.

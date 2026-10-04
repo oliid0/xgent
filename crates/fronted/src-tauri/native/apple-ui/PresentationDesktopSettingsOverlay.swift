@@ -11,14 +11,16 @@ struct XgentDesktopSettingsOverlay: View {
         let size = XgentDesktopSheetSizing.settingsSize(in: availableSize)
         let theme = document.theme ?? .fallback
         let shape = RoundedRectangle(cornerRadius: CGFloat(theme.radius.container), style: .continuous)
+        let sidebar = document.nodes.first { $0.kind == .settingsLayout }?.children?.first
+        let dismissLabel = sidebar?.children?.first { $0.id == "settings-close" }?.label ?? document.title
         ZStack {
-            Button { model.dismiss(document) } label: {
-                Color.black.opacity(0.08).contentShape(Rectangle())
+            ZStack {
+                Color.black.opacity(0.08).accessibilityHidden(true)
+                XgentDesktopSettingsBackdrop(dialogSize: size,
+                    cornerRadius: CGFloat(theme.radius.container),
+                    label: dismissLabel,
+                    enabled: document.dismissAction != nil) { model.dismiss(document) }
             }
-            .buttonStyle(.plain)
-            .disabled(document.dismissAction == nil)
-            .accessibilityLabel(Text("Close settings"))
-            .accessibilityIdentifier("settings-dismiss-backdrop")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             XgentSheetView(document: document, model: model)
