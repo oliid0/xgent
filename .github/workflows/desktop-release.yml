@@ -1143,6 +1143,9 @@ jobs:
           PY
           )"
           collect_ios_diagnostics() {
+            xcrun simctl spawn "$simulator_udid" log show --last 15m --style compact --info \
+              --predicate 'subsystem == "com.ohi.xgent" AND category == "shell-installation"' \
+              > "$RUNNER_TEMP/xgent-ios-shell-installation.log" 2>&1 || true
             xcrun simctl spawn "$simulator_udid" log show --last 15m --style compact \
               --predicate 'process == "Xgent" OR process == "xgent" OR eventMessage CONTAINS "com.ohi.xgent"' \
               > "$RUNNER_TEMP/xgent-ios-interaction-system.log" 2>&1 || true

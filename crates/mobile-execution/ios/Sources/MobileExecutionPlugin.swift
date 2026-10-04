@@ -280,9 +280,14 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                     if let percent { progress["percent"] = percent }
                     self.trigger("install-progress", data: progress)
                 }) {
+                    let diagnostics = Logger(subsystem: "com.ohi.xgent", category: "shell-installation")
+                    diagnostics.notice("Initializing the bundled command registry")
                     try self.initializeBackendIfNeeded()
+                    diagnostics.notice("Bundled command registry initialized")
                     let workspace = try self.installationProbeWorkspace()
-                    try self.runInstallationProbes(workspace: workspace)
+                    try self.runInstallationProbes(workspace: workspace) { percent in
+                        self.trigger("install-progress", data: ["phase": "verifying", "percent": percent])
+                    }
                 }
                 UserDefaults.standard.set(true, forKey: self.installationPreferenceKey)
                 UserDefaults.standard.set(
@@ -650,7 +655,13 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         setlocale(LC_CTYPE, "UTF-8")
         configureCommandEnvironment(workspace: workspace)
 
+        // Installation uses only fixed, non-secret probe names. Keep these
+        // lifecycle checkpoints out of ordinary task command/output logs.
+        let installationDiagnostics = request.runId.hasPrefix("install-probe-")
+            ? Logger(subsystem: "com.ohi.xgent", category: "shell-installation") : nil
+        installationDiagnostics?.notice("Allocating bundled verification command")
         let pid = ios_fork()
+        installationDiagnostics?.notice("Allocated bundled verification PID: \(pid)")
         stateLock.lock()
         let wasCancelled = cancelledRuns.contains(request.runId)
         let command = ActiveCommand(
@@ -671,9 +682,11 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         // explicitly allowed above even when cwd is an external workspace.
         let quotedScript = "\"" + scriptURL.path.replacingOccurrences(of: "\"", with: "\\\"") + "\""
         var exitCode = ios_system("dash " + quotedScript)
+        installationDiagnostics?.notice("Dispatched bundled verification command, status=\(exitCode)")
         fflush(stdoutStream)
         fflush(stderrStream)
         ios_waitpid(pid)
+        installationDiagnostics?.notice("Bundled verification command finished waiting")
         ios_releaseThreadId(pid)
         if exitCode == 0 { exitCode = ios_getCommandStatus() }
 
@@ -718,6 +731,10 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         defer { initializationLock.unlock() }
         if initialized { return }
         initializeEnvironment()
+        // Match a-Shell's AppDelegate: the host explicitly waits for its PID
+        // below and owns interruption. The default synchronous join can wait
+        // for auxiliary threads a nested shell command also waits for.
+        joinMainThread = false
         guard let bundledResources = bundledResourcesURL() else {
             throw MobileExecutionError.io("The a-Shell resources are unavailable in the app bundle")
         }
@@ -986,7 +1003,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         return try resolveWorkspace(workspace.path)
     }
 
-    private func runInstallationProbes(workspace: URL) throws {
+    private func runInstallationProbes(workspace: URL, onProgress: (Int) -> Void) throws {
         let diagnostics = Logger(subsystem: "com.ohi.xgent", category: "shell-installation")
         let token = installationProbeToken
         let probes: [(name: String, command: String, expected: String)] = [
@@ -1025,7 +1042,8 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             )
         }
         for (index, probe) in probes.enumerated() {
-            diagnostics.info("Starting bundled shell verification: \(probe.name, privacy: .public)")
+            onProgress(index * 100 / probes.count)
+            diagnostics.notice("Starting bundled shell verification: \(probe.name, privacy: .public)")
             let request = RunArgs(
                 runId: "install-probe-\(index)",
                 workdir: workspace.path,
@@ -1042,7 +1060,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 cwd: workspace,
                 stdin: nil
             )
-            diagnostics.info("Finished bundled shell verification: \(probe.name, privacy: .public), exit=\(result.exitCode), timeout=\(result.timedOut), cancelled=\(result.cancelled)")
+            diagnostics.notice("Finished bundled shell verification: \(probe.name, privacy: .public), exit=\(result.exitCode), timeout=\(result.timedOut), cancelled=\(result.cancelled)")
             guard result.exitCode == 0,
                   !result.timedOut,
                   !result.cancelled,

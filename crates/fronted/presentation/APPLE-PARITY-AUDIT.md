@@ -166,6 +166,20 @@ added to simulate native glass.
   The parser's pinned 0.13.1 `AccessibilityElement.hint` API was verified from
   its upstream source. Follow-up compilation and images remain pending.
 
+- CI 280 / `58597d7`: all eight jobs passed, including the new mounted
+  navigation label/hint test. Release 128 finished: Android/Windows/Linux passed;
+  both macOS packaged launch tests failed before the composer appeared. iOS
+  device/simulator packaging passed, but its actual Shell installation timed out
+  at command verification. The exported screenshot/AX still show Verifying and
+  Installing, rather than an error or a completed version.
+- The pinned a-Shell AppDelegate explicitly sets `joinMainThread = false` before
+  its own `ios_waitpid` calls. Xgent now follows that host-owned waiting model;
+  the installed Shell test and its 180-second assertion are unchanged. Fixed-name
+  probe lifecycle checkpoints use persisted notice-level diagnostics, verification
+  reports actual progress, and the release harness exports a separate focused
+  shell log. Sixteen release/resource checks passed locally. A new installed run
+  is required to prove the initialization hang and cancellation are resolved.
+
 Installed screenshots, dark/largest-text traversal, shell cancellation and
 end-to-end service parity remain required. This pass does not claim 90% measured
 visual similarity or identical complex task completion.
