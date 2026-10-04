@@ -88,6 +88,18 @@ not been measured or established.
   off-window List in the snapshot fixture. The fixture now mounts a real NSWindow
   and requires visible search/options bounds plus an actual option press before
   it can pass. New-head CI and installed application screenshots remain pending.
+- CI 277 / `8b08dd7`: all eight jobs passed; macOS 176 and iOS 182 SDK tests
+  passed. Inspected new macOS picker images contain the real font rows/checkmark.
+  Release 128 / `37198073484` was dispatched for this exact SHA after its CI
+  passed; all six application targets are running. Installed results are pending.
+- Installed iOS coverage previously exercised only Shell. A new packaged-app
+  test opens all 12 mobile settings destinations, verifies visible core controls
+  and separate header bounds, enters Hooks/Cron/SSH and requires return to Other.
+  A second test changes the voice flag, waits for the shared Saved status, then
+  verifies Settings reopen and application relaunch before restoring the flag.
+  The release harness repeats navigation at dark/accessibility maximum text size
+  and exports both runs' images/hierarchies even on failure. These tests have not
+  run yet; they do not establish provider/WebDAV/OS-permission service success.
 
 Push this as one reviewed batch. Use the new commit's CI results, then trigger the
 full release with smoke checks. Do not substitute an older green CI for the new

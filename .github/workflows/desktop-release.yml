@@ -1207,14 +1207,26 @@ jobs:
             -resultBundlePath "$RUNNER_TEMP/xgent-ios-interactions.xcresult" \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/xgent-ios-interactions.log"
 
+          # Exercise actual settings navigation at the same large-text/dark
+          # appearance as the launch image; a launch image alone covers no routes.
+          xcrun simctl ui "$simulator_udid" appearance dark
+          xcrun simctl ui "$simulator_udid" content_size accessibility-extra-extra-extra-large
+          xcodebuild test -project "$smoke_project/XgentIOSSmoke.xcodeproj" \
+            -scheme XgentIOSSmoke -destination "platform=iOS Simulator,id=$simulator_udid" \
+            -only-testing:XgentIOSSmoke/PackagedSettingsTests/testActualSettingsNavigationAndDetailedRoutes \
+            -resultBundlePath "$RUNNER_TEMP/xgent-ios-settings-dark-large.xcresult" \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/xgent-ios-settings-dark-large.log"
+
       - name: Export iOS interaction evidence
         if: always() && (github.event_name == 'push' || inputs.publish == true || inputs.smoke == true)
         shell: bash
         run: |
-          if [ -d "$RUNNER_TEMP/xgent-ios-interactions.xcresult" ]; then
-            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/xgent-ios-interactions.xcresult" \
-              --output-path "$RUNNER_TEMP/xgent-ios-interactions"
-          fi
+          for result in xgent-ios-interactions xgent-ios-settings-dark-large; do
+            if [ -d "$RUNNER_TEMP/$result.xcresult" ]; then
+              xcrun xcresulttool export attachments --path "$RUNNER_TEMP/$result.xcresult" \
+                --output-path "$RUNNER_TEMP/$result"
+            fi
+          done
 
       - name: Upload iOS launch evidence
         if: always() && (github.event_name == 'push' || inputs.publish == true || inputs.smoke == true)
@@ -1227,6 +1239,7 @@ jobs:
             ${{ runner.temp }}/xgent-ios-*.log
             ${{ runner.temp }}/xgent-ios-crashes
             ${{ runner.temp }}/xgent-ios-interactions
+            ${{ runner.temp }}/xgent-ios-settings-dark-large
           if-no-files-found: warn
           retention-days: 7
 

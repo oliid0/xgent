@@ -610,6 +610,7 @@ struct XgentIOSSheetPresentation: View {
             .buttonStyle(.plain)
             .modifier(XgentIOSNavigationControl())
             .accessibilityLabel(Text("Close"))
+            .accessibilityIdentifier("presentation-sheet-close")
         } else {
             Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
         }
@@ -617,6 +618,7 @@ struct XgentIOSSheetPresentation: View {
 
     private var title: some View {
         Text(document.title)
+            .accessibilityIdentifier("presentation-sheet-title")
             .font(.headline)
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
