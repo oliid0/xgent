@@ -11,7 +11,10 @@ struct NativeMacAccessibilityElement {
         attribute(.identifier, getter: "accessibilityIdentifier") as? String
     }
     func accessibilityRole() -> NSAccessibility.Role? {
-        guard let role = attribute(.role, getter: "accessibilityRole") as? String else { return nil }
+        if let modern = object as? any NSAccessibilityProtocol { return modern.accessibilityRole() }
+        let value = attribute(.role, getter: "accessibilityRole")
+        if let role = value as? NSAccessibility.Role { return role }
+        guard let role = value as? String else { return nil }
         return NSAccessibility.Role(rawValue: role)
     }
     func accessibilityLabel() -> String? {

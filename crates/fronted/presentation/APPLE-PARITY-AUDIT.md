@@ -519,3 +519,9 @@ were inspected through GitHub/Swift MCP and official documentation.
   real role through its existing modern/legacy attribute mechanism, and the
   control selection is split into explicitly typed expressions. Neither the
   menu-width nor the outside-close assertions has been weakened or skipped.
+- CI 300 / `2901685`: macOS compiled and ran 180 tests, with one failure before
+  the pointer assertions: its new filter did not identify the Shell menu. Role
+  inspection now accepts the native menu-button role and reads formally typed
+  accessibility roles directly. Screenshots and role/frame diagnostics are
+  attached before checking the menu, so a failure preserves the actual view.
+  All other macOS tests passed; this remains an unsuccessful CI run.

@@ -34,18 +34,24 @@ final class DesktopSettingsRenderingTests: XCTestCase {
             XCTAssertFalse(elements.contains { $0.accessibilityText() == "Back to Chat" })
             let close = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "settings-close" })
             XCTAssertGreaterThan(close.accessibilityFrame().width, 0)
-            let shellControls = elements.filter { element in
-                guard element.accessibilityIdentifier() == "terminal-shell" else { return false }
-                let role = element.accessibilityRole()
-                return role == NSAccessibility.Role.button || role == NSAccessibility.Role.popUpButton
-            }
-            let shell = try XCTUnwrap(shellControls.first)
-            XCTAssertLessThan(shell.accessibilityFrame().width, width / 2,
-                "A desktop description must wrap beside its menu instead of pushing it into a full-width second row")
             let image = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
             host.cacheDisplay(in: host.bounds, to: image)
             let attachment = XCTAttachment(image: NSImage(cgImage: try XCTUnwrap(image.cgImage), size: host.bounds.size))
             attachment.name = "settings-actual-presentation-\(Int(width))"; attachment.lifetime = .keepAlways; add(attachment)
+            let controls = elements.filter { $0.accessibilityIdentifier() == "terminal-shell" }.map {
+                "\($0.accessibilityIdentifier() ?? "_"): \($0.accessibilityRole()?.rawValue ?? "_") \(NSStringFromRect($0.accessibilityFrame()))"
+            }
+            let hierarchy = XCTAttachment(string: controls.joined(separator: "\n"))
+            hierarchy.name = "settings-shell-controls-\(Int(width))"; hierarchy.lifetime = .keepAlways; add(hierarchy)
+            let shellControls = elements.filter { element in
+                guard element.accessibilityIdentifier() == "terminal-shell" else { return false }
+                let role = element.accessibilityRole()
+                return role == NSAccessibility.Role.button || role == NSAccessibility.Role.popUpButton ||
+                    role == NSAccessibility.Role.menuButton
+            }
+            let shell = try XCTUnwrap(shellControls.first)
+            XCTAssertLessThan(shell.accessibilityFrame().width, width / 2,
+                "A desktop description must wrap beside its menu instead of pushing it into a full-width second row")
             func descendants(_ view: NSView) -> [NSView] {
                 [view] + view.subviews.flatMap { descendants($0) }
             }
