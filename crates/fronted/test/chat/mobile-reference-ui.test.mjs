@@ -84,7 +84,7 @@ test("mobile navigation and settings retain Astryx drawer and bottom-sheet hiera
   assert.match(appSource, /<BottomSheet[\s\S]*?purpose="form"[\s\S]*?height="tall"[\s\S]*?<SettingsPage/);
   assert.match(
     appSource,
-    /<BottomSheet[\s\S]*?paddingBlockStart=\{5\}[\s\S]*?<SettingsPage/,
+    /<BottomSheet[\s\S]*?className="settings-bottom-sheet"[\s\S]*?paddingBlockStart=\{0\}[\s\S]*?<SettingsPage/,
   );
   assert.match(settingsSource, /<DialogHeader[\s\S]*?hasDivider=\{false\}/);
   assert.doesNotMatch(settingsSource, /settings-section-balanced-inset/);

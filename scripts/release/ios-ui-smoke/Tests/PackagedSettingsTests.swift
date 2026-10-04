@@ -119,8 +119,10 @@ final class PackagedSettingsTests: XCTestCase {
             tap(app.buttons["sidebar"].firstMatch, in: app)
         }
         tap(app.buttons["settings"].firstMatch, in: app)
-        XCTAssertTrue(app.staticTexts["presentation-sheet-title"].firstMatch.waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["presentation-sheet-close"].firstMatch.waitForExistence(timeout: 30))
         reveal(app.buttons["nav:system"].firstMatch, in: app)
+        XCTAssertFalse(app.staticTexts["presentation-sheet-title"].exists,
+                       "The settings index starts with its sections, without an extra page title")
     }
 
     private func closeSettings(_ app: XCUIApplication) {

@@ -7,7 +7,7 @@ extension XCTestCase {
     // every UIKit material. Capture the mounted hierarchy as separate evidence.
     @MainActor
     func attachCompositedNativeScreenshot(of view: UIView, name: String) throws {
-        XCTAssertNotNil(view.window, "Composited evidence requires a mounted view")
+        XCTAssertTrue(view is UIWindow || view.window != nil, "Composited evidence requires a mounted view")
         let format = UIGraphicsImageRendererFormat()
         format.scale = view.traitCollection.displayScale
         let renderer = UIGraphicsImageRenderer(bounds: view.bounds, format: format)

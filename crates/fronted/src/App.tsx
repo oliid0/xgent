@@ -735,6 +735,7 @@ export default function App() {
                       ) : null
                     ) : compactSettingsDialog ? (
                       <BottomSheet
+                        className="settings-bottom-sheet"
                         isOpen={settingsOpen}
                         onOpenChange={(isOpen) => {
                           if (!isOpen) closeSettings();
@@ -749,7 +750,7 @@ export default function App() {
                             height="100%"
                             minHeight={0}
                             gap={0}
-                            paddingBlockStart={5}
+                            paddingBlockStart={0}
                           >
                             <SettingsPage
                               settings={settings}

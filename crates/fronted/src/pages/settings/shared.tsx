@@ -15,17 +15,21 @@ export function SettingsRowGroup(props: {
   children: ReactNode;
   tone?: "default" | "danger";
   hideTitle?: boolean;
+  titleEndContent?: ReactNode;
 }) {
   return (
     <VStack as="section" className="settings-row-group" gap={2} width="100%">
       {props.hideTitle ? null : (
-        <Heading
-          level={3}
-          color="secondary"
-          style={props.tone === "danger" ? { color: "var(--color-error)" } : undefined}
-        >
-          {props.title}
-        </Heading>
+        <HStack className="settings-row-group-heading" width="100%" gap={3}>
+          <Heading
+            level={3}
+            color="secondary"
+            style={props.tone === "danger" ? { color: "var(--color-error)" } : undefined}
+          >
+            {props.title}
+          </Heading>
+          {props.titleEndContent}
+        </HStack>
       )}
       <List density="spacious" hasDividers>
         {props.children}

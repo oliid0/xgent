@@ -320,3 +320,35 @@ were inspected through Swift/GitHub MCP.
   The narrow composer check now includes those four buttons, independent bounds
   and a minimum visible width for the actual current mode. This follow-up awaits
   a new CI pass and is not included in Release 129's pinned source.
+
+- The user clarified the settings drawer reference with IMG_0400: its index has
+  no separate page title or top grabber. The live mobile-theme index now starts
+  with its first section heading and a 44-point glass close button in that row,
+  preserving the section/card hierarchy and avoiding a second toolbar. Native
+  grouped sheets request a 36-point corner radius. Detailed routes retain their
+  Back/title navigation, matching the separate detail-page references.
+- A mounted native-sheet check exercises the actual presentation host at narrow,
+  regular and accessibility sizes, captures composited index/detail evidence and
+  checks that the first value and Close do not overlap. The packaged settings
+  harness now waits for the real index controls rather than the removed title.
+  These changes await CI and a subsequent build; Release 129 retains `d28c108`.
+
+Reference: [Apple native sheet corner radius](https://developer.apple.com/documentation/swiftui/view/presentationcornerradius(_:))
+was checked through Swift MCP.
+
+- The Astryx compact settings index now follows the same structure: no separate
+  page title or decorative handle, Close beside Theme, inset gray section labels
+  and rounded navigation groups. Its modal accessible name, selectors, every
+  destination and detail Back/title remain available. The handle styling is
+  scoped to the settings sheet and verified against installed Astryx 0.6.3 source;
+  the public API has no handle-visibility property. Desktop layout is preserved.
+- CI 288 / `82d6937`: all eight jobs passed. Its composited 320-point
+  accessibility screenshot visibly retains the full Ask label and four action
+  buttons on separate rows. This confirms the composer fix, not installed-app
+  behavior. The new settings index changes require another CI and build.
+- Release 129: Android, Windows and Linux completed successfully. The actual
+  Apple Silicon macOS screenshot shows the native chat, but the composer
+  hittability assertion failed; its accessibility tree still includes transport
+  WebView descendants and marks the window Disabled. Intel timed out during
+  accessibility queries. iOS simulator smoke compilation is still in progress.
+  These failures are unresolved and the release is not reported as successful.

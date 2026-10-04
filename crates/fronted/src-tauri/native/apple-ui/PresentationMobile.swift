@@ -8,7 +8,7 @@ private extension XgentNode {
     func child(id: String) -> XgentNode? { children?.first { $0.id == id } }
 }
 
-private struct XgentIOSNavigationControl: ViewModifier {
+struct XgentIOSNavigationControl: ViewModifier {
     func body(content: Content) -> some View {
         content
             .foregroundStyle(.primary)
@@ -555,6 +555,9 @@ struct XgentIOSSheetPresentation: View {
     }
 
     private var contentNodes: [XgentNode] { list?.children ?? visibleNodes }
+    private var isSettingsIndex: Bool {
+        back == nil && contentNodes.contains { $0.kind == .settingsGroup && $0.id == "mobile-theme" }
+    }
     private var detents: Set<PresentationDetent> {
         list == nil ? [.large] : [.fraction(0.62), .large]
     }
@@ -648,15 +651,18 @@ struct XgentIOSSheetPresentation: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Capsule()
-                .fill(Color.secondary.opacity(0.32))
-                .frame(width: 40, height: 4)
-                .padding(.top, 10)
-                .padding(.bottom, 2)
-                .accessibilityHidden(true)
-            header
+            if !isSettingsIndex {
+                Capsule()
+                    .fill(Color.secondary.opacity(0.32))
+                    .frame(width: 40, height: 4)
+                    .padding(.top, 10)
+                    .padding(.bottom, 2)
+                    .accessibilityHidden(true)
+                header
+            }
             if grouped {
-                XgentIOSSettingsForm(nodes: contentNodes, document: document, model: model)
+                XgentIOSSettingsForm(nodes: contentNodes, document: document, model: model,
+                    showsRootClose: isSettingsIndex)
             } else if contentNodes.contains(where: { $0.kind == .terminalLayout }) {
                 XgentIOSNodes(nodes: contentNodes, document: document, model: model)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -678,6 +684,7 @@ struct XgentIOSSheetPresentation: View {
         // surfaces use the tall budget. Long pages must never open at medium.
         .presentationDetents(detents)
         .presentationDragIndicator(.hidden)
+        .presentationCornerRadius(grouped ? 36 : nil)
         .preferredColorScheme(document.colorScheme)
         .interactiveDismissDisabled(document.dismissAction == nil)
         .sheet(item: Binding(get: { nextSheet }, set: { if $0 == nil, let nextSheet { model.dismiss(nextSheet) } })) { next in

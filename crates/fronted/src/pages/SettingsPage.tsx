@@ -459,42 +459,26 @@ export function SettingsPage(props: SettingsPageProps) {
           <Layout
             height={sheetScrollsAccess ? "auto" : "fill"}
             padding={0}
-            className={`settings-page settings-page-compact${sheetScrollsAccess ? " settings-page-sheet-scroll" : ""}`}
+            className={`settings-page settings-page-compact${!mobileDetailOpen ? " settings-page-index" : ""}${sheetScrollsAccess ? " settings-page-sheet-scroll" : ""}`}
             data-edge-swipe-ignore
             header={
-              detailLayerDepth > 0 ? undefined : (
+              detailLayerDepth > 0 || !mobileDetailOpen ? undefined : (
                 <VStack className="mobile-panel-header" width="100%" gap={0}>
                   <DialogHeader
-                    title={mobileDetailOpen ? sectionLabels[section] : t("settings.title")}
+                    title={sectionLabels[section]}
                     hasDivider={false}
                     startContent={
-                      mobileDetailOpen ? (
-                        <IconButton
-                          className="settings-navigation-control"
-                          label={t("settings.mobile.backToSettings")}
-                          tooltip={t("settings.mobile.backToSettings")}
-                          icon={<Icon icon={ArrowLeft} size="md" color="inherit" />}
-                          variant="ghost"
-                          size="lg"
-                          onClick={() => setMobileDetailOpen(false)}
-                        />
-                      ) : undefined
+                      <IconButton
+                        className="settings-navigation-control"
+                        label={t("settings.mobile.backToSettings")}
+                        tooltip={t("settings.mobile.backToSettings")}
+                        icon={<Icon icon={ArrowLeft} size="md" color="inherit" />}
+                        variant="ghost"
+                        size="lg"
+                        onClick={() => setMobileDetailOpen(false)}
+                      />
                     }
-                    endContent={
-                      mobileDetailOpen ? (
-                        <SaveStatus indicator={saveIndicator} />
-                      ) : (
-                        <IconButton
-                          className="settings-navigation-control"
-                          label={t("settings.backToChat")}
-                          tooltip={t("settings.backToChat")}
-                          icon={<Icon icon={X} size="md" color="inherit" />}
-                          variant="ghost"
-                          size="lg"
-                          onClick={onBack}
-                        />
-                      )
-                    }
+                    endContent={<SaveStatus indicator={saveIndicator} />}
                   />
                 </VStack>
               )
@@ -527,7 +511,20 @@ export function SettingsPage(props: SettingsPageProps) {
                     gap={5}
                     style={{ marginInline: "auto" }}
                   >
-                    <SettingsRowGroup title={t("settings.native.theme")}>
+                    <SettingsRowGroup
+                      title={t("settings.native.theme")}
+                      titleEndContent={
+                        <IconButton
+                          className="settings-navigation-control settings-index-close"
+                          label={t("settings.backToChat")}
+                          tooltip={t("settings.backToChat")}
+                          icon={<Icon icon={X} size="md" color="inherit" />}
+                          variant="ghost"
+                          size="lg"
+                          onClick={onBack}
+                        />
+                      }
+                    >
                       <SettingsRow label={t("settings.native.appearance")}>
                         <Selector
                           label={t("settings.native.appearance")}
@@ -575,25 +572,20 @@ export function SettingsPage(props: SettingsPageProps) {
                       </SettingsRow>
                     </SettingsRowGroup>
                     {mobileNavGroups.map((group) => (
-                      <VStack key={group.label} width="100%" gap={2}>
-                        <Heading level={3} className="text-muted-foreground">
-                          {group.label}
-                        </Heading>
-                        <List density="balanced" hasDividers>
-                          {group.items.map((item) => (
-                            <ListItem
-                              key={item.id}
-                              label={item.label}
-                              startContent={<Icon icon={item.icon} size="md" color="inherit" />}
-                              endContent={<Icon icon={ChevronRight} size="sm" color="tertiary" />}
-                              onClick={() => {
-                                setSection(item.id);
-                                setMobileDetailOpen(true);
-                              }}
-                            />
-                          ))}
-                        </List>
-                      </VStack>
+                      <SettingsRowGroup key={group.label} title={group.label}>
+                        {group.items.map((item) => (
+                          <ListItem
+                            key={item.id}
+                            label={item.label}
+                            startContent={<Icon icon={item.icon} size="md" color="inherit" />}
+                            endContent={<Icon icon={ChevronRight} size="sm" color="tertiary" />}
+                            onClick={() => {
+                              setSection(item.id);
+                              setMobileDetailOpen(true);
+                            }}
+                          />
+                        ))}
+                      </SettingsRowGroup>
                     ))}
                   </VStack>
                 </LayoutContent>

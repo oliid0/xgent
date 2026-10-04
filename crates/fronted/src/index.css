@@ -3608,6 +3608,41 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   background: var(--color-background-body);
 }
 
+.settings-bottom-sheet {
+  border-start-start-radius: 36px;
+  border-start-end-radius: 36px;
+  background: var(--color-background-body);
+}
+
+/* Astryx 0.6.3 renders its decorative handle as this first direct child.
+   Settings uses explicit navigation and close controls instead. */
+.settings-bottom-sheet > div[aria-hidden="true"]:first-child {
+  display: none;
+}
+
+.settings-page-compact .settings-row-group-heading {
+  padding-inline: 16px;
+}
+
+.settings-page-compact .settings-row-group-heading > .astryx-heading {
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.settings-page-index .settings-row-group:first-child {
+  gap: 0;
+}
+
+.settings-page-index .settings-row-group:first-child > .settings-row-group-heading {
+  padding-inline-end: 0;
+}
+
+.settings-page-index .settings-index-close {
+  margin-inline-start: auto;
+}
+
 /* A gray page, one rounded surface per group, and inset row separators match
    the compact native forms without adding a second card around every field. */
 .settings-page-compact :is(.astryx-section, .astryx-card, .astryx-list) {
