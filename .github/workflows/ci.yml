@@ -227,7 +227,13 @@ jobs:
         if: ${{ !cancelled() && matrix.platform == 'macos' }}
         run: |
           set -o pipefail
+          xcodebuild -resolvePackageDependencies -scheme XgentNativeUI \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/native-xcode-packages" \
+            2>&1 | tee "$RUNNER_TEMP/native-macos-resolve.log"
+          python3 ../../../../../scripts/release/prepare-apple-ui-resources.py patch-inline-images \
+            "$RUNNER_TEMP/native-xcode-packages/checkouts"
           xcodebuild test -scheme XgentNativeUI -destination 'platform=macOS' -skipPackagePluginValidation \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/native-xcode-packages" \
             -resultBundlePath "$RUNNER_TEMP/native-macos.xcresult" \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/native-macos.log"
 
@@ -307,8 +313,14 @@ jobs:
         if: ${{ matrix.platform == 'ios' }}
         run: |
           set -o pipefail
+          xcodebuild -resolvePackageDependencies -project TestHost/XgentNativeTestHost.xcodeproj \
+            -scheme XgentNativeHostedTests -clonedSourcePackagesDirPath "$RUNNER_TEMP/native-xcode-packages" \
+            2>&1 | tee "$RUNNER_TEMP/native-ios-resolve.log"
+          python3 ../../../../../scripts/release/prepare-apple-ui-resources.py patch-inline-images \
+            "$RUNNER_TEMP/native-xcode-packages/checkouts"
           xcodebuild test -project TestHost/XgentNativeTestHost.xcodeproj \
             -scheme XgentNativeHostedTests -skipPackagePluginValidation \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/native-xcode-packages" \
             -destination "platform=iOS Simulator,id=$NATIVE_SIMULATOR_ID" \
             -resultBundlePath "$RUNNER_TEMP/native-ios.xcresult" \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/native-ios.log"
@@ -319,6 +331,8 @@ jobs:
           set -o pipefail
           xcrun swift package resolve --package-path . --scratch-path "$RUNNER_TEMP/native-device"
           python3 ../../../../../scripts/release/prepare-apple-ui-resources.py patch-math \
+            "$RUNNER_TEMP/native-device/checkouts"
+          python3 ../../../../../scripts/release/prepare-apple-ui-resources.py patch-inline-images \
             "$RUNNER_TEMP/native-device/checkouts"
           xcrun swift build --package-path . --scratch-path "$RUNNER_TEMP/native-device" \
             --configuration release --product XgentNativeUI \

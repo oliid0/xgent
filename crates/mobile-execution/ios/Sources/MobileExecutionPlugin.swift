@@ -1171,6 +1171,12 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     }
 
     private func resolveWorkspace(_ path: String) throws -> URL {
+        // Restoration owns the FileProvider grant. Wait for it before resolving
+        // symlinks or probing a directory outside the application container.
+        guard path.hasPrefix("/"),
+              isPath(path, inside: sandboxRootPath()) || externalWorkspaces.contains(path: path) else {
+            throw MobileExecutionError.invalidRequest("workdir must be an authorized absolute directory")
+        }
         let url = URL(fileURLWithPath: path, isDirectory: true)
             .resolvingSymlinksInPath()
             .standardizedFileURL
@@ -1192,6 +1198,11 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
             throw MobileExecutionError.invalidRequest("cwd must be a POSIX path")
         }
         if raw.hasPrefix("/") {
+            guard isPath(raw, inside: sandboxRootPath()) || externalWorkspaces.contains(path: raw) else {
+                throw MobileExecutionError.invalidRequest(
+                    "absolute cwd must be inside the Xgent application sandbox or an authorized workspace"
+                )
+            }
             let target = URL(fileURLWithPath: raw, isDirectory: true)
                 .resolvingSymlinksInPath()
                 .standardizedFileURL

@@ -106,7 +106,7 @@ fn link_native_ui(manifest_dir: &std::path::Path) {
             .env_remove("SDKROOT")
             .status().expect("resolve pinned native UI packages");
         assert!(status.success(), "native UI dependency resolution failed");
-        for operation in if ios { vec!["patch-math"] } else { vec!["patch-keyboard", "patch-math"] } {
+        for operation in if ios { vec!["patch-math", "patch-inline-images"] } else { vec!["patch-keyboard", "patch-math", "patch-inline-images"] } {
             let status = Command::new("python3").arg(&resource_helper)
                 .arg(operation).arg(scratch.join("checkouts"))
                 .status().expect("prepare native UI resource lookup");

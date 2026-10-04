@@ -254,3 +254,28 @@ Workspace research: [Apple's directory access guide](https://developer.apple.com
 [balanced security scope grants](https://developer.apple.com/documentation/foundation/url/startaccessingsecurityscopedresource()),
 the local yy MountedFoldersManager, and the upstream a-Shell scope call sites
 were inspected. The iOS bookmark options remain platform-compatible.
+
+- CI 285 / `83eb984`: seven jobs passed, including 179 macOS native tests,
+  the actual workspace store regression harness and the device archive build.
+  iOS ran 187 tests with four failed assertions: two formula checks and the
+  suggestion menu's standard/accessibility overlap checks. Actual exported
+  screenshots showed the popup clipped into the composer, and an intermittent
+  missing inline formula at wide widths. The existing assertions are retained.
+- The popup now measures its content, supplies a bounded explicit scroll viewport
+  and offsets that viewport above the input. The formerly unspecified viewport
+  and alignment guide are removed. This is pending native geometry verification.
+- The pinned MarkdownUI image task unconditionally assigns an empty dictionary
+  after cancellation. A guarded compatibility patch prevents a retired task from
+  overwriting active paragraph images. This is a source-based explanation of the
+  intermittent formula loss; unchanged native pixel/accessibility checks must
+  confirm it. Both SDK testing and production archive builds apply the same patch.
+  The patch rejects upstream drift and incomplete application; no package was
+  upgraded. Baseline prose screenshots are also retained for failure diagnosis.
+- Shell workspace and absolute cwd validation now await external grant restoration
+  before filesystem probes, then check canonical containment again. A delayed
+  restore regression verifies that startup access waits for the owned grant.
+
+Research: [MarkdownUI 2.4.1 InlineText image task](https://github.com/gonzalezreal/swift-markdown-ui/blob/2.4.1/Sources/MarkdownUI/Views/Inlines/InlineText.swift),
+[Apple task cancellation checking](https://developer.apple.com/documentation/swift/task/checkcancellation()),
+[content geometry observations](https://developer.apple.com/documentation/swiftui/view/ongeometrychange(for:of:action:)-36gt0)
+and SwaTex 0.5.0's mutex-protected font provider/image renderer were inspected.

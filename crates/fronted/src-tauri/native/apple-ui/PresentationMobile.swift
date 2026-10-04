@@ -352,8 +352,7 @@ struct XgentIOSComposer: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay(alignment: .top) {
             if let suggestions {
-                XgentComposerSuggestions(node: suggestions, document: document, model: model)
-                    .alignmentGuide(.top) { $0[.bottom] + 8 }
+                XgentComposerSuggestions(node: suggestions, document: document, model: model, floatsAboveInput: true)
             }
         }
         .padding(.horizontal, 16)

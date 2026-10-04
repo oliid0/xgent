@@ -54,6 +54,7 @@ struct ExternalWorkspaceRegression {
         defer { try? FileManager.default.removeItem(at: root) }
         try mountLifecycle(in: root)
         try restoredBookmarks(in: root)
+        try startupAccessWaitsForRestoration(in: root)
         try concurrentPersistence(in: root)
         print("External workspace grant identity, rollback, stale bookmark and persistence regressions passed")
     }
@@ -127,6 +128,28 @@ struct ExternalWorkspaceRegression {
             precondition(persisted.first?["bookmark"] as? String == Data("old".utf8).base64EncodedString())
             store = nil
         }
+    }
+
+    private static func startupAccessWaitsForRestoration(in root: URL) throws {
+        let recorder = ScopeRecorder(directory: root)
+        let file = root.appendingPathComponent("startup.json")
+        try seed(file, path: root.path)
+        let entered = DispatchSemaphore(value: 0), resume = DispatchSemaphore(value: 0)
+        let complete = DispatchSemaphore(value: 0)
+        var operations = recorder.operations
+        operations.resolve = { _ in
+            entered.signal(); precondition(resume.wait(timeout: .now() + 5) == .success)
+            return (recorder.picked, false)
+        }
+        let store = IOSExternalWorkspaceStore(storeURL: file, operations: operations)
+        precondition(entered.wait(timeout: .now() + 5) == .success)
+        DispatchQueue.global().async {
+            precondition(store.contains(path: root.path), "A startup command must wait for the retained grant")
+            complete.signal()
+        }
+        precondition(complete.wait(timeout: .now() + .milliseconds(100)) == .timedOut)
+        resume.signal(); precondition(complete.wait(timeout: .now() + 5) == .success)
+        precondition(recorder.count(recorder.picked) == 1)
     }
 
     private static func concurrentPersistence(in root: URL) throws {

@@ -47,6 +47,37 @@ private var xgentKeyboardShortcutResourceBundle: Bundle {
     source.write_text(text, encoding="utf-8")
 
 
+def patch_inline_image_cancellation(checkouts):
+    package = next((path for path in checkouts.iterdir()
+                    if path.name.lower() == "swift-markdown-ui"), None)
+    if package is None:
+        raise ValueError("The pinned MarkdownUI checkout is missing")
+    source = package / "Sources/MarkdownUI/Views/Inlines/InlineText.swift"
+    text = source.read_text(encoding="utf-8")
+    original = '''    .task(id: self.inlines) {
+      self.inlineImages = (try? await self.loadInlineImages()) ?? [:]
+    }'''
+    replacement = '''    .task(id: self.inlines) {
+      // Xgent: a retired image task must never erase the current paragraph.
+      do {
+        let images = try await self.loadInlineImages()
+        try Task.checkCancellation()
+        self.inlineImages = images
+      } catch {
+        if !Task.isCancelled { self.inlineImages = [:] }
+      }
+    }'''
+    marker = "// Xgent: a retired image task must never erase the current paragraph."
+    if marker in text:
+        if text.count(replacement) != 1 or original in text:
+            raise ValueError("The inline image cancellation patch is incomplete")
+        return
+    if text.count(original) != 1:
+        raise ValueError("MarkdownUI image task changed; review its pinned source")
+    source.chmod(source.stat().st_mode | stat.S_IWUSR)
+    source.write_text(text.replace(original, replacement), encoding="utf-8")
+
+
 def make_staged_bundle_writable(bundle):
     # SwiftPM preserves the checkout's read-only font/resource permissions.
     # Device and simulator builds reuse this staging directory; only staging
@@ -149,7 +180,7 @@ def verify(source, ios):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=["patch-keyboard", "patch-math", "copy", "verify-macos", "verify-ios"])
+    parser.add_argument("operation", choices=["patch-keyboard", "patch-math", "patch-inline-images", "copy", "verify-macos", "verify-ios"])
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", nargs="?", type=Path)
     args = parser.parse_args()
@@ -157,6 +188,8 @@ def main():
         patch_keyboard_shortcuts(args.source)
     elif args.operation == "patch-math":
         patch_math_fonts(args.source)
+    elif args.operation == "patch-inline-images":
+        patch_inline_image_cancellation(args.source)
     elif args.operation == "copy":
         if args.destination is None:
             parser.error("copy requires the destination resource directory")

@@ -52,7 +52,11 @@ final class MarkdownMathTests: XCTestCase {
                     }
                 }
                 try await Task.sleep(for: .milliseconds(100))
-                let proseInk = try mathInkPixels(await capture())
+                let proseSnapshot = await capture()
+                let proseAttachment = XCTAttachment(image: proseSnapshot)
+                proseAttachment.name = "native-inline-math-prose-\(Int(width))-\(size)"
+                proseAttachment.lifetime = .keepAlways; add(proseAttachment)
+                let proseInk = try mathInkPixels(proseSnapshot)
                 XCTAssertGreaterThan(proseInk, 50, "The comparison must contain actual rendered prose")
                 host.rootView = content("Answer $$x^2 + y^2$$.")
                 var screenshot = await capture()
@@ -67,7 +71,7 @@ final class MarkdownMathTests: XCTestCase {
                 attachment.name = "native-inline-math-pixels-\(Int(width))-\(size)"
                 attachment.lifetime = .keepAlways; add(attachment)
                 XCTAssertGreaterThan(ink, proseInk * 6 / 5,
-                    "The mounted formula must add visible ink; a restored accessibility label alone is insufficient")
+                    "The mounted formula must add visible ink at \(width)/\(size); a restored accessibility label alone is insufficient")
             }
         }
     }

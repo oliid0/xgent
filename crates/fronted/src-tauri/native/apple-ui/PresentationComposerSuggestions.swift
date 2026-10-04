@@ -4,7 +4,11 @@ struct XgentComposerSuggestions: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    var floatsAboveInput = false
     @ScaledMetric(relativeTo: .body) private var maximumHeight: CGFloat = 180
+    @State private var contentHeight: CGFloat = 180
+
+    private var viewportHeight: CGFloat { min(max(contentHeight, 44), min(maximumHeight, 260)) }
 
     var body: some View {
         ScrollView {
@@ -39,10 +43,13 @@ struct XgentComposerSuggestions: View {
                     }
                 }
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { _, height in
+                if height.isFinite && height > 0 { contentHeight = height }
+            }
         }
-        .frame(maxHeight: min(maximumHeight, 260))
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(height: viewportHeight)
         .modifier(XgentGlassSurface(radius: 22, floating: true))
+        .offset(y: floatsAboveInput ? -(viewportHeight + 8) : 0)
         .accessibilityIdentifier(node.id)
     }
 }

@@ -104,6 +104,26 @@ test("math font lookup uses signed app resources and fails closed when its pinne
   assert.notEqual(run("patch-math", directory).status, 0);
 });
 
+test("pinned MarkdownUI image cancellation guard is idempotent and rejects incomplete or drifted patches", (t) => {
+  const directory = fixture(t);
+  const source = path.join(directory, "swift-markdown-ui/Sources/MarkdownUI/Views/Inlines/InlineText.swift");
+  mkdirSync(path.dirname(source), { recursive: true });
+  const original = 'import SwiftUI\n    .task(id: self.inlines) {\n      self.inlineImages = (try? await self.loadInlineImages()) ?? [:]\n    }\n';
+  writeFileSync(source, original);
+  chmodSync(source, 0o444);
+  const first = run("patch-inline-images", directory);
+  assert.equal(first.status, 0, first.stderr);
+  const patched = readFileSync(source, "utf8");
+  assert.match(patched, /try Task\.checkCancellation\(\)/);
+  assert.match(patched, /if !Task\.isCancelled \{ self\.inlineImages = \[:\] \}/);
+  assert.equal(run("patch-inline-images", directory).status, 0);
+  assert.equal(readFileSync(source, "utf8"), patched);
+  writeFileSync(source, patched.replace("try Task.checkCancellation()", "// incomplete guard"));
+  assert.notEqual(run("patch-inline-images", directory).status, 0);
+  writeFileSync(source, original.replace("self.loadInlineImages()", "self.changedLoader()"));
+  assert.notEqual(run("patch-inline-images", directory).status, 0);
+});
+
 test("pinned shortcut resource compatibility is idempotent and rejects upstream lookup drift", (t) => {
   const directory = fixture(t);
   const source = path.join(directory, "KeyboardShortcuts/Sources/KeyboardShortcuts/Utilities.swift");
