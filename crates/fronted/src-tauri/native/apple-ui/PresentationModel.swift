@@ -493,7 +493,8 @@ final class XgentPresentationModel: ObservableObject {
 
     func reportComposerSelection(_ range: NSRange, text: String, node: XgentNode, in document: XgentDocument) {
         guard active, node.kind == .composerInput, node.disabled != true,
-              let current = documents.first(where: { $0.surface == document.surface })?.node(id: node.id),
+              let currentDocument = documents.first(where: { $0.surface == document.surface }),
+              let current = currentDocument.node(id: node.id),
               current.kind == .composerInput, current.action == node.action, current.disabled != true,
               let action = current.selectionAction, action == node.selectionAction,
               value(current, in: document).text == text,
@@ -503,7 +504,7 @@ final class XgentPresentationModel: ObservableObject {
               let encoded = String(data: data, encoding: .utf8) else { return }
         let requestId = UUID().uuidString
         // Selection reports never replace the optimistic text draft or mark it busy.
-        pending[requestId] = (document.surface, key(document.surface, "\(node.id):selection"), current.revision)
+        pending[requestId] = (document.surface, key(document.surface, "\(node.id):selection"), currentDocument.revision)
         emit(XgentAction(surface: document.surface, action: action, requestId: requestId, value: .string(encoded)))
     }
 

@@ -233,3 +233,8 @@ EhPanda's [native glass menu controls](https://github.com/EhPanda-Team/EhPanda/b
 Astryx List/ListItem documentation, and [Swift Package Index's Introspect entry](https://swiftpackageindex.com/siteline/swiftui-introspect)
 were consulted. These changes use the existing pinned packages and native Apple
 controls; no UI code was generated from Astryx.
+
+- CI 283 / `0149efd`: iOS compilation found a selection event revision read
+  from the node instead of its owning document. It now captures the current
+  document alongside its node and records that document revision. Native runtime
+  assertions and updated screenshot inspection are still pending.

@@ -24,9 +24,9 @@ final class ComposerSelectionBridgeTests: XCTestCase {
         XCTAssertFalse(model.isBusy(input, in: initial))
         let count = actions.count
         model.reportComposerSelection(NSRange(location: 40, length: 0), text: draftAction.value.text, node: input, in: initial)
-        model.reportComposerSelection(.zero, text: "stale", node: input, in: initial)
+        model.reportComposerSelection(NSRange(location: 0, length: 0), text: "stale", node: input, in: initial)
         model.update(try document(revision: 2, selectionAction: "selection:two"))
-        model.reportComposerSelection(.zero, text: "", node: input, in: initial)
+        model.reportComposerSelection(NSRange(location: 0, length: 0), text: "", node: input, in: initial)
         XCTAssertEqual(actions.count, count)
     }
 
