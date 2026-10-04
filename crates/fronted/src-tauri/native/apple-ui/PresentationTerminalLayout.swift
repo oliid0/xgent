@@ -27,8 +27,13 @@ struct XgentTerminalLayout: View {
 
     private var ptyLayout: some View {
         GeometryReader { geometry in
+            // Retain the full viewport when it leaves at least 140 points for
+            // controls. A percentage alone shrinks tall iOS layouts too early
+            // after their safe-area and accessibility insets are applied.
+            let preferredViewport: CGFloat = geometry.size.height >= 440
+                ? 300 : max(120, geometry.size.height * 0.6)
             let viewportReserve = min(max(0, geometry.size.height - 44),
-                min(300, max(120, geometry.size.height * 0.6)))
+                preferredViewport)
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) { nodes(chrome) }

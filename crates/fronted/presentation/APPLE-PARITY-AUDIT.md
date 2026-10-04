@@ -546,3 +546,11 @@ were inspected through GitHub/Swift MCP and official documentation.
   hint and optional-value semantics without the generic minimum-height wrapper.
   No rendering assertions were removed; the short-window change still requires
   remote compilation and frame/output verification.
+- CI 303 / `f643ab6`: seven jobs passed. macOS ran all 180 tests successfully,
+  including settings outside clicks and all eight terminal width/height/auth
+  captures. iOS ran all 189 tests; its two failures are the preserved normal
+  terminal-height assertions (286.3 instead of at least 290). The percentage
+  reservation reduced output prematurely in the available iOS content area.
+  Sizing now retains 300 points whenever at least 140 points remain for controls,
+  and adapts only when that arrangement cannot fit. The original assertions
+  remain unchanged. All-eight-job validation is still required on the new SHA.
