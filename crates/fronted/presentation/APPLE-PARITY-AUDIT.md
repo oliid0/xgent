@@ -455,3 +455,12 @@ were inspected through GitHub/Swift MCP and official documentation.
   reads the sidebar's actual action; a validated-document/action-dispatch test
   exercises that provider-scoped callback. This is a functional fix, separate
   from layout evidence. The complete parity audit remains open.
+- Further image review found that Astryx Section's outer wrapper still escaped
+  the compact page gutter even though LayoutContent had 16-point padding. The
+  compact form now resets inherited bleed variables at its own boundary;
+  sections retain their internal padding propagation. All twelve entrances at
+  320/768 were navigated using the CI 293 bundle with this pending rule applied:
+  26 captures, no runtime exceptions or horizontal overflow. Card edges in the
+  four crowded pages are inset instead of touching the page edge. Computer-use
+  setup actions also wrap their long labels. The unmodified next-CI bundle and
+  installed applications still need validation for these changes.

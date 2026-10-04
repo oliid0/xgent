@@ -297,6 +297,7 @@ export function ComputerUseSection({
             onChange={setDriverPath}
           />
           <Button
+            className="settings-wrapping-action"
             label={t("settings.cua.addDriver")}
             isDisabled={
               !driverPath.trim() || busy || supported !== true || status?.target === "android"
@@ -304,6 +305,7 @@ export function ComputerUseSection({
             onClick={addDriver}
           />
           <Button
+            className="settings-wrapping-action"
             label={t("settings.cua.installDriver")}
             variant="ghost"
             isDisabled={busy || supported !== true}

@@ -4276,6 +4276,25 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
   min-width: 0;
 }
+/* Section's outer wrapper otherwise escapes LayoutContent's inherited padding.
+   The form keeps the page gutter; each section still publishes its own padding
+   to its lists, dividers and nested sections. */
+.settings-page-compact .settings-section-shell {
+  --container-padding-inline-start: 0px;
+  --container-padding-inline-end: 0px;
+  --container-padding-block-start: 0px;
+  --container-padding-block-end: 0px;
+}
+.settings-page-compact .settings-wrapping-action {
+  white-space: normal;
+  height: auto;
+  min-height: 44px;
+  padding-block: 10px;
+}
+.settings-page-compact .settings-wrapping-action > span > span {
+  overflow: visible;
+  text-overflow: clip;
+}
 .settings-page-compact [data-settings-section] .settings-cron-view-tabs {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
