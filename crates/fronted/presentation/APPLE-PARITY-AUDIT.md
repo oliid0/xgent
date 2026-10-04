@@ -79,6 +79,15 @@ not been measured or established.
   Apple resource CLI tests passed, with no skipped cases. TypeScript no-emit,
   architecture and the 55-kind/44-property native contract checks also passed.
   These checks did not compile Swift or run installed Apple applications.
+- CI 276 / `8c4d449`: seven jobs passed, including all 176 macOS SDK tests.
+  iOS ran all 182 SDK tests; four failures were the missing native font search
+  accessibility label at the four width/text-size combinations. Secure-field
+  blur/Return commits and archived workspace selection/menu bounds passed.
+  The search field now declares its localized accessibility label; the original
+  assertion remains. Inspected macOS font picker images also exposed an empty
+  off-window List in the snapshot fixture. The fixture now mounts a real NSWindow
+  and requires visible search/options bounds plus an actual option press before
+  it can pass. New-head CI and installed application screenshots remain pending.
 
 Push this as one reviewed batch. Use the new commit's CI results, then trigger the
 full release with smoke checks. Do not substitute an older green CI for the new

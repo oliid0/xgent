@@ -37,6 +37,7 @@ struct XgentSelectionPicker: View {
                     .submitLabel(.search)
                     #endif
                     .accessibilityIdentifier("\(node.id):search")
+                    .accessibilityLabel(source.children?.first?.label ?? source.label ?? "")
                 if !query.isEmpty {
                     Button {
                         query = ""
