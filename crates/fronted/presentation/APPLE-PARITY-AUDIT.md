@@ -491,3 +491,18 @@ were inspected through GitHub/Swift MCP and official documentation.
   Desktop descriptions can wrap beside the value menu, navigation text keeps
   its available width, and dialog sizing preserves gutters in short windows.
   These native follow-ups require the next remote compile and rendering tests.
+- CI 297 / `40944a4` compiled the native backdrop and the packaged UI harness.
+  The host's outside/inside hit-region and actual hierarchy routing assertions
+  passed at both widths, but the window-event close assertions still failed.
+  That narrows the failure to event delivery or callback execution. The pointer
+  fixture had clicked the resizable window's lower-left corner; it now uses the
+  centered left gutter and converts host coordinates into window coordinates.
+  Packaged smoke also avoids the window's resize corner. The close-action
+  requirement remains unchanged; the event-delivery diagnosis is still pending.
+- The unmodified CI 296 frontend bundle completed all twelve settings entrances
+  at 320, 390, 768 and 1040: 52 captures, no runtime exceptions or horizontal
+  content overflow. The four crowded compact pages' cards start at an 18-point
+  inset, and the long computer-use action label wraps fully. The first combined
+  browser run timed out at its final 390-point touch; a separate complete run
+  verified that width. This is real compiled layout with fixture settings data,
+  not packaged backend or live-service evidence.

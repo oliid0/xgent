@@ -42,18 +42,26 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                 [view] + view.subviews.flatMap { descendants($0) }
             }
             let backdrop = try XCTUnwrap(descendants(host).compactMap { $0 as? XgentDesktopSettingsDismissView }.first)
-            let outside = backdrop.convert(NSPoint(x: 8, y: 8), from: host)
+            XCTAssertTrue(backdrop.enabled)
+            XCTAssertNotNil(backdrop.dismiss)
+            XCTAssertTrue(backdrop.window === window)
+            // Avoid the resizable window's corner, which AppKit handles before
+            // content hit testing. This is in the dialog's 16-point left gutter.
+            let outsidePoint = NSPoint(x: 12, y: host.bounds.midY)
+            let outside = backdrop.convert(outsidePoint, from: host)
             XCTAssertTrue(backdrop.hitTest(backdrop.convert(outside, to: backdrop.superview)) === backdrop)
             let inside = NSPoint(x: backdrop.bounds.midX, y: backdrop.bounds.midY)
             XCTAssertNil(backdrop.hitTest(backdrop.convert(inside, to: backdrop.superview)),
                 "Settings content and empty panel space must never be a dismissal target")
-            XCTAssertTrue(host.hitTest(NSPoint(x: 8, y: 8)) === backdrop,
+            XCTAssertTrue(host.hitTest(outsidePoint) === backdrop,
                 "The actual hosting hierarchy must route the outside pointer to the dismissal target")
             // This point is outside the centered dialog and must dismiss it.
-            let click = try [NSEvent.EventType.leftMouseDown, .leftMouseUp].map { type in
-                try XCTUnwrap(NSEvent.mouseEvent(with: type, location: NSPoint(x: 8, y: 8),
+            let windowPoint = host.convert(outsidePoint, to: nil)
+            let click = try [NSEvent.EventType.leftMouseDown, .leftMouseUp].enumerated().map { index, type in
+                try XCTUnwrap(NSEvent.mouseEvent(with: type, location: windowPoint,
                     modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-                    windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+                    windowNumber: window.windowNumber, context: nil, eventNumber: index + 1,
+                    clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
             }
             // AppKit controls may track synchronously inside mouseDown. Queue
             // the release before dispatching the press so tracking can finish.

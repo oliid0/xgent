@@ -57,7 +57,8 @@ final class PackagedApplicationTests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 30))
         let backdrop = app.buttons["settings-dismiss-backdrop"].firstMatch
         XCTAssertTrue(backdrop.waitForExistence(timeout: 15))
-        backdrop.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.01)).click()
+        // The window corner is an AppKit resize target, not settings backdrop.
+        backdrop.coordinate(withNormalizedOffset: CGVector(dx: 0.015, dy: 0.5)).click()
         let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: title)
         XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 15), .completed,
             "Clicking outside the desktop settings dialog must dismiss it")
