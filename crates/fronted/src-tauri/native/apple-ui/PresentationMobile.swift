@@ -339,13 +339,7 @@ struct XgentIOSComposer: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
             if let actions {
-                ViewThatFits(in: .horizontal) {
-                    actionRow(actions.children ?? [])
-                    VStack(alignment: .leading, spacing: 6) {
-                        actionRow((actions.children ?? []).filter { ["model", "context-usage"].contains($0.id) })
-                        actionRow((actions.children ?? []).filter { !["model", "context-usage"].contains($0.id) })
-                    }
-                }
+                XgentIOSComposerActions(nodes: actions.children ?? [], document: document, model: model)
             }
         }
         .padding(12)
@@ -359,20 +353,6 @@ struct XgentIOSComposer: View {
         .padding(.vertical, 12)
     }
 
-    private func actionRow(_ nodes: [XgentNode]) -> some View {
-        HStack(spacing: 6) {
-            ForEach(nodes) { child in
-                if child.id == "context-usage" {
-                    XgentIOSContextUsage(node: child)
-                } else if child.id == "model" {
-                    XgentIOSNode(node: child, document: document, model: model, parentAxis: .horizontal)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    XgentIOSNode(node: child, document: document, model: model, parentAxis: .horizontal)
-                }
-            }
-        }
-    }
 }
 
 private struct XgentIOSSidebarPresentation: View {
@@ -485,7 +465,7 @@ private struct XgentIOSSidebarFooter: View {
     }
 }
 
-private struct XgentIOSContextUsage: View {
+struct XgentIOSContextUsage: View {
     let node: XgentNode
 
     private var ratio: Double {

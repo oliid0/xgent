@@ -19,7 +19,9 @@ final class MobileComposerLayoutTests: XCTestCase {
                     ["id": "command-safety", "kind": "Selector", "variant": "composer-command-safety", "label": "Command safety", "value": "ask", "action": "safety",
                         "options": [["value": "ask", "label": "Ask"], ["value": "auto", "label": "Automatic"]]],
                     ["id": "gap", "kind": "Spacer"],
+                    ["id": "voice", "kind": "IconButton", "label": "Voice input", "icon": "mic", "action": "voice"],
                     ["id": "send", "kind": "IconButton", "label": "Send", "icon": "arrow.up", "action": "send"],
+                    ["id": "stop", "kind": "IconButton", "label": "Stop generation", "icon": "stop.fill", "action": "stop"],
                 ]],
             ]]]]
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
@@ -44,13 +46,26 @@ final class MobileComposerLayoutTests: XCTestCase {
             let input = try XCTUnwrap(textView(in: host.view))
             XCTAssertGreaterThanOrEqual(bounds.minY, 0)
             XCTAssertLessThanOrEqual(bounds.maxY, input.convert(input.bounds, to: host.view).minY)
-            for id in ["attach", "command-safety", "send"] {
+            var controlBounds: [CGRect] = []
+            for id in ["attach", "command-safety", "voice", "send", "stop"] {
                 let element = try XCTUnwrap(elements.first { $0.identifier == id })
                 let rect = element.shape.bezierPath.bounds
                 XCTAssertGreaterThanOrEqual(rect.height, 44)
                 XCTAssertGreaterThanOrEqual(rect.minX, -1)
                 XCTAssertLessThanOrEqual(rect.maxX, 321)
                 XCTAssertLessThanOrEqual(rect.maxY, 721)
+                for previous in controlBounds {
+                    XCTAssertFalse(previous.intersects(rect), "Composer controls must not overlap")
+                }
+                controlBounds.append(rect)
+                if id == "command-safety" {
+                    let category: UIContentSizeCategory = size.isAccessibilitySize ? .accessibilityExtraLarge : .large
+                    let font = UIFont.preferredFont(forTextStyle: .subheadline,
+                        compatibleWith: UITraitCollection(preferredContentSizeCategory: category))
+                    let labelWidth = ("Ask" as NSString).size(withAttributes: [.font: font]).width
+                    XCTAssertGreaterThanOrEqual(rect.width, labelWidth + 32,
+                        "The current execution label needs visible space beyond the shield and chevrons")
+                }
             }
             try attachNativeAccessibilityEvidence(hierarchy, name: "composer-mentions-320-\(size)")
             try attachCompositedNativeScreenshot(of: host.view, name: "composer-mentions-320-\(size)")

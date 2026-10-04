@@ -307,3 +307,16 @@ were inspected through Swift/GitHub MCP.
   layers directly in the original window and asserts that mount identity stays
   intact. Its ink threshold, four sizes and deadline remain unchanged. This
   harness diagnosis and the actual formula rendering still await CI verification.
+
+- CI 287 / `d28c108`: all eight jobs passed, with 179 macOS and 187 iOS native
+  tests. The mounted-update formula pixel assertions passed at all four sizes.
+  Composited screenshots visibly showed the floating file menu, native switch
+  thumb, glass controls, the corrected details chevron and the wide formula.
+  Full Release 129 was dispatched at this exact green commit with smoke enabled.
+- Visual review still found a 320-point accessibility defect: the command-safety
+  menu's current value was compressed away even though its outer bounds passed.
+  Inline layouts now budget for the full current-mode label; when necessary the
+  mode gets its own wrapping row above the attachment/voice/send/stop buttons.
+  The narrow composer check now includes those four buttons, independent bounds
+  and a minimum visible width for the actual current mode. This follow-up awaits
+  a new CI pass and is not included in Release 129's pinned source.
