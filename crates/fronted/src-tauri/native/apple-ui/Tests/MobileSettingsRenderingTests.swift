@@ -1,5 +1,6 @@
 #if os(iOS)
 import SnapshotTesting
+import AccessibilitySnapshotParser
 import SwiftUI
 import UIKit
 import XCTest
@@ -48,6 +49,28 @@ final class MobileSettingsRenderingTests: XCTestCase {
                 host.view.layoutIfNeeded()
                 try await Task.sleep(nanoseconds: 300_000_000)
                 XCTAssertEqual(host.view.bounds.width, width, accuracy: 1)
+                let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
+                let elements = hierarchy.flattenToElements()
+                let name = try XCTUnwrap(elements.first { $0.identifier == "provider-name" })
+                let key = try XCTUnwrap(elements.first { $0.identifier == "provider-key" && $0.traits.contains(.secureTextField) })
+                let auth = try XCTUnwrap(elements.first { $0.identifier == "provider-auth" && $0.traits.contains(.button) })
+                var bounds: [CGRect] = []
+                for element in [name, key, auth] {
+                    let rect = element.shape.bezierPath.bounds
+                    XCTAssertGreaterThan(rect.width, 0)
+                    XCTAssertGreaterThan(rect.height, 0)
+                    XCTAssertGreaterThanOrEqual(rect.minX, -1)
+                    XCTAssertLessThanOrEqual(rect.maxX, width + 1)
+                    for previous in bounds {
+                        XCTAssertFalse(previous.intersects(rect), "Independent settings fields must not overlap")
+                    }
+                    bounds.append(rect)
+                }
+                XCTAssertEqual(auth.value, "API key")
+                let tree = XCTAttachment(string: String(describing: hierarchy))
+                tree.name = "settings-mobile-form-accessibility-\(Int(width))-\(typeSize)"
+                tree.lifetime = .keepAlways
+                add(tree)
                 let scroll = try XCTUnwrap(scrollView(in: host.view))
                 if width == 320 && typeSize.isAccessibilitySize {
                     XCTAssertGreaterThan(scroll.contentSize.height, scroll.bounds.height,

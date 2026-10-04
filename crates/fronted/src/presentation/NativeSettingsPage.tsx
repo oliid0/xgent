@@ -131,11 +131,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     t,
     props.onBack,
   );
-  const fonts = useNativeFontSettings(
-    { settings, setSettings },
-    !nativeMobile && page === "system",
-    t,
-  );
+  const fonts = useNativeFontSettings({ settings, setSettings }, page === "system", t);
   const [returnPage, setReturnPage] = useState("");
   const [settingsQuery, setSettingsQuery] = useState("");
   const [failure, setFailure] = useState<unknown>(null);
@@ -808,6 +804,39 @@ export function NativeSettingsPage(props: SettingsPageProps) {
                 ),
                 accessibilityHint: t("settings.ui.colorFormat"),
               },
+              {
+                ...c.color(
+                  "sidebar-light",
+                  t("settings.ui.sidebarLight"),
+                  appearance.sidebarLight,
+                  (sidebarLight) => updateAppearance({ sidebarLight }),
+                ),
+                accessibilityHint: t("settings.ui.colorFormat"),
+              },
+              {
+                ...c.color(
+                  "sidebar-dark",
+                  t("settings.ui.sidebarDark"),
+                  appearance.sidebarDark,
+                  (sidebarDark) => updateAppearance({ sidebarDark }),
+                ),
+                accessibilityHint: t("settings.ui.colorFormat"),
+              },
+              c.select(
+                "appearance-radius",
+                t("settings.ui.radius"),
+                String(appearance.radius),
+                [...new Set([0, 8, 12, 16, 24, 32, appearance.radius])]
+                  .sort((a, b) => a - b)
+                  .map((value) => ({ value: String(value), label: `${value}px` })),
+                (radius) => updateAppearance({ radius: Number(radius) }),
+              ),
+              c.action("appearance-reset", t("settings.ui.reset"), () =>
+                updateAppearance({
+                  ...normalizeSettings({}).customSettings.appearance,
+                  preset: appearance.preset,
+                }),
+              ),
             ]
           : []),
       ]),
@@ -1042,6 +1071,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     );
     if (nativeMobile) {
       nodes.push(c.group("general", "", [executionMode, language]));
+      const appearance = createNativeDesktopAppearance({ settings, setSettings }, t, false);
+      nodes.push(...appearance.nodes);
+      for (const [id, handler] of appearance.handlers) c.handlers.set(id, handler);
+      nodes.push(...fonts.nodes);
+      for (const [id, handler] of fonts.handlers) c.handlers.set(id, handler);
     } else {
       nodes.push(c.group("execution-mode", "", [executionMode]));
       nodes.push(...desktopSystem.nodes.filter((node) => node.id === "desktop-terminal"));

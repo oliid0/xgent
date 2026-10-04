@@ -36,12 +36,14 @@ enum XgentFonts {
     }
 
     @MainActor static func body(_ family: String?, size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        if let name = name(for: family) { return .custom(name, size: size).weight(weight) }
+        // Callers supply sizes from ScaledMetric. A relative custom Font here
+        // would apply Dynamic Type again and overflow settings at large sizes.
+        if let name = name(for: family) { return .custom(name, fixedSize: size).weight(weight) }
         return .system(size: size, weight: weight)
     }
 
     @MainActor static func code(_ family: String?, size: CGFloat) -> Font {
-        if let name = name(for: family) { return .custom(name, size: size) }
+        if let name = name(for: family) { return .custom(name, fixedSize: size) }
         return .system(size: size, design: .monospaced)
     }
 }

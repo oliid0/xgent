@@ -104,3 +104,54 @@ not been measured or established.
 Push this as one reviewed batch. Use the new commit's CI results, then trigger the
 full release with smoke checks. Do not substitute an older green CI for the new
 commit. No local build/dev/install/cargo or Swift compilation is permitted.
+
+## Mobile reference pass and installed macOS startup
+
+The reference pass compares IMG_0400/0403/0406 with the actual CI 276 native Form
+attachment, rather than assuming matching wire nodes imply matching visuals.
+The now-populated `yy/src/ios` reference was inspected: SettingsSheet,
+SoulSettingsView, OffloadPermissionSettingsView, AboutView and ContentView's
+native glass implementation. Its application/service code remains reference
+material; Xgent settings continue to use Xgent's shared reducers and commands.
+
+- Native navigation and picker close buttons use Apple's interactive Liquid
+  Glass through the existing availability/reduced-transparency modifier.
+  Mobile controls use 17-point body text, native green switches, 54-point grouped
+  rows, semibold section labels and symmetric settings header columns.
+- Native grouped fields no longer draw a second bordered box inside the card.
+  Short form entries use a label/value row; accessibility and secure entry retain
+  a full-width layout. Secondary section explanations move outside the card,
+  while standalone notes and every original action remain in the document.
+- Custom fonts use fixed-size SwiftUI fonts with explicit ScaledMetric at their
+  owners, avoiding a second Dynamic Type scale. A real hosted measurement test
+  compares installed custom/system font heights at standard/accessibility sizes.
+  Native settings tests now require separate, in-bounds actual input/menu AX
+  elements, rather than accepting a nonempty image alone.
+- Both iOS system routes expose font families, per-area sizes, reasoning display
+  and all detailed appearance options. Android's system form now exposes the
+  same mobile preferences and rejects invalid custom font drafts. Desktop window
+  behavior is omitted from both native mobile routes. Astryx compact groups now
+  have one rounded card per group and circular header controls.
+- CI 278 / `1e83171`: all eight jobs passed. These results precede this visual
+  pass and do not establish its Swift compilation or screenshot appearance.
+- Release 128 / `8b08dd7`: Windows, Linux and installed Android smoke passed.
+  macOS ARM successfully linked and packaged, fixing the zlib failure. Its real
+  application launch test failed: screenshot/AX show a running app with no
+  visible window. Launch code awaited two WebKit frames before showing the
+  initially hidden window. The native launch path now reveals immediately and
+  finishes through a microtask; a regression never delivers an animation frame.
+  The installed test assertion is retained for the next release. iOS device IPA
+  construction passed and simulator construction was still running at inspection.
+
+Research: Apple's [custom Liquid Glass guidance](https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views),
+[fixed-size custom fonts](https://developer.apple.com/documentation/swiftui/font/custom(_:fixedsize:)),
+WebKit's [inactive-page frame suspension](https://webkit.org/blog/8970/how-web-content-can-affect-power-usage/),
+GitHub's EhPanda native interactive glass examples, Astryx Switch/List docs, and
+Swift Package Index entries for [Introspect](https://swiftpackageindex.com/siteline/swiftui-introspect)
+and [Flow](https://swiftpackageindex.com/tevelee/SwiftUI-Flow) were consulted.
+Existing pinned packages provide those capabilities; no unneeded dependency was
+added to simulate native glass.
+
+New-head remote compilation, installed screenshots, dark/largest-text traversal,
+shell cancellation and end-to-end service parity remain required. This pass does
+not claim 90% measured visual similarity or identical complex task completion.

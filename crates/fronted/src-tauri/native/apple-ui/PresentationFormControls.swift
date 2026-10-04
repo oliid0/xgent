@@ -4,6 +4,8 @@ struct XgentTextInput: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    @Environment(\.xgentSettingsRow) private var isFormRow
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var secretFocused = false
     @FocusState private var focused: Bool
     @State private var hasDraft = false
@@ -49,18 +51,54 @@ struct XgentTextInput: View {
         #endif
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            XgentFieldLabel(node: node)
-            accessibleEntry
+    private var field: some View {
+        accessibleEntry
                 .textFieldStyle(.plain)
-                .modifier(XgentFieldSurface(node: node, active: focused || secretFocused))
                 .onSubmit(commit)
                 #if os(iOS)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 #endif
+    }
+
+    @ViewBuilder private var layout: some View {
+        #if os(iOS)
+        if isFormRow {
+            if node.secure != true && !dynamicTypeSize.isAccessibilitySize {
+                XgentSettingsValueRow(node: node, showsDescription: false) {
+                    field
+                        .modifier(XgentControlTypography(node: node))
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 140)
+                        .frame(minHeight: 44)
+                }
+            } else { settingsField }
+        } else {
+            labeledField
         }
+        #else
+        labeledField
+        #endif
+    }
+
+    private var settingsField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            XgentFieldLabel(node: node)
+            field
+                .modifier(XgentControlTypography(node: node))
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        }
+    }
+
+    private var labeledField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            XgentFieldLabel(node: node)
+            field.modifier(XgentFieldSurface(node: node, active: focused || secretFocused))
+        }
+    }
+
+    var body: some View {
+        layout
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
         .disabled(node.disabled == true)
@@ -195,6 +233,9 @@ struct XgentSwitch: View {
             }
         }
         .toggleStyle(.switch)
+        #if os(iOS)
+        .tint(Color(uiColor: .systemGreen))
+        #endif
         .modifier(XgentControlTypography(node: node))
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .disabled(node.disabled == true)

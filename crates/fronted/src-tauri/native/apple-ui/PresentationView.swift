@@ -55,6 +55,7 @@ extension Color {
 
 struct XgentPresentationThemeModifier: ViewModifier {
     @Environment(\.colorScheme) private var systemScheme
+    @ScaledMetric(relativeTo: .body) private var bodyScale = 1.0
     let theme: XgentPresentationTheme
     let appearance: XgentDocument.Appearance
 
@@ -71,7 +72,7 @@ struct XgentPresentationThemeModifier: ViewModifier {
         content
             .environment(\.xgentPresentationTheme, theme)
             .environment(\.colorScheme, scheme)
-            .environment(\.font, XgentFonts.body(theme.fontFamily, size: CGFloat(17 * theme.fontScale)))
+            .environment(\.font, XgentFonts.body(theme.fontFamily, size: CGFloat(17 * theme.fontScale) * bodyScale))
             .tint(Color(xgentHex: palette.accent))
     }
 }

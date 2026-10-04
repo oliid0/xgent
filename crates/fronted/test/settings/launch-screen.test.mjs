@@ -47,6 +47,36 @@ for (const warm of [false, true]) {
 }
 
 for (const platform of ["ios", "macos"]) {
+  test(`${platform} native launch finishes while the hidden WebKit host receives no animation frames`, async () => {
+    const previous = Object.fromEntries(["window", "document", "requestAnimationFrame", "localStorage"].map(key => [key, globalThis[key]]));
+    const commands = [], saved = new Map();
+    let removed = 0, frames = 0;
+    const loader = createTsModuleLoader({ mocks: {
+      "@xgent/runtime": { isBrowserRuntime: () => false, invoke: async command => commands.push(command) },
+      "../runtimePlatform": { inferRuntimePlatform: () => platform },
+      "../../runtime/applePresentation": { isApplePresentationRuntime: () => true },
+    } });
+    try {
+      globalThis.document = { documentElement: { dataset: {} }, getElementById: () => ({ remove: () => removed++ }) };
+      globalThis.window = {};
+      globalThis.requestAnimationFrame = () => { frames++; }; // Never deliver a frame.
+      globalThis.localStorage = { setItem: (key, value) => saved.set(key, value) };
+      const launch = loader.loadModule("src/lib/system/launchScreen.ts");
+      launch.showFirstLaunch();
+      assert.equal(commands.length, platform === "macos" ? 1 : 0);
+      launch.finishLaunch();
+      launch.finishLaunch();
+      await Promise.resolve();
+      assert.equal(frames, 0);
+      assert.equal(removed, 1);
+      assert.equal(saved.get("xgent.launch-completed.v1"), "true");
+      assert.equal(commands.length, platform === "macos" ? 2 : 0);
+      assert.ok(commands.every(command => command === "app_frontend_ready"));
+    } finally {
+      for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete globalThis[key]; else globalThis[key] = value; }
+    }
+  });
+
   test(`${platform} boot failure uses native recovery, a real reload action and retires on painted launch`, async () => {
     const previous = Object.fromEntries(["window", "document", "requestAnimationFrame", "localStorage"].map(key => [key, globalThis[key]]));
     const documents = [], frames = [], commands = [], acknowledgements = [];

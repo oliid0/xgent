@@ -12,7 +12,13 @@ let finishing = false;
 let nativeRecovery: ReturnType<typeof createNativeLaunchRecovery> | undefined;
 
 export function showFirstLaunch() {
-  if (isApplePresentationRuntime()) document.documentElement.dataset.nativePresentation = "true";
+  if (isApplePresentationRuntime()) {
+    document.documentElement.dataset.nativePresentation = "true";
+    // A hidden macOS window does not receive WebKit animation frames. The
+    // native host must become visible before waiting for any browser paint.
+    revealWindow();
+    return;
+  }
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
       if (!finishing) revealWindow();
@@ -32,23 +38,23 @@ function revealWindow() {
   }
 }
 
-/** Reveal the painted application once, without a splash or transition. */
+/** Finish once; native SwiftUI presentation does not depend on a browser paint. */
 export function finishLaunch(success = true) {
   nativeRecovery?.dispose();
   nativeRecovery = undefined;
   if (finishing) return;
   finishing = true;
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      document.getElementById("launch-error")?.remove();
-      if (success) {
-        try {
-          localStorage.setItem("xgent.launch-completed.v1", "true");
-        } catch {}
-      }
-      revealWindow();
-    });
-  });
+  const finish = () => {
+    document.getElementById("launch-error")?.remove();
+    if (success) {
+      try {
+        localStorage.setItem("xgent.launch-completed.v1", "true");
+      } catch {}
+    }
+    revealWindow();
+  };
+  if (isApplePresentationRuntime()) queueMicrotask(finish);
+  else requestAnimationFrame(() => requestAnimationFrame(finish));
 }
 
 export function showLaunchFailure(error?: unknown) {

@@ -16,12 +16,14 @@ extension EnvironmentValues {
 struct XgentSettingsValueRow<Content: View>: View {
     let node: XgentNode
     let content: Content
+    let showsDescription: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.xgentPresentationTheme) private var theme
     @ScaledMetric(relativeTo: .subheadline) private var detailScale = 1.0
 
-    init(node: XgentNode, @ViewBuilder content: () -> Content) {
+    init(node: XgentNode, showsDescription: Bool = true, @ViewBuilder content: () -> Content) {
         self.node = node
+        self.showsDescription = showsDescription
         self.content = content()
     }
 
@@ -32,7 +34,7 @@ struct XgentSettingsValueRow<Content: View>: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 XgentFieldLabel(node: node)
-                if let text = node.text, !text.isEmpty {
+                if showsDescription, let text = node.text, !text.isEmpty {
                     Text(text)
                         .font(XgentFonts.body(theme.fontFamily,
                             size: CGFloat(theme.typography.supporting * theme.fontScale) * detailScale))
@@ -57,10 +59,9 @@ struct XgentSettingsValueRow<Content: View>: View {
             if dynamicTypeSize.isAccessibilitySize { stacked }
             else {
                 ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .center, spacing: 20) {
-                        label.frame(minWidth: 140, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: 8)
+                    HStack(alignment: .center, spacing: 12) {
+                        label.fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 12)
                         content.fixedSize(horizontal: true, vertical: false)
                     }
                     stacked

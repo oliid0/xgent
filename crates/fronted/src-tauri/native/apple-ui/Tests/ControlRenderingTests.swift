@@ -11,6 +11,31 @@ import AppKit
 
 final class ControlRenderingTests: XCTestCase {
     @MainActor
+    func testCustomInterfaceFontScalesOnceLikeTheSystemFont() async throws {
+        let fixture = try document(nodes: [node("font-label", "Text", ["text": "Settings"])])
+        let base = XgentPresentationTheme.fallback
+        let family = "Helvetica Neue"
+        XCTAssertNotNil(XgentFonts.name(for: family))
+        let custom = XgentPresentationTheme(light: base.light, dark: base.dark, radius: base.radius,
+            spacing: base.spacing, control: base.control, typography: base.typography,
+            motion: base.motion, material: base.material, fontScale: base.fontScale,
+            fontFamily: family, codeFontFamily: base.codeFontFamily)
+        for size in [DynamicTypeSize.large, .accessibility3] {
+            func label(_ theme: XgentPresentationTheme) -> some View {
+                Text("Settings")
+                    .modifier(XgentControlTypography(node: fixture.nodes[0]))
+                    .environment(\.xgentPresentationTheme, theme)
+                    .dynamicTypeSize(size)
+            }
+            let system = try await fitted(label(base), width: 768)
+            let chosen = try await fitted(label(custom), width: 768)
+            XCTAssertGreaterThan(chosen.height, system.height * 0.7)
+            XCTAssertLessThan(chosen.height, system.height * 1.4,
+                "Choosing a font must not apply a second accessibility text scale")
+        }
+    }
+
+    @MainActor
     func testButtonsHugContentInSheetsAndWrapLongLabelsWithoutShrinkingText() async throws {
         var shortSizes: [CGSize] = []
         for mode in ["root", "sheet"] {

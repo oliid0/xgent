@@ -1,7 +1,7 @@
 import SwiftUI
 
-// Geometry comes from the same serialized Astryx tokens as the other clients.
-// A minimum hit target is separate from typography; labels may grow and wrap.
+// Business preferences are shared, while compact Apple controls use native
+// text sizes and touch targets. Desktop controls retain their own metrics.
 struct XgentControlMetricsAdapter {
     let height: CGFloat
     let fontSize: CGFloat
@@ -11,7 +11,8 @@ struct XgentControlMetricsAdapter {
         let small = node.size == "small" || (node.size == nil && node.variant == "compact")
         let token = small ? theme.control.small : node.size == "large" ? theme.control.large : theme.control.medium
         height = max(mobile ? 44 : 24, CGFloat(token))
-        fontSize = CGFloat((small ? theme.typography.supporting : theme.typography.body) * theme.fontScale)
+        fontSize = CGFloat((mobile ? (small ? 15 : 17)
+            : (small ? theme.typography.supporting : theme.typography.body)) * theme.fontScale)
         horizontalPadding = CGFloat(small ? theme.spacing.sm : theme.spacing.md)
     }
 }
@@ -33,9 +34,10 @@ struct XgentActionButtonStyle: ButtonStyle {
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.xgentSettingsRow) private var isFormRow
     @ScaledMetric(relativeTo: .body) private var scale = 1.0
 
-    func makeBody(configuration: Configuration) -> some View {
+    @ViewBuilder func makeBody(configuration: Configuration) -> some View {
         let palette = theme.palette(for: colorScheme)
         #if os(iOS)
         let metrics = XgentControlMetricsAdapter(node: node, theme: theme, mobile: true)
@@ -49,6 +51,31 @@ struct XgentActionButtonStyle: ButtonStyle {
             : emphasis == .ghost ? .clear : Color(xgentHex: palette.neutral ?? palette.muted)
         let foreground = emphasis == .primary ? palette.onAccent ?? "#ffffff"
             : emphasis == .destructive ? palette.onError ?? "#ffffff" : palette.text
+        #if os(iOS)
+        if isFormRow && !iconOnly && emphasis != .primary {
+            configuration.label
+                .font(XgentFonts.body(theme.fontFamily, size: metrics.fontSize * scale))
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .foregroundStyle(Color(xgentHex: emphasis == .destructive
+                    ? palette.error ?? "#e3193b" : palette.accentText))
+                .background(Color(xgentHex: palette.muted).opacity(configuration.isPressed ? 1 : 0))
+                .contentShape(Rectangle())
+                .opacity(isEnabled ? 1 : 0.48)
+        } else {
+            filledButton(configuration, metrics: metrics, radius: radius, background: background,
+                         foreground: foreground, palette: palette)
+        }
+        #else
+        filledButton(configuration, metrics: metrics, radius: radius, background: background,
+                     foreground: foreground, palette: palette)
+        #endif
+    }
+
+    private func filledButton(_ configuration: Configuration, metrics: XgentControlMetricsAdapter,
+                              radius: CGFloat, background: Color, foreground: String,
+                              palette: XgentPalette) -> some View {
         configuration.label
             .font(XgentFonts.body(theme.fontFamily, size: metrics.fontSize * scale, weight: .medium))
             .multilineTextAlignment(.center)
@@ -135,7 +162,12 @@ struct XgentControlTypography: ViewModifier {
 
     func body(content: Content) -> some View {
         let small = node.size == "small" || (node.size == nil && node.variant == "compact")
-        content.font(XgentFonts.body(theme.fontFamily, size: CGFloat((small ? theme.typography.supporting : theme.typography.body) * theme.fontScale) * scale))
+        #if os(iOS)
+        let size = small ? 15.0 : 17.0
+        #else
+        let size = small ? theme.typography.supporting : theme.typography.body
+        #endif
+        content.font(XgentFonts.body(theme.fontFamily, size: CGFloat(size * theme.fontScale) * scale))
     }
 }
 
@@ -145,6 +177,7 @@ struct XgentFieldSurface: ViewModifier {
     var tracksFocus = true
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.xgentSettingsRow) private var isSettingsRow
     @FocusState private var focused: Bool
 
     @ViewBuilder func body(content: Content) -> some View {
@@ -165,6 +198,19 @@ struct XgentFieldSurface: ViewModifier {
                     .stroke(Color(xgentHex: focused || active ? palette.accent : palette.emphasizedBorder), lineWidth: focused || active ? 2 : 1)
                     .allowsHitTesting(false)
             }
+        #if os(iOS)
+        if isSettingsRow {
+            content
+                .modifier(XgentControlTypography(node: node))
+                .frame(maxWidth: .infinity, minHeight: metrics.height, alignment: .leading)
+                .contentShape(Rectangle())
+        } else { focusedSurface(surface) }
+        #else
+        focusedSurface(surface)
+        #endif
+    }
+
+    @ViewBuilder private func focusedSurface<Surface: View>(_ surface: Surface) -> some View {
         if !tracksFocus { surface }
         else {
         #if os(iOS)

@@ -4,6 +4,8 @@ import { updateSystem } from "../lib/settings";
 import type { SettingsSaveState } from "../lib/settings/storage";
 import type { SettingsSectionProps } from "../pages/settings/types";
 import { NativeSurface } from "./NativeSurface";
+import { createNativeDesktopAppearance } from "./nativeDesktopAppearance";
+import { useNativeFontSettings } from "./nativeFontSettings";
 import { createNativePresentationTheme } from "./nativeTheme";
 import type { PresentationHandler } from "./types";
 
@@ -15,6 +17,8 @@ export function NativeMobileSystemSettings({
   saveState,
 }: SettingsSectionProps & { onBack: () => void; saveState?: SettingsSaveState }) {
   const { t } = useLocale();
+  const appearance = createNativeDesktopAppearance({ settings, setSettings }, t, false);
+  const fonts = useNativeFontSettings({ settings, setSettings }, true, t);
   const [failure, setFailure] = useState<unknown>(null);
   if (failure) throw failure;
   const handlers = new Map<string, PresentationHandler>([
@@ -40,6 +44,8 @@ export function NativeMobileSystemSettings({
       },
     ],
   ]);
+  for (const [id, handler] of appearance.handlers) handlers.set(id, handler);
+  for (const [id, handler] of fonts.handlers) handlers.set(id, handler);
   return (
     <NativeSurface
       document={{
@@ -51,22 +57,29 @@ export function NativeMobileSystemSettings({
         dismissAction: "close",
         nodes: [
           {
+            id: "back",
+            kind: "IconButton",
+            label: t("settings.mobile.backToSettings"),
+            icon: "chevron.left",
+            action: "close",
+          },
+          ...(saveState
+            ? [
+                {
+                  id: "save-status",
+                  kind: "Text" as const,
+                  secondary: saveState.status !== "error",
+                  text:
+                    saveState.status === "error"
+                      ? `${t("settings.saveError")}: ${saveState.message}`
+                      : t(saveState.status === "saving" ? "settings.saving" : "settings.saved"),
+                },
+              ]
+            : []),
+          {
             id: "system-settings",
             kind: "SettingsGroup",
             children: [
-              ...(saveState
-                ? [
-                    {
-                      id: "save-status",
-                      kind: "Text" as const,
-                      secondary: saveState.status !== "error",
-                      text:
-                        saveState.status === "error"
-                          ? `${t("settings.saveError")}: ${saveState.message}`
-                          : t(saveState.status === "saving" ? "settings.saving" : "settings.saved"),
-                    },
-                  ]
-                : []),
               {
                 id: "execution-mode",
                 kind: "Selector",
@@ -102,6 +115,8 @@ export function NativeMobileSystemSettings({
               },
             ],
           },
+          ...appearance.nodes,
+          ...fonts.nodes,
         ],
       }}
       handlers={handlers}

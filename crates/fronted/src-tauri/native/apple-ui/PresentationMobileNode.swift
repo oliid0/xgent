@@ -402,7 +402,8 @@ struct XgentIOSNode: View {
             section
         case .text:
             Text(node.text ?? "")
-                .font(XgentFonts.body(theme.fontFamily, size: CGFloat(theme.typography.body * theme.fontScale * bodyScale)))
+                .font(XgentFonts.body(theme.fontFamily, size: CGFloat((node.secondary == true ? 15 : 17) * theme.fontScale * bodyScale)))
+                .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(Color(xgentHex: node.secondary == true ? palette.secondaryText : palette.text))
                 .textSelection(.enabled)
         case .heading:
@@ -413,7 +414,7 @@ struct XgentIOSNode: View {
                 Text(node.text ?? node.label ?? "")
                     .lineLimit(node.maxLines)
             }
-            .font(XgentFonts.body(theme.fontFamily, size: CGFloat(theme.typography.body * theme.fontScale * bodyScale), weight: .semibold))
+            .font(XgentFonts.body(theme.fontFamily, size: CGFloat(17 * theme.fontScale * bodyScale), weight: .semibold))
             .foregroundStyle(Color(xgentHex: palette.text))
             .accessibilityAddTraits(.isHeader)
         case .button:
@@ -744,6 +745,7 @@ struct XgentIOSNode: View {
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(node.label ?? "").foregroundStyle(Color(xgentHex: palette.text))
+                        .fixedSize(horizontal: false, vertical: true)
                     if let text = node.text, !text.isEmpty {
                         Text(text).font(.subheadline).foregroundStyle(Color(xgentHex: palette.secondaryText))
                             .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
@@ -773,6 +775,7 @@ struct XgentIOSNode: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .modifier(XgentControlTypography(node: node))
         .accessibilityAddTraits(node.selected == true ? .isSelected : [])
     }
 

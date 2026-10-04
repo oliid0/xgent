@@ -110,13 +110,22 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(settings.customSettings.appearance.preset, "stone");
   assert.equal((await dispatch("appearance-customized", true)).ok, true);
   assert.deepEqual(
-    document.nodes.find((node) => node.id === "mobile-theme").children.slice(-2).map((node) => node.id),
-    ["accent-light", "accent-dark"],
+    document.nodes.find((node) => node.id === "mobile-theme").children.slice(3).map((node) => node.id),
+    ["accent-light", "accent-dark", "sidebar-light", "sidebar-dark", "appearance-radius", "appearance-reset"],
   );
   assert.equal((await dispatch("accent-light", "#ABCDEF")).ok, true);
   assert.equal((await dispatch("accent-dark", "#123456")).ok, true);
   assert.equal(settings.customSettings.appearance.accentLight, "#abcdef");
   assert.equal(settings.customSettings.appearance.accentDark, "#123456");
+  assert.equal((await dispatch("sidebar-light", "#121212")).ok, true);
+  assert.equal((await dispatch("sidebar-dark", "#343434")).ok, true);
+  assert.equal((await dispatch("appearance-radius", "24")).ok, true);
+  assert.equal(settings.customSettings.appearance.sidebarLight, "#121212");
+  assert.equal(settings.customSettings.appearance.sidebarDark, "#343434");
+  assert.equal(settings.customSettings.appearance.radius, 24);
+  assert.equal((await dispatch("appearance-reset")).ok, true);
+  assert.equal(settings.customSettings.appearance.preset, "stone");
+  assert.equal(settings.customSettings.appearance.customized, false);
   assert.equal((await dispatch("appearance-preset", "matcha")).ok, true);
   assert.equal(settings.customSettings.appearance.customized, false);
   assert.ok(!document.nodes.find((node) => node.id === "mobile-theme").children.some((node) => node.id === "accent-light"));
@@ -127,6 +136,15 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(settings.locale, "zh-CN");
   assert.equal(settings.system.executionMode, "text");
   assert.equal(settings.theme, "light", "system navigation preserves the root appearance selection");
+  const systemNodes = document.nodes.flatMap(node => [node, ...(node.children ?? [])]);
+  for (const id of ["font-scale:sidebar", "font-scale:chat", "font-scale:workspaceTools", "font-family:interfaceFontFamily", "font-family:chatFontFamily", "font-family:codeFontFamily", "thinking"]) {
+    assert.ok(systemNodes.some(node => node.id === id && node.action), `The actual mobile system route exposes ${id}`);
+  }
+  assert.ok(!systemNodes.some(node => node.id === "close-window-behavior"), "Mobile appearance has no desktop window control");
+  assert.equal((await dispatch("font-scale:chat", "1.2")).ok, true);
+  assert.equal(settings.customSettings.fontScale.chat, 1.2);
+  assert.equal((await dispatch("thinking", false)).ok, true);
+  assert.equal(settings.customSettings.appearance.showThinking, false);
   await dispatch("back");
   await dispatch("nav:providers");
   await dispatch("provider-vendor", "codex");

@@ -9,14 +9,10 @@ private extension XgentNode {
 }
 
 private struct XgentIOSNavigationControl: ViewModifier {
-    @Environment(\.xgentPresentationTheme) private var theme
-    @Environment(\.colorScheme) private var colorScheme
-
     func body(content: Content) -> some View {
-        let palette = theme.palette(for: colorScheme)
         content
-            .background(Color(xgentHex: palette.card), in: Circle())
-            .overlay(Circle().stroke(Color(xgentHex: palette.border), lineWidth: 1))
+            .foregroundStyle(.primary)
+            .modifier(XgentGlassCircle())
     }
 }
 
@@ -619,7 +615,7 @@ struct XgentIOSSheetPresentation: View {
     private var title: some View {
         Text(document.title)
             .accessibilityIdentifier("presentation-sheet-title")
-            .font(.headline)
+            .font(.headline.weight(.semibold))
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .accessibilityAddTraits(.isHeader)
@@ -629,6 +625,7 @@ struct XgentIOSSheetPresentation: View {
         Text(node.text ?? "")
             .font(.subheadline)
             .foregroundStyle(node.secondary == true ? Color.secondary : Color.red)
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier(node.id)
     }
 
@@ -652,11 +649,12 @@ struct XgentIOSSheetPresentation: View {
             } else {
                 HStack(spacing: 8) {
                     leadingNavigation
+                        .frame(width: saveStatus != nil && back != nil ? 72 : 44, alignment: .leading)
                     title.lineLimit(2)
                     if let saveStatus, back != nil {
                         statusText(saveStatus)
                             .lineLimit(2)
-                            .frame(minWidth: 44, maxWidth: 96)
+                            .frame(width: 72)
                     } else {
                         trailingNavigation
                     }

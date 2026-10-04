@@ -34,11 +34,17 @@ struct XgentIOSModelPicker: View {
                 Text(currentNode?.label ?? node.label ?? "Model")
                     .font(.headline)
                     .foregroundStyle(Color(xgentHex: palette.text))
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                Button { dismiss() } label: { Image(systemName: "xmark") }
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.primary)
+                    .modifier(XgentGlassCircle())
                     .accessibilityLabel(Text("Close"))
-                    .frame(minWidth: 44, minHeight: 44)
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -58,7 +64,10 @@ struct XgentIOSModelPicker: View {
                 .submitLabel(.search)
                 .accessibilityIdentifier("model-search")
                 if !query.isEmpty {
-                    Button { query = "" } label: { Image(systemName: "xmark.circle.fill") }
+                    Button { query = "" } label: {
+                        Image(systemName: "xmark.circle.fill").frame(minWidth: 44, minHeight: 44)
+                    }
+                        .buttonStyle(.plain)
                         .accessibilityLabel(Text("Clear search"))
                         .foregroundStyle(Color(xgentHex: palette.secondaryText))
                 }

@@ -22,8 +22,16 @@ struct XgentSelectionPicker: View {
             HStack(spacing: 12) {
                 Text(source.label ?? "").font(.headline).fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                Button { isPresented = false } label: { Image(systemName: "xmark").frame(minWidth: 32, minHeight: 44) }
+                Button { isPresented = false } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                }
                     .buttonStyle(.plain)
+                    #if os(iOS)
+                    .foregroundStyle(.primary)
+                    .modifier(XgentGlassCircle())
+                    #endif
                     .accessibilityLabel(source.children?.last?.label ?? "")
             }
             HStack(spacing: 8) {
@@ -85,6 +93,7 @@ struct XgentSelectionPicker: View {
             }
         }
         .padding(16)
+        .environment(\.xgentSettingsRow, false)
         .background { XgentThemeBackground() }
         .preferredColorScheme((currentDocument ?? document).colorScheme)
         .modifier(XgentPresentationThemeModifier(theme: currentDocument?.theme ?? document.theme ?? .fallback,

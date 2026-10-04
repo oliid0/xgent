@@ -37,6 +37,7 @@ import { useTrayPrefs, writeTrayPrefs } from "../../lib/tray/trayPrefs";
 import { NativeMobileSystemSettings } from "../../presentation/NativeMobileSystemSettings";
 import { supportsApplePresentation } from "../../runtime/applePresentation";
 import { AppearanceSettingsSection } from "./AppearanceSettingsSection";
+import { MobileAppearanceSettings } from "./MobileAppearanceSettings";
 import { SecretTextInput } from "./SecretTextInput";
 import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
 import type { SettingsSectionProps } from "./types";
@@ -115,6 +116,7 @@ function MobileSystemSettingsForm({ settings, setSettings }: SystemSettingsFormP
           />
         </SettingsRow>
       </SettingsRowGroup>
+      <MobileAppearanceSettings settings={settings} setSettings={setSettings} />
     </VStack>
   );
 }

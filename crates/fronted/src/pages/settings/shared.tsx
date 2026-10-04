@@ -17,7 +17,7 @@ export function SettingsRowGroup(props: {
   hideTitle?: boolean;
 }) {
   return (
-    <VStack as="section" gap={2} width="100%">
+    <VStack as="section" className="settings-row-group" gap={2} width="100%">
       {props.hideTitle ? null : (
         <Heading
           level={3}

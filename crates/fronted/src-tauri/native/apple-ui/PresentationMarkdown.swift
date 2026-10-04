@@ -23,11 +23,18 @@ struct XgentMarkdown: View {
     @ScaledMetric(relativeTo: .body) private var bodySize: CGFloat = 15
 
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
+    private var baseBodySize: CGFloat {
+        #if os(iOS)
+        17
+        #else
+        CGFloat(theme.typography.body)
+        #endif
+    }
     private var mathProvider: XgentMathImageProvider {
         let color = Color(xgentHex: secondary ? palette.secondaryText : palette.text)
         let resolved = color.resolve(in: EnvironmentValues())
         let store = mathAccessibility
-        return XgentMathImageProvider(fontSize: bodySize * CGFloat(theme.fontScale * theme.typography.body / 15),
+        return XgentMathImageProvider(fontSize: bodySize * CGFloat(theme.fontScale) * baseBodySize / 15,
             foreground: color, rgba: .init(r: resolved.red, g: resolved.green, b: resolved.blue, a: resolved.opacity),
             didRender: { url in await store.register(url) })
     }
@@ -85,7 +92,7 @@ struct XgentMarkdown: View {
                 if let name = XgentFonts.name(for: theme.fontFamily) { FontFamily(.custom(name)) }
                 // MarkdownUI applies its own body-relative ScaledMetric to this
                 // base value. Passing bodySize here would scale prose twice.
-                FontSize(CGFloat(theme.fontScale * theme.typography.body))
+                FontSize(CGFloat(theme.fontScale) * baseBodySize)
                 ForegroundColor(Color(xgentHex: secondary ? palette.secondaryText : palette.text))
                 BackgroundColor(nil)
             })

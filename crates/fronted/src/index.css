@@ -3605,11 +3605,11 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 
 .settings-page-compact {
-  background: var(--color-background-surface);
+  background: var(--color-background-body);
 }
 
-/* Mobile settings use one continuous page. Groups are separated by row
-   dividers rather than nested cards; controls retain their native semantics. */
+/* A gray page, one rounded surface per group, and inset row separators match
+   the compact native forms without adding a second card around every field. */
 .settings-page-compact :is(.astryx-section, .astryx-card, .astryx-list) {
   border-radius: var(--radius-container);
   border: 0;
@@ -3623,6 +3623,29 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 
 .settings-page-compact .astryx-list-item {
   border-radius: var(--radius-element);
+}
+
+.settings-page-compact .settings-row-group > .astryx-list {
+  background: var(--color-background-card);
+  border-radius: var(--radius-container);
+  overflow: hidden;
+}
+
+.settings-page-compact .settings-row-group .astryx-list-item {
+  border-radius: 0;
+  min-height: 54px;
+}
+
+.settings-page-compact .settings-navigation-control {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--astryx-theme-xgent-glass-surface, var(--color-background-card));
+  border: 1px solid var(--color-border);
+  -webkit-backdrop-filter: var(--xgent-material-filter, none);
+  backdrop-filter: var(--xgent-material-filter, none);
 }
 
 .settings-page-compact .astryx-dialog-header {

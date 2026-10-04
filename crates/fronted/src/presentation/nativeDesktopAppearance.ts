@@ -3,10 +3,11 @@ import { normalizeAppearance, UI_THEME_PRESETS } from "../lib/settings/appearanc
 import type { SettingsSectionProps } from "../pages/settings/types";
 import { presentationControls } from "./controls";
 
-/** Reachable desktop controls, using AppearanceSettingsSection's persisted model. */
+/** Shared appearance controls; mobile callers omit desktop window behavior. */
 export function createNativeDesktopAppearance(
   { settings, setSettings }: SettingsSectionProps,
   t: (key: string) => string,
+  includeWindow = true,
 ) {
   const c = presentationControls();
   const appearance = settings.customSettings.appearance;
@@ -141,5 +142,9 @@ export function createNativeDesktopAppearance(
       },
     ]),
   ];
-  return { nodes, handlers: c.handlers };
+  if (!includeWindow) c.handlers.delete(c.actionId("close-window-behavior"));
+  return {
+    nodes: includeWindow ? nodes : nodes.filter((node) => node.id !== "desktop-window"),
+    handlers: c.handlers,
+  };
 }

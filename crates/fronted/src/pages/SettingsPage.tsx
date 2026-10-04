@@ -470,6 +470,7 @@ export function SettingsPage(props: SettingsPageProps) {
                     startContent={
                       mobileDetailOpen ? (
                         <IconButton
+                          className="settings-navigation-control"
                           label={t("settings.mobile.backToSettings")}
                           tooltip={t("settings.mobile.backToSettings")}
                           icon={<Icon icon={ArrowLeft} size="md" color="inherit" />}
@@ -484,6 +485,7 @@ export function SettingsPage(props: SettingsPageProps) {
                         <SaveStatus indicator={saveIndicator} />
                       ) : (
                         <IconButton
+                          className="settings-navigation-control"
                           label={t("settings.backToChat")}
                           tooltip={t("settings.backToChat")}
                           icon={<Icon icon={X} size="md" color="inherit" />}
