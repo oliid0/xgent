@@ -152,13 +152,12 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                 node("proxy-type", "Selector", ["label": "Proxy type", "value": "socks5", "action": "proxy-type", "options": [
                     ["value": "http", "label": "HTTP"], ["value": "socks5", "label": "SOCKS5"],
                 ]]),
-                node("proxy-host", "TextInput", ["label": "Proxy host", "value": "127.0.0.1", "action": "proxy-host"]),
-                node("proxy-port", "TextInput", ["label": "Port", "value": "1080", "action": "proxy-port"]),
+                node("proxy-host", "TextInput", ["label": "Proxy host", "value": "127.0.0.1", "action": "proxy-host", "commitAction": "proxy-host:commit"]),
+                node("proxy-port", "TextInput", ["label": "Port", "value": "1080", "action": "proxy-port", "commitAction": "proxy-port:commit"]),
                 node("proxy-username", "TextInput", ["label": "Username (optional)", "value": "", "action": "proxy-username"]),
                 node("proxy-password", "TextInput", ["label": "Password (optional)", "value": "", "secure": true, "action": "proxy-password"]),
                 node("proxy-password-status", "Text", ["text": "Proxy password saved", "secondary": true]),
                 node("proxy-password-clear", "Button", ["label": "Clear", "action": "proxy-password-clear"]),
-                node("proxy-save", "Button", ["label": "Save", "action": "proxy-save", "disabled": true]),
             ]]),
         ]
         let permissionGroups = [

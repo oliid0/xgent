@@ -16,8 +16,21 @@ test("desktop panels require a valid focus token, translated controls and a real
   assert.equal(createNativeWorkspacePanel(key => key, true).mode, "root");
   for (const patch of [{ formFactor: "mobile" }, { dismissAction: undefined },
     { workspacePanel: undefined }, { workspacePanel: { ...panel.workspacePanel, focusRequest: -1 } },
-    { workspacePanel: { ...panel.workspacePanel, closeLabel: " " } }]) {
+    { workspacePanel: { ...panel.workspacePanel, closeLabel: " " } },
+    { workspacePanel: { ...panel.workspacePanel, closeTabLabel: " " } }]) {
     assert.throws(() => validatePresentationDocument({ ...panel, ...patch }, handlers), /workspace panel/);
+  }
+});
+
+test("text commits require a separate live string handler on a single-line input", () => {
+  const { presentationControls } = loader.loadModule("src/presentation/controls.ts");
+  const c = presentationControls("provider-a");
+  const input = c.committedInput("host", "Proxy host", "", () => {}, () => {});
+  assert.notEqual(input.action, input.commitAction);
+  assert.doesNotThrow(() => validatePresentationDocument(document(input), c.handlers));
+  for (const patch of [{ kind: "TextArea" }, { action: undefined },
+    { commitAction: "" }, { commitAction: input.action }, { commitAction: "retired" }]) {
+    assert.throws(() => validatePresentationDocument(document({ ...input, ...patch }), c.handlers), /text commit action/);
   }
 });
 

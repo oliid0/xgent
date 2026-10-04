@@ -6367,6 +6367,26 @@ export function ChatPage(props: ChatPageProps) {
           pendingApprovals={pendingToolApprovals}
           projects={workspaceProjects}
           workspaceProjectGroups={workspaceProjectGroups}
+          archivedProjectPathKeys={archivedWorkspaceProjectPathKeys}
+          onCreateWorkspaceGroup={handleCreateWorkspaceGroup}
+          onRenameWorkspaceGroup={handleRenameWorkspaceGroup}
+          onDeleteWorkspaceGroup={handleDeleteWorkspaceGroup}
+          onMoveProjectToGroup={handleMoveWorkspaceProjectToGroup}
+          onRenameProject={commitWorkspaceProjectRename}
+          onSetProjectPinned={handleSetWorkspaceProjectPinned}
+          onArchiveProject={handleArchiveWorkspaceProject}
+          onUnarchiveProject={handleUnarchiveWorkspaceProject}
+          onRemoveProject={handleRemoveWorkspaceProject}
+          onOpenWorkspaceSettings={handleOpenWorkspaceSettings}
+          onNewConversationForProject={handleNewConversationForProject}
+          onBrowseProjectInFileTree={async (project) => {
+            if (!(await checkWorkspaceProjectDirectory(project))) return;
+            activateWorkspaceProject(project);
+            setMobileWorkspaceDestination({ kind: "files" });
+          }}
+          onBrowseProjectInSystemFileManager={
+            desktopBridgeEnabled ? handleBrowseWorkspaceProjectInSystemFileManager : undefined
+          }
           onToggleWorkspaceGroupCollapsed={handleToggleWorkspaceGroupCollapsed}
           attachmentsEnabled={canDropUpload}
           trajectoryAvailable={!nativeMobile && canShowTrajectory}
@@ -6607,6 +6627,14 @@ export function ChatPage(props: ChatPageProps) {
           />
         ) : null}
         <NativeBrowserPage settings={settings} />
+        {workspaceSettingsProject ? (
+          <WorkspaceProjectSettingsDialog
+            project={workspaceSettingsProject}
+            settings={settings}
+            setSettings={setSettings}
+            onClose={() => setWorkspaceSettingsProject(null)}
+          />
+        ) : null}
         <NativeWorkspaceFilePage
           onEditorSessionsChanged={setNativeEditorSessions}
           settings={settings}

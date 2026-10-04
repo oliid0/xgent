@@ -12,6 +12,7 @@ function sidebarSnapshot(conversations = []) {
     mutations: new Map(),
     mutationErrors: new Map(),
     runningConversationIds: new Set(),
+    runningWorkdirPathKeys: new Set(),
   };
 }
 

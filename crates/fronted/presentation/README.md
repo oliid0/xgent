@@ -4,6 +4,9 @@ Xgent shares business state, execution, persistence and registered actions acros
 platforms. Android, Windows, Linux and Web use React/Astryx. iOS and macOS render
 their application interface in handwritten SwiftUI.
 
+The current [Apple parity audit](APPLE-PARITY-AUDIT.md) tracks detailed settings,
+sidebars, chat actions, discovered gaps and installed-app evidence separately.
+
 There is no executable Astryx-to-SwiftUI component mapping or generation command.
 `src/presentation/protocol.ts` and `native/apple-ui/PresentationProtocol.swift`
 define only the serializable state/action vocabulary. `pnpm native:check` checks

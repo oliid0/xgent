@@ -81,7 +81,7 @@ struct XgentSidebarConversationRow: View {
             }
         }
         .modifier(XgentControlTypography(node: node))
-        .foregroundStyle(Color(xgentHex: palette.text))
+        .foregroundStyle(Color(xgentHex: node.secondary == true ? palette.secondaryText : palette.text))
         .background(node.selected == true ? Color(xgentHex: palette.neutral ?? palette.muted) : .clear,
                     in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.element)))
         .accessibilityElement(children: .contain)

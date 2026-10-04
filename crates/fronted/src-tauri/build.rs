@@ -153,6 +153,9 @@ fn link_native_ui(manifest_dir: &std::path::Path) {
     println!("cargo:rustc-link-search=native={}", compatibility_libraries.display());
     println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/lib/swift");
     println!("cargo:rustc-link-lib=static=XgentNativeUI");
+    // SwaTexRender's SwiftPM linkedLibrary("z") is not propagated to the
+    // Rust/cc consumer of this static archive (FastPNGEncoder uses zlib).
+    println!("cargo:rustc-link-lib=z");
     let platform_ui = if ios { "UIKit" } else { "AppKit" };
     for framework in ["SwiftUI", platform_ui, "WebKit", "Foundation", "PhotosUI", "Photos", "UniformTypeIdentifiers", "AVFoundation", "AVKit", "PDFKit", "QuickLook", "Metal", "MetalKit", "CoreText", "CoreGraphics", "ImageIO", "QuartzCore"] {
         println!("cargo:rustc-link-lib=framework={framework}");

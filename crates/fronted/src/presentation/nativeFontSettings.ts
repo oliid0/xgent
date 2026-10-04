@@ -79,46 +79,68 @@ export function useNativeFontSettings(
         const value = settings.customSettings[key];
         const selected = toFontFamilySelectValue(value, options, custom[key]);
         return [
-          c.select(
-            `font-family:${key}`,
-            label,
-            selected,
-            [
-              { value: FONT_FAMILY_DEFAULT_SELECT_VALUE, label: t("settings.fontFamilyDefault") },
-              { value: FONT_FAMILY_CUSTOM_SELECT_VALUE, label: t("settings.fontFamilyCustom") },
-              ...options,
+          {
+            ...c.select(
+              `font-family:${key}`,
+              label,
+              selected,
+              [
+                { value: FONT_FAMILY_DEFAULT_SELECT_VALUE, label: t("settings.fontFamilyDefault") },
+                { value: FONT_FAMILY_CUSTOM_SELECT_VALUE, label: t("settings.fontFamilyCustom") },
+                ...options,
+              ],
+              (next) => {
+                setCustom((previous) => ({
+                  ...previous,
+                  [key]: next === FONT_FAMILY_CUSTOM_SELECT_VALUE,
+                }));
+                if (next === FONT_FAMILY_CUSTOM_SELECT_VALUE) {
+                  setDrafts((previous) => ({ ...previous, [key]: previous[key] ?? value }));
+                } else {
+                  patch(key, fromFontFamilySelectValue(next));
+                  setDrafts((previous) => ({ ...previous, [key]: undefined }));
+                }
+              },
+            ),
+            variant: "searchable-selector",
+            children: [
+              { id: `font-family:${key}:search`, kind: "Text", label: t("search.title") },
+              {
+                id: `font-family:${key}:empty`,
+                kind: "EmptyState",
+                label: t("projectTools.fileTree.noMatches"),
+              },
+              {
+                id: `font-family:${key}:search-clear-label`,
+                kind: "Text",
+                label: t("chat.history.searchClear"),
+              },
+              { id: `font-family:${key}:close`, kind: "Text", label: t("settings.cancel") },
             ],
-            (next) => {
-              setCustom((previous) => ({
-                ...previous,
-                [key]: next === FONT_FAMILY_CUSTOM_SELECT_VALUE,
-              }));
-              if (next === FONT_FAMILY_CUSTOM_SELECT_VALUE) {
-                setDrafts((previous) => ({ ...previous, [key]: previous[key] ?? value }));
-              } else {
-                patch(key, fromFontFamilySelectValue(next));
-                setDrafts((previous) => ({ ...previous, [key]: undefined }));
-              }
-            },
-          ),
+          },
           ...(selected === FONT_FAMILY_CUSTOM_SELECT_VALUE
             ? [
                 {
-                  ...c.input(
+                  ...c.committedInput(
                     `font-family:${key}:custom`,
                     t("settings.fontFamilyCustom"),
                     drafts[key] ?? value,
                     (draft) => setDrafts((previous) => ({ ...previous, [key]: draft })),
+                    (draft) => {
+                      patch(key, draft);
+                      setDrafts((previous) => ({ ...previous, [key]: draft }));
+                    },
+                    false,
+                    true,
+                    (draft) => {
+                      const normalized = normalizeFontFamily(draft);
+                      if (draft.trim() && !normalized)
+                        throw new Error(t("settings.fontFamilyInvalid"));
+                      return normalized;
+                    },
                   ),
                   text: t("settings.fontFamilyPlaceholder"),
                 },
-                c.action(`font-family:${key}:save`, t("settings.save"), () => {
-                  const draft = drafts[key] ?? value;
-                  const normalized = normalizeFontFamily(draft);
-                  if (draft.trim() && !normalized) throw new Error(t("settings.fontFamilyInvalid"));
-                  patch(key, normalized);
-                  setDrafts((previous) => ({ ...previous, [key]: normalized }));
-                }),
               ]
             : []),
         ];

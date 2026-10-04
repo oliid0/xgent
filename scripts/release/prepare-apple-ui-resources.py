@@ -47,6 +47,20 @@ private var xgentKeyboardShortcutResourceBundle: Bundle {
     source.write_text(text, encoding="utf-8")
 
 
+def make_staged_bundle_writable(bundle):
+    # SwiftPM preserves the checkout's read-only font/resource permissions.
+    # Device and simulator builds reuse this staging directory; only staging
+    # files may change, never the original checkout or SwiftPM product.
+    paths = [bundle, *bundle.rglob("*")]
+    if any(path.is_symlink() for path in paths):
+        raise ValueError(f"Staged resource bundle contains a symbolic link: {bundle.name}")
+    for path in paths:
+        permissions = path.stat().st_mode | stat.S_IWUSR
+        if path.is_dir():
+            permissions |= stat.S_IXUSR
+        path.chmod(permissions)
+
+
 def copy_bundles(source, destination):
     bundles = sorted(path for path in source.iterdir() if path.suffix == ".bundle")
     if not bundles:
@@ -56,7 +70,10 @@ def copy_bundles(source, destination):
         target = destination / bundle.name
         if not bundle.is_dir() or bundle.is_symlink() or target.is_symlink():
             raise ValueError(f"Resource bundle must be a real directory: {bundle.name}")
+        if target.exists():
+            make_staged_bundle_writable(target)
         shutil.copytree(bundle, target, dirs_exist_ok=True)
+        make_staged_bundle_writable(target)
         print(f"Native UI resource: {bundle.name}")
 
 

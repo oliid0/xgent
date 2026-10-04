@@ -63,7 +63,9 @@ enum XgentNodeKind: String, Decodable, CaseIterable {
         switch self {
         case .button, .menu, .navigationRow, .iconButton, .treeRow, .activityPreview:
             return ["press"]
-        case .textInput, .textArea, .composerInput, .timeInput:
+        case .textInput:
+            return ["changeText", "commitText"]
+        case .textArea, .composerInput, .timeInput:
             return ["changeText"]
         case .numberInput, .slider:
             return ["changeNumber"]

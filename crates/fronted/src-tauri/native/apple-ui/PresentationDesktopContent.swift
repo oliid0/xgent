@@ -113,7 +113,9 @@ extension XgentNodeView {
                 #endif
             }
         case .hStack:
-            if node.variant == "workspace-file-metadata" {
+            if node.variant == "sidebar-section-heading" {
+                XgentSidebarSectionHeading(node: node, document: document, model: model)
+            } else if node.variant == "workspace-file-metadata" {
                 XgentWorkspaceFileMetadata(node: node, document: document, model: model)
             } else { XgentHorizontalControls(node: node) { children } }
         case .scrollView:
@@ -234,7 +236,7 @@ extension XgentNodeView {
         case .navigationRow:
             if node.variant == "memory-entry" {
                 XgentMemoryEntry(node: node, document: document, model: model)
-            } else if node.variant == "sidebar-conversation-row" {
+            } else if node.variant == "sidebar-conversation-row" || node.variant == "sidebar-workspace-row" {
                 XgentSidebarConversationRow(node: node, document: document, model: model)
             } else { navigationRow }
         case .chatLayout:

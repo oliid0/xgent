@@ -284,9 +284,24 @@ test("native settings mirrors compact navigation and persists shared system, pro
     ["execution-mode", "desktop-terminal", "general", "desktop-appearance"]);
   assert.ok(["settings.chatModeDesc", "settings.agentModeDesc"].includes(flatten(document.nodes).find(node => node.id === "mode").text));
   assert.ok(flatten(document.nodes).some(node => node.id === "desktop-appearance"), "default macOS system route exposes appearance");
-  for (const id of ["terminal-shell", "tray-show-titles", "tray-running-badge", "proxy-host", "proxy-password", "proxy-enabled"]) {
+  for (const id of ["terminal-shell", "tray-show-titles", "tray-running-badge", "proxy-enabled"]) {
     assert.ok(flatten(document.nodes).some(node => node.id === id), `default macOS system route exposes ${id}`);
   }
+  assert.ok(!flatten(document.nodes).some(node => node.id === "proxy-host"), "disabled proxy starts collapsed, as on Windows/Linux");
+  assert.equal((await dispatch("proxy-enabled", true)).ok, true);
+  assert.equal(settings.system.systemProxy.enabled, false, "enabling an incomplete proxy opens its configuration first");
+  for (const id of ["proxy-host", "proxy-port", "proxy-username", "proxy-password"]) {
+    assert.ok(flatten(document.nodes).some(node => node.id === id), `expanded proxy exposes ${id}`);
+  }
+  assert.equal((await dispatch("proxy-host", " 127.0.0.1 ")).ok, true);
+  assert.notEqual(settings.system.systemProxy.host, " 127.0.0.1 ", "typing remains a local draft until blur/Return");
+  assert.equal((await dispatch("proxy-host:commit", " 127.0.0.1 ")).ok, true);
+  assert.equal(settings.system.systemProxy.host, "127.0.0.1");
+  assert.equal((await dispatch("proxy-port:commit", "7890")).ok, true);
+  assert.equal((await dispatch("proxy-enabled", true)).ok, true);
+  assert.equal(settings.system.systemProxy.enabled, true);
+  assert.equal((await dispatch("proxy-enabled", false)).ok, true);
+  assert.ok(!flatten(document.nodes).some(node => node.id === "proxy-host"), "turning off the proxy collapses its detailed fields");
   assert.equal((await dispatch("appearance-customized", true)).ok, true);
   assert.equal((await dispatch("appearance-color:sidebarDark", "#123ABC")).ok, true);
   assert.equal(settings.customSettings.appearance.sidebarDark, "#123abc");

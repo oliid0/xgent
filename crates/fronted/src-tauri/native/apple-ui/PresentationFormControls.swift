@@ -5,21 +5,32 @@ struct XgentTextInput: View {
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
     @State private var secretFocused = false
+    @FocusState private var focused: Bool
+    @State private var hasDraft = false
 
     private var value: Binding<String> {
         Binding(get: { model.value(node, in: document).text },
-                set: { model.send(node, in: document, value: .string($0), editing: true) })
+                set: {
+                    hasDraft = true
+                    model.send(node, in: document, value: .string($0), editing: true)
+                })
+    }
+
+    private func commit() {
+        guard hasDraft, node.commitAction != nil else { return }
+        hasDraft = false
+        model.send(node, in: document, value: .string(value.wrappedValue), editing: true, committing: true)
     }
 
     @ViewBuilder private var entry: some View {
         if node.secure == true {
             #if os(iOS)
-            XgentIOSSecretField(text: value, focused: $secretFocused, node: node)
+            XgentIOSSecretField(text: value, focused: $secretFocused, node: node, commit: commit)
             #else
-            SecureField(node.text ?? "", text: value)
+            SecureField(node.text ?? "", text: value).focused($focused)
             #endif
         }
-        else { TextField(node.text ?? "", text: value) }
+        else { TextField(node.text ?? "", text: value).focused($focused) }
     }
 
     @ViewBuilder private var accessibleEntry: some View {
@@ -43,7 +54,8 @@ struct XgentTextInput: View {
             XgentFieldLabel(node: node)
             accessibleEntry
                 .textFieldStyle(.plain)
-                .modifier(XgentFieldSurface(node: node, active: secretFocused))
+                .modifier(XgentFieldSurface(node: node, active: focused || secretFocused))
+                .onSubmit(commit)
                 #if os(iOS)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -52,6 +64,11 @@ struct XgentTextInput: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
         .disabled(node.disabled == true)
+        .onChange(of: focused) { wasFocused, isFocused in
+            if wasFocused && !isFocused { commit() }
+        }
+        .onChange(of: node.action) { _, _ in hasDraft = false }
+        .onChange(of: node.commitAction) { _, _ in hasDraft = false }
     }
 }
 
@@ -61,9 +78,26 @@ struct XgentSelector: View {
     @ObservedObject var model: XgentPresentationModel
     var showsLabel = true
     @Environment(\.xgentSettingsRow) private var isSettingsRow
+    @State private var pickerOpen = false
 
     private var selectedLabel: String {
         node.options?.first { $0.value == model.value(node, in: document).text }?.label ?? node.text ?? ""
+    }
+
+    private var selectionLabel: some View {
+        HStack(spacing: 8) {
+            Text(selectedLabel).fixedSize(horizontal: false, vertical: true)
+            if !isSettingsRow { Spacer(minLength: 8) }
+            Image(systemName: "chevron.up.chevron.down").font(.caption).accessibilityHidden(true)
+        }
+        .modifier(XgentSelectorSurface(node: node, isSettingsRow: isSettingsRow))
+    }
+
+    @ViewBuilder private var control: some View {
+        if node.variant == "searchable-selector" {
+            Button { pickerOpen = true } label: { selectionLabel }
+                .modifier(XgentSelectionPresentation(node: node, document: document, model: model, isPresented: $pickerOpen))
+        } else { menu }
     }
 
     private var menu: some View {
@@ -79,12 +113,7 @@ struct XgentSelector: View {
                     .disabled(option.disabled == true)
                 }
             } label: {
-                HStack(spacing: 8) {
-                    Text(selectedLabel).fixedSize(horizontal: false, vertical: true)
-                    if !isSettingsRow { Spacer(minLength: 8) }
-                    Image(systemName: "chevron.up.chevron.down").font(.caption).accessibilityHidden(true)
-                }
-                .modifier(XgentSelectorSurface(node: node, isSettingsRow: isSettingsRow))
+                selectionLabel
             }
             .menuStyle(.button)
             .menuIndicator(.hidden)
@@ -98,15 +127,23 @@ struct XgentSelector: View {
     var body: some View {
         Group {
             if isSettingsRow && showsLabel {
-                XgentSettingsValueRow(node: node) { menu }
+                XgentSettingsValueRow(node: node) { accessibleControl }
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     if showsLabel { XgentFieldLabel(node: node) }
-                    menu
+                    accessibleControl
                 }
             }
         }
         .disabled(node.disabled == true)
+    }
+
+    private var accessibleControl: some View {
+        control.buttonStyle(.plain)
+            .accessibilityIdentifier(node.id)
+            .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
+            .accessibilityValue(selectedLabel)
+            .accessibilityHint(node.accessibilityHint ?? node.text ?? "")
     }
 }
 

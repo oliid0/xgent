@@ -1747,9 +1747,9 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   } else if (page === "other") {
     nodes.push(
       c.group("other-tools", titles.other, [
-        navigate("hooks", "bolt"),
-        navigate("cron", "calendar.badge.clock"),
-        navigate("ssh", "server.rack"),
+        { ...navigate("hooks", "bolt"), text: t("settings.mobile.hooksDescription") },
+        { ...navigate("cron", "calendar.badge.clock"), text: t("settings.mobile.cronDescription") },
+        { ...navigate("ssh", "server.rack"), text: t("settings.mobile.sshDescription") },
       ]),
     );
   } else if (page === "access") {

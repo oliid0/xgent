@@ -47,6 +47,38 @@ export function presentationControls(actionScope?: string) {
         ),
       };
     },
+    committedInput(
+      id: string,
+      label: string,
+      value: string,
+      edit: (value: string) => unknown,
+      commit: (value: string) => unknown,
+      secure = false,
+      enabled = true,
+      normalize?: (value: string) => string,
+    ): PresentationNode {
+      const committed = bind(
+        `${id}:commit`,
+        (next) => commit(next as string),
+        (next) => typeof next === "string",
+        enabled,
+        normalize ? (next) => normalize(next as string) : undefined,
+      );
+      return {
+        id,
+        kind: "TextInput",
+        label,
+        value,
+        secure,
+        commitAction: committed.action,
+        ...bind(
+          id,
+          (next) => edit(next as string),
+          (next) => typeof next === "string",
+          enabled,
+        ),
+      };
+    },
     color(
       id: string,
       label: string,

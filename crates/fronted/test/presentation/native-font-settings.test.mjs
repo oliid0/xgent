@@ -79,10 +79,11 @@ test("native font selectors persist independent values and require valid custom 
   assert.equal(h.settings.customSettings.chatFontFamily, "Georgia");
   await h.dispatch("font-family:chatFontFamily:custom", ' "Missing Font",   Georgia ');
   assert.equal(h.settings.customSettings.chatFontFamily, "Georgia");
-  assert.equal((await h.dispatch("font-family:chatFontFamily:save")).ok, true);
+  assert.equal(h.node("font-family:chatFontFamily:custom").commitAction, "font-family:chatFontFamily:custom:commit");
+  assert.equal((await h.dispatch("font-family:chatFontFamily:custom:commit", ' "Missing Font",   Georgia ')).ok, true);
   assert.equal(h.settings.customSettings.chatFontFamily, '"Missing Font", Georgia');
   await h.dispatch("font-family:chatFontFamily:custom", "url(secret)");
-  assert.equal((await h.dispatch("font-family:chatFontFamily:save")).ok, false);
+  assert.equal((await h.dispatch("font-family:chatFontFamily:custom:commit", "url(secret)")).ok, false);
   assert.equal(h.settings.customSettings.chatFontFamily, '"Missing Font", Georgia');
   await h.dispatch("font-family:chatFontFamily", "__default__");
   assert.equal(h.settings.customSettings.chatFontFamily, "");

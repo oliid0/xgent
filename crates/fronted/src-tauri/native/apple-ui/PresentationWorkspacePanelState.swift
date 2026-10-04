@@ -7,9 +7,11 @@ struct XgentWorkspacePanelControls: Decodable {
     let expandLabel: String
     let restoreLabel: String
     let closeLabel: String
+    let closeTabLabel: String?
 
     var isValid: Bool {
         (0...9_007_199_254_740_991).contains(focusRequest) &&
+        (closeTabLabel.map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? true) &&
         [openLabel, returnLabel, expandLabel, restoreLabel, closeLabel].allSatisfy {
             !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }

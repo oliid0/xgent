@@ -72,6 +72,8 @@ export function validatePresentationDocument(
       document.formFactor !== "desktop" ||
       !document.dismissAction ||
       !panel ||
+      (panel.closeTabLabel !== undefined &&
+        (typeof panel.closeTabLabel !== "string" || !panel.closeTabLabel.trim())) ||
       !Number.isSafeInteger(panel.focusRequest) ||
       panel.focusRequest < 0 ||
       [
@@ -103,6 +105,16 @@ export function validatePresentationDocument(
         }
         if (!handlers.has(node.action))
           throw new Error(`Missing native action handler: ${node.action}`);
+      }
+      if (
+        node.commitAction !== undefined &&
+        (node.kind !== "TextInput" ||
+          !node.action ||
+          !node.commitAction ||
+          node.commitAction === node.action ||
+          !handlers.has(node.commitAction))
+      ) {
+        throw new Error(`Invalid native text commit action: ${node.id}`);
       }
       if (
         node.diagramAction !== undefined &&

@@ -25,8 +25,8 @@ struct XgentWorkspaceEditorTabs: View {
             .focusable()
             .onAppear { if let selected { proxy.scrollTo(selected) } }
             .onChange(of: selected) { _, id in if let id { proxy.scrollTo(id) } }
-            .onKeyPress(.leftArrow) { select(-1) }
-            .onKeyPress(.rightArrow) { select(1) }
+            .modifier(XgentTabKeyNavigation(ids: tabs.map(\.id), current: selected,
+                select: select, close: close))
         }
         .frame(minWidth: 0, maxWidth: .infinity)
         .frame(height: contentHeight)
@@ -34,11 +34,18 @@ struct XgentWorkspaceEditorTabs: View {
         .accessibilityLabel(node.label ?? "")
     }
 
-    private func select(_ direction: Int) -> KeyPress.Result {
-        guard let index = tabs.firstIndex(where: { $0.selected == true }), !tabs.isEmpty,
-              let action = tabs[(index + direction + tabs.count) % tabs.count].children?.first,
-              action.disabled != true, !model.isBusy(action, in: document) else { return .ignored }
+    private func select(_ id: String) -> Bool {
+        guard let action = tabs.first(where: { $0.id == id })?.children?.first,
+              action.disabled != true, !model.isBusy(action, in: document) else { return false }
         XgentWorkspaceTabAction.send(action, document: document, model: model)
-        return .handled
+        return true
+    }
+
+    private func close() -> Bool {
+        guard let tab = tabs.first(where: { $0.selected == true }), let action = tab.children?.last,
+              action.id != tab.children?.first?.id, action.disabled != true,
+              !model.isBusy(action, in: document) else { return false }
+        XgentWorkspaceTabAction.send(action, document: document, model: model)
+        return true
     }
 }

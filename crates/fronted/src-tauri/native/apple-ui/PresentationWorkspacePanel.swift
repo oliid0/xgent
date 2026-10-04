@@ -12,10 +12,9 @@ struct XgentDesktopWorkspaceLayout<Main: View>: View {
     let minimumMainWidth: CGFloat
     let enabled: Bool
     let main: Main
-    @Environment(\.colorScheme) private var scheme
-    @Environment(\.xgentPresentationTheme) private var theme
     @AppStorage("xgent.native.workspace-panel-width.v1") private var storedWidth = 420.0
     @State private var state = XgentWorkspacePanelState()
+    @FocusState private var tabStripFocused: Bool
 
     init(model: XgentPresentationModel, minimumMainWidth: CGFloat, enabled: Bool,
          @ViewBuilder content: () -> Main) {
@@ -84,20 +83,24 @@ struct XgentDesktopWorkspaceLayout<Main: View>: View {
                     ScrollView(.horizontal) {
                         HStack(spacing: 4) {
                             ForEach(panels) { tab in
-                                Button { state.select(tab.surface) } label: {
-                                    Text(tab.title).lineLimit(1).frame(maxWidth: 180)
-                                        .padding(.horizontal, 8).padding(.vertical, 6)
-                                        .background(tab.surface == document.surface ? Color(xgentHex: theme.palette(for: scheme).muted) : .clear,
-                                                    in: RoundedRectangle(cornerRadius: 6))
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityAddTraits(tab.surface == document.surface ? [.isSelected] : [])
+                                XgentWorkspacePanelTab(document: tab, selected: tab.surface == document.surface,
+                                                       select: {
+                                    state.select(tab.surface)
+                                    tabStripFocused = true
+                                }, model: model)
                                 .id(tab.surface)
-                                .accessibilityIdentifier("xgent-workspace-tab:\(tab.surface)")
                             }
                         }
                     }
                     .scrollIndicators(.hidden)
+                    .focusable()
+                    .focused($tabStripFocused)
+                    .modifier(XgentTabKeyNavigation(ids: panels.map(\.surface), current: document.surface,
+                        select: { state.select($0); return true }, close: {
+                            guard document.dismissAction != nil, !model.isDismissing(document) else { return false }
+                            model.dismiss(document)
+                            return true
+                        }))
                     .onAppear { proxy.scrollTo(document.surface) }
                     .onChange(of: document.surface) { _, id in proxy.scrollTo(id) }
                 }
@@ -120,10 +123,7 @@ struct XgentDesktopWorkspaceLayout<Main: View>: View {
                             id: "expand") { state.expanded.toggle() }
                         .keyboardShortcut(KeyEquivalent(Character(String(UnicodeScalar(Int(NSEvent.SpecialKey.f11.rawValue))!))), modifiers: [])
                 }
-                if document.dismissAction != nil {
-                    control(controls.closeLabel, icon: "xmark", id: "close") { model.dismiss(document) }
-                        .disabled(model.isDismissing(document))
-                }
+                control(controls.closeLabel, icon: "sidebar.right", id: "close") { state.visible = false }
             }
             .padding(6)
             Divider()

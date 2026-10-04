@@ -17,6 +17,7 @@ export function createNativeWorkspacePanel(
           expandLabel: t("chat.workspacePanel.expand"),
           restoreLabel: t("chat.workspacePanel.restore"),
           closeLabel: t("chat.workspacePanel.close"),
+          closeTabLabel: t("browser.closeTab"),
         },
       };
 }

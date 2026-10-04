@@ -251,7 +251,7 @@ struct XgentIOSNode: View {
         switch node.kind {
         case .textInput, .colorInput:
             rendered
-        case .navigationRow where node.variant == "sidebar-conversation-row":
+        case .navigationRow where node.variant == "sidebar-conversation-row" || node.variant == "sidebar-workspace-row":
             rendered
         case .collapsible where node.variant == "memory-project":
             rendered.accessibilityElement(children: .contain)
@@ -384,7 +384,9 @@ struct XgentIOSNode: View {
                 VStack(alignment: .leading, spacing: node.spacing.map { CGFloat($0) }) { children }
             }
         case .hStack:
-            if node.variant == "workspace-file-metadata" {
+            if node.variant == "sidebar-section-heading" {
+                XgentSidebarSectionHeading(node: node, document: document, model: model)
+            } else if node.variant == "workspace-file-metadata" {
                 XgentWorkspaceFileMetadata(node: node, document: document, model: model)
             } else { XgentHorizontalControls(node: node) { children } }
         case .scrollView:
@@ -504,7 +506,7 @@ struct XgentIOSNode: View {
         case .treeRow, .navigationRow:
             if node.variant == "memory-entry" {
                 XgentMemoryEntry(node: node, document: document, model: model)
-            } else if node.variant == "sidebar-conversation-row" {
+            } else if node.variant == "sidebar-conversation-row" || node.variant == "sidebar-workspace-row" {
                 XgentSidebarConversationRow(node: node, document: document, model: model)
             } else { navigationRow }
         case .settingsGroup:

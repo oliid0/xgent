@@ -13,9 +13,10 @@ import AppKit
 final class SidebarConversationRenderingTests: XCTestCase {
     @MainActor
     func testConversationMenusRemainSeparateFromLongTitlesAtNarrowAndAccessibleWidths() async throws {
-        for width in [CGFloat(240), 320] {
+        let cases = [false, true].flatMap { workspace in [CGFloat(240), 320].map { (workspace, $0) } }
+        for (workspace, width) in cases {
             for size in [DynamicTypeSize.large, .accessibility3] {
-                let document = try fixture()
+                let document = try fixture(workspace: workspace)
                 let model = XgentPresentationModel()
                 model.update(document)
                 let view = ScrollView {
@@ -59,7 +60,7 @@ final class SidebarConversationRenderingTests: XCTestCase {
                 }
                 #endif
                 let attachment = XCTAttachment(image: image)
-                attachment.name = "sidebar-actions-\(Int(width))-\(size == .large ? "standard" : "large-dark")"
+                attachment.name = "sidebar-\(workspace ? "workspace" : "conversation")-actions-\(Int(width))-\(size == .large ? "standard" : "large-dark")"
                 attachment.lifetime = .keepAlways
                 add(attachment)
                 #if os(iOS)
@@ -94,9 +95,9 @@ final class SidebarConversationRenderingTests: XCTestCase {
         }
     }
 
-    private func fixture() throws -> XgentDocument {
+    private func fixture(workspace: Bool = false) throws -> XgentDocument {
         let nodes = ["selected", "running", "ordinary"].map { id -> [String: Any] in
-            ["id": id, "kind": "NavigationRow", "variant": "sidebar-conversation-row", "label": "\(id): Review browser results and prepare the workspace presentation",
+            ["id": id, "kind": "NavigationRow", "variant": workspace ? "sidebar-workspace-row" : "sidebar-conversation-row", "label": "\(id): Review browser results and prepare the workspace presentation",
              "action": id, "selected": id == "selected", "status": id == "running" ? "running" : "completed",
              "icon": "pin.fill", "children": [["id": "\(id):menu", "kind": "Menu", "variant": "compact", "icon": "ellipsis", "label": "Actions for \(id)", "children": [
                 ["id": "\(id):rename", "kind": "Button", "label": "Rename", "action": "\(id):rename", "disabled": id == "running"],

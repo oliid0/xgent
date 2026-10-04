@@ -51,6 +51,7 @@ export type PresentationNode = {
   text?: string;
   value?: PresentationValue;
   action?: string;
+  commitAction?: string;
   diagramAction?: string;
   focusRequest?: number;
   disabled?: boolean;
@@ -110,6 +111,7 @@ export type PresentationDocument = {
     expandLabel: string;
     restoreLabel: string;
     closeLabel: string;
+    closeTabLabel?: string;
   };
   title: string;
   appearance: "system" | "light" | "dark";

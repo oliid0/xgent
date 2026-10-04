@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -47,6 +47,31 @@ test("static Apple UI copies complete localization and shader bundles, preservin
   const missing = path.join(directory, "empty");
   mkdirSync(missing);
   assert.notEqual(run("copy", missing, resources).status, 0, "Missing production resources must fail packaging");
+});
+
+test("device then simulator staging replaces read-only SwiftPM fonts without changing the source product", (t) => {
+  const directory = fixture(t);
+  const binary = path.join(directory, "swift-product");
+  const resources = path.join(directory, "apple-ui-bundles");
+  const relative = "SwaTex_SwaTexRender.bundle/Fonts/KaTeX_Main-Regular.ttf";
+  const font = path.join(binary, relative), staged = path.join(resources, relative);
+  mkdirSync(path.dirname(font), { recursive: true });
+  writeFileSync(font, "device-font");
+  chmodSync(font, 0o444);
+  assert.equal(run("copy", binary, resources).status, 0);
+  // Reproduce an existing staging directory created by the older copier.
+  chmodSync(staged, 0o444);
+  if (process.platform !== "win32") chmodSync(path.dirname(staged), 0o555);
+  chmodSync(font, 0o644);
+  writeFileSync(font, "simulator-font");
+  chmodSync(font, 0o444);
+  const result = run("copy", binary, resources);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(staged, "utf8"), "simulator-font");
+  assert.equal(readFileSync(font, "utf8"), "simulator-font");
+  assert.equal(statSync(font).mode & 0o200, 0, "Do not relax the source product's permissions");
+  assert.notEqual(statSync(staged).mode & 0o200, 0);
+  assert.equal(run("copy", binary, resources).status, 0, "Repeated architecture staging remains usable");
 });
 
 test("IPA resource checks accept only terminal shaders carried inside the installed main application", (t) => {

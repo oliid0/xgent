@@ -50,6 +50,7 @@ import type { SidebarStore } from "../lib/sidebar/store";
 import { type DesktopSttCapture, startDesktopSttCapture } from "../lib/stt/desktopAudioCapture";
 import type { TaskListState } from "../lib/tools/builtinTypes";
 import type { PendingToolApprovalSummary, ToolApprovalDecision } from "../lib/tools/toolApproval";
+import { sortWorkspaceProjectsByActivity } from "../lib/workspaceProjects";
 import type { ChatQueueTurnPreview } from "../pages/chat/components/ChatComposerBar";
 import { createNativeComposerStore } from "./composerStore";
 import { presentationControls } from "./controls";
@@ -67,6 +68,10 @@ import { nativeReadOnlyCodeNodes } from "./nativeReadOnlyCode";
 import { attachReadOnlySyntax, readOnlySyntaxPalette } from "./nativeReadOnlySyntax";
 import { createNativeTaskProgress } from "./nativeTaskProgress";
 import { createNativePresentationTheme } from "./nativeTheme";
+import {
+  type NativeWorkspaceActionsProps,
+  useNativeWorkspaceActions,
+} from "./nativeWorkspaceActions";
 import type { NativeWorkspaceEditorSessions } from "./nativeWorkspaceEditorSessions";
 import type { PresentationHandler, PresentationNode, PresentationValue } from "./types";
 
@@ -85,7 +90,7 @@ function activityIcon(toolName: string) {
   return "hammer";
 }
 
-export type NativeChatPageProps = {
+export type NativeChatPageProps = NativeWorkspaceActionsProps & {
   editorSessions?: NativeWorkspaceEditorSessions;
   conversationId: string;
   uploadWorkdir: string;
@@ -166,6 +171,20 @@ export function NativeChatPage(props: NativeChatPageProps) {
     props.sidebarStore.subscribe,
     props.sidebarStore.getSnapshot,
   );
+  const workspaceActions = useNativeWorkspaceActions(
+    {
+      ...props,
+      runningProjectPathKeys: sidebar.runningWorkdirPathKeys,
+      onNavigate: () => {
+        if (compact) setSidebarOpen(false);
+      },
+    },
+    t,
+  );
+  const sidebarProjects = sortWorkspaceProjectsByActivity(props.projects, {
+    projectActivityUpdatedAts: sidebar.workdirActivity,
+    runningProjectPathKeys: sidebar.runningWorkdirPathKeys,
+  });
   const live = useSyncExternalStore(
     props.liveTranscriptStore.subscribe,
     props.liveTranscriptStore.getSnapshot,
@@ -995,6 +1014,8 @@ export function NativeChatPage(props: NativeChatPageProps) {
     };
   };
   const projectSidebarRows = (project: WorkspaceProject, indent = 0): PresentationNode[] => {
+    const archived =
+      props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)) ?? false;
     const expanded = expandedProjectIds.has(project.id);
     const key = workspaceProjectPathKey(project.path);
     const state = sidebar.workspaceHistory.get(key);
@@ -1007,6 +1028,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
     return [
       {
         ...sidebarButton(`project:${project.id}`, project.name, () => {
+          if (archived) return;
           setExpandedProjectIds((current) => {
             const next = new Set(current);
             if (next.has(project.id)) next.delete(project.id);
@@ -1016,9 +1038,17 @@ export function NativeChatPage(props: NativeChatPageProps) {
           props.onSelectProject(project);
         }),
         icon: expanded ? "folder.fill" : "folder",
+        variant: "sidebar-workspace-row",
+        selected: workspaceProjectPathKey(props.uploadWorkdir) === key,
+        secondary: archived,
+        status: sidebar.runningWorkdirPathKeys.has(key) ? "running" : undefined,
+        accessibilityValue: sidebar.runningWorkdirPathKeys.has(key)
+          ? t("chat.statusRunningReply")
+          : undefined,
+        children: [workspaceActions.projectMenu(project)],
         indent,
       },
-      ...(expanded
+      ...(expanded && !archived
         ? visible.map((conversation) =>
             conversationSidebarRow(
               {
@@ -1039,7 +1069,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
             ),
           )
         : []),
-      ...(expanded && (!state || (state.loading && visible.length === 0))
+      ...(expanded && !archived && (!state || (state.loading && visible.length === 0))
         ? [
             {
               id: `workspace-loading:${project.id}`,
@@ -1049,7 +1079,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
             },
           ]
         : []),
-      ...(expanded && state?.error
+      ...(expanded && !archived && state?.error
         ? [
             {
               ...sidebarButton(`workspace-retry:${project.id}`, t("presentation.retry"), () =>
@@ -1059,7 +1089,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
             },
           ]
         : []),
-      ...(expanded && (state?.hasMore || conversations.length > visible.length)
+      ...(expanded && !archived && (state?.hasMore || conversations.length > visible.length)
         ? [
             {
               ...sidebarButton(`workspace-more:${project.id}`, t("presentation.loadMore"), () =>
@@ -1081,8 +1111,10 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const projectQuery = query.toLocaleLowerCase();
   const projectNodes: PresentationNode[] = [
     ...(props.workspaceProjectGroups ?? []).flatMap((group): PresentationNode[] => {
-      const members = props.projects.filter(
-        (project) => groupByPath.get(workspaceProjectPathKey(project.path)) === group.id,
+      const members = sidebarProjects.filter(
+        (project) =>
+          groupByPath.get(workspaceProjectPathKey(project.path)) === group.id &&
+          !props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)),
       );
       const groupMatches = group.name.toLocaleLowerCase().includes(projectQuery);
       const visibleMembers = groupMatches
@@ -1095,17 +1127,47 @@ export function NativeChatPage(props: NativeChatPageProps) {
             props.onToggleWorkspaceGroupCollapsed?.(group.id),
           ),
           icon: group.collapsed ? "folder" : "folder.fill",
+          variant: "sidebar-workspace-row",
+          children: [workspaceActions.groupMenu(group)],
         },
         ...(!group.collapsed
           ? visibleMembers.flatMap((project) => projectSidebarRows(project, 18))
           : []),
       ];
     }),
-    ...props.projects
+    ...sidebarProjects
+      .filter(
+        (project) => !props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)),
+      )
       .filter((project) => !groupByPath.has(workspaceProjectPathKey(project.path)))
       .filter((project) => project.name.toLocaleLowerCase().includes(projectQuery))
       .flatMap((project) => projectSidebarRows(project)),
+    ...(props.projects.some((project) =>
+      props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)),
+    )
+      ? [
+          {
+            id: "archived-projects-label",
+            kind: "Heading" as const,
+            text: t("chat.workspaceArchivedGroup").replace(
+              "{count}",
+              String(
+                props.projects.filter((project) =>
+                  props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)),
+                ).length,
+              ),
+            ),
+          },
+          ...sidebarProjects
+            .filter((project) =>
+              props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)),
+            )
+            .filter((project) => project.name.toLocaleLowerCase().includes(projectQuery))
+            .flatMap((project) => projectSidebarRows(project)),
+        ]
+      : []),
   ];
+  for (const [id, handler] of workspaceActions.handlers) sidebarHandlers.set(id, handler);
   sidebarHandlers.set("search", {
     enabled: true,
     accepts: (value) => typeof value === "string",
@@ -1420,8 +1482,10 @@ export function NativeChatPage(props: NativeChatPageProps) {
                       }),
                       {
                         id: "projects-label",
-                        kind: "Heading",
+                        kind: "HStack",
+                        variant: "sidebar-section-heading",
                         text: t("chat.workspaceSection"),
+                        children: [workspaceActions.workspaceMenu],
                       },
                       ...projectNodes,
                       { id: "recents-label", kind: "Heading", text: t("chat.recentConversation") },
@@ -1613,6 +1677,21 @@ export function NativeChatPage(props: NativeChatPageProps) {
             nodes: dialogNodes,
           }}
           handlers={dialogControls.handlers}
+          onError={setFailure}
+        />
+      ) : null}
+      {workspaceActions.dialog ? (
+        <NativeSurface
+          document={{
+            mode: "sheet",
+            title: workspaceActions.dialog.title,
+            appearance: props.settings.theme,
+            formFactor: compact ? "mobile" : "desktop",
+            theme: createNativePresentationTheme(props.settings, compact, "sidebar"),
+            dismissAction: "workspace-dialog-cancel",
+            nodes: workspaceActions.dialog.nodes,
+          }}
+          handlers={workspaceActions.dialog.handlers}
           onError={setFailure}
         />
       ) : null}

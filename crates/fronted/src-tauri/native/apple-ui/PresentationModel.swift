@@ -152,6 +152,7 @@ struct XgentNode: Decodable, Identifiable {
     let text: String?
     let value: XgentValue?
     let action: String?
+    let commitAction: String?
     let diagramAction: String?
     let focusRequest: Int?
     let disabled: Bool?
@@ -274,6 +275,10 @@ struct XgentDocument: Decodable, Identifiable {
                 }
                 if let diagramAction = node.diagramAction {
                     guard node.kind == .markdown, !diagramAction.isEmpty else { throw XgentProtocolError.invalid }
+                }
+                if let commitAction = node.commitAction {
+                    guard node.kind == .textInput, node.action?.isEmpty == false,
+                          !commitAction.isEmpty, commitAction != node.action else { throw XgentProtocolError.invalid }
                 }
                 let measures = [node.minimum, node.maximum, node.step, node.current, node.total].compactMap { $0 }
                 // Business ranges are finite, not screen dimensions. In particular,
@@ -430,7 +435,7 @@ final class XgentPresentationModel: ObservableObject {
             for node in nodes {
                 let nodeKey = key(document.surface, node.id)
                 visibleNodes.insert(nodeKey)
-                if let old = previous?.node(id: node.id), old.action != node.action || old.kind != node.kind {
+                if let old = previous?.node(id: node.id), old.action != node.action || old.commitAction != node.commitAction || old.kind != node.kind {
                     // Stable field IDs can represent a different provider or
                     // route. Its draft and pending ACK belong to the old action.
                     edits.removeValue(forKey: nodeKey)
@@ -482,13 +487,15 @@ final class XgentPresentationModel: ObservableObject {
     }
 
     func send(_ node: XgentNode, in document: XgentDocument, value: XgentValue = .null,
-              editing: Bool = false, continuous: Bool = false) {
+              editing: Bool = false, continuous: Bool = false, committing: Bool = false) {
         guard active else { return }
+        guard !committing || (node.kind == .textInput && editing && !continuous) else { return }
         guard !continuous || ((node.kind == .terminalViewport || node.kind == .shortcutRecorder || node.kind == .spreadsheetGrid) && !editing) else { return }
         guard node.disabled != true,
               let current = documents.first(where: { $0.surface == document.surface })?.node(id: node.id),
               current.kind == node.kind, current.action == node.action,
-              current.disabled != true, let action = current.action else { return }
+              !committing || current.commitAction == node.commitAction,
+              current.disabled != true, let action = committing ? current.commitAction : current.action else { return }
         let nodeKey = key(document.surface, node.id)
         if !editing && !continuous && busy.contains(nodeKey) { return }
         let requestId = UUID().uuidString

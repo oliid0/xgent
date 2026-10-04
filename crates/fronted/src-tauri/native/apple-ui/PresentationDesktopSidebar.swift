@@ -112,6 +112,10 @@ struct XgentDesktopSidebar: View {
 
     @ViewBuilder private func historyItem(_ item: XgentNode) -> some View {
         if item.id == "projects-label" {
+            if item.variant == "sidebar-section-heading" {
+                XgentSidebarSectionHeading(node: item, document: document, model: model)
+                    .padding(.horizontal, 10).padding(.bottom, 6)
+            } else {
             HStack(spacing: 8) {
                 sectionHeading(item)
                 Spacer(minLength: 8)
@@ -127,6 +131,7 @@ struct XgentDesktopSidebar: View {
             }
             .padding(.horizontal, 10)
             .padding(.bottom, 6)
+            }
         } else if item.id == "recents-label" {
             Divider().padding(.vertical, 10)
             sectionHeading(item).padding(.horizontal, 10).padding(.bottom, 6)

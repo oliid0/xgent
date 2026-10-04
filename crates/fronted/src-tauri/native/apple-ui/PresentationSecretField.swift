@@ -8,12 +8,13 @@ struct XgentIOSSecretField: UIViewRepresentable {
     @Binding var text: String
     @Binding var focused: Bool
     let node: XgentNode
+    var commit: () -> Void = {}
     @Environment(\.isEnabled) private var enabled
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .body) private var scale = 1.0
 
-    func makeCoordinator() -> Coordinator { Coordinator(text: $text, focused: $focused) }
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text, focused: $focused, commit: commit) }
 
     func makeUIView(context: Context) -> UITextField {
         let field = UITextField()
@@ -36,6 +37,7 @@ struct XgentIOSSecretField: UIViewRepresentable {
     func updateUIView(_ field: UITextField, context: Context) {
         context.coordinator.text = $text
         context.coordinator.focused = $focused
+        context.coordinator.commit = commit
         configure(field)
     }
 
@@ -66,10 +68,12 @@ struct XgentIOSSecretField: UIViewRepresentable {
     final class Coordinator: NSObject, UITextFieldDelegate {
         var text: Binding<String>
         var focused: Binding<Bool>
+        var commit: () -> Void
 
-        init(text: Binding<String>, focused: Binding<Bool>) {
+        init(text: Binding<String>, focused: Binding<Bool>, commit: @escaping () -> Void) {
             self.text = text
             self.focused = focused
+            self.commit = commit
         }
 
         @objc func changed(_ field: UITextField) {
@@ -82,6 +86,7 @@ struct XgentIOSSecretField: UIViewRepresentable {
         func textFieldDidEndEditing(_ field: UITextField) {
             changed(field)
             focused.wrappedValue = false
+            commit()
         }
         func textFieldShouldReturn(_ field: UITextField) -> Bool {
             changed(field)
