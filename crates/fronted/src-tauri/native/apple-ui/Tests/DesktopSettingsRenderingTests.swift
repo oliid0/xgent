@@ -39,11 +39,17 @@ final class DesktopSettingsRenderingTests: XCTestCase {
             let attachment = XCTAttachment(image: NSImage(cgImage: try XCTUnwrap(image.cgImage), size: host.bounds.size))
             attachment.name = "settings-actual-presentation-\(Int(width))"; attachment.lifetime = .keepAlways; add(attachment)
             // This point is outside the centered dialog and must dismiss it.
-            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-                let event = try XCTUnwrap(NSEvent.mouseEvent(with: type, location: NSPoint(x: 8, y: 8),
+            let click = try [NSEvent.EventType.leftMouseDown, .leftMouseUp].map { type in
+                try XCTUnwrap(NSEvent.mouseEvent(with: type, location: NSPoint(x: 8, y: 8),
                     modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                     windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
-                window.sendEvent(event)
+            }
+            // AppKit controls may track synchronously inside mouseDown. Queue
+            // the release before dispatching the press so tracking can finish.
+            NSApp.postEvent(click[1], atStart: true)
+            window.sendEvent(click[0])
+            if let release = NSApp.nextEvent(matching: .leftMouseUp, until: Date(), inMode: .default, dequeue: true) {
+                window.sendEvent(release)
             }
             let actionDeadline = ContinuousClock.now + .seconds(3)
             while actions.isEmpty && ContinuousClock.now < actionDeadline { try await Task.sleep(for: .milliseconds(50)) }

@@ -464,3 +464,9 @@ were inspected through GitHub/Swift MCP and official documentation.
   four crowded pages are inset instead of touching the page edge. Computer-use
   setup actions also wrap their long labels. The unmodified next-CI bundle and
   installed applications still need validation for these changes.
+- The desktop CI bundle also rendered all twelve destinations at 1040. Image
+  review found that the global list theme removed PC group borders and squared
+  the selected navigation row. Desktop settings now explicitly retain rounded
+  navigation rows and outlined setting groups. The native pointer fixture queues
+  mouse-up before dispatching mouse-down, because AppKit may track a control
+  synchronously until release; the outside-click assertion remains mandatory.

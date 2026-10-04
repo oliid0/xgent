@@ -2461,6 +2461,18 @@
 .settings-page-desktop > header {
   background: transparent;
 }
+.settings-page-desktop [role="navigation"] .astryx-list {
+  background: transparent;
+}
+.settings-page-desktop [role="navigation"] .astryx-list-item {
+  min-height: 48px;
+  border-radius: var(--radius-element);
+  margin-block: 2px;
+}
+.settings-page-desktop .settings-row-group > .astryx-list {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+}
 
 .settings-page-desktop
   :is(.astryx-layout, .astryx-layout-panel, .astryx-layout-content, .astryx-layout-header) {
