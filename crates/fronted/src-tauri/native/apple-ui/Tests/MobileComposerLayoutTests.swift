@@ -53,6 +53,7 @@ final class MobileComposerLayoutTests: XCTestCase {
                 XCTAssertLessThanOrEqual(rect.maxY, 721)
             }
             try attachNativeAccessibilityEvidence(hierarchy, name: "composer-mentions-320-\(size)")
+            try attachCompositedNativeScreenshot(of: host.view, name: "composer-mentions-320-\(size)")
             let strategy = Snapshotting<UIView, UIImage>.image(size: CGSize(width: 320, height: 720))
             let image = await withCheckedContinuation { continuation in
                 strategy.snapshot(host.view).run { continuation.resume(returning: $0) }

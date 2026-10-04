@@ -76,6 +76,8 @@ final class MobileSettingsRenderingTests: XCTestCase {
                     XCTAssertGreaterThan(scroll.contentSize.height, scroll.bounds.height,
                         "Large settings must remain scrollable to reach all fields/actions")
                 }
+                try attachCompositedNativeScreenshot(of: host.view,
+                    name: "settings-mobile-manual-\(Int(width))-\(typeSize)")
                 let strategy = Snapshotting<UIView, UIImage>.image(size: CGSize(width: width, height: 720))
                 let image = await withCheckedContinuation { continuation in
                     strategy.snapshot(host.view).run { continuation.resume(returning: $0) }

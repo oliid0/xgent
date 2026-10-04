@@ -22,7 +22,7 @@ final class MobileRenderingTests: XCTestCase {
             ("chat-wide", CGFloat(768), "light", DynamicTypeSize.large),
             ("chat-accessible", CGFloat(390), "light", DynamicTypeSize.accessibility2),
         ] {
-            let document = try document(mode: "root", appearance: appearance, nodes: chatNodes)
+            let document = try document(mode: "root", appearance: appearance, nodes: chatNodes, title: "Chat")
             let model = XgentPresentationModel()
             let view = XgentIOSRootPresentation(document: document, sidebar: nil, model: model)
                 .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: document.appearance))
@@ -247,7 +247,7 @@ final class MobileRenderingTests: XCTestCase {
         try await capture(XgentIOSSheetPresentation(initialDocument: settings, model: model),
                           name: "settings-dark", width: 390)
 
-        let chat = try document(mode: "root", appearance: "light", nodes: chatNodes)
+        let chat = try document(mode: "root", appearance: "light", nodes: chatNodes, title: "Chat")
         let sidebar = try document(mode: "sidebar", appearance: "light", nodes: [
             node("sidebar-layout", "VStack", ["children": [
                 node("sidebar-title", "Heading", ["text": "Xgent"]),
@@ -346,14 +346,14 @@ final class MobileRenderingTests: XCTestCase {
     @MainActor
     func testModelGroupsAndLongSettingsHeader() async throws {
         let model = XgentPresentationModel()
-        let chat = try document(mode: "root", appearance: "dark", nodes: chatNodes)
+        let chat = try document(mode: "root", appearance: "dark", nodes: chatNodes, title: "Chat")
         model.update(chat)
         let composer = try XCTUnwrap(chat.nodes.first?.children?.first { $0.id == "composer" })
         let actions = try XCTUnwrap(composer.children?.first { $0.id == "composer-actions" })
         let modelNode = try XCTUnwrap(actions.children?.first { $0.id == "model" })
         try await capture(XgentIOSModelPicker(node: modelNode, document: chat, model: model),
                           name: "model-groups-narrow", width: 320)
-        let lightChat = try document(mode: "root", appearance: "light", nodes: chatNodes)
+        let lightChat = try document(mode: "root", appearance: "light", nodes: chatNodes, title: "Chat")
         let lightModel = XgentPresentationModel()
         lightModel.update(lightChat)
         let lightComposer = try XCTUnwrap(lightChat.nodes.first?.children?.first { $0.id == "composer" })
@@ -463,8 +463,9 @@ final class MobileRenderingTests: XCTestCase {
         controller.view.layoutIfNeeded()
         defer { window.isHidden = true; window.rootViewController = nil }
         try await Task.sleep(nanoseconds: 500_000_000)
-        // SwiftPM tests have no application key window. SnapshotTesting renders
-        // the hosting view's layers and captures WKWebView children separately.
+        try attachCompositedNativeScreenshot(of: controller.view, name: name)
+        // Keep the existing layer snapshot and pixel assertions alongside the
+        // visible hierarchy evidence, including native materials and switches.
         let strategy = Snapshotting<UIViewController, UIImage>.image(size: size)
         let image = await withCheckedContinuation { continuation in
             strategy.snapshot(controller).run { continuation.resume(returning: $0) }
@@ -612,6 +613,11 @@ final class MobileRenderingTests: XCTestCase {
                         ["value": "second", "label": "Remote · SwiftUI review model", "group": "remote", "groupLabel": "Remote", "disabled": true],
                     ]]),
                     node("context-usage", "ProgressBar", ["label": "Context usage", "current": 12, "total": 100]),
+                    node("command-safety", "Selector", ["label": "Command safety", "variant": "composer-command-safety",
+                        "value": "ask", "action": "command-safety", "options": [
+                            ["value": "auto", "label": "Automatic"], ["value": "ask", "label": "Ask"],
+                            ["value": "sandbox", "label": "Sandbox"], ["value": "sandboxOffline", "label": "Offline sandbox"],
+                        ]]),
                     node("attach", "FilePicker", ["label": "Attach", "action": "attach", "options": [
                         ["value": "camera", "label": "Camera"], ["value": "photos", "label": "Photos"], ["value": "files", "label": "Files"],
                     ], "children": [

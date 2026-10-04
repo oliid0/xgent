@@ -279,3 +279,31 @@ Research: [MarkdownUI 2.4.1 InlineText image task](https://github.com/gonzalezre
 [Apple task cancellation checking](https://developer.apple.com/documentation/swift/task/checkcancellation()),
 [content geometry observations](https://developer.apple.com/documentation/swiftui/view/ongeometrychange(for:of:action:)-36gt0)
 and SwaTex 0.5.0's mutex-protected font provider/image renderer were inspected.
+
+- Exported narrow settings screenshots also showed the details chevron moving
+  below a long description. Navigation now keeps the chevron in a separate
+  trailing column while the label, description and current value can wrap.
+- Mobile chat fixtures now use a chat title and the real four-option execution
+  selector. Desktop sidebar fixtures include the brand work-mode menu and check
+  its visible bounds alongside navigation controls.
+- Glass and switch rendering in layer screenshots needs separate visual
+  verification. Mounted UIKit hierarchy captures are added to chat, settings and
+  mention-menu evidence, without replacing the original pixel or geometry tests.
+  The new layout and composited captures await native CI; these are component
+  screenshots, not evidence that the packaged application passes installation.
+
+Research: [SwiftUI adaptive layouts](https://developer.apple.com/documentation/swiftui/viewthatfits),
+[UIKit complete hierarchy rendering](https://developer.apple.com/documentation/uikit/uiview/drawhierarchy(in:afterscreenupdates:))
+and [SnapshotTesting 1.19.6 renderer](https://github.com/pointfreeco/swift-snapshot-testing/blob/1.19.6/Sources/SnapshotTesting/Common/View.swift)
+were inspected through Swift/GitHub MCP.
+
+- CI 286 / `ed1002e`: seven jobs passed. iOS executed 187 tests; mention
+  geometry passed, while all four mounted-update formula pixel assertions failed.
+  Its layer screenshots still do not establish that the floating menu or glass
+  controls are visibly correct; the new composited evidence must confirm that.
+- The pinned SnapshotTesting UIView strategy moves the hosted view into another
+  window and removes it on disposal. Repeated pixel probes thus cancel image
+  tasks during the mounted-update test. That test now renders the same UIView
+  layers directly in the original window and asserts that mount identity stays
+  intact. Its ink threshold, four sizes and deadline remain unchanged. This
+  harness diagnosis and the actual formula rendering still await CI verification.

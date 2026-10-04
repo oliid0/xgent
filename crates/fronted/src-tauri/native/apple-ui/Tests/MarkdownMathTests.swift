@@ -34,7 +34,6 @@ final class MarkdownMathTests: XCTestCase {
                 window.rootViewController = host; window.makeKeyAndVisible()
                 defer { window.isHidden = true; window.rootViewController = nil }
                 host.view.layoutIfNeeded()
-                let strategy = Snapshotting<UIView, UIImage>.image(size: CGSize(width: width, height: 240))
                 let native = host.view!
                 #else
                 let host = NSHostingView(rootView: content("Answer ."))
@@ -47,9 +46,20 @@ final class MarkdownMathTests: XCTestCase {
                 let native = host
                 #endif
                 func capture() async -> MathSnapshotImage {
-                    await withCheckedContinuation { continuation in
+                    #if os(iOS)
+                    // SnapshotTesting's UIView strategy reparents the hosted
+                    // view into a temporary window. Repeated probes therefore
+                    // cancel the very image task this mounted-update test checks.
+                    // Keep the same layer renderer, with the real host mounted.
+                    XCTAssertTrue(native.window === window)
+                    let renderer = UIGraphicsImageRenderer(bounds: native.bounds,
+                        format: UIGraphicsImageRendererFormat(for: native.traitCollection))
+                    return renderer.image { context in native.layer.render(in: context.cgContext) }
+                    #else
+                    return await withCheckedContinuation { continuation in
                         strategy.snapshot(native).run { continuation.resume(returning: $0) }
                     }
+                    #endif
                 }
                 try await Task.sleep(for: .milliseconds(100))
                 let proseSnapshot = await capture()
@@ -72,6 +82,10 @@ final class MarkdownMathTests: XCTestCase {
                 attachment.lifetime = .keepAlways; add(attachment)
                 XCTAssertGreaterThan(ink, proseInk * 6 / 5,
                     "The mounted formula must add visible ink at \(width)/\(size); a restored accessibility label alone is insufficient")
+                #if os(iOS)
+                try attachCompositedNativeScreenshot(of: native,
+                    name: "native-inline-math-pixels-\(Int(width))-\(size)")
+                #endif
             }
         }
     }

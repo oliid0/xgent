@@ -35,8 +35,9 @@ final class DesktopSidebarTests: XCTestCase {
                 let newChat = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "new-chat" })
                 let skills = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "skills" })
                 let settings = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "settings" })
+                let mode = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "sidebar-execution-mode" })
                 let bounds = window.convertToScreen(host.convert(host.bounds, to: nil))
-                for element in [newChat, skills, settings] {
+                for element in [newChat, skills, settings, mode] {
                     let frame = element.accessibilityFrame()
                     XCTAssertGreaterThan(frame.height, 20)
                     XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX - 1)
@@ -76,6 +77,9 @@ final class DesktopSidebarTests: XCTestCase {
             "mode": "sidebar", "title": "XGent", "appearance": "light", "formFactor": "desktop",
             "dismissAction": "close", "nodes": [["id": "sidebar-layout", "kind": "VStack", "children": [
                 ["id": "sidebar-title", "kind": "Heading", "text": "XGent"],
+                ["id": "sidebar-execution-mode", "kind": "Selector", "variant": "sidebar-work-mode",
+                    "label": "Work mode", "value": "tools", "action": "work-mode",
+                    "options": [["value": "tools", "label": "Xgent"], ["value": "text", "label": "Xchat"]]],
                 ["id": "sidebar-close", "kind": "IconButton", "label": "Close sidebar", "action": "close"],
                 ["id": "sidebar-search", "kind": "TextInput", "label": "Search conversations", "value": "", "action": "search"],
                 ["id": "sidebar-list", "kind": "List", "children": [

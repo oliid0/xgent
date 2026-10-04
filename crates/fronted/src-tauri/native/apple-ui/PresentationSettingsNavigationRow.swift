@@ -6,15 +6,15 @@ struct XgentSettingsNavigationRow: View {
     @ObservedObject var model: XgentPresentationModel
 
     private var row: some View {
-        XgentSettingsValueRow(node: node) {
-            HStack(spacing: 8) {
+        HStack(spacing: 12) {
+            XgentSettingsValueRow(node: node) {
                 if let value = node.value?.text, !value.isEmpty {
                     Text(value).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
-                if node.action != nil {
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary).accessibilityHidden(true)
-                }
+            }
+            if node.action != nil {
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary).accessibilityHidden(true)
             }
         }
         .contentShape(Rectangle())
