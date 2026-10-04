@@ -242,6 +242,18 @@ jobs:
             -o "$RUNNER_TEMP/native-cua-arguments" 2>&1 | tee "$RUNNER_TEMP/native-cua-arguments.log"
           "$RUNNER_TEMP/native-cua-arguments" | tee -a "$RUNNER_TEMP/native-cua-arguments.log"
 
+      - name: Test iOS external workspace grant lifetimes and persistence
+        if: ${{ !cancelled() && matrix.platform == 'macos' }}
+        run: |
+          set -o pipefail
+          xcrun swiftc -swift-version 5 -O \
+            "$GITHUB_WORKSPACE/crates/mobile-execution/ios/Sources/MobileExecutionError.swift" \
+            "$GITHUB_WORKSPACE/crates/mobile-execution/ios/Sources/WorkspaceAccessLease.swift" \
+            "$GITHUB_WORKSPACE/crates/mobile-execution/ios/Sources/ExternalWorkspaceStore.swift" \
+            "$GITHUB_WORKSPACE/scripts/release/tests/ios-external-workspaces.swift" \
+            -o "$RUNNER_TEMP/native-workspace-grants" 2>&1 | tee "$RUNNER_TEMP/native-workspace-grants.log"
+          "$RUNNER_TEMP/native-workspace-grants" | tee -a "$RUNNER_TEMP/native-workspace-grants.log"
+
       - name: Compile packaged macOS application UI tests
         if: ${{ !cancelled() && matrix.platform == 'macos' }}
         run: |

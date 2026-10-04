@@ -55,17 +55,6 @@ private struct RemoveExternalWorkspaceArgs: Decodable {
     let id: String
 }
 
-enum MobileExecutionError: LocalizedError {
-    case invalidRequest(String)
-    case io(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidRequest(let message), .io(let message): return message
-        }
-    }
-}
-
 private struct ActiveCommand {
     let runId: String
     let pid: Int32

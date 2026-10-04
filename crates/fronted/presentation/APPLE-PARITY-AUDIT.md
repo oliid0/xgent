@@ -238,3 +238,19 @@ controls; no UI code was generated from Astryx.
   from the node instead of its owning document. It now captures the current
   document alongside its node and records that document revision. Native runtime
   assertions and updated screenshot inspection are still pending.
+- CI 284 / `61c5c25`: the settings navigation view exceeded Swift's expression
+  type-checking limit. The native button/status composition and typed
+  accessibility labels are now separate expressions. This is pending remote
+  compilation; it is not a native layout pass.
+- External iOS workspaces now retain the original FileProvider URL through an
+  owned scope lease before canonicalizing or checking the directory. Replacement,
+  failed bookmark refresh, failed persistence, removal and store destruction
+  release exactly their acquired grants. Stale bookmarks and moved paths are
+  saved, and mutations serialize across snapshot writes and rollback. A remote
+  Foundation regression harness exercises these actual production store methods;
+  device FileProvider behavior remains to be checked in the installed application.
+
+Workspace research: [Apple's directory access guide](https://developer.apple.com/documentation/uikit/providing-access-to-directories),
+[balanced security scope grants](https://developer.apple.com/documentation/foundation/url/startaccessingsecurityscopedresource()),
+the local yy MountedFoldersManager, and the upstream a-Shell scope call sites
+were inspected. The iOS bookmark options remain platform-compatible.

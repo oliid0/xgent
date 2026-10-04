@@ -11,6 +11,7 @@ private struct PersistedExternalWorkspace: Codable, Sendable {
 private struct ActiveExternalWorkspace {
     var persisted: PersistedExternalWorkspace
     let url: URL
+    let access: IOSWorkspaceAccessLease
 }
 
 struct ExternalWorkspaceListItem: Encodable {
@@ -34,21 +35,17 @@ final class IOSExternalWorkspaceStore {
     private let lock = NSLock()
     private let persistenceLock = NSLock()
     private let restoreGroup = DispatchGroup()
+    private let storeURL: URL
+    private let operations: IOSWorkspaceFileOperations
     private var entries: [PersistedExternalWorkspace]
     private var activeById: [String: ActiveExternalWorkspace] = [:]
     private var restoreErrors: [String: String] = [:]
 
-    init() {
-        entries = Self.loadPersisted()
+    init(storeURL: URL? = nil, operations: IOSWorkspaceFileOperations = .live) {
+        self.storeURL = storeURL ?? Self.defaultStoreURL
+        self.operations = operations
+        entries = Self.loadPersisted(at: self.storeURL)
         restorePersistedWorkspaces(entries)
-    }
-
-    deinit {
-        lock.lock()
-        let urls = activeById.values.map(\.url)
-        activeById.removeAll()
-        lock.unlock()
-        urls.forEach { $0.stopAccessingSecurityScopedResource() }
     }
 
     func listEncodablePayload() -> [ExternalWorkspaceListItem] {
@@ -64,27 +61,23 @@ final class IOSExternalWorkspaceStore {
     }
 
     func add(url pickedURL: URL, allowWrite: Bool) throws -> [String: Any] {
-        let url = pickedURL.resolvingSymlinksInPath().standardizedFileURL
+        let access = try IOSWorkspaceAccessLease(url: pickedURL, operations: operations)
+        let url = operations.canonicalize(pickedURL)
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
               isDirectory.boolValue else {
             throw MobileExecutionError.invalidRequest("The selected workspace is unavailable")
         }
 
-        guard url.startAccessingSecurityScopedResource() else {
-            throw MobileExecutionError.invalidRequest(
-                "Could not retain access to the selected workspace"
-            )
-        }
-
         do {
-            let bookmark = try url.bookmarkData(
-                options: [],
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
+            let bookmark = try operations.bookmark(pickedURL)
             let canonicalPath = url.path
             let writable = allowWrite && Self.probeWritable(at: url)
+
+            // Serializing the complete mutation keeps an older snapshot/rollback
+            // from overwriting a concurrent add, remove or bookmark restoration.
+            persistenceLock.lock()
+            defer { persistenceLock.unlock() }
 
             lock.lock()
             if let existingIndex = entries.firstIndex(where: { entry in
@@ -93,6 +86,7 @@ final class IOSExternalWorkspaceStore {
             }) {
                 let previousEntry = entries[existingIndex]
                 let previousActive = activeById[previousEntry.id]
+                let previousError = restoreErrors[previousEntry.id]
                 let refreshed = PersistedExternalWorkspace(
                     id: previousEntry.id,
                     name: previousEntry.name,
@@ -101,7 +95,7 @@ final class IOSExternalWorkspaceStore {
                     lastKnownPath: canonicalPath
                 )
                 entries[existingIndex] = refreshed
-                let replacement = ActiveExternalWorkspace(persisted: refreshed, url: url)
+                let replacement = ActiveExternalWorkspace(persisted: refreshed, url: url, access: access)
                 activeById[refreshed.id] = replacement
                 restoreErrors.removeValue(forKey: refreshed.id)
                 let snapshot = entries
@@ -120,11 +114,11 @@ final class IOSExternalWorkspaceStore {
                         } else {
                             activeById.removeValue(forKey: previousEntry.id)
                         }
+                        restoreErrors[previousEntry.id] = previousError
                     }
                     lock.unlock()
                     throw error
                 }
-                previousActive?.url.stopAccessingSecurityScopedResource()
                 return payload(refreshed, active: replacement, restoreError: nil)
             }
 
@@ -135,7 +129,7 @@ final class IOSExternalWorkspaceStore {
                 writable: writable,
                 lastKnownPath: canonicalPath
             )
-            let active = ActiveExternalWorkspace(persisted: persisted, url: url)
+            let active = ActiveExternalWorkspace(persisted: persisted, url: url, access: access)
             guard entries.count < Self.maximumWorkspaces else {
                 lock.unlock()
                 throw MobileExecutionError.invalidRequest(
@@ -158,12 +152,13 @@ final class IOSExternalWorkspaceStore {
             }
             return payload(persisted, active: active, restoreError: nil)
         } catch {
-            url.stopAccessingSecurityScopedResource()
             throw error
         }
     }
 
     func remove(id: String) throws -> Bool {
+        persistenceLock.lock()
+        defer { persistenceLock.unlock() }
         lock.lock()
         guard entries.contains(where: { $0.id == id }) else {
             lock.unlock()
@@ -184,10 +179,9 @@ final class IOSExternalWorkspaceStore {
         }
 
         lock.lock()
-        let removedActive = activeById.removeValue(forKey: id)
+        activeById.removeValue(forKey: id)
         restoreErrors.removeValue(forKey: id)
         lock.unlock()
-        removedActive?.url.stopAccessingSecurityScopedResource()
         return true
     }
 
@@ -208,10 +202,11 @@ final class IOSExternalWorkspaceStore {
     }
 
     private func restorePersistedWorkspaces(_ snapshot: [PersistedExternalWorkspace]) {
+        let group = restoreGroup
         for entry in snapshot {
-            restoreGroup.enter()
+            group.enter()
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                defer { self?.restoreGroup.leave() }
+                defer { group.leave() }
                 self?.restore(entry)
             }
         }
@@ -219,49 +214,46 @@ final class IOSExternalWorkspaceStore {
 
     private func restore(_ entry: PersistedExternalWorkspace) {
         do {
-            var stale = false
-            let url = try URL(
-                resolvingBookmarkData: entry.bookmark,
-                options: [],
-                relativeTo: nil,
-                bookmarkDataIsStale: &stale
-            ).resolvingSymlinksInPath().standardizedFileURL
-            guard url.startAccessingSecurityScopedResource() else {
-                recordRestoreError(
-                    id: entry.id,
-                    message: "Permission must be granted again for this folder"
-                )
-                return
-            }
+            let resolved = try operations.resolve(entry.bookmark)
+            let access = try IOSWorkspaceAccessLease(url: resolved.url, operations: operations)
+            let url = operations.canonicalize(resolved.url)
             var isDirectory: ObjCBool = false
             guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
                   isDirectory.boolValue else {
-                url.stopAccessingSecurityScopedResource()
                 recordRestoreError(id: entry.id, message: "The folder is currently unavailable")
                 return
             }
 
             var refreshed = entry
             refreshed.lastKnownPath = url.path
-            if stale {
-                refreshed.bookmark = try url.bookmarkData(
-                    options: [],
-                    includingResourceValuesForKeys: nil,
-                    relativeTo: nil
-                )
+            if resolved.stale {
+                refreshed.bookmark = try operations.bookmark(resolved.url)
             }
 
+            persistenceLock.lock()
+            defer { persistenceLock.unlock() }
             lock.lock()
             guard let index = entries.firstIndex(where: { $0.id == entry.id }),
+                  entries[index].bookmark == entry.bookmark,
                   activeById[entry.id] == nil else {
                 lock.unlock()
-                url.stopAccessingSecurityScopedResource()
                 return
             }
             entries[index] = refreshed
-            activeById[entry.id] = ActiveExternalWorkspace(persisted: refreshed, url: url)
+            activeById[entry.id] = ActiveExternalWorkspace(persisted: refreshed, url: url, access: access)
             restoreErrors.removeValue(forKey: entry.id)
+            let snapshot = entries
             lock.unlock()
+            if refreshed.bookmark != entry.bookmark || refreshed.lastKnownPath != entry.lastKnownPath {
+                do { try save(snapshot) }
+                catch {
+                    lock.lock()
+                    entries[index] = entry
+                    activeById.removeValue(forKey: entry.id)
+                    lock.unlock()
+                    throw error
+                }
+            }
         } catch {
             recordRestoreError(id: entry.id, message: error.localizedDescription)
         }
@@ -326,18 +318,12 @@ final class IOSExternalWorkspaceStore {
     }
 
     private func save(_ persisted: [PersistedExternalWorkspace]) throws {
-        persistenceLock.lock()
-        defer { persistenceLock.unlock() }
-        let manager = FileManager.default
-        try manager.createDirectory(
-            at: Self.storeURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
+        // The caller holds persistenceLock across its state update and rollback.
         let data = try JSONEncoder().encode(persisted)
-        try data.write(to: Self.storeURL, options: .atomic)
+        try operations.persist(data, storeURL)
     }
 
-    private static func loadPersisted() -> [PersistedExternalWorkspace] {
+    private static func loadPersisted(at storeURL: URL) -> [PersistedExternalWorkspace] {
         guard let data = try? Data(contentsOf: storeURL),
               let decoded = try? JSONDecoder().decode(
                 [PersistedExternalWorkspace].self,
@@ -367,7 +353,7 @@ final class IOSExternalWorkspaceStore {
 
     private static let maximumWorkspaces = 12
 
-    private static var storeURL: URL {
+    private static var defaultStoreURL: URL {
         let support = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask

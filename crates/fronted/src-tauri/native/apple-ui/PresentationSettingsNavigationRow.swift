@@ -20,18 +20,24 @@ struct XgentSettingsNavigationRow: View {
         .contentShape(Rectangle())
     }
 
+    @ViewBuilder private var control: some View {
+        if node.action != nil {
+            Button { model.send(node, in: document) } label: { row }
+                .buttonStyle(.plain)
+                .disabled(node.disabled == true || model.isBusy(node, in: document))
+        } else { row.accessibilityElement(children: .ignore) }
+    }
+
+    private var label: String { node.accessibilityLabel ?? node.label ?? "" }
+    private var value: String { node.accessibilityValue ?? node.value?.text ?? "" }
+    private var hint: String { node.accessibilityHint ?? node.text ?? "" }
+
     var body: some View {
-        Group {
-            if node.action != nil {
-                Button { model.send(node, in: document) } label: { row }
-                    .buttonStyle(.plain)
-                    .disabled(node.disabled == true || model.isBusy(node, in: document))
-            } else { row.accessibilityElement(children: .ignore) }
-        }
+        control
         .foregroundStyle(.primary)
         .modifier(XgentControlTypography(node: node))
-        .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
-        .accessibilityValue(node.accessibilityValue ?? node.value?.text ?? "")
-        .accessibilityHint(node.accessibilityHint ?? node.text ?? "")
+        .accessibilityLabel(Text(label))
+        .accessibilityValue(Text(value))
+        .accessibilityHint(Text(hint))
     }
 }

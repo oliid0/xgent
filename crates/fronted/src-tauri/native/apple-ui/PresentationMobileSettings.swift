@@ -60,22 +60,22 @@ struct XgentIOSSettingsForm: View {
             LazyVStack(alignment: .leading, spacing: 28) {
                 ForEach(sections) { section in
                     VStack(alignment: .leading, spacing: 10) {
-                    if !section.labels.isEmpty {
-                        Text(section.labels.joined(separator: " / "))
-                            .font(XgentFonts.body(theme.fontFamily, size: CGFloat(15 * theme.fontScale) * headerScale, weight: .semibold))
-                            .foregroundStyle(Color(uiColor: .secondaryLabel))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .textCase(nil)
-                            .accessibilityAddTraits(.isHeader)
-                            .padding(.horizontal, 16)
-                    }
-                    if !section.leadingNotes.isEmpty {
-                        notes(section.leadingNotes).padding(.horizontal, 16)
-                    }
-                    XgentIOSSettingsCard(section: section, document: document, model: model)
-                    if !section.trailingNotes.isEmpty {
-                        notes(section.trailingNotes).padding(.horizontal, 16)
-                    }
+                        if !section.labels.isEmpty {
+                            Text(section.labels.joined(separator: " / "))
+                                .font(XgentFonts.body(theme.fontFamily, size: CGFloat(15 * theme.fontScale) * headerScale, weight: .semibold))
+                                .foregroundStyle(Color(uiColor: .secondaryLabel))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .textCase(nil)
+                                .accessibilityAddTraits(.isHeader)
+                                .padding(.horizontal, 16)
+                        }
+                        if !section.leadingNotes.isEmpty {
+                            notes(section.leadingNotes).padding(.horizontal, 16)
+                        }
+                        XgentIOSSettingsCard(section: section, document: document, model: model)
+                        if !section.trailingNotes.isEmpty {
+                            notes(section.trailingNotes).padding(.horizontal, 16)
+                        }
                     }
                 }
             }
