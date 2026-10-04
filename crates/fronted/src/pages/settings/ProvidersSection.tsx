@@ -2713,7 +2713,7 @@ function ProviderList(props: {
             ? t("settings.noProviders")
             : `${filtered.length} ${t("settings.navProviders")}`}
         </AstryxStack>
-        <HStack gap={2} vAlign="center">
+        <HStack gap={2} vAlign="center" wrap="wrap" style={{ minWidth: 0, maxWidth: "100%" }}>
           <AstryxNativeButton
             label={t("settings.addProvider")}
             variant="primary"
@@ -3275,6 +3275,7 @@ export function ProvidersSection(
       ) : (
         <VStack height="100%" minHeight={0} gap={0}>
           <Toolbar
+            className="settings-provider-tabs-toolbar"
             label={t("settings.navProviders")}
             size="sm"
             dividers={["bottom"]}

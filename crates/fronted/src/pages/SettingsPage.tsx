@@ -27,9 +27,11 @@ import {
   Info,
   Keyboard,
   Mic,
+  Palette,
   Settings2,
   Shield,
   Sparkles,
+  Sun,
   Terminal,
   X,
 } from "../components/icons";
@@ -527,11 +529,17 @@ export function SettingsPage(props: SettingsPageProps) {
                         />
                       }
                     >
-                      <SettingsRow label={t("settings.native.appearance")}>
+                      <SettingsRow
+                        label={t("settings.native.appearance")}
+                        icon={<Icon icon={Sun} size="md" color="inherit" />}
+                      >
                         <Selector
                           label={t("settings.native.appearance")}
                           isLabelHidden
                           value={settings.theme}
+                          variant="ghost"
+                          size="lg"
+                          presentation="adaptive"
                           options={THEME_OPTIONS.map((value) => ({
                             value,
                             label: t(`settings.native.${value}`),
@@ -544,11 +552,17 @@ export function SettingsPage(props: SettingsPageProps) {
                           }
                         />
                       </SettingsRow>
-                      <SettingsRow label={t("settings.ui.preset")}>
+                      <SettingsRow
+                        label={t("settings.ui.preset")}
+                        icon={<Icon icon={Palette} size="md" color="inherit" />}
+                      >
                         <Selector
                           label={t("settings.ui.preset")}
                           isLabelHidden
                           value={settings.customSettings.appearance.preset}
+                          variant="ghost"
+                          size="lg"
+                          presentation="adaptive"
                           options={UI_THEME_PRESETS.map((value) => ({
                             value,
                             label:

@@ -40,6 +40,7 @@ export function SettingsRowGroup(props: {
 
 export function SettingsRow(props: {
   label: string;
+  icon?: ReactNode;
   description?: string;
   children: ReactNode;
   align?: "center" | "start";
@@ -48,6 +49,7 @@ export function SettingsRow(props: {
     <ListItem
       className="settings-control-row"
       label={props.label}
+      startContent={props.icon}
       description={
         props.description ? (
           <Text type="supporting" color="secondary" wordBreak="break-word">

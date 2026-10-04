@@ -416,3 +416,19 @@ Research: [a-Shell embedding configuration](https://github.com/holzschu/a-shell/
 [XcodeGen dependency options](https://github.com/yonaskolb/XcodeGen/blob/master/Docs/ProjectSpec.md)
 and [Apple dynamic library lifecycle](https://developer.apple.com/library/archive/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/DynamicLibraryUsageGuidelines.html)
 were inspected through GitHub/Swift MCP and official documentation.
+
+- CI 291 / `2581326`: all three Apple jobs passed. Hosted iOS ran 189 tests
+  with zero failures; macOS passed its real host accessibility, pointer/action
+  round-trip and shared-JS checks. Composited iOS screenshots were reviewed for
+  the index, centered detail header and long-history sidebar footer. These are
+  live component hosts, not a substitute for packaged application smoke.
+- CI 291's frontend built successfully but failed on the formatting of one CSS
+  selector. That formatting is corrected; all 659 frontend source files pass
+  the error-level Biome check. TypeScript and ten targeted checks also pass.
+- Rendering the downloaded CI 289 bundle with real SettingsPage/Astryx controls
+  exposed overflowing provider action buttons and unbounded toolbar tabs at
+  320 points. Provider actions now wrap, and tabs have a shrinking scroll slot.
+  The settings index uses semantic leading icons and borderless, adaptive
+  current-value selectors. The browser fixture supplies settings data only;
+  it establishes layout evidence, not backend functional parity. Updated bundle
+  rendering and installed-app verification remain required.
