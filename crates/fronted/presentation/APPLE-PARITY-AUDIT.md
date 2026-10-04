@@ -506,3 +506,10 @@ were inspected through GitHub/Swift MCP and official documentation.
   browser run timed out at its final 390-point touch; a separate complete run
   verified that width. This is real compiled layout with fixture settings data,
   not packaged backend or live-service evidence.
+- CI 297 image review showed that label layout priority alone did not stop the
+  Shell menu from stacking. Desktop setting rows now measure the value first
+  and wrap the label within the remaining column, falling back to a vertical
+  arrangement for insufficient width or accessibility text. The native host
+  requires the Shell menu to retain its intrinsic width. Navigation labels use
+  their complete remaining column instead of competing with a spacer. Remote
+  layout and pointer verification remain required for these refinements.

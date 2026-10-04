@@ -56,21 +56,24 @@ struct XgentSettingsValueRow<Content: View>: View {
 
     var body: some View {
         Group {
+            #if os(macOS)
+            XgentDesktopSettingsValueLayout(stacked: dynamicTypeSize.isAccessibilitySize) {
+                VStack(alignment: .leading, spacing: 0) { label }
+                VStack(alignment: .leading, spacing: 0) { content }
+            }
+            #else
             if dynamicTypeSize.isAccessibilitySize { stacked }
             else {
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .center, spacing: 12) {
-                        #if os(macOS)
-                        label.frame(minWidth: 180, alignment: .leading).layoutPriority(1)
-                        #else
                         label.fixedSize(horizontal: true, vertical: false)
-                        #endif
                         Spacer(minLength: 12)
                         content.fixedSize(horizontal: true, vertical: false)
                     }
                     stacked
                 }
             }
+            #endif
         }
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .accessibilityElement(children: .contain)

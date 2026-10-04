@@ -34,6 +34,12 @@ final class DesktopSettingsRenderingTests: XCTestCase {
             XCTAssertFalse(elements.contains { $0.accessibilityText() == "Back to Chat" })
             let close = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "settings-close" })
             XCTAssertGreaterThan(close.accessibilityFrame().width, 0)
+            let shell = try XCTUnwrap(elements.first {
+                $0.accessibilityIdentifier() == "terminal-shell" &&
+                ($0.accessibilityRole() == .button || $0.accessibilityRole() == .popUpButton)
+            })
+            XCTAssertLessThan(shell.accessibilityFrame().width, width / 2,
+                "A desktop description must wrap beside its menu instead of pushing it into a full-width second row")
             let image = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
             host.cacheDisplay(in: host.bounds, to: image)
             let attachment = XCTAttachment(image: NSImage(cgImage: try XCTUnwrap(image.cgImage), size: host.bounds.size))
