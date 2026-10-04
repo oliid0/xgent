@@ -513,3 +513,9 @@ were inspected through GitHub/Swift MCP and official documentation.
   requires the Shell menu to retain its intrinsic width. Navigation labels use
   their complete remaining column instead of competing with a spacer. Remote
   layout and pointer verification remain required for these refinements.
+- CI 299 / `cd21024` compiled the new row layout, but its host test did not
+  compile: the accessibility-tree wrapper lacked the role getter used to select
+  the actual menu rather than its containing group. The wrapper now reads the
+  real role through its existing modern/legacy attribute mechanism, and the
+  control selection is split into explicitly typed expressions. Neither the
+  menu-width nor the outside-close assertions has been weakened or skipped.

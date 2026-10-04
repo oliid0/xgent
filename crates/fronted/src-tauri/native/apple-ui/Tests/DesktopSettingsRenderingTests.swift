@@ -34,10 +34,12 @@ final class DesktopSettingsRenderingTests: XCTestCase {
             XCTAssertFalse(elements.contains { $0.accessibilityText() == "Back to Chat" })
             let close = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "settings-close" })
             XCTAssertGreaterThan(close.accessibilityFrame().width, 0)
-            let shell = try XCTUnwrap(elements.first {
-                $0.accessibilityIdentifier() == "terminal-shell" &&
-                ($0.accessibilityRole() == .button || $0.accessibilityRole() == .popUpButton)
-            })
+            let shellControls = elements.filter { element in
+                guard element.accessibilityIdentifier() == "terminal-shell" else { return false }
+                let role = element.accessibilityRole()
+                return role == NSAccessibility.Role.button || role == NSAccessibility.Role.popUpButton
+            }
+            let shell = try XCTUnwrap(shellControls.first)
             XCTAssertLessThan(shell.accessibilityFrame().width, width / 2,
                 "A desktop description must wrap beside its menu instead of pushing it into a full-width second row")
             let image = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
