@@ -470,3 +470,12 @@ were inspected through GitHub/Swift MCP and official documentation.
   navigation rows and outlined setting groups. The native pointer fixture queues
   mouse-up before dispatching mouse-down, because AppKit may track a control
   synchronously until release; the outside-click assertion remains mandatory.
+- Release preflight found a remaining installed-iOS assertion that waited for
+  the intentionally removed Saved badge. It now requires that badge to remain
+  absent and verifies the changed voice flag through application relaunch.
+  Restoring the original flag now has its own relaunch/value assertion too;
+  persistence is checked from actual process restarts rather than a status label.
+- CI 294's iOS rendering and device jobs passed, as did frontend and Rust. The
+  macOS log stopped at the new mouse-down fixture until the newer push canceled
+  it; that supports the event-tracking diagnosis above. It is not a green CI
+  run and must not authorize release.

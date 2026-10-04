@@ -93,7 +93,7 @@ final class PackagedSettingsTests: XCTestCase {
         let changed = original == "1" ? "0" : "1"
         tap(toggle, in: app)
         waitForValue(toggle, changed)
-        waitForSaved(app)
+        XCTAssertFalse(app.staticTexts["save-status"].exists, "Normal saves must not add a visible settings badge")
         tap(app.buttons["back"].firstMatch, in: app)
         closeSettings(app)
         openSettings(app)
@@ -107,7 +107,14 @@ final class PackagedSettingsTests: XCTestCase {
         record(app, name: "ios-packaged-voice-persisted")
         tap(toggle, in: app)
         waitForValue(toggle, original)
-        waitForSaved(app)
+        XCTAssertFalse(app.staticTexts["save-status"].exists)
+        tap(app.buttons["back"].firstMatch, in: app)
+        closeSettings(app)
+        app.terminate()
+        app.launch()
+        openSettings(app)
+        tap(app.buttons["nav:voice"].firstMatch, in: app)
+        waitForValue(toggle, original)
         tap(app.buttons["back"].firstMatch, in: app)
         closeSettings(app)
     }
@@ -175,14 +182,6 @@ final class PackagedSettingsTests: XCTestCase {
         XCTAssertTrue(element.waitForExistence(timeout: 30))
         let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: element)
         XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 30), .completed)
-    }
-
-    private func waitForSaved(_ app: XCUIApplication) {
-        let saved = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "label IN %@", ["Saved", "已保存"] as NSArray),
-            object: app.staticTexts["save-status"].firstMatch)
-        XCTAssertEqual(XCTWaiter.wait(for: [saved], timeout: 30), .completed,
-                       "The shared settings store must confirm persistence before relaunch")
     }
 
     private func record(_ app: XCUIApplication, name: String) {
