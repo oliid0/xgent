@@ -27,7 +27,7 @@ struct XgentDesktopSettingsLayout: View {
         GeometryReader { geometry in
             if geometry.size.width >= 760 && !dynamicTypeSize.isAccessibilitySize {
                 HStack(alignment: .top, spacing: 0) {
-                    navigationColumn.frame(width: 224)
+                    navigationColumn.frame(width: 224).background(.regularMaterial)
                     Divider()
                     detailContent
                 }
@@ -87,8 +87,7 @@ struct XgentDesktopSettingsLayout: View {
 
     @ViewBuilder private var closeControl: some View {
         if let close {
-            if close.kind == .iconButton { XgentIconButton(node: close, document: document, model: model) }
-            else { XgentActionButton(node: close, document: document, model: model) }
+            XgentIconButton(node: close, document: document, model: model)
         }
     }
 
@@ -107,8 +106,8 @@ struct XgentDesktopSettingsLayout: View {
             .modifier(XgentControlTypography(node: item))
             .fontWeight(item.selected == true ? .semibold : .regular)
             .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
-            .background(item.selected == true ? Color(xgentHex: palette.neutral ?? palette.muted) : .clear,
+            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            .background(item.selected == true ? Color(xgentHex: palette.accent).opacity(0.16) : .clear,
                         in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.inner)))
             .contentShape(Rectangle())
         }
@@ -127,9 +126,10 @@ struct XgentDesktopSettingsLayout: View {
                     .font(XgentFonts.body(theme.fontFamily, size: titleSize * CGFloat(theme.fontScale), weight: .bold))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
-                    .frame(maxWidth: 640, alignment: .leading)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 60, alignment: .leading)
                 Divider()
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: CGFloat(theme.spacing.lg)) {

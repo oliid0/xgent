@@ -29,12 +29,14 @@ export function withNativeSettingsChrome(
     return { document, handlers };
   const canClose = !!document.dismissAction;
   const shellHandlers = new Map(chrome.handlers);
-  const close = shellHandlers.get("settings-close");
-  if (close) shellHandlers.set("settings-close", { ...close, enabled: canClose && close.enabled });
+  const closeAction = chrome.sidebar.children?.find((node) => node.id === "settings-close")?.action;
+  const close = closeAction ? shellHandlers.get(closeAction) : undefined;
+  if (close && closeAction)
+    shellHandlers.set(closeAction, { ...close, enabled: canClose && close.enabled });
   return {
     document: {
       ...document,
-      dismissAction: document.dismissAction ? "settings-close" : undefined,
+      dismissAction: document.dismissAction ? closeAction : undefined,
       nodes: [
         {
           id: "settings-layout",

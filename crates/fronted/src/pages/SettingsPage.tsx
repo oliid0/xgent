@@ -633,8 +633,8 @@ export function SettingsPage(props: SettingsPageProps) {
             <VStack height="100%" gap={2}>
               <HStack width="100%" hAlign="start">
                 <IconButton
-                  label={t("settings.backToChat")}
-                  tooltip={t("settings.backToChat")}
+                  label={t("settings.close")}
+                  tooltip={t("settings.close")}
                   icon={<Icon icon={X} size="sm" color="inherit" />}
                   variant="ghost"
                   onClick={onBack}

@@ -53,6 +53,15 @@ final class PackagedApplicationTests: XCTestCase {
 
         click(app.buttons["settings-close"].firstMatch)
         XCTAssertTrue(draft.waitForExistence(timeout: 30))
+        click(settings)
+        XCTAssertTrue(title.waitForExistence(timeout: 30))
+        let backdrop = app.buttons["settings-dismiss-backdrop"].firstMatch
+        XCTAssertTrue(backdrop.waitForExistence(timeout: 15))
+        backdrop.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.01)).click()
+        let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: title)
+        XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 15), .completed,
+            "Clicking outside the desktop settings dialog must dismiss it")
+        XCTAssertTrue(draft.isHittable)
         let window = app.windows.firstMatch
         let before = window.frame
         let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -2, dy: -2))

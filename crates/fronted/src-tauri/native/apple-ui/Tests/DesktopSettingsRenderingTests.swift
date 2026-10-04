@@ -12,6 +12,8 @@ final class DesktopSettingsRenderingTests: XCTestCase {
         defer { accessibility.restore() }
         for width: CGFloat in [640, 1040] {
             let model = XgentPresentationModel()
+            var actions: [XgentAction] = []
+            model.actionSink = { actions.append($0) }
             let root = try JSONDecoder().decode(XgentDocument.self, from: Data(#"{"version":1,"surface":"root","revision":1,"mode":"root","title":"Chat","appearance":"light","formFactor":"desktop","nodes":[{"id":"welcome","kind":"Text","text":"Chat"}]}"#.utf8))
             model.update(root)
             let host = NSHostingView(rootView: XgentPresentationView(model: model))
@@ -22,17 +24,30 @@ final class DesktopSettingsRenderingTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(120))
             model.update(try fixture(section: .appearance))
             let deadline = ContinuousClock.now + .seconds(3)
-            while window.sheets.isEmpty && ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(60)) }
-            let sheet = try XCTUnwrap(window.sheets.first)
+            while !nativeMacAccessibilityTree(window).contains(where: { $0.accessibilityIdentifier() == "settings-close" }),
+                  ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(60)) }
             try await Task.sleep(for: .milliseconds(120))
-            XCTAssertLessThanOrEqual(sheet.frame.width, width + 1, "The actual presented settings must fit the parent window")
-            XCTAssertGreaterThan(sheet.frame.width, min(width - 64, 900), "Settings must not collapse to the generic minimum sheet width")
-            let expected = width < 760 ? "settings-navigation-menu" : "desktop-nav:general"
-            XCTAssertTrue(nativeMacAccessibilityTree(sheet).contains { $0.accessibilityIdentifier() == expected })
-            let image = try XCTUnwrap(sheet.contentView?.bitmapImageRepForCachingDisplay(in: sheet.contentView!.bounds))
-            sheet.contentView!.cacheDisplay(in: sheet.contentView!.bounds, to: image)
-            let attachment = XCTAttachment(image: NSImage(cgImage: try XCTUnwrap(image.cgImage), size: sheet.contentView!.bounds.size))
+            XCTAssertTrue(window.sheets.isEmpty, "PC settings must be an in-window dialog, not a system sheet")
+            let elements = nativeMacAccessibilityTree(window)
+            let expected = width < 792 ? "settings-navigation-menu" : "desktop-nav:system"
+            XCTAssertTrue(elements.contains { $0.accessibilityIdentifier() == expected })
+            XCTAssertFalse(elements.contains { $0.accessibilityText() == "Back to Chat" })
+            let close = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "settings-close" })
+            XCTAssertGreaterThan(close.accessibilityFrame().width, 0)
+            let image = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: image)
+            let attachment = XCTAttachment(image: NSImage(cgImage: try XCTUnwrap(image.cgImage), size: host.bounds.size))
             attachment.name = "settings-actual-presentation-\(Int(width))"; attachment.lifetime = .keepAlways; add(attachment)
+            // This point is outside the centered dialog and must dismiss it.
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                let event = try XCTUnwrap(NSEvent.mouseEvent(with: type, location: NSPoint(x: 8, y: 8),
+                    modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                    windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+                window.sendEvent(event)
+            }
+            let actionDeadline = ContinuousClock.now + .seconds(3)
+            while actions.isEmpty && ContinuousClock.now < actionDeadline { try await Task.sleep(for: .milliseconds(50)) }
+            XCTAssertEqual(actions.last?.action, "close", "A real click outside settings must use its close callback")
         }
     }
 
@@ -187,9 +202,9 @@ final class DesktopSettingsRenderingTests: XCTestCase {
         let groups: [[String: Any]]
         let title: String
         switch section {
-        case .appearance: groups = appearanceGroups; title = "General"
-        case .systemTools: groups = systemGroups; title = "General"
-        case .proxy: groups = proxyGroups; title = "General"
+        case .appearance: groups = desktopGeneralGroups() + appearanceGroups; title = "System"
+        case .systemTools: groups = systemGroups; title = "System"
+        case .proxy: groups = proxyGroups; title = "System"
         case .about:
             groups = [node("about-name", "Heading", ["text": "XGent"]),
                       node("about-version", "Text", ["text": "v1.0.0", "secondary": true])]
@@ -209,18 +224,25 @@ final class DesktopSettingsRenderingTests: XCTestCase {
         }
         let json: [String: Any] = [
             "version": 1, "surface": "settings-manual", "revision": 1, "mode": "sheet",
-            "title": "Settings", "appearance": "light", "formFactor": "desktop", "nodes": [
+            "title": "Settings", "appearance": "light", "formFactor": "desktop", "dismissAction": "close", "nodes": [
                 node("settings-layout", "SettingsLayout", ["fill": true, "children": [
                     node("settings-sidebar", "VStack", ["children": [
                         node("settings-search", "TextInput", ["label": "Search settings", "value": "", "action": "search"]),
                         node("settings-navigation", "List", ["children": [
-                            node("desktop-nav:general", "NavigationRow", ["label": "General", "icon": "gearshape", "selected": title == "General", "action": "general"]),
+                            node("desktop-nav:system", "NavigationRow", ["label": "System", "icon": "gearshape", "selected": title == "System", "action": "system"]),
                             node("desktop-nav:providers", "NavigationRow", ["label": "Providers", "icon": "network", "selected": section == .providers, "action": "providers"]),
+                            node("desktop-nav:shortcuts", "NavigationRow", ["label": "Shortcuts", "icon": "keyboard", "action": "shortcuts"]),
                             node("desktop-nav:backup", "NavigationRow", ["label": "Backup and synchronization", "icon": "icloud", "action": "backup"]),
+                            node("desktop-nav:computerUse", "NavigationRow", ["label": "Computer use", "icon": "display", "action": "computerUse"]),
                             node("desktop-nav:permissions", "NavigationRow", ["label": "Tool permissions", "icon": "lock.shield", "selected": section == .permissions, "action": "permissions"]),
+                            node("desktop-nav:voice", "NavigationRow", ["label": "Voice Input", "icon": "mic", "action": "voice"]),
+                            node("desktop-nav:soul", "NavigationRow", ["label": "Soul", "icon": "person.crop.circle", "action": "soul"]),
+                            node("desktop-nav:memory", "NavigationRow", ["label": "Memory", "icon": "brain", "action": "memory"]),
+                            node("desktop-nav:other", "NavigationRow", ["label": "Other", "icon": "ellipsis.circle", "action": "other"]),
+                            node("desktop-nav:access", "NavigationRow", ["label": "Local & Cloud", "icon": "icloud", "action": "access"]),
                             node("desktop-nav:about", "NavigationRow", ["label": "About", "icon": "info.circle", "selected": section == .about, "action": "about"]),
                         ]]),
-                        node("settings-close", "Button", ["label": "Back to Chat", "action": "close"]),
+                        node("settings-close", "IconButton", ["label": "Close", "icon": "xmark", "action": "close"]),
                     ]]),
                     node("settings-detail", "ScrollView", ["children": [
                         node("settings-detail-title", "Heading", ["text": title]),
@@ -231,6 +253,29 @@ final class DesktopSettingsRenderingTests: XCTestCase {
         let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: json))
         try document.validate()
         return document
+    }
+
+    private func desktopGeneralGroups() -> [[String: Any]] {
+        func select(_ id: String, _ label: String, _ value: String, _ options: [[String: String]], _ description: String? = nil) -> [String: Any] {
+            var node: [String: Any] = ["id": id, "kind": "Selector", "label": label, "value": value,
+                "action": id, "options": options]
+            if let description { node["text"] = description }
+            return node
+        }
+        return [
+            ["id": "execution-mode", "kind": "SettingsGroup", "children": [
+                select("mode", "Execution mode", "tools", [["value": "text", "label": "Chat mode"], ["value": "tools", "label": "Agent mode"]],
+                    "Allow tools, file operations and command execution."),
+            ]],
+            ["id": "desktop-terminal", "kind": "SettingsGroup", "children": [
+                select("terminal-shell", "Terminal Shell", "auto", [["value": "auto", "label": "Platform default"], ["value": "bash", "label": "Bash"]],
+                    "Reuse the same terminal session. Follow the selected platform shell."),
+            ]],
+            ["id": "general", "kind": "SettingsGroup", "children": [
+                select("theme", "Appearance", "system", [["value": "system", "label": "Automatic"], ["value": "light", "label": "Light"], ["value": "dark", "label": "Dark"]]),
+                select("language", "Language", "en-US", [["value": "system", "label": "System"], ["value": "en-US", "label": "English"], ["value": "zh-CN", "label": "简体中文"]]),
+            ]],
+        ]
     }
 }
 #endif

@@ -432,3 +432,26 @@ were inspected through GitHub/Swift MCP and official documentation.
   current-value selectors. The browser fixture supplies settings data only;
   it establishes layout evidence, not backend functional parity. Updated bundle
   rendering and installed-app verification remain required.
+
+- CI 293 / `25e201e`: frontend compilation/lint and all 1,779 frontend tests
+  passed; Rust, device archive and macOS passed. iOS compiled but one of 189
+  tests found a 16-point editor viewport drift after file switching. The UIKit
+  restore now keeps intermediate callbacks suppressed until the final layout
+  batch applies the saved viewport; the original three-point assertion remains.
+- CI 293 bundle rendering verified all twelve settings entrances at 320/390:
+  no runtime exceptions or horizontal content overflow, and real touch actions
+  returned to the index. Screenshots were reviewed for index, providers, local/
+  cloud and Other. The 768 run stalled in browser input dispatch; it is not a
+  completed check. No backend is supplied by this layout fixture.
+- The user's PC reference requires an in-window centered settings dialog. macOS
+  now has a native backdrop that dispatches the actual close action, rounded
+  content, blurred parent, an X close control, independent scrolling columns,
+  matching 896/608 maximum geometry and accent navigation selection. The host
+  and packaged smoke checks require real outside clicks. The old fixture's five
+  entrances and Back-to-Chat button were replaced with all twelve PC destinations
+  and the actual system-form order. Their screenshots still await the next CI.
+- Provider detail chrome previously assumed an unscoped settings-close action,
+  even though provider controls scope their action IDs. Nested detail close now
+  reads the sidebar's actual action; a validated-document/action-dispatch test
+  exercises that provider-scoped callback. This is a functional fix, separate
+  from layout evidence. The complete parity audit remains open.

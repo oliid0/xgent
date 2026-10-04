@@ -413,6 +413,19 @@ struct XgentPresentationView: View {
 
     private var root: XgentDocument? { model.documents.last { $0.mode == .root } }
     private var sheet: XgentDocument? { model.documents.first { $0.mode == .sheet } }
+    #if os(macOS)
+    private var desktopSettings: XgentDocument? {
+        guard let sheet, sheet.nodes.contains(where: { $0.kind == .settingsLayout }) else { return nil }
+        return sheet
+    }
+    #endif
+    private var presentedSheet: XgentDocument? {
+        #if os(macOS)
+        return desktopSettings == nil ? sheet : nil
+        #else
+        return sheet
+        #endif
+    }
 
     @ViewBuilder private var groupedRoot: some View {
         #if os(iOS)
@@ -434,13 +447,28 @@ struct XgentPresentationView: View {
     }
 
     var body: some View {
-        groupedRoot
+        Group {
+            #if os(macOS)
+            ZStack {
+                groupedRoot
+                    .blur(radius: desktopSettings == nil ? 0 : 6)
+                    .allowsHitTesting(desktopSettings == nil)
+                    .accessibilityHidden(desktopSettings != nil)
+                if let desktopSettings {
+                    XgentDesktopSettingsOverlay(document: desktopSettings,
+                        availableSize: availableSize, model: model)
+                }
+            }
+            #else
+            groupedRoot
+            #endif
+        }
         #if os(macOS)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { availableSize = $0 }
         #endif
         .background { XgentThemeBackground().ignoresSafeArea() }
         .preferredColorScheme(root?.colorScheme)
-        .sheet(item: Binding(get: { sheet }, set: { if $0 == nil, let sheet { model.dismiss(sheet) } })) { document in
+        .sheet(item: Binding(get: { presentedSheet }, set: { if $0 == nil, let presentedSheet { model.dismiss(presentedSheet) } })) { document in
             #if os(iOS)
             XgentIOSSheetPresentation(initialDocument: document, model: model)
             #else

@@ -518,7 +518,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         : []),
       { id: "settings-sidebar-space", kind: "Spacer" },
       {
-        ...c.action("settings-close", t("settings.backToChat"), props.onBack, !busy),
+        ...c.action("settings-close", t("settings.close"), props.onBack, !busy),
         kind: "IconButton",
         icon: "xmark",
         variant: "ghost",

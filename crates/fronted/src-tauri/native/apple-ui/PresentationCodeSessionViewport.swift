@@ -49,6 +49,24 @@ private final class XgentCodeSessionViewportState: ObservableObject {
                              y: min(saved.verticalScrollPosition, max(0, view.contentSize.height - view.bounds.height + inset.bottom)))
         // The pinned editor clamps using bounds.height - contentSize.height on UIKit.
         view.setContentOffset(offset, animated: false)
+        // UIKit can adjust the scroll anchor after restoring a selection while
+        // TextKit finishes its layout. Keep interim callbacks out of the saved
+        // session and restore the viewport once that layout batch has finished.
+        DispatchQueue.main.async { [weak self, weak view] in
+            guard let self, let view, self.view === view, self.session == session,
+                  self.owner == owner, self.restored, view.window != nil,
+                  store.owns(session, owner: owner) else { return }
+            view.layoutIfNeeded()
+            if let manager = view.textLayoutManager, let range = manager.textContentManager?.documentRange {
+                manager.ensureLayout(for: range)
+            }
+            let inset = view.adjustedContentInset
+            view.setContentOffset(CGPoint(
+                x: min(self.horizontal, max(0, view.contentSize.width - view.bounds.width + inset.right)),
+                y: min(self.saved.verticalScrollPosition, max(0, view.contentSize.height - view.bounds.height + inset.bottom))),
+                animated: false)
+            store.finishRestoring(session, owner: owner)
+        }
         #else
         guard let scroll = view.enclosingScrollView else { restored = false; return }
         view.setSelectedRanges(saved.selections.map { NSValue(range: $0) }, affinity: .downstream, stillSelecting: false)
@@ -56,7 +74,9 @@ private final class XgentCodeSessionViewportState: ObservableObject {
                              y: min(saved.verticalScrollPosition, max(0, view.bounds.height - scroll.contentSize.height)))
         scroll.contentView.scroll(to: offset); scroll.reflectScrolledClipView(scroll.contentView)
         #endif
+        #if os(macOS)
         store.finishRestoring(session, owner: owner)
+        #endif
     }
 
     func capture() {

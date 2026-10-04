@@ -52,3 +52,28 @@ test("desktop settings subpages keep navigation and actions on the same sheet", 
   setNativeSettingsChrome("settings:test");
   assert.equal(withNativeSettingsChrome("settings:test", document, sectionHandlers).document, document);
 });
+
+test("provider detail closes through its actual scoped shell action", async () => {
+  const { presentationControls } = loader.loadModule("src/presentation/controls.ts");
+  const c = presentationControls(JSON.stringify(["provider", "example", "codex", "api-key"]));
+  let closed = 0;
+  const close = { ...c.action("settings-close", "Close", () => closed++), kind: "IconButton", icon: "xmark" };
+  const surface = "settings:scoped-provider";
+  setNativeSettingsChrome(surface, {
+    sidebar: { id: "settings-sidebar", kind: "VStack", children: [close] },
+    saveStatus: { id: "save-status", kind: "Text", text: "Saved", secondary: true },
+    handlers: c.handlers,
+  });
+  try {
+    const prepared = withNativeSettingsChrome(surface, {
+      mode: "sheet", formFactor: "desktop", title: "Provider request settings", appearance: "system",
+      dismissAction: "back", nodes: [],
+    }, new Map());
+    validatePresentationDocument({ ...prepared.document, version: 1, surface, revision: 1 }, prepared.handlers);
+    assert.equal(prepared.document.dismissAction, close.action);
+    const registry = createPresentationActionRegistry();
+    registry.register(surface, prepared.handlers);
+    assert.equal((await registry.dispatch({ surface, action: prepared.document.dismissAction, value: null, requestId: "close" })).ok, true);
+    assert.equal(closed, 1);
+  } finally { setNativeSettingsChrome(surface); }
+});
