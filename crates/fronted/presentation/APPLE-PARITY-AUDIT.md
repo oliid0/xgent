@@ -540,3 +540,9 @@ were inspected through GitHub/Swift MCP and official documentation.
   window resize chrome; the actual dismissal requirement was preserved. This
   does not validate the newer terminal follow-up or replace all-eight-job and
   installed-application checks on the final commit.
+- CI 302 / `877a45a`: all Apple compiles stopped at the same terminal error:
+  the reused accessibility modifier was file-private. It is now module-internal
+  so the manually composed terminal viewport retains the exact existing label,
+  hint and optional-value semantics without the generic minimum-height wrapper.
+  No rendering assertions were removed; the short-window change still requires
+  remote compilation and frame/output verification.

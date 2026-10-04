@@ -163,7 +163,7 @@ struct XgentGlassSurface: ViewModifier {
     }
 }
 
-private struct XgentAccessibilityModifier: ViewModifier {
+struct XgentAccessibilityModifier: ViewModifier {
     let node: XgentNode
 
     @ViewBuilder func body(content: Content) -> some View {
