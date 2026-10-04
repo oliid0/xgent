@@ -54,7 +54,6 @@ struct XgentCodeEditor: View {
     @StateObject private var sessionOwner = XgentCodeSessionOwner()
     @State private var messages: Set<TextLocated<LanguageSupport.Message>> = []
     @State private var editorTheme = CodeEditorView.Theme.defaultLight
-    @State private var revealedRequest: String?
     @StateObject private var editingCommands = XgentCodeEditingCommands()
 
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
@@ -117,7 +116,8 @@ struct XgentCodeEditor: View {
             if enabled {
                 input
                     .modifier(XgentCodeSessionViewport(session: session, store: sessionStore, owner: sessionOwner.id, reveal: reveal))
-                    .modifier(XgentCodeRevealModifier(location: reveal, text: text, session: session, store: sessionStore, owner: sessionOwner.id))
+                    .modifier(XgentCodeRevealModifier(location: reveal, text: text, position: positionBinding,
+                        session: session, store: sessionStore, owner: sessionOwner.id))
                     .modifier(XgentCodeEditingTarget(commands: editingCommands))
                     .modifier(XgentCodeFindTarget(configuration: find, acknowledge: findAction, session: session, store: sessionStore, owner: sessionOwner.id))
                     .modifier(XgentCodeFindHighlightModifier(configuration: find, syntax: syntax, session: session, store: sessionStore, owner: sessionOwner.id))
@@ -147,14 +147,6 @@ struct XgentCodeEditor: View {
             editorTheme = next
         }
         .onAppear { sessionOwner.appear(session, store: sessionStore) }
-        .onChange(of: reveal, initial: true) {
-            guard let reveal, revealedRequest != reveal.request else { return }
-            if let session, let sessionStore, sessionStore.revealed(reveal.request, session: session) { return }
-            var next = positionBinding.wrappedValue
-            next.selections = [reveal.range(in: text)]
-            positionBinding.wrappedValue = next
-            revealedRequest = reveal.request
-        }
     }
     private func performFind(_ command: String, draft: XgentCodeFindDraft) {
         guard let snapshot = editingCommands.snapshot() else { return }

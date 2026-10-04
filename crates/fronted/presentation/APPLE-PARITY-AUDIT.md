@@ -183,3 +183,17 @@ added to simulate native glass.
 Installed screenshots, dark/largest-text traversal, shell cancellation and
 end-to-end service parity remain required. This pass does not claim 90% measured
 visual similarity or identical complex task completion.
+
+- CI 281 / `8fc544a`: seven jobs passed, but the macOS code-reference test
+  exposed a lost first scroll and an old request resetting the caret after an
+  edit acknowledgement. The initial SwiftUI selection and native reveal were
+  independent; a single yielded native callback could miss window attachment.
+  Reference selection now belongs to one native transaction, retried by window
+  and layout lifecycle events. Its selection and actual scroll offset are saved
+  to the package position binding before subsequent updates. The original
+  assertions remain, with an additional delayed-window-attachment scenario.
+  Remote compilation and runtime verification of this follow-up are pending.
+
+Research: the pinned [CodeEditorView 0.16.0 binding updates](https://github.com/mchakravarty/CodeEditorView/blob/0.16.0/Sources/CodeEditorView/CodeEditor.swift)
+and Apple's [TextKit layout requirement](https://developer.apple.com/documentation/appkit/nstextlayoutmanager/ensurelayout(for:)-3duae)
+were inspected for the reference-navigation fix.

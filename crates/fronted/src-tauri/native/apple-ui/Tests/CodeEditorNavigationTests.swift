@@ -36,6 +36,14 @@ final class CodeEditorNavigationTests: XCTestCase {
     }
 
     @MainActor func testReferenceNavigationScrollsAndAcknowledgementDoesNotResetTheCaret() async throws {
+        try await exerciseReferenceNavigation(delayedWindowAttachment: false)
+    }
+
+    @MainActor func testReferenceNavigationWaitsForWindowAttachmentAndConsumesTheRequestOnce() async throws {
+        try await exerciseReferenceNavigation(delayedWindowAttachment: true)
+    }
+
+    @MainActor private func exerciseReferenceNavigation(delayedWindowAttachment: Bool) async throws {
         let model = XgentPresentationModel()
         var actions: [XgentAction] = []
         model.actionSink = { actions.append($0) }
@@ -44,6 +52,12 @@ final class CodeEditorNavigationTests: XCTestCase {
         let location = #"{"request":"1","line":101,"column":5}"#
         model.update(try fixture(content, location: location))
         let host = NSHostingView(rootView: XgentRootLayout(model: model))
+        if delayedWindowAttachment {
+            host.frame = CGRect(x: 0, y: 0, width: 640, height: 320)
+            host.layoutSubtreeIfNeeded()
+            try await Task.sleep(nanoseconds: 100_000_000)
+            XCTAssertNil(host.window)
+        }
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 640, height: 320), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host

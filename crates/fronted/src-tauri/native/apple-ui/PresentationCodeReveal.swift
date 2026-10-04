@@ -1,9 +1,12 @@
+import CodeEditorView
 import SwiftUI
 import SwiftUIIntrospect
 #if os(iOS)
 import UIKit
+private typealias XgentRevealTextView = UITextView
 #else
 import AppKit
+private typealias XgentRevealTextView = NSTextView
 #endif
 
 @MainActor
@@ -13,6 +16,11 @@ private final class XgentCodeRevealState: ObservableObject {
     var store: XgentCodeSessionStore?
     var owner: UUID?
     private var generation = 0
+    private weak var view: XgentRevealTextView?
+    private var location: XgentCodeLocation?
+    private var text = ""
+    private var position: Binding<CodeEditor.Position>?
+    private var pending = false
     private func consumed(_ request: String) -> Bool {
         lastRequest == request || (session.flatMap { session in store.map { $0.revealed(request, session: session) } } ?? false)
     }
@@ -25,53 +33,66 @@ private final class XgentCodeRevealState: ObservableObject {
         if let session, let store, let owner { store.markRevealed(request, session: session, owner: owner) }
     }
 
-    #if os(iOS)
-    func schedule(_ location: XgentCodeLocation?, text: String, to view: UITextView) {
-        generation += 1
+    func schedule(_ location: XgentCodeLocation?, text: String, position: Binding<CodeEditor.Position>, to view: XgentRevealTextView) {
+        self.location = location; self.text = text; self.position = position; self.view = view
+        resume()
+    }
+    func resume() {
+        guard !pending, let location, !consumed(location.request), view != nil else { return }
+        pending = true
         let revision = generation
-        Task { @MainActor [weak self, weak view] in
+        Task { @MainActor [weak self] in
             await Task.yield()
-            guard let self, let view, self.generation == revision else { return }
-            self.apply(location, text: text, to: view)
+            guard let self, self.generation == revision else { return }
+            self.pending = false
+            guard let view = self.view else { return }
+            self.apply(self.location, text: self.text, to: view)
         }
     }
-    func apply(_ location: XgentCodeLocation?, text: String, to view: UITextView) {
-        guard ownsSession, let location, !consumed(location.request), view.window != nil, view.text == text else { return }
+    func cancel() {
+        generation += 1
+        pending = false; view = nil
+    }
+    private func apply(_ location: XgentCodeLocation?, text: String, to view: XgentRevealTextView) {
+        guard ownsSession, let location, !consumed(location.request), view.window != nil,
+              view.bounds.width > 0, view.bounds.height > 0 else { return }
+        #if os(iOS)
+        guard view.text == text else { return }
+        #else
+        guard view.string == text, let scroll = view.enclosingScrollView,
+              scroll.contentSize.width > 0, scroll.contentSize.height > 0 else { return }
+        #endif
         let range = location.range(in: text)
-        prepare(range, text: text)
+        // Introspection may precede window attachment and TextKit's first layout.
+        // A native lifecycle callback retries readiness, without polling or
+        // selecting once in SwiftUI and then again on a later acknowledgement.
+        if let manager = view.textLayoutManager, let storage = manager.textContentManager as? NSTextContentStorage,
+           let nativeRange = XgentCodeTextKitRange.native(range, in: storage) {
+            manager.ensureLayout(for: nativeRange)
+        }
+        if let session, let store, let owner { store.finishRestoring(session, owner: owner) }
+        #if os(iOS)
+        view.layoutIfNeeded()
         view.selectedRange = range
-        view.scrollRangeToVisible(range)
-        remember(location.request)
-    }
-    #else
-    func schedule(_ location: XgentCodeLocation?, text: String, to view: NSTextView) {
-        generation += 1
-        let revision = generation
-        Task { @MainActor [weak self, weak view] in
-            await Task.yield()
-            guard let self, let view, self.generation == revision else { return }
-            self.apply(location, text: text, to: view)
-        }
-    }
-    func apply(_ location: XgentCodeLocation?, text: String, to view: NSTextView) {
-        guard ownsSession, let location, !consumed(location.request), view.window != nil, view.string == text else { return }
-        let range = location.range(in: text)
-        prepare(range, text: text)
+        #else
+        scroll.layoutSubtreeIfNeeded()
+        view.layoutSubtreeIfNeeded()
         view.setSelectedRange(range)
+        #endif
         view.scrollRangeToVisible(range)
         remember(location.request)
-    }
-    #endif
-
-    private func prepare(_ range: NSRange, text: String) {
-        guard let session, let store, let owner else { return }
-        // A reference takes precedence over the initial viewport restore.
-        // Store its selection before the native delegate's next update reads
-        // the position binding, rather than marking an unsaved reveal consumed.
-        var position = store.position(session, text: text)
-        position.selections = [range]
-        store.finishRestoring(session, owner: owner)
-        store.save(position, session: session, owner: owner, text: text)
+        // The package reapplies its position binding on each update. Persist
+        // both native selection and scroll offset, including sessionless inputs.
+        if let position {
+            var next = position.wrappedValue
+            next.selections = [range]
+            #if os(iOS)
+            next.verticalScrollPosition = view.contentOffset.y
+            #else
+            next.verticalScrollPosition = scroll.contentView.bounds.origin.y
+            #endif
+            position.wrappedValue = next
+        }
     }
 }
 
@@ -79,6 +100,7 @@ private final class XgentCodeRevealState: ObservableObject {
 struct XgentCodeRevealModifier: ViewModifier {
     let location: XgentCodeLocation?
     let text: String
+    let position: Binding<CodeEditor.Position>
     var session: XgentCodeSessionIdentity? = nil
     var store: XgentCodeSessionStore? = nil
     var owner: UUID? = nil
@@ -87,10 +109,12 @@ struct XgentCodeRevealModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             #if os(iOS)
-            .introspect(.xgentCodeEditor, on: .iOS(.v26)) { view in configure(); state.schedule(location, text: text, to: view) }
+            .introspect(.xgentCodeEditor, on: .iOS(.v26)) { view in configure(); state.schedule(location, text: text, position: position, to: view) }
             #else
-            .introspect(.xgentCodeEditor, on: .macOS(.v15, .v26)) { view in configure(); state.schedule(location, text: text, to: view) }
+            .introspect(.xgentCodeEditor, on: .macOS(.v15, .v26)) { view in configure(); state.schedule(location, text: text, position: position, to: view) }
             #endif
+            .background(XgentCodeRevealLifecycle { state.resume() }.allowsHitTesting(false).accessibilityHidden(true))
+            .onDisappear { state.cancel() }
     }
     private func configure() { state.session = session; state.store = store; state.owner = owner }
 }
