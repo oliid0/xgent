@@ -155,6 +155,7 @@ struct XgentNode: Decodable, Identifiable {
     let commitAction: String?
     let diagramAction: String?
     let focusRequest: Int?
+    let selectionAction: String?
     let disabled: Bool?
     let destructive: Bool?
     let prominent: Bool?
@@ -279,6 +280,10 @@ struct XgentDocument: Decodable, Identifiable {
                 if let commitAction = node.commitAction {
                     guard node.kind == .textInput, node.action?.isEmpty == false,
                           !commitAction.isEmpty, commitAction != node.action else { throw XgentProtocolError.invalid }
+                }
+                if let selectionAction = node.selectionAction {
+                    guard node.kind == .composerInput, node.action?.isEmpty == false,
+                          !selectionAction.isEmpty, selectionAction != node.action else { throw XgentProtocolError.invalid }
                 }
                 let measures = [node.minimum, node.maximum, node.step, node.current, node.total].compactMap { $0 }
                 // Business ranges are finite, not screen dimensions. In particular,
@@ -484,6 +489,22 @@ final class XgentPresentationModel: ObservableObject {
         guard request > (consumedFocusRequests[nodeKey] ?? 0) else { return false }
         consumedFocusRequests[nodeKey] = request
         return true
+    }
+
+    func reportComposerSelection(_ range: NSRange, text: String, node: XgentNode, in document: XgentDocument) {
+        guard active, node.kind == .composerInput, node.disabled != true,
+              let current = documents.first(where: { $0.surface == document.surface })?.node(id: node.id),
+              current.kind == .composerInput, current.action == node.action, current.disabled != true,
+              let action = current.selectionAction, action == node.selectionAction,
+              value(current, in: document).text == text,
+              range.location >= 0, range.length >= 0, range.location <= text.utf16.count,
+              range.length <= text.utf16.count - range.location,
+              let data = try? JSONSerialization.data(withJSONObject: ["text": text, "location": range.location, "length": range.length]),
+              let encoded = String(data: data, encoding: .utf8) else { return }
+        let requestId = UUID().uuidString
+        // Selection reports never replace the optimistic text draft or mark it busy.
+        pending[requestId] = (document.surface, key(document.surface, "\(node.id):selection"), current.revision)
+        emit(XgentAction(surface: document.surface, action: action, requestId: requestId, value: .string(encoded)))
     }
 
     func send(_ node: XgentNode, in document: XgentDocument, value: XgentValue = .null,

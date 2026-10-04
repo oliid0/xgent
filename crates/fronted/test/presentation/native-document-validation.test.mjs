@@ -46,6 +46,15 @@ function document(node) {
   };
 }
 
+test("composer caret reports require their own live handler and cannot reuse a text edit action", () => {
+  const handlers = new Map(["draft", "selection"].map(action => [action, { enabled: true, accepts: value => typeof value === "string", run() {} }]));
+  const input = { id: "draft", kind: "ComposerInput", action: "draft", selectionAction: "selection" };
+  assert.doesNotThrow(() => validatePresentationDocument(document(input), handlers));
+  for (const patch of [{ kind: "TextInput" }, { action: undefined }, { selectionAction: "" }, { selectionAction: "draft" }, { selectionAction: "retired" }]) {
+    assert.throws(() => validatePresentationDocument(document({ ...input, ...patch }), handlers), /composer selection action/);
+  }
+});
+
 test("native documents accept mapped components, properties, and typed actions", () => {
   const handlers = new Map([
     ["send", { enabled: true, accepts: (value) => value === null, run() {} }],

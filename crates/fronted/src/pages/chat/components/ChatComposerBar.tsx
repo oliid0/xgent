@@ -1130,7 +1130,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                 </Popover>
               )}
 
-              {isNativeMobileRuntime() ? null : mobileExperience || narrowComposer ? (
+              {isNativeMobileRuntime() || mobileExperience || narrowComposer ? (
                 <DropdownMenu
                   className="xgent-command-safety-menu"
                   button={{

@@ -24,6 +24,7 @@ import {
   saveChatLayoutPreferences,
 } from "../lib/chat/layoutPreferences";
 import { normalizeLogicalLineEndings } from "../lib/chat/messages/composerText";
+import { createFileMentionReference } from "../lib/chat/messages/mentionReferences";
 import { safeStringify, summarizeToolCall } from "../lib/chat/messages/uiMessages";
 import type { PendingUploadedFile } from "../lib/chat/messages/uploadedFiles";
 import { normalizeConversationTitle } from "../lib/chat/page/chatPageHelpers";
@@ -39,6 +40,7 @@ import { isNativeMobileRuntime } from "../lib/runtimePlatform";
 import type {
   AppSettings,
   ChatRuntimeControls,
+  CommandSafetyMode,
   ReasoningLevel,
   SelectedModel,
   WorkspaceProject,
@@ -59,6 +61,12 @@ import { useNativeAskUserQuestions } from "./nativeAskUserQuestions";
 import { toolEvidenceNodes } from "./nativeChatEvidence";
 import { createNativeChatRuntimeControls } from "./nativeChatRuntimeControls";
 import { createNativeChatTranscript } from "./nativeChatTranscript";
+import {
+  createNativeMentionSearch,
+  decodeNativeComposerSelection,
+  detectNativeComposerMention,
+  nativeMentionSearchKey,
+} from "./nativeComposerMentions";
 import {
   createNativeConversationActions,
   mutateNativeConversation,
@@ -153,6 +161,7 @@ export type NativeChatPageProps = NativeWorkspaceActionsProps & {
   onOpenFiles: () => void;
   onOpenWorkspaceFile: (path: string) => void;
   onChangeMode: (mode: "text" | "tools") => void;
+  onCommandSafetyModeChange: (mode: CommandSafetyMode) => void;
   onLoadEarlierHistory: () => Promise<unknown> | void;
   onDecide: (id: string, decision: ToolApprovalDecision) => { ok: boolean; message?: string };
   onCreateProject: () => void;
@@ -166,7 +175,27 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const { t } = useLocale();
   const compact = isNativeMobileRuntime();
   const [composer] = useState(createNativeComposerStore);
+  const [mentionSearch] = useState(createNativeMentionSearch);
   useSyncExternalStore(composer.subscribe, composer.getSnapshot, composer.getSnapshot);
+  const mentionFiles = useSyncExternalStore(
+    mentionSearch.subscribe,
+    mentionSearch.getSnapshot,
+    mentionSearch.getSnapshot,
+  );
+  const mentionContext = props.inputDisabled
+    ? null
+    : detectNativeComposerMention(composer.handle.getText(), composer.getSelection(), true);
+  const mentionKey = nativeMentionSearchKey(
+    props.conversationId,
+    props.uploadWorkdir,
+    mentionContext,
+  );
+  const mentionContextRef = useRef(mentionContext);
+  mentionContextRef.current = mentionContext;
+  useEffect(() => {
+    void mentionSearch.search(mentionKey, props.uploadWorkdir, mentionContextRef.current);
+    return () => mentionSearch.cancel();
+  }, [mentionSearch, mentionKey, props.uploadWorkdir]);
   const sidebar = useSyncExternalStore(
     props.sidebarStore.subscribe,
     props.sidebarStore.getSnapshot,
@@ -395,6 +424,67 @@ export function NativeChatPage(props: NativeChatPageProps) {
         }
       : undefined;
   const draft = composer.handle.getDraft();
+  const mentionNodes: PresentationNode[] = [];
+  if (mentionContext?.trigger === "skill") {
+    const query = mentionContext.query.toLocaleLowerCase();
+    for (const skill of (props.enabledSkills ?? [])
+      .filter((skill) =>
+        `${skill.name}\n${skill.description}\n${skill.baseDir}`.toLocaleLowerCase().includes(query),
+      )
+      .slice(0, 12)) {
+      mentionNodes.push({
+        ...button(
+          `mention-skill:${skill.name}`,
+          skill.name,
+          () => composer.replaceMention(mentionContext, { type: "skillMention", skill }),
+          !props.inputDisabled,
+        ),
+        icon: "sparkles",
+        text: skill.description,
+      });
+    }
+  } else if (mentionContext?.trigger === "file" && mentionFiles.key === mentionKey) {
+    for (const file of mentionFiles.entries) {
+      const reference = createFileMentionReference(file.path, file.kind);
+      if (!reference) continue;
+      mentionNodes.push({
+        ...button(
+          `mention-file:${file.path}`,
+          file.path,
+          () => composer.replaceMention(mentionContext, { type: "fileMention", reference }),
+          !props.inputDisabled,
+        ),
+        icon: file.kind === "dir" ? "folder" : "doc",
+      });
+    }
+  }
+  const mentionMenu: PresentationNode | undefined = mentionContext
+    ? {
+        id: "composer-suggestions",
+        kind: "List",
+        variant: "composer-suggestions",
+        label: t(mentionContext.trigger === "skill" ? "chat.composer.plugins" : "sidebar.myFiles"),
+        children: mentionNodes.length
+          ? mentionNodes
+          : [
+              {
+                id: "composer-suggestions-status",
+                kind: "Text",
+                secondary: true,
+                text: t(
+                  mentionContext.trigger === "file" &&
+                    (mentionFiles.key !== mentionKey || mentionFiles.loading)
+                    ? "settings.loading"
+                    : mentionFiles.key === mentionKey && mentionFiles.error
+                      ? "search.filesFailed"
+                      : mentionContext.trigger === "skill"
+                        ? "chat.composer.noMatchingEnabledSkills"
+                        : "chat.composer.noMatchingFiles",
+                ),
+              },
+            ],
+      }
+    : undefined;
   const canSend =
     !props.inputDisabled &&
     !props.isUploading &&
@@ -579,26 +669,6 @@ export function NativeChatPage(props: NativeChatPageProps) {
                   },
                 ]
               : []),
-            ...(compact
-              ? [
-                  {
-                    id: "execution-mode",
-                    kind: "Selector" as const,
-                    variant: "compact",
-                    label: t("settings.executionMode"),
-                    value: props.settings.system.executionMode === "text" ? "text" : "tools",
-                    options: [
-                      { value: "text", label: t("chat.mode.chat") },
-                      { value: "tools", label: t("chat.mode.agent") },
-                    ],
-                    action: change(
-                      "execution-mode",
-                      (value) => props.onChangeMode(value as "text" | "tools"),
-                      (value) => value === "text" || value === "tools",
-                    ),
-                  },
-                ]
-              : []),
             {
               ...button("tools", t("chat.mobileMenu.title"), () => setToolsOpen(true)),
               kind: "IconButton",
@@ -711,10 +781,24 @@ export function NativeChatPage(props: NativeChatPageProps) {
                   },
                 ]
               : []),
+            ...(mentionMenu ? [mentionMenu] : []),
             {
               id: "draft",
               kind: "ComposerInput",
               focusRequest: composer.getFocusRevision(),
+              text: composer.getSelectionRequest(),
+              selectionAction: change(
+                `draft-selection:${props.conversationId}:${attachmentContext.revision}`,
+                (value) => {
+                  const selection = decodeNativeComposerSelection(value);
+                  if (selection) composer.reportSelection(selection);
+                },
+                (value) => {
+                  const selection = decodeNativeComposerSelection(value);
+                  return selection?.text === composer.handle.getText();
+                },
+                !props.inputDisabled,
+              ),
               label: props.inputPlaceholder,
               value: draft.text,
               disabled: props.inputDisabled,
@@ -785,36 +869,23 @@ export function NativeChatPage(props: NativeChatPageProps) {
                   ),
                 },
                 {
-                  id: "skill-mentions",
-                  kind: "Menu",
-                  variant: "compact",
-                  icon: "at",
-                  label: t("chat.composer.plugins"),
-                  disabled: props.inputDisabled,
-                  children: [
-                    ...(props.enabledSkills ?? []).map((skill) => ({
-                      ...button(
-                        `mention-skill:${skill.name}`,
-                        skill.name,
-                        () => composer.handle.insertSkillMention(skill),
-                        !props.inputDisabled,
-                      ),
-                      icon: "sparkles",
-                      text: skill.description,
-                    })),
-                    ...(props.enabledSkills?.length
-                      ? [{ id: "skill-menu-divider", kind: "Divider" as const }]
-                      : []),
-                    {
-                      ...button(
-                        "manage-skills",
-                        t("settings.navSkills"),
-                        props.onOpenSkillsHub,
-                        !props.inputDisabled,
-                      ),
-                      icon: "slider.horizontal.3",
-                    },
-                  ],
+                  id: "command-safety",
+                  kind: "Selector",
+                  variant: "composer-command-safety",
+                  icon: "shield",
+                  label: t("settings.commandSafety.title"),
+                  value: props.settings.system.commandSafetyMode ?? "ask",
+                  options: (["auto", "ask", "sandbox", "sandboxOffline"] as const).map((value) => ({
+                    value,
+                    label: t(`settings.commandSafety.${value}`),
+                  })),
+                  disabled: props.inputDisabled || props.settings.system.executionMode === "text",
+                  action: change(
+                    "command-safety",
+                    (value) => props.onCommandSafetyModeChange(value as CommandSafetyMode),
+                    (value) => ["auto", "ask", "sandbox", "sandboxOffline"].includes(value),
+                    !props.inputDisabled && props.settings.system.executionMode !== "text",
+                  ),
                 },
                 {
                   id: "model",
@@ -1395,13 +1466,13 @@ export function NativeChatPage(props: NativeChatPageProps) {
                     : []),
                   {
                     id: "sidebar-execution-mode",
-                    kind: compact ? "Selector" : "SegmentedControl",
-                    variant: compact ? "compact" : undefined,
+                    kind: "Selector",
+                    variant: "sidebar-work-mode",
                     label: t("settings.executionMode"),
                     value: props.settings.system.executionMode === "text" ? "text" : "tools",
                     options: [
-                      { value: "text", label: t("chat.mode.chat") },
-                      { value: "tools", label: t("chat.mode.agent") },
+                      { value: "text", label: "XChat" },
+                      { value: "tools", label: "XGent" },
                     ],
                     action: "sidebar-execution-mode",
                   },

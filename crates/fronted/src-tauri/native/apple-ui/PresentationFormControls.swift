@@ -6,6 +6,9 @@ struct XgentTextInput: View {
     @ObservedObject var model: XgentPresentationModel
     @Environment(\.xgentSettingsRow) private var isFormRow
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    #if os(iOS)
+    @Environment(\.xgentSettingsFieldHeader) private var hasSectionLabel
+    #endif
     @State private var secretFocused = false
     @FocusState private var focused: Bool
     @State private var hasDraft = false
@@ -64,7 +67,10 @@ struct XgentTextInput: View {
     @ViewBuilder private var layout: some View {
         #if os(iOS)
         if isFormRow {
-            if node.secure != true && !dynamicTypeSize.isAccessibilitySize {
+            if hasSectionLabel {
+                field.modifier(XgentControlTypography(node: node))
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            } else if node.secure != true && !dynamicTypeSize.isAccessibilitySize {
                 XgentSettingsValueRow(node: node, showsDescription: false) {
                     field
                         .modifier(XgentControlTypography(node: node))
@@ -124,8 +130,11 @@ struct XgentSelector: View {
 
     private var selectionLabel: some View {
         HStack(spacing: 8) {
+            if node.variant == "composer-command-safety" {
+                Image(systemName: node.icon ?? "shield").accessibilityHidden(true)
+            }
             Text(selectedLabel).fixedSize(horizontal: false, vertical: true)
-            if !isSettingsRow { Spacer(minLength: 8) }
+            if !isSettingsRow && !["composer-command-safety", "sidebar-work-mode"].contains(node.variant ?? "") { Spacer(minLength: 8) }
             Image(systemName: "chevron.up.chevron.down").font(.caption).accessibilityHidden(true)
         }
         .modifier(XgentSelectorSurface(node: node, isSettingsRow: isSettingsRow))
@@ -166,6 +175,8 @@ struct XgentSelector: View {
         Group {
             if isSettingsRow && showsLabel {
                 XgentSettingsValueRow(node: node) { accessibleControl }
+            } else if ["composer-command-safety", "sidebar-work-mode"].contains(node.variant ?? "") {
+                accessibleControl
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     if showsLabel { XgentFieldLabel(node: node) }
@@ -190,6 +201,13 @@ private struct XgentSelectorSurface: ViewModifier {
     let isSettingsRow: Bool
 
     @ViewBuilder func body(content: Content) -> some View {
+        if node.variant == "sidebar-work-mode" {
+            content.font(.title2.weight(.bold)).foregroundStyle(.primary)
+                .frame(minHeight: 44).contentShape(Rectangle())
+        } else if node.variant == "composer-command-safety" {
+            content.font(.subheadline).foregroundStyle(.secondary)
+                .frame(minHeight: 44).contentShape(Rectangle())
+        } else {
         #if os(iOS)
         if isSettingsRow {
             content
@@ -201,6 +219,7 @@ private struct XgentSelectorSurface: ViewModifier {
         #else
         content.modifier(XgentFieldSurface(node: node))
         #endif
+        }
     }
 }
 

@@ -123,6 +123,16 @@ export function validatePresentationDocument(
         throw new Error(`Invalid native diagram action: ${node.id}`);
       }
       if (
+        node.selectionAction !== undefined &&
+        (node.kind !== "ComposerInput" ||
+          !node.action ||
+          node.selectionAction === node.action ||
+          !node.selectionAction ||
+          !handlers.has(node.selectionAction))
+      ) {
+        throw new Error(`Invalid native composer selection action: ${node.id}`);
+      }
+      if (
         node.focusRequest !== undefined &&
         (node.kind !== "ComposerInput" ||
           !Number.isSafeInteger(node.focusRequest) ||

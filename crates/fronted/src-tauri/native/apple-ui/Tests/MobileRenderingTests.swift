@@ -232,10 +232,12 @@ final class MobileRenderingTests: XCTestCase {
         let model = XgentPresentationModel()
         let settings = try document(mode: "sheet", appearance: "dark", nodes: [
             node("general", "SettingsGroup", ["label": "General", "children": [
-                node("theme", "Selector", ["label": "Appearance", "value": "dark", "action": "theme", "options": [
+                node("theme", "Selector", ["label": "Appearance", "icon": "sun.max", "value": "system", "action": "theme", "options": [
                     ["value": "system", "label": "System"], ["value": "dark", "label": "Dark"],
                 ]]),
-                node("notifications", "Switch", ["label": "Notifications", "value": true, "action": "notifications"]),
+                node("language", "Selector", ["label": "App language", "icon": "globe", "value": "en", "action": "language", "options": [["value": "en", "label": "English"]]]),
+                node("notifications", "NavigationRow", ["label": "Notifications", "icon": "bell", "value": "Push", "action": "notifications"]),
+                node("haptics", "Switch", ["label": "Haptic feedback", "icon": "iphone.radiowaves.left.and.right", "value": true, "action": "haptics"]),
             ]]),
             node("workspace", "SettingsGroup", ["label": "Workspace", "children": [
                 node("projects", "NavigationRow", ["label": "Projects", "icon": "folder", "action": "projects"]),
@@ -249,7 +251,8 @@ final class MobileRenderingTests: XCTestCase {
         let sidebar = try document(mode: "sidebar", appearance: "light", nodes: [
             node("sidebar-layout", "VStack", ["children": [
                 node("sidebar-title", "Heading", ["text": "Xgent"]),
-                node("sidebar-execution-mode", "Badge", ["label": "Local workspace"]),
+                node("sidebar-execution-mode", "Selector", ["label": "Work mode", "variant": "sidebar-work-mode", "value": "tools", "action": "work-mode",
+                    "options": [["value": "tools", "label": "Xgent"], ["value": "text", "label": "Xchat"]]]),
                 node("sidebar-search-toggle", "IconButton", ["label": "Search", "icon": "magnifyingglass", "action": "search"]),
                 node("sidebar-list", "List", ["children": [
                     node("workspaces", "Heading", ["text": "Workspaces"]),
@@ -578,7 +581,6 @@ final class MobileRenderingTests: XCTestCase {
         [node("chat", "ChatLayout", ["children": [
             node("toolbar", "HStack", ["children": [
                 node("sidebar", "IconButton", ["label": "Open sidebar", "icon": "sidebar.left", "action": "sidebar"]),
-                node("execution-mode", "Badge", ["label": "Local workspace"]),
                 node("tools", "IconButton", ["label": "Tools", "icon": "ellipsis", "action": "tools"]),
             ]]),
             node("transcript", "ScrollView", ["children": [

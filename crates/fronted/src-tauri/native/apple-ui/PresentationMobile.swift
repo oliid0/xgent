@@ -204,7 +204,6 @@ private struct XgentIOSChatPresentation: View {
     private var chat: XgentNode? { document.nodes.first { $0.kind == .chatLayout } }
     private var toolbar: XgentNode? { chat?.child(id: "toolbar") }
     private var sidebarControl: XgentNode? { toolbar?.child(id: "sidebar") }
-    private var executionMode: XgentNode? { toolbar?.child(id: "execution-mode") }
     private var toolsControl: XgentNode? { toolbar?.child(id: "tools") }
     private var transcript: XgentNode? { chat?.child(id: "transcript") }
     private var composer: XgentNode? { chat?.child(id: "composer") }
@@ -219,9 +218,8 @@ private struct XgentIOSChatPresentation: View {
                     XgentIOSNode(node: sidebarControl, document: document, model: model)
                 }
                 Spacer(minLength: 0)
-                if let executionMode {
-                    XgentIOSNode(node: executionMode, document: document, model: model)
-                }
+                Text(document.title).font(.headline.weight(.semibold)).lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 0)
                 if let toolsControl {
                     XgentIOSNode(node: toolsControl, document: document, model: model)
@@ -307,6 +305,7 @@ struct XgentIOSComposer: View {
     @ObservedObject var model: XgentPresentationModel
     private var activity: XgentNode? { node.child(id: "activity-strip") }
     private var queue: XgentNode? { node.child(id: "queued-turns") }
+    private var suggestions: XgentNode? { node.child(id: "composer-suggestions") }
     private var input: XgentNode? { node.child(id: "draft") }
     private var actions: XgentNode? { node.child(id: "composer-actions") }
     private var feedback: [XgentNode] {
@@ -314,7 +313,7 @@ struct XgentIOSComposer: View {
     }
     private var supporting: [XgentNode] {
         (node.children ?? []).filter {
-            !["queued-turns", "activity-strip", "draft", "composer-actions", "voice-error", "voice-partial"].contains($0.id)
+            !["queued-turns", "activity-strip", "draft", "composer-actions", "voice-error", "voice-partial", "composer-suggestions"].contains($0.id)
         }
     }
 
@@ -351,6 +350,12 @@ struct XgentIOSComposer: View {
         }
         .padding(12)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay(alignment: .top) {
+            if let suggestions {
+                XgentComposerSuggestions(node: suggestions, document: document, model: model)
+                    .alignmentGuide(.top) { $0[.bottom] + 8 }
+            }
+        }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
@@ -385,7 +390,10 @@ private struct XgentIOSSidebarPresentation: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                if let title {
+                if let mode {
+                    XgentSelector(node: mode, document: document, model: model, showsLabel: false)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else if let title {
                     Text(title.text ?? title.label ?? "Xgent")
                         .font(.title2.weight(.bold))
                         .lineLimit(1)
@@ -408,12 +416,6 @@ private struct XgentIOSSidebarPresentation: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            if let mode {
-                XgentIOSNode(node: mode, document: document, model: model)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
-            }
             if let search {
                 XgentIOSNode(node: search, document: document, model: model)
                     .padding(.horizontal, 16)

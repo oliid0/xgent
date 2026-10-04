@@ -13,6 +13,7 @@ export function createNativeComposerStore() {
   let focusRevision = 0;
   let version = 0;
   let typingGeneration = 0;
+  let selection = { location: 0, length: 0 };
   const listeners = new Set<() => void>();
   const changed = () => {
     version++;
@@ -21,6 +22,7 @@ export function createNativeComposerStore() {
   const setDraft = (next: MentionComposerDraft) => {
     typingGeneration++;
     draft = structuredClone(next);
+    selection = { location: draft.text.length, length: 0 };
     changed();
   };
   const setSegments = (segments: MentionComposerDraftSegment[]) => {
@@ -54,6 +56,18 @@ export function createNativeComposerStore() {
       ...(segment.type === "text" ? [] : [{ type: "text" as const, text: " " }]),
     ]);
   };
+  const slice = (from: number, to: number): MentionComposerDraftSegment[] => {
+    let offset = 0;
+    return draft.segments.flatMap((segment): MentionComposerDraftSegment[] => {
+      const text = buildTextFromComposerDraft({ ...draft, segments: [segment] });
+      const end = offset + text.length;
+      const begin = offset;
+      offset = end;
+      if (from >= end || to <= begin) return [];
+      if (from <= begin && to >= end) return [segment];
+      return [{ type: "text", text: text.slice(Math.max(0, from - begin), to - begin) }];
+    });
+  };
   const replaceEditorText = (value: string) => {
     const next = normalizeLogicalLineEndings(value);
     const previous = draft.text;
@@ -68,18 +82,6 @@ export function createNativeComposerStore() {
       previous[previous.length - suffix - 1] === next[next.length - suffix - 1]
     )
       suffix++;
-    const slice = (from: number, to: number): MentionComposerDraftSegment[] => {
-      let offset = 0;
-      return draft.segments.flatMap((segment): MentionComposerDraftSegment[] => {
-        const text = buildTextFromComposerDraft({ ...draft, segments: [segment] });
-        const end = offset + text.length;
-        const begin = offset;
-        offset = end;
-        if (from >= end || to <= begin) return [];
-        if (from <= begin && to >= end) return [segment];
-        return [{ type: "text", text: text.slice(Math.max(0, from - begin), to - begin) }];
-      });
-    };
     // Rich mentions and large pastes outside the changed range keep their metadata.
     // Editing inside a token converts only that token's surviving text to plain text.
     setSegments([
@@ -87,6 +89,7 @@ export function createNativeComposerStore() {
       { type: "text", text: next.slice(start, next.length - suffix) },
       ...slice(previous.length - suffix, previous.length),
     ]);
+    selection = { location: next.length - suffix, length: 0 };
   };
   const handle: MentionComposerHandle = {
     getText: () => draft.text,
@@ -133,6 +136,44 @@ export function createNativeComposerStore() {
   return {
     handle,
     replaceEditorText,
+    getSelection: () => ({ ...selection }),
+    getSelectionRequest: () => JSON.stringify({ request: focusRevision, ...selection }),
+    reportSelection(value: { text: string; location: number; length: number }) {
+      if (
+        value.text !== draft.text ||
+        !Number.isSafeInteger(value.location) ||
+        !Number.isSafeInteger(value.length) ||
+        value.location < 0 ||
+        value.length < 0 ||
+        value.location + value.length > draft.text.length
+      )
+        return false;
+      if (selection.location === value.location && selection.length === value.length) return true;
+      selection = { location: value.location, length: value.length };
+      changed();
+      return true;
+    },
+    replaceMention(
+      context: { text: string; start: number; end: number },
+      segment: MentionComposerDraftSegment,
+    ) {
+      if (
+        context.text !== draft.text ||
+        selection.length !== 0 ||
+        selection.location !== context.end ||
+        context.start < 0 ||
+        context.start > context.end ||
+        context.end > draft.text.length
+      ) {
+        throw new Error("The composer reference is no longer active.");
+      }
+      const before = slice(0, context.start),
+        after = slice(context.end, draft.text.length);
+      const token = buildTextFromComposerDraft({ ...draft, segments: [segment] });
+      setSegments([...before, segment, { type: "text", text: " " }, ...after]);
+      selection = { location: context.start + token.length + 1, length: 0 };
+      handle.focus();
+    },
     getSnapshot: () => version,
     getFocusRevision: () => focusRevision,
     subscribe(listener: () => void) {

@@ -6342,6 +6342,9 @@ export function ChatPage(props: ChatPageProps) {
       <>
         <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
         <NativeChatPage
+          onCommandSafetyModeChange={(commandSafetyMode) =>
+            setSettings((previous) => updateSystem(previous, { commandSafetyMode }))
+          }
           editorSessions={nativeEditorSessions}
           conversationId={currentConversationId}
           uploadWorkdir={workdir}

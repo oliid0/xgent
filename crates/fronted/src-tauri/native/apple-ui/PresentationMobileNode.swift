@@ -501,7 +501,9 @@ struct XgentIOSNode: View {
         case .codeBlock:
             codeBlock
         case .list:
-            list
+            if node.variant == "composer-suggestions" {
+                XgentComposerSuggestions(node: node, document: document, model: model)
+            } else { list }
         case .providerList:
             XgentProviderListView(node: node, document: document, model: model)
         case .treeRow, .navigationRow:
@@ -509,6 +511,8 @@ struct XgentIOSNode: View {
                 XgentMemoryEntry(node: node, document: document, model: model)
             } else if node.variant == "sidebar-conversation-row" || node.variant == "sidebar-workspace-row" {
                 XgentSidebarConversationRow(node: node, document: document, model: model)
+            } else if isFormRow {
+                XgentSettingsNavigationRow(node: node, document: document, model: model)
             } else { navigationRow }
         case .settingsGroup:
             settingsGroup
@@ -521,16 +525,7 @@ struct XgentIOSNode: View {
         case .composer:
             VStack(alignment: .leading, spacing: CGFloat(theme.spacing.sm)) { children }
         case .composerInput:
-            TextField(node.label ?? "", text: textBinding, axis: .vertical)
-                .modifier(XgentComposerFocusModifier(node: node, document: document, model: model))
-                .lineLimit(1 ... 6)
-                .textFieldStyle(.plain)
-                .font(.body)
-                .padding(.vertical, 8)
-                .introspect(.textField(axis: .vertical), on: .iOS(.v26)) { textView in
-                    textView.keyboardDismissMode = .interactive
-                    textView.showsVerticalScrollIndicator = false
-                }
+            XgentComposerInput(node: node, document: document, model: model)
         case .browserLayout:
             XgentBrowserLayout(node: node, document: document, model: model)
         case .chatLayout:

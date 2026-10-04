@@ -2,8 +2,8 @@
 import SwiftUI
 import UIKit
 
-// Native Form sections own spacing and surfaces. A nested Shell workspace group
-// must not become another rounded card inside an already grouped form row.
+// Grouping preserves every business row. The mobile composition supplies
+// explicit card geometry, rather than depending on a platform Form's defaults.
 struct XgentSettingsFormSection: Identifiable {
     let id: String
     let labels: [String]
@@ -50,27 +50,16 @@ struct XgentIOSSettingsForm: View {
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
     @Environment(\.xgentPresentationTheme) private var theme
-    @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .subheadline) private var headerScale = 1.0
 
     private var sections: [XgentSettingsFormSection] { XgentSettingsFormSection.sections(nodes) }
     private var route: String { nodes.first(where: { $0.kind == .settingsGroup })?.id ?? document.id }
 
     var body: some View {
-        Form {
-            ForEach(sections) { section in
-                Section {
-                    ForEach(section.controlRows) { row in
-                        XgentIOSNode(node: row, document: document, model: model, parentAxis: .vertical)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
-                            .listRowBackground(section.hasControls
-                                ? Color(xgentHex: theme.palette(for: colorScheme).card) : Color.clear)
-                            .listRowSeparator(.hidden, edges: .top)
-                            .listRowSeparator(section.hasControls && row.id != section.controlRows.last?.id
-                                ? .visible : .hidden, edges: .bottom)
-                    }
-                } header: {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 28) {
+                ForEach(sections) { section in
+                    VStack(alignment: .leading, spacing: 10) {
                     if !section.labels.isEmpty {
                         Text(section.labels.joined(separator: " / "))
                             .font(XgentFonts.body(theme.fontFamily, size: CGFloat(15 * theme.fontScale) * headerScale, weight: .semibold))
@@ -78,18 +67,24 @@ struct XgentIOSSettingsForm: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .textCase(nil)
                             .accessibilityAddTraits(.isHeader)
+                            .padding(.horizontal, 16)
                     }
-                    notes(section.leadingNotes)
-                } footer: {
-                    notes(section.trailingNotes)
+                    if !section.leadingNotes.isEmpty {
+                        notes(section.leadingNotes).padding(.horizontal, 16)
+                    }
+                    XgentIOSSettingsCard(section: section, document: document, model: model)
+                    if !section.trailingNotes.isEmpty {
+                        notes(section.trailingNotes).padding(.horizontal, 16)
+                    }
+                    }
                 }
-                .listSectionSeparator(.hidden)
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 20)
+            .padding(.bottom, 32)
         }
-        .formStyle(.grouped)
         .environment(\.xgentIOSFormRow, true)
         .environment(\.xgentSettingsRow, true)
-        .scrollContentBackground(.hidden)
         .scrollDismissesKeyboard(.interactively)
         .id("\(document.id):\(route)")
     }

@@ -197,3 +197,39 @@ visual similarity or identical complex task completion.
 Research: the pinned [CodeEditorView 0.16.0 binding updates](https://github.com/mchakravarty/CodeEditorView/blob/0.16.0/Sources/CodeEditorView/CodeEditor.swift)
 and Apple's [TextKit layout requirement](https://developer.apple.com/documentation/appkit/nstextlayoutmanager/ensurelayout(for:)-3duae)
 were inspected for the reference-navigation fix.
+
+- CI 282 / `9be7fcb`: all eight jobs passed, including the unchanged caret/scroll
+  assertions and the additional delayed-window scenario. This is the baseline
+  for the following user-directed mobile composition pass, not its validation.
+- Re-inspected IMG_0400/0401/0402/0403/0405/0406. The sidebar's brand now owns
+  the XChat/XGent picker on both Apple platforms; chat chrome has no work-mode
+  selector. The composer exposes the shared command safety preference, and
+  Android's previously hidden compact command control is restored as well.
+- The permanent @ button is removed. Native TextSelection reports trigger
+  @file and /skill suggestions at the real caret, including edits in the middle
+  of a draft. Selection ACKs are isolated from optimistic text. Choosing an item
+  replaces its active query while preserving existing rich references and the
+  suffix. File searches use the existing Rust fs_mention_list operation and
+  discard late results from an old conversation/workspace. Slash with no enabled
+  skills now shows the empty state on both renderers instead of ignoring input.
+- Mobile settings use explicit 26-point cards, 54-point minimum rows, inset
+  internal dividers and external section descriptions. Standalone input labels
+  sit above their cards. Navigation current values use a separate trailing slot;
+  read-only status rows do not masquerade as enabled navigation buttons.
+  Existing 320-point/accessibility field-overlap and scrolling assertions remain.
+  New native tests cover caret reporting and mention caret restoration.
+- Remote compilation, these new native interaction tests and exported updated
+  screenshots remain pending. Packaged shell installation and launch tests also
+  remain mandatory before treating the build as usable.
+- Local TypeScript checking, the 55-kind/45-property state/action contract and
+  all 1,155 presentation/chat/settings behavior tests passed. No local build,
+  package installation or native compilation was run. A new native geometry test
+  checks that suggestions float above the draft and that execution/send controls
+  remain at least 44 points tall at 320-point width and accessibility text sizes.
+
+Research: Apple's [native text selection binding](https://developer.apple.com/documentation/swiftui/textfield/init(_:text:selection:prompt:axis:)-80y12),
+[TextSelection](https://developer.apple.com/documentation/swiftui/textselection),
+EhPanda's [native glass menu controls](https://github.com/EhPanda-Team/EhPanda/blob/main/EhPanda/View/Reading/Support/ControlPanel.swift),
+Astryx List/ListItem documentation, and [Swift Package Index's Introspect entry](https://swiftpackageindex.com/siteline/swiftui-introspect)
+were consulted. These changes use the existing pinned packages and native Apple
+controls; no UI code was generated from Astryx.

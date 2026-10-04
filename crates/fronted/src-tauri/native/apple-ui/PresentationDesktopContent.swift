@@ -228,7 +228,9 @@ extension XgentNodeView {
         case .codeBlock:
             nativeCodeBlock
         case .list:
-            nativeList
+            if node.variant == "composer-suggestions" {
+                XgentComposerSuggestions(node: node, document: document, model: model)
+            } else { nativeList }
         case .providerList:
             XgentProviderListView(node: node, document: document, model: model)
         case .treeRow:

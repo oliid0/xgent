@@ -1046,6 +1046,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             }),
           ),
       ),
+      icon: "bubble.left.and.bubble.right",
       text: t(
         settings.system.executionMode === "text"
           ? "settings.chatModeDesc"
@@ -1070,7 +1071,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         setSettings((previous) => ({ ...previous, locale: locale as typeof previous.locale })),
     );
     if (nativeMobile) {
-      nodes.push(c.group("general", "", [executionMode, language]));
+      nodes.push(c.group("general", "", [executionMode, { ...language, icon: "globe" }]));
       const appearance = createNativeDesktopAppearance({ settings, setSettings }, t, false);
       nodes.push(...appearance.nodes);
       for (const [id, handler] of appearance.handlers) c.handlers.set(id, handler);
@@ -1396,7 +1397,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         kind: "NavigationRow",
         icon: "wifi",
         label: t("settings.native.network"),
-        text: networkLabel,
+        value: networkLabel,
         disabled: true,
       });
     }

@@ -57,10 +57,14 @@ struct XgentDesktopSidebar: View {
     private var header: some View {
         VStack(spacing: 12) {
             HStack(spacing: 8) {
+                if let mode {
+                    XgentSelector(node: mode, document: document, model: model, showsLabel: false)
+                } else {
                 Text(children.first { $0.id == "sidebar-title" }?.text ?? document.title)
                     .font(XgentFonts.body(theme.fontFamily, size: titleSize * CGFloat(theme.fontScale), weight: .semibold))
                     .lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
+                }
                 Spacer(minLength: 8)
                 if let search {
                     Button { searchShown.toggle() } label: {
@@ -151,13 +155,11 @@ struct XgentDesktopSidebar: View {
     private var footerControls: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 12) {
-                if let mode { XgentSelector(node: mode, document: document, model: model, showsLabel: false) }
                 ForEach(footer.filter { $0.id != "new-chat" && $0.kind != .spacer }) { item in
                     XgentNodeView(node: item, document: document, model: model, parentAxis: .horizontal)
                 }
             }
             VStack(alignment: .leading, spacing: 8) {
-                if let mode { XgentSelector(node: mode, document: document, model: model, showsLabel: false) }
                 ForEach(footer.filter { $0.id != "new-chat" && $0.kind != .spacer }) { item in
                     XgentNodeView(node: item, document: document, model: model, parentAxis: .vertical)
                 }

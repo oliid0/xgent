@@ -7,6 +7,61 @@ import XCTest
 @testable import XgentNativeUI
 
 final class MobileComposerLayoutTests: XCTestCase {
+    @MainActor func testMentionSuggestionsFloatAboveTheDraftWithoutCompressingExecutionAndSendControls() async throws {
+        let payload: [String: Any] = ["version": 1, "surface": "chat", "revision": 1, "mode": "root", "title": "Chat", "appearance": "light", "formFactor": "mobile",
+            "nodes": [["id": "composer", "kind": "Composer", "children": [
+                ["id": "composer-suggestions", "kind": "List", "variant": "composer-suggestions", "label": "Files", "children": [
+                    ["id": "mention-file", "kind": "Button", "label": "docs/guide.md", "icon": "doc", "action": "mention"],
+                ]],
+                ["id": "draft", "kind": "ComposerInput", "label": "Message", "value": "Read @doc", "action": "draft"],
+                ["id": "composer-actions", "kind": "HStack", "children": [
+                    ["id": "attach", "kind": "IconButton", "label": "Attach", "icon": "plus", "action": "attach"],
+                    ["id": "command-safety", "kind": "Selector", "variant": "composer-command-safety", "label": "Command safety", "value": "ask", "action": "safety",
+                        "options": [["value": "ask", "label": "Ask"], ["value": "auto", "label": "Automatic"]]],
+                    ["id": "gap", "kind": "Spacer"],
+                    ["id": "send", "kind": "IconButton", "label": "Send", "icon": "arrow.up", "action": "send"],
+                ]],
+            ]]]]
+        let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
+        try document.validate()
+        let model = XgentPresentationModel(); model.update(document)
+        defer { model.invalidate() }
+        let composer = try XCTUnwrap(document.nodes.first)
+        for size in [DynamicTypeSize.large, .accessibility3] {
+            let view = VStack(spacing: 0) {
+                Spacer(minLength: 120)
+                XgentIOSComposer(node: composer, document: document, model: model)
+            }.frame(width: 320, height: 720).dynamicTypeSize(size)
+            let host = UIHostingController(rootView: view); host.safeAreaRegions = []
+            let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 720))
+            window.rootViewController = host; window.makeKeyAndVisible()
+            defer { window.isHidden = true; window.rootViewController = nil }
+            host.view.layoutIfNeeded(); try await Task.sleep(nanoseconds: 200_000_000)
+            let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
+            let elements = hierarchy.flattenToElements()
+            let suggestion = try XCTUnwrap(elements.first { $0.identifier == "mention-file" })
+            let bounds = suggestion.shape.bezierPath.bounds
+            let input = try XCTUnwrap(textView(in: host.view))
+            XCTAssertGreaterThanOrEqual(bounds.minY, 0)
+            XCTAssertLessThanOrEqual(bounds.maxY, input.convert(input.bounds, to: host.view).minY)
+            for id in ["attach", "command-safety", "send"] {
+                let element = try XCTUnwrap(elements.first { $0.identifier == id })
+                let rect = element.shape.bezierPath.bounds
+                XCTAssertGreaterThanOrEqual(rect.height, 44)
+                XCTAssertGreaterThanOrEqual(rect.minX, -1)
+                XCTAssertLessThanOrEqual(rect.maxX, 321)
+                XCTAssertLessThanOrEqual(rect.maxY, 721)
+            }
+            try attachNativeAccessibilityEvidence(hierarchy, name: "composer-mentions-320-\(size)")
+            let strategy = Snapshotting<UIView, UIImage>.image(size: CGSize(width: 320, height: 720))
+            let image = await withCheckedContinuation { continuation in
+                strategy.snapshot(host.view).run { continuation.resume(returning: $0) }
+            }
+            let attachment = XCTAttachment(image: image); attachment.name = "composer-mentions-320-\(size)"
+            attachment.lifetime = .keepAlways; add(attachment)
+        }
+    }
+
     @MainActor func testSupportingChipsLeaveSpaceForTranscriptAndDraft() async throws {
         func wire(_ id: String, _ kind: String, _ fields: [String: Any] = [:]) -> [String: Any] {
             fields.merging(["id": id, "kind": kind]) { _, value in value }

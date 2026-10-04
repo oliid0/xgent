@@ -592,11 +592,7 @@ extension XgentNodeView {
     }
 
     var composerInput: some View {
-        TextField(node.label ?? "", text: textBinding, axis: .vertical)
-            .modifier(XgentComposerFocusModifier(node: node, document: document, model: model))
-            .lineLimit(1...6).textFieldStyle(.plain)
-            .font(.body).padding(.vertical, 8)
-            .accessibilityLabel(node.label ?? "")
+        XgentComposerInput(node: node, document: document, model: model)
     }
 
     var filePicker: some View {

@@ -93,7 +93,7 @@ function harness(overrides = {}, options = {}) {
   const props = {
     conversationId: "conversation",
     uploadWorkdir: "/project",
-    settings: { theme: "system", system: { executionMode: "text" }, customSettings: { appearance: { showThinking: true } } },
+    settings: { theme: "system", system: { executionMode: "text", commandSafetyMode: "ask" }, customSettings: { appearance: { showThinking: true } } },
     composerRef: { current: null },
     sidebarStore: { subscribe: () => () => {}, getSnapshot: () => sidebarSnapshot() },
     historyItems: [], liveTranscriptStore: createLiveTranscriptStore(),
@@ -106,7 +106,7 @@ function harness(overrides = {}, options = {}) {
     inputDisabled: false, inputPlaceholder: "Message",
     isSending: false, errorMessage: null, hasMoreHistory: false, pendingApprovals: [],
     projects: [], attachmentsEnabled: true, uploads: [], isUploading: false,
-    onSend() {}, onStop() {}, onSelectModel() {}, onSelectConversation() {}, onSelectProject() {},
+    onSend() {}, onStop() {}, onSelectModel() {}, onSelectConversation() {}, onSelectProject() {}, onCommandSafetyModeChange() {},
     onConversationDeleted() {}, onConversationCwdChanged() {},
     queuedTurns: [], onRunQueuedTurnNow() {}, onMoveQueuedTurnUp() {}, onEditQueuedTurn() {}, onRemoveQueuedTurn() {},
     onNewConversation() {}, onOpenSettings() {}, onOpenRemote() {}, onOpenBrowser() {},
@@ -307,24 +307,29 @@ test("native attachment menu keeps runtime controls usable without attachment su
   h.unmount();
 });
 
-test("native skill menu inserts rich references into the sent draft and rejects removed or disabled choices", async () => {
+test("typing slash opens native skill suggestions, replaces the query and rejects removed or disabled choices", async () => {
   const skill = { name: "review", description: "Review changes", skillFile: "/skills/review/SKILL.md", baseDir: "/skills/review" };
   const sent = [];
   let managed = 0;
   const h = harness({ enabledSkills: [skill], onOpenSkillsHub: () => managed++,
     onSend: () => sent.push(h.props.composerRef.current.getDraft()) }, { mobile: true });
-  await h.dispatch("draft", "Check this ");
+  await h.dispatch("draft", "Check this /rev");
+  let composer = h.render().nodes[0].children.find(node => node.id === "composer");
+  assert.ok(composer.children.find(node => node.id === "composer-suggestions"));
+  assert.equal(composer.children.find(node => node.id === "composer-actions").children.some(node => node.id === "skill-mentions"), false);
   assert.equal((await h.dispatch("mention-skill:review")).ok, true);
   h.render();
   assert.equal((await h.dispatch("send")).ok, true);
   assert.deepEqual(sent[0].skillMentions, [skill]);
   assert.ok(sent[0].text.startsWith("Check this "));
-  assert.equal((await h.dispatch("manage-skills")).ok, true);
+  assert.equal(sent[0].segments.filter(segment => segment.type === "text").map(segment => segment.text).join(""), "Check this  ");
+  assert.equal((await h.dispatch("attach-plugins")).ok, true);
   assert.equal(managed, 1);
   h.props.inputDisabled = true;
   h.render();
   assert.equal((await h.dispatch("mention-skill:review")).ok, false);
   h.props.inputDisabled = false;
+  await h.dispatch("draft", "/rev");
   h.props.enabledSkills = [];
   h.render();
   assert.equal((await h.dispatch("mention-skill:review")).ok, false);
@@ -588,18 +593,29 @@ test("native work stays visible while running and folds only after completion", 
   h.unmount();
 });
 
-test("native iPhone exposes execution mode and live context usage in the chat chrome", async () => {
+test("native iPhone work modes belong to the sidebar title while command safety belongs to the composer", async () => {
   const selectedModes = [];
-  const h = harness({ onChangeMode: (mode) => selectedModes.push(mode) }, { mobile: true });
+  const safety = [];
+  const h = harness({ onChangeMode: (mode) => selectedModes.push(mode), onCommandSafetyModeChange: mode => safety.push(mode) }, { mobile: true });
   const chat = h.render().nodes[0];
   const toolbar = chat.children.find((node) => node.id === "toolbar");
-  const mode = toolbar.children.find((node) => node.id === "execution-mode");
-  assert.equal(mode.kind, "Selector");
-  assert.equal(mode.value, "text");
-  assert.equal((await h.dispatch("execution-mode", "tools")).ok, true);
+  assert.equal(toolbar.children.some(node => node.id === "execution-mode"), false);
+  assert.equal((await h.dispatch("sidebar")).ok, true);
+  h.render();
+  const mode = h.documents().find(document => document.mode === "sidebar").nodes[0].children.find(node => node.id === "sidebar-execution-mode");
+  assert.equal(mode.variant, "sidebar-work-mode");
+  assert.equal((await h.dispatch("sidebar-execution-mode", "tools", "sidebar")).ok, true);
   assert.deepEqual(selectedModes, ["tools"]);
   const composer = chat.children.find((node) => node.id === "composer");
   const actions = composer.children.find((node) => node.id === "composer-actions");
+  const commandSafety = actions.children.find(node => node.id === "command-safety");
+  assert.deepEqual(commandSafety.options.map(option => option.value), ["auto", "ask", "sandbox", "sandboxOffline"]);
+  assert.equal((await h.dispatch("command-safety", "auto")).ok, false, "Text-only work mode cannot execute tools");
+  h.props.settings.system.executionMode = "tools"; h.render();
+  assert.equal((await h.dispatch("command-safety", "auto")).ok, true);
+  assert.equal((await h.dispatch("command-safety", "sandboxOffline")).ok, true);
+  assert.equal((await h.dispatch("command-safety", "unknown")).ok, false);
+  assert.deepEqual(safety, ["auto", "sandboxOffline"]);
   const usage = actions.children.find((node) => node.id === "context-usage");
   assert.equal(usage.kind, "ProgressBar");
   assert.equal(usage.current, 45_000);
