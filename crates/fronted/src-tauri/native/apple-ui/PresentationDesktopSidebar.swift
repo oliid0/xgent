@@ -153,7 +153,7 @@ struct XgentDesktopSidebar: View {
         HStack(spacing: 8) {
             ForEach(footer.filter { $0.id != "new-chat" && $0.kind != .spacer }) { item in
                 if item.id == "sidebar-soul-menu" {
-                    XgentNodeView(node: item, document: document, model: model, parentAxis: .horizontal)
+                    XgentDesktopSoulMenu(node: item, document: document, model: model)
                         .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 } else {
                     XgentNodeView(node: item, document: document, model: model, parentAxis: .horizontal)

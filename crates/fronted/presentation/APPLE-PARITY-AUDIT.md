@@ -655,3 +655,33 @@ version and failure/retry labels, and reserves duplicate requests before render.
 The shared `AboutSection.tsx` itself contains only the name and current version;
 that native page was already aligned. New controller checks pass; footer geometry
 and actual macOS button dispatch remain subject to the new remote SDK run.
+
+# Native input and real-control follow-up (2026-10-05)
+
+CI 311 and 312 compiled the device archive and passed the frontend, Rust,
+architecture and workflow jobs. Hosted iOS ran 195 tests with one search-input
+identity failure. macOS 312 ran 185 tests with four Soul-menu frame failures;
+its search bounds, native typing and real arrow/Return dispatch passed.
+The captured iOS accessibility tree shows the search container identifier
+overwriting the actual field identifier. The container now preserves child
+identities. The desktop Soul footer now owns a handwritten 40-point native
+button and popover instead of the generic Menu's 17-point text cell. Existing
+bounds assertions remain, with added real preset activation checks.
+
+The installed iOS settings harness now enters the actual inline Hook, Cron
+and SSH editors, checks their fields and returns to Other with a real Back
+button. Hook/Cron back actions retain their controller ownership and disabled
+saving state. Installed-app results remain pending a green exact-HEAD release.
+
+Reading `MentionComposer.tsx` and `ChatPage.tsx` found hardware Return behavior
+missing from the native input. Native input now routes Return to shared send,
+Shift-Return to native text insertion, and Control/Command-Return to the shared
+steer callback. A floating candidate menu owns local selection, arrow movement,
+Tab/Return activation, Escape dismissal and selected-row scrolling. Composition
+and stale text/caret guards precede those actions. Submission reconciles the
+native draft before calling existing business handlers, retaining unchanged rich
+references and rejecting retired conversation/workspace operations. Node
+controller checks pass; real macOS key events are required by new SDK tests.
+Hardware behavior on a physical iPad and the installed macOS application is not
+yet proved. The source's prompt-history recall and atomic mention-chip keyboard
+behavior remain separate source-audit items, not demonstrated by this change.

@@ -6400,6 +6400,7 @@ export function ChatPage(props: ChatPageProps) {
           taskList={conversationState.meta.taskList}
           isUploading={isUploadingFiles}
           onSend={handleSend}
+          onSteer={handleSteer}
           onStop={handleStopSending}
           queuedTurns={queuedChatTurnsForCurrentConversation}
           onRunQueuedTurnNow={runQueuedTurnNow}

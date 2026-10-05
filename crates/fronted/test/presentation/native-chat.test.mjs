@@ -173,6 +173,55 @@ test("native edits reach the shared composer used by send and conversation draft
   assert.equal((await h.dispatch("send")).ok, false);
 });
 
+test("native hardware submit uses the current native draft and shared steer callback, preserving rich references and rejecting retired sessions", async () => {
+  for (const mobile of [false, true]) {
+    const sent = [], steered = [];
+    const h = harness({}, { mobile });
+    try {
+      const keyboard = (name) => h.render().nodes[0].children.find(n => n.id === "composer")
+        .children.find(n => n.id === "draft").children.find(n => n.id === `draft-keyboard-${name}`);
+      h.props.onSend = () => sent.push(h.props.composerRef.current.getDraft());
+      h.props.onSteer = () => steered.push(h.props.composerRef.current.getDraft());
+      assert.equal((await h.dispatch(keyboard("submit").action, "Typed before the edit ACK\r\nNext line")).ok, true);
+      assert.equal(sent[0].text, "Typed before the edit ACK\nNext line");
+      h.props.composerRef.current.insertSkillMention({ name: "review", description: "", baseDir: "/skills/review", skillFile: "/skills/review/SKILL.md" });
+      const richText = h.props.composerRef.current.getText();
+      const steer = keyboard("steer");
+      assert.equal((await h.dispatch(steer.action, richText + " continue")).ok, true);
+      assert.equal(steered[0].skillMentions[0].name, "review");
+      assert.ok(steered[0].text.endsWith(" continue"));
+      h.props.onSteer = () => steered.push("latest callback");
+      h.render(); assert.equal((await h.dispatch(steer.action, "A newer instruction")).ok, true);
+      assert.equal(steered.at(-1), "latest callback");
+      h.props.isUploading = true; h.render();
+      assert.equal((await h.dispatch(steer.action, "Must not run while uploading")).ok, false);
+      h.props.isUploading = false; h.props.conversationId = "next"; h.render();
+      assert.equal((await h.dispatch(steer.action, "Old conversation")).ok, false);
+      assert.equal(h.props.composerRef.current.getText(), "A newer instruction");
+      h.props.composerRef.current.clear();
+      assert.equal((await h.dispatch(keyboard("submit").action, "  ")).ok, true);
+      assert.equal(sent.length, 1, "An empty native draft cannot send a message");
+    } finally { h.unmount(); }
+  }
+});
+
+test("native Escape dismisses only the active mention session and a new query reopens its real candidates", async () => {
+  const h = harness({ enabledSkills: [{ name: "review", description: "Review", baseDir: "/skills", skillFile: "/skills/review/SKILL.md" }] });
+  try {
+    const composer = () => h.render().nodes[0].children.find(n => n.id === "composer");
+    await h.dispatch("draft", "/rev");
+    const initial = composer();
+    assert.equal(initial.children.find(n => n.id === "composer-suggestions").children[0].label, "review");
+    const dismiss = initial.children.find(n => n.id === "draft").children.find(n => n.id === "draft-keyboard-dismiss");
+    assert.equal((await h.dispatch(dismiss.action)).ok, true);
+    assert.equal(composer().children.some(n => n.id === "composer-suggestions"), false);
+    assert.equal(h.props.composerRef.current.getText(), "/rev");
+    await h.dispatch("draft", "/revi");
+    assert.equal(composer().children.find(n => n.id === "composer-suggestions").children[0].label, "review");
+    assert.equal((await h.dispatch(dismiss.action)).ok, false);
+  } finally { h.unmount(); }
+});
+
 test("native main chat publishes a working question card outside work and resumes the shared task", async () => {
   const h = harness();
   const ask = h.loader.loadModule("src/lib/tools/askUserQuestionTools.ts");

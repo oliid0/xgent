@@ -142,6 +142,7 @@ export type NativeChatPageProps = NativeWorkspaceActionsProps & {
   taskList?: TaskListState;
   isUploading: boolean;
   onSend: () => void;
+  onSteer?: () => void;
   onStop: () => void;
   queuedTurns: ChatQueueTurnPreview[];
   onRunQueuedTurnNow: (id: string) => void;
@@ -210,9 +211,18 @@ export function NativeChatPage(props: NativeChatPageProps) {
     mentionSearch.getSnapshot,
     mentionSearch.getSnapshot,
   );
-  const mentionContext = props.inputDisabled
+  const detectedMentionContext = props.inputDisabled
     ? null
     : detectNativeComposerMention(composer.handle.getText(), composer.getSelection(), true);
+  const [dismissedMentionScope, setDismissedMentionScope] = useState<string | null>(null);
+  const mentionScope = JSON.stringify([
+    props.conversationId,
+    props.uploadWorkdir,
+    detectedMentionContext?.text,
+    detectedMentionContext?.start,
+    detectedMentionContext?.end,
+  ]);
+  const mentionContext = mentionScope === dismissedMentionScope ? null : detectedMentionContext;
   const mentionKey = nativeMentionSearchKey(
     props.conversationId,
     props.uploadWorkdir,
@@ -261,6 +271,8 @@ export function NativeChatPage(props: NativeChatPageProps) {
     workdir: props.uploadWorkdir,
     revision: 0,
   }).current;
+  const currentProps = useRef(props);
+  currentProps.current = props;
   if (
     attachmentContext.conversationId !== props.conversationId ||
     attachmentContext.workdir !== props.uploadWorkdir
@@ -494,6 +506,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
         id: "composer-suggestions",
         kind: "List",
         variant: "composer-suggestions",
+        value: mentionScope,
         label: t(mentionContext.trigger === "skill" ? "chat.composer.plugins" : "sidebar.myFiles"),
         children: mentionNodes.length
           ? mentionNodes
@@ -521,6 +534,63 @@ export function NativeChatPage(props: NativeChatPageProps) {
     !props.isUploading &&
     props.modelOptions.length > 0 &&
     (!draft.isEmpty || props.uploads.length > 0);
+  const keyboardScope = `${props.conversationId}:${attachmentContext.revision}`;
+  const keyboardEnabled =
+    !props.inputDisabled && !props.isUploading && props.modelOptions.length > 0;
+  const keyboardSubmit = (steer: boolean): PresentationNode => {
+    const conversation = props.conversationId;
+    const revision = attachmentContext.revision;
+    const available = () => {
+      const latest = currentProps.current;
+      return (
+        attachmentContext.conversationId === conversation &&
+        attachmentContext.revision === revision &&
+        !latest.inputDisabled &&
+        !latest.isUploading &&
+        latest.modelOptions.length > 0
+      );
+    };
+    return {
+      id: steer ? "draft-keyboard-steer" : "draft-keyboard-submit",
+      kind: "Button",
+      label: t(steer ? "chat.queue.runNow" : "chat.send"),
+      disabled: !keyboardEnabled,
+      action: change(
+        `draft-keyboard:${keyboardScope}:${steer ? "steer" : "submit"}`,
+        (text) => {
+          if (!available()) throw new Error("This composer is no longer available.");
+          // Hardware Return can arrive before the last text edit is acknowledged.
+          // Reconcile that native draft without losing unchanged rich references.
+          composer.replaceEditorText(text);
+          if (!composer.handle.hasContent() && currentProps.current.uploads.length === 0) return;
+          const latest = currentProps.current;
+          (steer ? (latest.onSteer ?? latest.onSend) : latest.onSend)();
+        },
+        () => available(),
+        keyboardEnabled,
+        normalizeLogicalLineEndings,
+      ),
+    };
+  };
+  const dismissSuggestions: PresentationNode | undefined = mentionContext
+    ? {
+        id: "draft-keyboard-dismiss",
+        kind: "Button",
+        label: t("settings.close"),
+        action: action(
+          `draft-keyboard-dismiss:${mentionScope}`,
+          () => {
+            if (
+              composer.handle.getText() !== mentionContext.text ||
+              composer.getSelection().location !== mentionContext.end
+            )
+              return;
+            setDismissedMentionScope(mentionScope);
+          },
+          !props.inputDisabled,
+        ),
+      }
+    : undefined;
   const queuedTurns: PresentationNode[] = props.queuedTurns.map((turn, index) => {
     const prefix = `queue:${props.conversationId}:${turn.id}`;
     const queueAction = (
@@ -826,6 +896,11 @@ export function NativeChatPage(props: NativeChatPageProps) {
               ),
               label: props.inputPlaceholder,
               value: draft.text,
+              children: [
+                keyboardSubmit(false),
+                keyboardSubmit(true),
+                ...(dismissSuggestions ? [dismissSuggestions] : []),
+              ],
               disabled: props.inputDisabled,
               action: change(
                 "draft",

@@ -345,6 +345,7 @@ struct XgentActionResult: Decodable {
 final class XgentPresentationModel: ObservableObject {
     let codeSessions = XgentCodeSessionStore()
     let codeHosts = XgentCodeHostStore()
+    let composerKeyboard = XgentComposerKeyboardState()
     @Published private(set) var documents: [XgentDocument] = []
     @Published private(set) var edits: [String: XgentValue] = [:]
     @Published private(set) var busy: Set<String> = []
@@ -370,6 +371,7 @@ final class XgentPresentationModel: ObservableObject {
         codeHighlightQueries.removeAll()
         codeHosts.clear()
         codeSessions.clear()
+        composerKeyboard.clear()
         active = false
         webview = nil
         actionSink = nil
@@ -390,6 +392,7 @@ final class XgentPresentationModel: ObservableObject {
         guard document.revision > (revisions[document.surface] ?? 0) else { return }
         revisions[document.surface] = document.revision
         if document.removed == true {
+            composerKeyboard.clear(surface: document.surface)
             for batch in Array(numberCommitBatches.values) where batch.surface == document.surface { batch.finish(false) }
             numberDrafts.clear(surface: document.surface)
             for (id, query) in codeHighlightQueries where query.surface == document.surface {

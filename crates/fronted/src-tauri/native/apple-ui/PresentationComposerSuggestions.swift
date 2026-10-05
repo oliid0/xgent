@@ -4,14 +4,24 @@ struct XgentComposerSuggestions: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    @ObservedObject private var keyboard: XgentComposerKeyboardState
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.xgentPresentationTheme) private var theme
     var floatsAboveInput = false
     @ScaledMetric(relativeTo: .body) private var maximumHeight: CGFloat = 180
     @State private var contentHeight: CGFloat = 180
 
+    init(node: XgentNode, document: XgentDocument, model: XgentPresentationModel, floatsAboveInput: Bool = false) {
+        self.node = node; self.document = document; self.model = model
+        self.floatsAboveInput = floatsAboveInput
+        self._keyboard = ObservedObject(wrappedValue: model.composerKeyboard)
+    }
+
     private var viewportHeight: CGFloat { min(max(contentHeight, 44), min(maximumHeight, 260)) }
 
     var body: some View {
-        ScrollView {
+        ScrollViewReader { proxy in
+          ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if let label = node.label {
                     Text(label).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
@@ -33,10 +43,15 @@ struct XgentComposerSuggestions: View {
                             }
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                             .padding(.horizontal, 14).padding(.vertical, 4)
+                            .background(keyboard.selectedID(menu: node, document: document) == child.id
+                                ? Color(xgentHex: theme.palette(for: colorScheme).muted) : .clear,
+                                in: RoundedRectangle(cornerRadius: 12))
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain).disabled(child.disabled == true || model.isBusy(child, in: document))
                         .accessibilityIdentifier(child.id)
+                        .accessibilityAddTraits(keyboard.selectedID(menu: node, document: document) == child.id ? .isSelected : [])
+                        .id(child.id)
                     } else {
                         Text(child.text ?? "").font(.subheadline).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true).padding(14)
@@ -46,6 +61,10 @@ struct XgentComposerSuggestions: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { _, height in
                 if height.isFinite && height > 0 { contentHeight = height }
             }
+          }
+          .onChange(of: keyboard.selectedID(menu: node, document: document)) { _, id in
+              if let id { proxy.scrollTo(id, anchor: .center) }
+          }
         }
         .frame(height: viewportHeight)
         .modifier(XgentGlassSurface(radius: 22, floating: true))

@@ -109,7 +109,7 @@ struct XgentWorkspaceSearchPalette: View {
         .onAppear { queryFocused = true }
         // A new query/action scope invalidates the prior keyboard selection.
         .onChange(of: results.map(\.action)) { _, _ in selectedID = nil }
-        .accessibilityIdentifier(node.id)
+        .accessibilityElement(children: .contain)
     }
 
     private func resultRow(_ result: XgentNode) -> some View {
