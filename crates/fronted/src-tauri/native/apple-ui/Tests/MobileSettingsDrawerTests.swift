@@ -126,6 +126,14 @@ final class MobileSettingsDrawerTests: XCTestCase {
             XCTAssertEqual(failure.label, "Could not save settings")
             let failureTitle = try XCTUnwrap(failed.first { $0.identifier == "presentation-sheet-title" })
             XCTAssertFalse(failure.shape.bezierPath.bounds.intersects(failureTitle.shape.bezierPath.bounds))
+            model.update(try document(title: "General", revision: 4, nodes: [
+                node("back", "IconButton", ["label": "Back", "action": "back", "disabled": true]),
+                node("saving", "Progress", ["label": "Saving"]),
+            ]))
+            try await waitFor("saving", in: window)
+            let saving = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: window).flattenToElements()
+            let disabledBack = try XCTUnwrap(saving.first { $0.identifier == "back" && $0.traits.contains(.button) })
+            XCTAssertTrue(disabledBack.traits.contains(.notEnabled), "Saving must expose a genuinely disabled Back control")
         }
     }
 

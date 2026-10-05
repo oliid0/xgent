@@ -187,6 +187,18 @@ export function SoulSection({
       run: () => onBack?.(),
     });
     const nodes: PresentationNode[] = [
+      ...(compact
+        ? [
+            {
+              id: "back",
+              kind: "IconButton" as const,
+              icon: "chevron.left",
+              label: t("settings.mobile.backToSettings"),
+              action: "close",
+              disabled: saving,
+            },
+          ]
+        : []),
       {
         id: "soul-description",
         kind: "Text",

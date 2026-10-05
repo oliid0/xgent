@@ -903,7 +903,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
               ],
               disabled: props.inputDisabled,
               action: change(
-                "draft",
+                `draft:${keyboardScope}`,
                 composer.replaceEditorText,
                 undefined,
                 !props.inputDisabled,

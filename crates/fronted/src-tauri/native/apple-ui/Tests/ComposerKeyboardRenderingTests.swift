@@ -39,10 +39,13 @@ final class ComposerKeyboardRenderingTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(220))
         let editor = try XCTUnwrap(window.firstResponder as? NSTextView)
         editor.setSelectedRange(NSRange(location: 1, length: 0))
+        // Explicit caret placement reports its selection asynchronously. Finish
+        // that setup before measuring the actions caused by the physical arrow.
+        try await Task.sleep(for: .milliseconds(100))
         let count = actions.count
         try press(125, "\u{f701}", in: window)
         try await Task.sleep(for: .milliseconds(60))
-        XCTAssertEqual(actions.count, count, "Arrow keys select locally")
+        XCTAssertEqual(actions.count, count, "Arrow keys select locally; unexpected actions: \(actions.dropFirst(count).map(\.action))")
         try press(48, "\t", in: window); try await Task.sleep(for: .milliseconds(100))
         XCTAssertEqual(actions.last?.action, "mention:1")
         try press(53, "\u{1b}", in: window); try await Task.sleep(for: .milliseconds(100))

@@ -542,6 +542,7 @@ struct XgentIOSSheetPresentation: View {
             }
             .buttonStyle(.plain)
             .modifier(XgentIOSNavigationControl())
+            .disabled(back.disabled == true || model.isBusy(back, in: document))
             .accessibilityLabel(back.label ?? "Back")
             .accessibilityIdentifier(back.id)
         } else {

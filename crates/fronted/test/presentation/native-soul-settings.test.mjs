@@ -42,6 +42,8 @@ test("native Soul includes all identity and personality details, drafts, presets
   const f = fixture();
   try {
     assert.equal(f.render().sessionSurface, "soul-session");
+    const back = f.all().find(node => node.id === "back");
+    assert.equal(back.kind, "IconButton"); assert.equal(back.action, "close");
     assert.equal(f.all().find(node => node.id === "soul-body").minHeight, 240);
     assert.equal(f.all().find(node => node.id === "soul-body").fill, undefined);
     for (const id of ["soul-name-hint", "soul-style-hint", "soul-body-hint"]) assert.ok(f.all().find(node => node.id === id)?.text);
@@ -107,6 +109,8 @@ test("pending Soul save locks native editing, prevents duplicate writes and reta
     assert.equal(f.all().find(node => node.id === "soul-body").disabled, true);
     assert.equal(f.all().find(node => node.id === "soul-preset").disabled, true);
     assert.equal(f.render().document.dismissAction, undefined);
+    assert.equal(f.all().some(node => node.id === "back"), false,
+      "Desktop Soul details use the shared settings shell");
     release(); await first; f.render();
     assert.equal(f.all().find(node => node.id === "soul-error").label, "storage unavailable");
     assert.equal(f.all().find(node => node.id === "soul-body").value, "Keep after failure");

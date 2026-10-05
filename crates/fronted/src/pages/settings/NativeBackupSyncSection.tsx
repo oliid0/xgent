@@ -22,9 +22,11 @@ export function NativeBackupSyncSection(props: {
   const { data } = props;
   const c = presentationControls();
   const { form, syncView, locked } = data;
+  const mobile = isNativeMobileRuntime();
   const available = !locked && !data.dirty && data.configured;
+  const back = c.action("backup-back", t("settings.mobile.backToSettings"), () => props.onBack?.());
   const nodes: PresentationNode[] = [
-    c.action("backup-back", t("settings.mobile.backToSettings"), () => props.onBack?.()),
+    ...(mobile ? [{ ...back, id: "back", kind: "IconButton" as const, icon: "chevron.left" }] : []),
     ...(data.operation === "load"
       ? [{ id: "backup-loading", kind: "Progress" as const, label: t("app.loading") }]
       : []),
@@ -270,8 +272,8 @@ export function NativeBackupSyncSection(props: {
         mode: "sheet",
         title: t("settings.navBackup"),
         appearance: props.settings.theme,
-        formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
-        theme: createNativePresentationTheme(props.settings, isNativeMobileRuntime()),
+        formFactor: mobile ? "mobile" : "desktop",
+        theme: createNativePresentationTheme(props.settings, mobile),
         dismissAction: "backup-back",
         nodes,
       }}

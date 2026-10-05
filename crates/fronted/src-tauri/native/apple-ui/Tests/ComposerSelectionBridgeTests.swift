@@ -30,10 +30,28 @@ final class ComposerSelectionBridgeTests: XCTestCase {
         XCTAssertEqual(actions.count, count)
     }
 
-    private func document(revision: Int, selectionAction: String) throws -> XgentDocument {
+    @MainActor func testPendingNativeDraftAndOldAcknowledgementCannotOverwriteTheNextConversation() throws {
+        let model = XgentPresentationModel()
+        var actions: [XgentAction] = []; model.actionSink = { actions.append($0) }
+        let first = try document(revision: 1, selectionAction: "selection:first", draftAction: "draft:first:0")
+        model.update(first); defer { model.invalidate() }
+        let oldInput = try XCTUnwrap(first.node(id: "draft"))
+        model.send(oldInput, in: first, value: .string("Unacknowledged old draft"), editing: true)
+        let pending = try XCTUnwrap(actions.last)
+        let second = try document(revision: 2, selectionAction: "selection:second", draftAction: "draft:second:1", text: "Restored new draft")
+        model.update(second)
+        let newInput = try XCTUnwrap(second.node(id: "draft"))
+        XCTAssertEqual(model.value(newInput, in: second).text, "Restored new draft")
+        model.send(oldInput, in: first, value: .string("Late old field edit"), editing: true)
+        XCTAssertEqual(actions.count, 1)
+        model.complete(.init(surface: first.surface, requestId: pending.requestId, ok: true, error: nil, acceptedValue: pending.value))
+        XCTAssertEqual(model.value(newInput, in: second).text, "Restored new draft")
+    }
+
+    private func document(revision: Int, selectionAction: String, draftAction: String = "draft", text: String = "") throws -> XgentDocument {
         let result = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: [
             "version": 1, "surface": "composer", "revision": revision, "mode": "root", "title": "Chat", "appearance": "system",
-            "nodes": [["id": "draft", "kind": "ComposerInput", "value": "", "action": "draft", "selectionAction": selectionAction]],
+            "nodes": [["id": "draft", "kind": "ComposerInput", "value": text, "action": draftAction, "selectionAction": selectionAction]],
         ]))
         try result.validate()
         return result

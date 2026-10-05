@@ -141,6 +141,8 @@ function harness(overrides = {}, options = {}) {
   render();
   return {
     props, render, loader,
+    draftAction: () => lastSurfaces[0].props.document.nodes[0].children.find(n => n.id === "composer")
+      .children.find(n => n.id === "draft").action,
     documents: () => lastSurfaces.map((surface) => surface.props.document),
     search: () => searchProps,
     dispatch: (action, value = null, surface = "chat") =>
@@ -153,7 +155,7 @@ test("native edits reach the shared composer used by send and conversation draft
   const sent = [];
   const h = harness({ onSend: () => sent.push(h.props.composerRef.current.getDraft().text) });
   assert.equal((await h.dispatch("send")).ok, false);
-  const edit = await h.dispatch("draft", "Hello\r\nmodel");
+  const edit = await h.dispatch(h.draftAction(), "Hello\r\nmodel");
   assert.equal(edit.ok, true);
   assert.equal(edit.acceptedValue, "Hello\nmodel", "Swift receives the shared newline spelling");
   h.render();
@@ -205,18 +207,40 @@ test("native hardware submit uses the current native draft and shared steer call
   }
 });
 
+test("native typing actions retire on conversation and workspace changes without overwriting restored drafts", async () => {
+  for (const mobile of [false, true]) {
+    const h = harness({}, { mobile });
+    try {
+      const original = h.draftAction();
+      await h.dispatch(original, "First conversation draft");
+      h.props.composerRef.current.setText("Restored second conversation");
+      h.props.conversationId = "second"; h.render();
+      assert.notEqual(h.draftAction(), original);
+      assert.equal((await h.dispatch(original, "Late first keystroke")).ok, false);
+      assert.equal(h.props.composerRef.current.getText(), "Restored second conversation");
+      const second = h.draftAction();
+      h.props.uploadWorkdir = "/other"; h.render();
+      assert.equal((await h.dispatch(second, "Previous workspace edit")).ok, false);
+      h.props.conversationId = "conversation"; h.props.uploadWorkdir = "/project"; h.render();
+      assert.notEqual(h.draftAction(), original, "Returning to an old target creates a fresh input scope");
+      assert.equal((await h.dispatch(original, "Retired first scope")).ok, false);
+      assert.equal((await h.dispatch(h.draftAction(), "Current typing")).ok, true);
+    } finally { h.unmount(); }
+  }
+});
+
 test("native Escape dismisses only the active mention session and a new query reopens its real candidates", async () => {
   const h = harness({ enabledSkills: [{ name: "review", description: "Review", baseDir: "/skills", skillFile: "/skills/review/SKILL.md" }] });
   try {
     const composer = () => h.render().nodes[0].children.find(n => n.id === "composer");
-    await h.dispatch("draft", "/rev");
+    await h.dispatch(h.draftAction(), "/rev");
     const initial = composer();
     assert.equal(initial.children.find(n => n.id === "composer-suggestions").children[0].label, "review");
     const dismiss = initial.children.find(n => n.id === "draft").children.find(n => n.id === "draft-keyboard-dismiss");
     assert.equal((await h.dispatch(dismiss.action)).ok, true);
     assert.equal(composer().children.some(n => n.id === "composer-suggestions"), false);
     assert.equal(h.props.composerRef.current.getText(), "/rev");
-    await h.dispatch("draft", "/revi");
+    await h.dispatch(h.draftAction(), "/revi");
     assert.equal(composer().children.find(n => n.id === "composer-suggestions").children[0].label, "review");
     assert.equal((await h.dispatch(dismiss.action)).ok, false);
   } finally { h.unmount(); }
@@ -246,7 +270,7 @@ test("native mobile can queue a new draft while generation remains stoppable", a
   let stops = 0;
   const h = harness({ isSending: true, onSend: () => sends++, onStop: () => stops++ }, { mobile: true });
   assert.equal((await h.dispatch("send")).ok, false);
-  assert.equal((await h.dispatch("draft", "Next instruction")).ok, true);
+  assert.equal((await h.dispatch(h.draftAction(), "Next instruction")).ok, true);
   const composer = h.render().nodes[0].children.find(node => node.id === "composer");
   const actions = composer.children.find(node => node.id === "composer-actions").children;
   assert.equal(actions.find(node => node.id === "send").label, "chat.queue.addToQueue");
@@ -368,7 +392,7 @@ test("typing slash opens native skill suggestions, replaces the query and reject
   let managed = 0;
   const h = harness({ enabledSkills: [skill], onOpenSkillsHub: () => managed++,
     onSend: () => sent.push(h.props.composerRef.current.getDraft()) }, { mobile: true });
-  await h.dispatch("draft", "Check this /rev");
+  await h.dispatch(h.draftAction(), "Check this /rev");
   let composer = h.render().nodes[0].children.find(node => node.id === "composer");
   assert.ok(composer.children.find(node => node.id === "composer-suggestions"));
   assert.equal(composer.children.find(node => node.id === "composer-actions").children.some(node => node.id === "skill-mentions"), false);
@@ -384,7 +408,7 @@ test("typing slash opens native skill suggestions, replaces the query and reject
   h.render();
   assert.equal((await h.dispatch("mention-skill:review")).ok, false);
   h.props.inputDisabled = false;
-  await h.dispatch("draft", "/rev");
+  await h.dispatch(h.draftAction(), "/rev");
   h.props.enabledSkills = [];
   h.render();
   assert.equal((await h.dispatch("mention-skill:review")).ok, false);
@@ -1213,10 +1237,10 @@ test("native controls enforce busy, model and attachment constraints at dispatch
   let picked = 0;
   const selected = [];
   const h = harness({ onImportFiles: async () => { picked++; }, onSelectModel: (value) => selected.push(value) });
-  await h.dispatch("draft", "Ready");
+  await h.dispatch(h.draftAction(), "Ready");
   h.props.inputDisabled = true;
   h.render();
-  for (const [action, value] of [["draft", "Blocked"], ["send", null], ["attach:conversation:0", null]]) {
+  for (const [action, value] of [[h.draftAction(), "Blocked"], ["send", null], ["attach:conversation:0", null]]) {
     assert.equal((await h.dispatch(action, value)).ok, false);
   }
   h.props.inputDisabled = false;
@@ -1274,7 +1298,7 @@ test("empty native model selection stays in the footer and opens provider settin
   assert.ok(model.label);
   assert.equal(composer.children.some((node) => node.id === "model"), false);
   assert.deepEqual(opened, []);
-  assert.equal((await h.dispatch("draft", "Keep this draft")).ok, true);
+  assert.equal((await h.dispatch(h.draftAction(), "Keep this draft")).ok, true);
   h.render();
   assert.equal((await h.dispatch("configure-provider")).ok, true);
   assert.deepEqual(opened, ["providers"]);

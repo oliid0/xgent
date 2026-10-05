@@ -95,6 +95,11 @@ test("native backup retains settings surface, secure input, presets and desktop-
     assert.equal(s.sessionSurface, "settings-backup");
     assert.equal(s.document.formFactor, mobile ? "mobile" : "desktop");
     assert.equal(s.document.dismissAction, "backup-back");
+    const back = s.document.nodes.find(node => node.id === "back");
+    assert.equal(back?.kind, mobile ? "IconButton" : undefined);
+    assert.equal(back?.action, mobile ? "backup-back" : undefined);
+    assert.equal(s.document.nodes.some(node => node.id === "backup-back"), false,
+      "Desktop uses the settings shell close; mobile has one native header Back");
     const connection = s.document.nodes.find(node => node.id === "backup-connection");
     const fields = connection.children.find(node => node.variant === "backup-connection-fields").children;
     assert.equal(fields.find(node => node.id === "backup-password").secure, true);

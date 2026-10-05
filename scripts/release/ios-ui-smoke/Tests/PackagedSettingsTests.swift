@@ -26,7 +26,7 @@ final class PackagedSettingsTests: XCTestCase {
         let pages: [(id: String, anchor: String, back: String)] = [
             ("system", "mode", "back"),
             ("providers", "add-provider", "back"),
-            ("soul", "soul-preset", "presentation-sheet-close"),
+            ("soul", "soul-preset", "back"),
             ("memory", "memory-category", "back"),
             ("mobileAssistant", "refresh-permissions", "back"),
             ("toolPermissions", "tool-policy-description", "back"),
@@ -34,7 +34,7 @@ final class PackagedSettingsTests: XCTestCase {
             ("voice", "voice-enabled", "back"),
             ("other", "other:hooks:hook-add", "back"),
             ("access", "lan-url", "back"),
-            ("backup", "backup-preset", "presentation-sheet-close"),
+            ("backup", "backup-preset", "back"),
             ("about", "about-version", "back"),
         ]
         for page in pages {

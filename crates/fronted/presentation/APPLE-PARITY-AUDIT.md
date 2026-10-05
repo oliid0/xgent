@@ -685,3 +685,21 @@ controller checks pass; real macOS key events are required by new SDK tests.
 Hardware behavior on a physical iPad and the installed macOS application is not
 yet proved. The source's prompt-history recall and atomic mention-chip keyboard
 behavior remain separate source-audit items, not demonstrated by this change.
+
+CI 313's 188 macOS tests passed the actual Soul-button/preset press and bounds,
+search typing/keys, Shift-Return newline, Return native-draft submission,
+Command-Return steer and marked-text Return suppression. One keyboard-menu test
+appears to have counted an asynchronous caret-placement report from its own setup
+as an arrow action. Setup now settles that report before the unchanged no-action assertion;
+the failure message records any later unexpected action names. This requires
+confirmation on the next SHA. All 195 hosted iOS tests and six other CI jobs passed;
+the real iOS search field now keeps its own accessibility identity.
+
+Further source review found Soul's mobile close-only detail and Backup's visible
+Back-to-Settings body button. Both now use the native header Back; desktop Backup
+keeps shell close/outside-dismiss only. Saving exposes a disabled Back control,
+checked in the real hosted drawer. Native typing actions also now carry their
+conversation/workspace scope, allowing the native model to discard old optimistic
+edits on target changes. Controller tests reject late and returned-old-scope edits;
+a bridge test requires a restored next-conversation draft to survive old input
+and its acknowledgement. Installed screenshots/persistence are still required.
