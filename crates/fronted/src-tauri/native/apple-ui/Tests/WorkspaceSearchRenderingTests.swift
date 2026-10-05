@@ -28,6 +28,8 @@ final class WorkspaceSearchRenderingTests: XCTestCase {
             host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(180))
             let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
             let elements = hierarchy.flattenToElements()
+            try attachNativeAccessibilityEvidence(hierarchy, name: "workspace-search-before-checks-320-\(size)")
+            try attachCompositedNativeScreenshot(of: host.view, name: "workspace-search-before-checks-320-\(size)")
             let query = try XCTUnwrap(elements.first { $0.identifier == "workspace-search-query" })
             let first = try XCTUnwrap(elements.first { $0.identifier == "workspace-search-result:0" })
             let queryFrame = query.shape.bezierPath.bounds, firstFrame = first.shape.bezierPath.bounds
@@ -54,6 +56,13 @@ final class WorkspaceSearchRenderingTests: XCTestCase {
             defer { model.invalidate(); window.close() }
             host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(180))
             let elements = nativeMacAccessibilityTree(window)
+            // Keep real diagnostics even when a required native element is missing.
+            try attachNativeAccessibilityEvidence(elements.map { ["id": $0.accessibilityIdentifier() ?? "", "label": $0.accessibilityLabel() ?? "",
+                "role": $0.accessibilityRole()?.rawValue ?? "", "frame": NSStringFromRect($0.accessibilityFrame())] },
+                name: "workspace-search-tree-320-\(size)")
+            let before = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds)); host.cacheDisplay(in: host.bounds, to: before)
+            let beforeAttachment = XCTAttachment(image: NSImage(cgImage: try XCTUnwrap(before.cgImage), size: host.bounds.size))
+            beforeAttachment.name = "workspace-search-before-checks-320-\(size)"; beforeAttachment.lifetime = .keepAlways; add(beforeAttachment)
             let query = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "workspace-search-query" })
             let first = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "workspace-search-result:0" })
             XCTAssertFalse(query.accessibilityFrame().intersects(first.accessibilityFrame()))

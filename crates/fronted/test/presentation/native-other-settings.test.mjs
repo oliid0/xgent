@@ -134,11 +134,13 @@ test("Other shows the actual Hooks, Cron and SSH lists and switches to real edit
       const retiredCron = h.node("other:cron:add").action;
       await h.send(h.node("other:hooks:hook-add").action); h.render();
       assert.ok(h.node("hook-name")); assert.equal(h.node("other:cron:cron-one"), undefined);
+      if (mobile) assert.ok(h.node("back"));
       assert.equal((await h.send(retiredCron)).ok, false);
       await h.send(h.render().dismissAction); h.render();
       assert.ok(h.node("other:cron:cron-one"));
       await h.send(h.node("other:cron:add").action); h.render();
       assert.ok(h.node("name")); assert.ok(h.node("cron"));
+      if (mobile) assert.ok(h.node("back"));
       await h.send(h.render().dismissAction); h.render();
       await h.send(h.node("other:ssh:ssh-one:edit").action); h.render();
       assert.equal(h.node("host").value, "server.test");

@@ -98,6 +98,7 @@ export function createNativeOtherContentStore() {
       theme: ContentDocument["theme"];
       mobile: boolean;
       backLabel: string;
+      detailBackLabel?: string;
       labels: Record<NativeOtherArea, { title: string; description: string }>;
       onBack: () => void;
       onClose: () => void;
@@ -146,11 +147,24 @@ export function createNativeOtherContentStore() {
           .map(rewrite);
       };
       if (detail) {
+        const detailNodes = nodesFor(detail, true);
+        const backAction =
+          detail.document.dismissAction ?? (detail.handlers.has("close") ? "close" : undefined);
+        if (options.mobile && backAction && !detailNodes.some((node) => node.id === "back"))
+          detailNodes.unshift({
+            id: "back",
+            kind: "IconButton",
+            icon: "chevron.left",
+            label: options.detailBackLabel ?? options.backLabel,
+            action: actionName(detail, backAction),
+            disabled:
+              !detail.document.dismissAction || detail.handlers.get(backAction)?.enabled !== true,
+          });
         return {
           document: {
             ...detail.document,
             mode: "sheet",
-            nodes: nodesFor(detail, true),
+            nodes: detailNodes,
             dismissAction: detail.document.dismissAction
               ? actionName(detail, detail.document.dismissAction)
               : undefined,

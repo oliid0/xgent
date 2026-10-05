@@ -19,6 +19,8 @@ struct XgentNativeMenu: View {
                     Text(node.label ?? "").fixedSize(horizontal: false, vertical: true)
                         .lineLimit(node.id == "sidebar-soul-menu" ? 1 : nil)
                 }
+                .frame(minHeight: node.id == "sidebar-soul-menu" ? 40 : nil, alignment: .leading)
+                .contentShape(Rectangle())
             }
         }
         .menuStyle(.button)

@@ -28,6 +28,7 @@ export function NativeOtherSettings(
     theme: createNativePresentationTheme(props.settings, props.mobile, "workspaceTools"),
     mobile: props.mobile,
     backLabel: t("settings.mobile.backToSettings"),
+    detailBackLabel: t("settings.native.back"),
     onBack: props.onBack,
     onClose: props.onClose,
     labels: {

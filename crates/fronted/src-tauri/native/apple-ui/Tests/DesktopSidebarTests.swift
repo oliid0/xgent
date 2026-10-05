@@ -41,7 +41,7 @@ final class DesktopSidebarTests: XCTestCase {
                 let bounds = window.convertToScreen(host.convert(host.bounds, to: nil))
                 for element in [newChat, skills, settings, mode, soul, update] {
                     let frame = element.accessibilityFrame()
-                    XCTAssertGreaterThan(frame.height, 20)
+                    XCTAssertGreaterThan(frame.height, 20, "\(element.accessibilityIdentifier() ?? "unknown") must expose its actual control area")
                     XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX - 1)
                     XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX + 1)
                     XCTAssertGreaterThanOrEqual(frame.minY, bounds.minY - 1)

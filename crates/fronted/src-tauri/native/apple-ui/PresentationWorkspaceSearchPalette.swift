@@ -34,17 +34,28 @@ struct XgentWorkspaceSearchPalette: View {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
                     TextField(query.label ?? "", text: Binding(
                         get: { model.value(query, in: document).text },
-                        set: { model.send(query, in: document, value: .string($0), editing: true) }))
+                        set: { next in
+                            guard next != model.value(query, in: document).text else { return }
+                            model.send(query, in: document, value: .string(next), editing: true)
+                        }))
                         .textFieldStyle(.plain)
                         .font(.body)
                         .focused($queryFocused)
                         #if os(iOS)
-                        .introspect(.textField, on: .iOS(.v26)) { fieldState.field = $0 }
+                        .introspect(.textField, on: .iOS(.v26)) { field in
+                            fieldState.field = field
+                            field.accessibilityIdentifier = query.id
+                            field.accessibilityLabel = query.label ?? ""
+                        }
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .submitLabel(.search)
                         #else
-                        .introspect(.textField, on: .macOS(.v15, .v26)) { fieldState.field = $0 }
+                        .introspect(.textField, on: .macOS(.v15, .v26)) { field in
+                            fieldState.field = field
+                            field.setAccessibilityIdentifier(query.id)
+                            field.setAccessibilityLabel(query.label ?? "")
+                        }
                         #endif
                         .accessibilityIdentifier(query.id)
                         .accessibilityLabel(query.label ?? "")

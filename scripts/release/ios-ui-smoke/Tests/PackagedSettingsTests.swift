@@ -32,7 +32,7 @@ final class PackagedSettingsTests: XCTestCase {
             ("toolPermissions", "tool-policy-description", "back"),
             ("mobileExecution", "shell-installation-status", "back"),
             ("voice", "voice-enabled", "back"),
-            ("other", "nav:hooks", "back"),
+            ("other", "other:hooks:hook-add", "back"),
             ("access", "lan-url", "back"),
             ("backup", "backup-preset", "presentation-sheet-close"),
             ("about", "about-version", "back"),
@@ -57,18 +57,26 @@ final class PackagedSettingsTests: XCTestCase {
             record(app, name: "ios-packaged-settings-" + page.id)
 
             if page.id == "other" {
-                for detail in ["hooks", "cron", "ssh"] {
-                    let row = app.buttons["nav:" + detail].firstMatch
+                let editors: [(area: String, action: String, field: String)] = [
+                    ("hooks", "other:hooks:hook-add", "hook-name"),
+                    ("cron", "other:cron:add", "cron"),
+                    ("ssh", "other:ssh:add", "host"),
+                ]
+                for editor in editors {
+                    let row = app.buttons[editor.action].firstMatch
                     reveal(row, in: app)
-                    let detailLabel = row.label
                     tap(row, in: app)
-                    let detailTitle = activeTitle(app)
-                    let shown = XCTNSPredicateExpectation(
-                        predicate: NSPredicate(format: "label CONTAINS[c] %@", detailLabel), object: detailTitle)
-                    XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: 20), .completed)
-                    record(app, name: "ios-packaged-settings-other-" + detail)
-                    tap(activeButton("presentation-sheet-close", in: app), in: app)
-                    XCTAssertTrue(app.buttons["nav:hooks"].waitForExistence(timeout: 20),
+                    let field = app.descendants(matching: .any)[editor.field].firstMatch
+                    reveal(field, in: app); assertOnscreen(field, in: app)
+                    XCTAssertFalse(app.buttons[editor.action].exists,
+                                   "An actual editor must replace the inline lists")
+                    let editorBack = activeButton("back", in: app)
+                    assertOnscreen(editorBack, in: app)
+                    XCTAssertGreaterThanOrEqual(editorBack.frame.height, 43.5)
+                    XCTAssertFalse(activeTitle(app).frame.intersects(editorBack.frame))
+                    record(app, name: "ios-packaged-settings-other-" + editor.area)
+                    tap(editorBack, in: app)
+                    XCTAssertTrue(app.buttons[editor.action].waitForExistence(timeout: 20),
                                   "A detail must return to Other, rather than close Settings")
                 }
             }
