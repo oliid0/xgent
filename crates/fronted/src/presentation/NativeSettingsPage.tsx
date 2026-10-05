@@ -613,6 +613,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         setSettings={setSettings}
         nativeSettingsSurfaceId={sessionSurface}
         mobile={nativeMobile}
+        saveState={props.saveState}
         onBack={returnToSettings}
         onClose={props.onBack}
       />

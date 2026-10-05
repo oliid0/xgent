@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore } from "react";
 import { useLocale } from "../i18n";
+import type { SettingsSaveState } from "../lib/settings/storage";
 import { CronSection } from "../pages/settings/CronSection";
 import { HooksSection } from "../pages/settings/HooksSection";
 import { SshSettingsSection } from "../pages/settings/SshSettingsSection";
@@ -13,6 +14,7 @@ export function NativeOtherSettings(
     mobile: boolean;
     onBack: () => void;
     onClose: () => void;
+    saveState?: SettingsSaveState;
   },
 ) {
   const { t } = useLocale();
@@ -25,7 +27,7 @@ export function NativeOtherSettings(
     appearance: props.settings.theme,
     theme: createNativePresentationTheme(props.settings, props.mobile, "workspaceTools"),
     mobile: props.mobile,
-    backLabel: t("settings.back"),
+    backLabel: t("settings.mobile.backToSettings"),
     onBack: props.onBack,
     onClose: props.onClose,
     labels: {
@@ -40,6 +42,13 @@ export function NativeOtherSettings(
       kind: "Banner",
       status: "error",
       label: error,
+    });
+  if (props.mobile && props.saveState?.status === "error")
+    content.document.nodes.push({
+      id: "save-status",
+      kind: "Text",
+      secondary: false,
+      text: props.saveState.message,
     });
   return (
     <>

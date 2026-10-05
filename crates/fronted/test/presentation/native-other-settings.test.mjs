@@ -48,7 +48,7 @@ test("Other content keeps lists together, uses current handlers and retires hidd
   store.dispose(); assert.throws(() => oldCron.run(null), /no longer available/);
 });
 
-function harness(mobile) {
+function harness(mobile, language) {
   const instances = new Map();
   let current, changed = true, document, handlers, request = 0;
   const calls = [], alerts = [];
@@ -64,7 +64,8 @@ function harness(mobile) {
   };
   const react = Object.fromEntries(["useState", "useRef", "useMemo", "useCallback", "useEffect"].map(name => [name, (...args) => current.react[name](...args)]));
   react.useLayoutEffect = (...args) => current.react.useEffect(...args); react.useSyncExternalStore = useSyncExternalStore;
-  const locale = { useLocale: () => ({ t: key => key }) };
+  const { t: translate } = createTsModuleLoader().loadModule("src/i18n/config.ts");
+  const locale = { useLocale: () => ({ t: key => language ? translate(key, language) : key }) };
   const loader = createTsModuleLoader({ mocks: {
     react, "../i18n": locale, "../../i18n": locale,
     "./NativeSurface": { NativeSurface: "NativeSurface" }, "../../presentation/NativeSurface": { NativeSurface: "NativeSurface" },
@@ -115,7 +116,7 @@ function harness(mobile) {
     return document;
   }
   render();
-  return { render, calls, alerts, node: id => flatten(document.nodes).find(n => n.id === id),
+  return { render, calls, alerts, props, node: id => flatten(document.nodes).find(n => n.id === id),
     send: (action, value = null) => registry.dispatch({ surface: "settings:other", action, value, requestId: String(++request) }),
     unmount: () => { for (const instance of instances.values()) instance.hooks.unmount(); instances.clear(); registry.remove("settings:other");
       if (previousWindow === undefined) delete globalThis.window; else globalThis.window = previousWindow; },
@@ -147,6 +148,20 @@ test("Other shows the actual Hooks, Cron and SSH lists and switches to real edit
       await h.send(h.node("other:hooks:hook:hook-one:delete").action); h.render();
       assert.equal(h.alerts.length, 1); assert.equal(h.alerts[0].document.mode, "alert");
       assert.ok(h.node("other:cron:cron-one"), "Confirmation alerts must retain the primary settings content");
+    } finally { h.unmount(); }
+  }
+});
+
+test("Other preserves translated mobile navigation and actual save failures without a saved badge", () => {
+  for (const language of ["en-US", "zh-CN"]) {
+    const h = harness(true, language);
+    try {
+      assert.equal(h.node("back").label, language === "en-US" ? "Back to Settings" : "返回设置");
+      assert.equal(h.render().title, language === "en-US" ? "Other" : "其他");
+      h.props.saveState = { status: "error", message: "Storage unavailable" }; h.render();
+      assert.equal(h.node("save-status").text, "Storage unavailable");
+      h.props.saveState = { status: "saved" }; h.render();
+      assert.equal(h.node("save-status"), undefined);
     } finally { h.unmount(); }
   }
 });

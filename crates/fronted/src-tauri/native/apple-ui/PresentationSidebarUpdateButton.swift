@@ -6,11 +6,12 @@ struct XgentSidebarUpdateButton: View {
     @ObservedObject var model: XgentPresentationModel
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var scheme
+    private var loading: Bool { node.status == "running" || model.isBusy(node, in: document) }
 
     var body: some View {
         Button { model.send(node, in: document) } label: {
             ZStack {
-                if node.status == .running || model.isBusy(node, in: document) {
+                if loading {
                     ProgressView().tint(.white).controlSize(.small)
                 } else {
                     Image(systemName: node.icon ?? "arrow.down")
