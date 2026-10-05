@@ -140,6 +140,7 @@ export const xgentTheme = defineTheme({
 export const xgentCompactTheme = defineTheme({
   name: "xgent-chat-compact",
   extends: xgentTheme,
+  typography: { scale: { base: 17, ratio: 1.18 } },
   tokens: {
     "--color-background-body": ["#f5f5f7", "#171717"],
     "--color-background-surface": ["#ffffff", "#212121"],

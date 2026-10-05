@@ -7,6 +7,104 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 const uiMocks = Object.fromEntries(["AlertDialog", "Banner", "Button", "CheckboxInput", "Collapsible", "Divider", "Grid", "IconButton", "Selector", "Stack", "StatusDot", "Switch", "TextArea", "TextInput", "TimeInput", "Dialog", "Text", "Layout"].map(name => [
   `@astryxdesign/core/${name}`, Object.fromEntries((name === "Text" ? ["Text", "Heading"] : name === "Dialog" ? ["DialogHeader"] : name === "Layout" ? ["HStack", "VStack"] : [name]).map(symbol => [symbol, symbol])),
 ]));
+uiMocks["./CompactMemorySettingsForm"] = { CompactMemorySettingsForm: "CompactMemorySettingsForm" };
+
+const walk = value => {
+  if (!value || typeof value !== "object") return [];
+  if (Array.isArray(value)) return value.flatMap(walk);
+  return [value, ...walk(value.props?.children), ...walk(value.props?.startContent)];
+};
+const deferred = () => {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return { promise, resolve };
+};
+
+function drawerHarness(native) {
+  const hooks = createReactHookHarness(), runs = [], wipes = [], queued = [];
+  let pokes = 0;
+  const models = createTsModuleLoader().loadModule("src/lib/providers/runtime/modelValue.ts");
+  const loader = createTsModuleLoader({ mocks: {
+    ...uiMocks, react: hooks.react,
+    "../../../lib/memory/api": {
+      formatMemoryError: error => error.message,
+      memoryQuotaSummary: async () => ({ scopes: [] }),
+      memoryOrganizeRunCreate: args => { const request = deferred(); runs.push({ args, request }); return request.promise; },
+    },
+    "./platform": { ...models, ModelPicker: "ModelPicker", canRunOrganizerLocally: true, pokeMemoryOrganizer: () => { pokes++; return true; } },
+    "./OrganizerHistoryModal": { OrganizerHistoryModal: "OrganizerHistoryModal" },
+    "../../../presentation/NativeSurface": { NativeSurface: "NativeSurface" },
+    "../../../presentation/nativeTheme": { createNativePresentationTheme: () => undefined },
+    "../../../runtime/applePresentation": { isApplePresentationRuntime: () => native },
+    "../../../lib/runtimePlatform": { isNativeMobileRuntime: () => true },
+  } });
+  const { MemorySettingsDrawer } = loader.loadModule("src/pages/settings/memory/MemorySettingsDrawer.tsx");
+  const { getDefaultSettings } = loader.loadModule("src/lib/settings/index.ts");
+  let settings = getDefaultSettings();
+  settings.memory.organizerModel = { customProviderId: "provider", model: "first" };
+  const props = { compact: true, modelOptions: [{ value: "provider::first", label: "First model" }], workdir: "/first", saving: false,
+    error: null, notice: null, t: key => key, onClose() {},
+    onRequestWipe: () => { const request = deferred(); wipes.push(request); return request.promise; },
+    onOrganizerRunQueued: id => queued.push(id), setSettings: update => { settings = update(settings); } };
+  const render = () => hooks.render(() => MemorySettingsDrawer({ ...props, settings }));
+  const controls = () => {
+    const tree = render();
+    if (native) return {
+      run: tree.props.handlers.get("memory-organizer-run")?.run,
+      wipeOpen: tree.props.handlers.get("memory-settings-wipe")?.run,
+      wipeConfirm: tree.props.handlers.get("memory-settings-wipe-confirm-action")?.run,
+      confirmation: tree.props.document?.nodes.some(node => node.id === "memory-settings-wipe-confirm"),
+    };
+    const nodes = walk(tree), form = nodes.find(node => node.type === "CompactMemorySettingsForm")?.props;
+    const alert = nodes.find(node => node.type === "AlertDialog")?.props;
+    return { run: form?.onRun, wipeOpen: form?.onWipe, wipeConfirm: alert?.onAction, confirmation: alert?.isOpen, form };
+  };
+  return { render, controls, hooks, props, runs, wipes, queued, get pokes() { return pokes; },
+    get settings() { return settings; }, set settings(value) { settings = value; } };
+}
+
+test("compact and native organizer actions reserve duplicate calls and ignore results after navigation", async () => {
+  for (const native of [false, true]) {
+    const h = drawerHarness(native), stale = h.controls();
+    stale.run(null); stale.run(null);
+    assert.equal(h.runs.length, 1, "Two immediate activations queue once before a render");
+    assert.equal(h.runs[0].args.model.model, "first");
+    h.props.workdir = "/second"; h.render();
+    stale.run(null);
+    assert.equal(h.runs.length, 1, "The previous workspace's callback cannot launch a new run");
+    h.runs[0].request.resolve({ run: { runId: "accepted" }, alreadyRunning: false }); await tick();
+    assert.equal(h.pokes, 1, "An accepted backend job still starts its worker after navigation");
+    assert.deepEqual(h.queued, [], "Retired results do not open or observe the old history");
+    const active = h.controls();
+    assert.ok(active.run, "The new workspace keeps its own usable organizer controls");
+    h.settings = { ...h.settings, memory: { ...h.settings.memory, organizerModel: { customProviderId: "provider", model: "latest" } } }; h.render();
+    active.run(null);
+    assert.equal(h.runs[1].args.model.model, "latest", "Callbacks use the current model before dispatch");
+    h.hooks.unmount(); active.run(null);
+    assert.equal(h.runs.length, 2, "Unmount retires even an otherwise idle callback");
+    h.runs[1].request.resolve({ run: { runId: "after-unmount" }, alreadyRunning: false }); await tick();
+    assert.deepEqual(h.queued, []);
+    active.run(null);
+    assert.equal(h.runs.length, 2, "A retired callback also stays inactive after its reservation clears");
+  }
+});
+
+test("compact and native memory wipe confirmations keep failures open, close on success and reserve duplicate submissions", async () => {
+  for (const native of [false, true]) {
+    const h = drawerHarness(native);
+    h.controls().wipeOpen(null);
+    let confirm = h.controls(); assert.equal(confirm.confirmation, true);
+    confirm.wipeConfirm(null); confirm.wipeConfirm(null);
+    assert.equal(h.wipes.length, 1);
+    h.wipes[0].resolve(false); await tick();
+    assert.equal(h.controls().confirmation, true, "An unsuccessful wipe remains available for retry");
+    confirm = h.controls(); confirm.wipeConfirm(null);
+    h.wipes[1].resolve(true); await tick();
+    assert.equal(h.controls().confirmation, false, "Both presentations dismiss the successful confirmation");
+    h.hooks.unmount(); confirm.wipeConfirm(null);
+    assert.equal(h.wipes.length, 2);
+  }
+});
 
 test("native organizer model, schedule, time, mode and Run Now use the existing reducers and queue", async () => {
   const hooks = createReactHookHarness(), calls = [], queued = [];
@@ -46,6 +144,11 @@ test("native organizer model, schedule, time, mode and Run Now use the existing 
       await handler.run(value); return render();
     };
     render(); await tick();
+    const modelPicker = render().document.nodes.flatMap(node => node.children ?? []).find(node => node.id === "memory-organizer-model");
+    assert.equal(modelPicker.variant, "searchable-stacked-selector");
+    assert.equal(modelPicker.children.find(node => node.id.endsWith(":search")).label, "chat.searchModel");
+    assert.equal(modelPicker.children.find(node => node.kind === "EmptyState").label, "chat.noModelFound");
+    assert.deepEqual(modelPicker.options.map(option => option.value), ["", "p::m"], "Searchable selection retains clearing and actual models");
     assert.equal(render().handlers.get("memory-organizer-run").enabled, false);
     await change("memory-organizer-model", "p::m");
     await change("memory-summary-model", "p::m");

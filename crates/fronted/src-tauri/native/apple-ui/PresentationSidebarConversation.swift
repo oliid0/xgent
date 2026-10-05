@@ -11,6 +11,7 @@ struct XgentSidebarConversationRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var menu: XgentNode? { node.children?.first { $0.kind == .menu } }
+    private var disclosure: XgentNode? { node.children?.first { $0.variant == "sidebar-disclosure" } }
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
 
     private var title: some View {
@@ -55,6 +56,19 @@ struct XgentSidebarConversationRow: View {
 
     var body: some View {
         HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center, spacing: 4) {
+            if let disclosure {
+                Button { model.send(disclosure, in: document) } label: {
+                    Image(systemName: disclosure.icon ?? "chevron.forward")
+                        .font(.caption.weight(.semibold))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(disclosure.disabled == true || model.isBusy(disclosure, in: document))
+                .accessibilityIdentifier(disclosure.id)
+                .accessibilityLabel(disclosure.accessibilityLabel ?? disclosure.label ?? "")
+                .help(disclosure.label ?? "")
+            }
             Button { model.send(node, in: document) } label: {
                 selectionLabel
                     .padding(.horizontal, 8)
@@ -83,6 +97,7 @@ struct XgentSidebarConversationRow: View {
                     .fixedSize()
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .modifier(XgentControlTypography(node: node))
         .foregroundStyle(Color(xgentHex: node.secondary == true ? palette.secondaryText : palette.text))
         .background(node.selected == true ? Color(xgentHex: palette.neutral ?? palette.muted) : .clear,

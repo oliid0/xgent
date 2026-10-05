@@ -67,7 +67,9 @@ struct XgentTextInput: View {
     @ViewBuilder private var layout: some View {
         #if os(iOS)
         if isFormRow {
-            if hasSectionLabel {
+            if node.variant == "settings-stacked-field" {
+                settingsField
+            } else if hasSectionLabel {
                 field.modifier(XgentControlTypography(node: node))
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             } else if node.secure != true && !dynamicTypeSize.isAccessibilitySize {
@@ -124,6 +126,9 @@ struct XgentSelector: View {
     @Environment(\.xgentSettingsRow) private var isSettingsRow
     @State private var pickerOpen = false
 
+    private var isStacked: Bool { node.variant == "searchable-stacked-selector" }
+    private var usesValueRow: Bool { isSettingsRow && !isStacked }
+
     private var selectedLabel: String {
         node.options?.first { $0.value == model.value(node, in: document).text }?.label ?? node.text ?? ""
     }
@@ -132,16 +137,19 @@ struct XgentSelector: View {
         HStack(spacing: 8) {
             if node.variant == "composer-command-safety" {
                 Image(systemName: node.icon ?? "shield").accessibilityHidden(true)
+            } else if isStacked, let icon = node.icon {
+                Image(systemName: icon).frame(width: 16).accessibilityHidden(true)
             }
             Text(selectedLabel).fixedSize(horizontal: false, vertical: true)
-            if !isSettingsRow && !["composer-command-safety", "sidebar-work-mode"].contains(node.variant ?? "") { Spacer(minLength: 8) }
+            if !usesValueRow && !["composer-command-safety", "sidebar-work-mode"].contains(node.variant ?? "") { Spacer(minLength: 8) }
             Image(systemName: "chevron.up.chevron.down").font(.caption).accessibilityHidden(true)
         }
-        .modifier(XgentSelectorSurface(node: node, isSettingsRow: isSettingsRow))
+        .modifier(XgentSelectorSurface(node: node, isSettingsRow: usesValueRow))
+        .environment(\.xgentSettingsRow, usesValueRow)
     }
 
     @ViewBuilder private var control: some View {
-        if node.variant == "searchable-selector" {
+        if ["searchable-selector", "searchable-stacked-selector"].contains(node.variant ?? "") {
             Button { pickerOpen = true } label: { selectionLabel }
                 .modifier(XgentSelectionPresentation(node: node, document: document, model: model, isPresented: $pickerOpen))
         } else { menu }
@@ -173,7 +181,7 @@ struct XgentSelector: View {
 
     var body: some View {
         Group {
-            if isSettingsRow && showsLabel {
+            if usesValueRow && showsLabel {
                 XgentSettingsValueRow(node: node) { accessibleControl }
             } else if ["composer-command-safety", "sidebar-work-mode"].contains(node.variant ?? "") {
                 accessibleControl

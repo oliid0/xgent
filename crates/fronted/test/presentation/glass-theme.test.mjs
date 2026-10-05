@@ -23,6 +23,7 @@ test("every preset and customized appearance resolves with the installed Astryx 
         const appearance = normalizeAppearance({ preset, customized, accentLight: "#123456" });
         const theme = createAppearanceTheme(appearance, compact);
         assert.equal(typeof theme.tokens["--color-background-surface"], "string");
+        if (compact) assert.equal(theme.tokens["--font-size-base"], "1.0625rem");
         if (preset === "current") {
           assert.match(theme.localTokens["--astryx-theme-xgent-glass-surface"], /color-mix/);
           assert.equal(

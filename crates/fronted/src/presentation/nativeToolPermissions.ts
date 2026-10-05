@@ -25,7 +25,7 @@ export function createNativeToolPermissions(
   const patch = (toolNames: string[], policy: ToolPolicy) =>
     setSettings((previous) => patchToolPolicies(previous, toolNames, policy));
   const nodes: PresentationNode[] = [
-    c.group("tool-policy-summary", t("settings.toolPermissionsTitle"), [
+    c.group("tool-policy-summary", nativeMobile ? "" : t("settings.toolPermissionsTitle"), [
       {
         id: "tool-policy-description",
         kind: "Text",
@@ -34,16 +34,29 @@ export function createNativeToolPermissions(
       },
       {
         id: "tool-policy-help",
-        kind: "VStack",
+        kind: nativeMobile ? "Text" : "VStack",
         variant: "tool-policy-help",
-        children: (["allow", "ask", "deny"] as const).map((policy) => ({
-          id: `tool-policy-help:${policy}`,
-          kind: "Text" as const,
-          text: t(
-            `settings.toolPolicy${policy === "allow" ? "Allow" : policy === "ask" ? "Ask" : "Deny"}Desc`,
-          ),
-          secondary: true,
-        })),
+        ...(nativeMobile
+          ? {
+              secondary: true,
+              text: [
+                "settings.toolPolicyAllowDesc",
+                "settings.toolPolicyAskDesc",
+                "settings.toolPolicyDenyDesc",
+              ]
+                .map(t)
+                .join("\n"),
+            }
+          : {
+              children: (["allow", "ask", "deny"] as const).map((policy) => ({
+                id: `tool-policy-help:${policy}`,
+                kind: "Text" as const,
+                text: t(
+                  `settings.toolPolicy${policy === "allow" ? "Allow" : policy === "ask" ? "Ask" : "Deny"}Desc`,
+                ),
+                secondary: true,
+              })),
+            }),
       },
       ...(Object.keys(policies).some((key) => !key.startsWith(PERSONAL_POLICY_PREFIX))
         ? [

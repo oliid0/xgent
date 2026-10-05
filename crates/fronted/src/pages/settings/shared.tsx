@@ -1,9 +1,10 @@
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
+import { Selector } from "@astryxdesign/core/Selector";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 export {
   ConfirmActionPopover,
@@ -44,11 +45,17 @@ export function SettingsRow(props: {
   description?: string;
   children: ReactNode;
   align?: "center" | "start";
+  controlLayout?: "value";
 }) {
   return (
     <ListItem
       className="settings-control-row"
-      label={props.label}
+      data-control-layout={props.controlLayout}
+      label={
+        <Text type="body" wordBreak="break-word">
+          {props.label}
+        </Text>
+      }
       startContent={props.icon}
       description={
         props.description ? (
@@ -62,6 +69,60 @@ export function SettingsRow(props: {
           {props.children}
         </HStack>
       }
+    />
+  );
+}
+
+/** A current value beside its label, with the same adaptive picker as a form field. */
+export function SettingsValueSelector(props: ComponentProps<typeof Selector>) {
+  return (
+    <Selector
+      {...props}
+      variant="ghost"
+      size="lg"
+      width="auto"
+      presentation="adaptive"
+      renderValue={(option) => (
+        <Text type="body" color="secondary" wordBreak="break-word">
+          {option.label}
+        </Text>
+      )}
+    />
+  );
+}
+
+export function SettingsNavigationRow(props: {
+  label: string;
+  icon: ReactNode;
+  status?: string;
+  chevron: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <ListItem
+      className="settings-navigation-row"
+      label={
+        <Text type="body" wordBreak="break-word">
+          {props.label}
+        </Text>
+      }
+      startContent={props.icon}
+      endContent={
+        <HStack gap={2} vAlign="center" style={{ minWidth: 0 }}>
+          {props.status ? (
+            <Text
+              type="body"
+              color="secondary"
+              wordBreak="break-word"
+              className="settings-navigation-status"
+            >
+              {props.status}
+            </Text>
+          ) : null}
+          {props.chevron}
+        </HStack>
+      }
+      onClick={props.onClick}
     />
   );
 }

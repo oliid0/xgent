@@ -12,7 +12,6 @@ import {
 } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Section } from "@astryxdesign/core/Section";
-import { Selector } from "@astryxdesign/core/Selector";
 import { StatusDot, type StatusDotVariant } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -27,8 +26,10 @@ import {
   Info,
   Keyboard,
   Mic,
+  MonitorSmartphone,
+  MoreHorizontal,
   Palette,
-  Settings2,
+  Settings,
   Shield,
   Sparkles,
   Sun,
@@ -50,6 +51,7 @@ import { MobileAssistantSection } from "./settings/MobileAssistantSection";
 import { MobileExecutionSection } from "./settings/MobileExecutionSection";
 import { MobileVoiceSettingsSection } from "./settings/MobileVoiceSettingsSection";
 import { MemoryPanel } from "./settings/memory/MemoryPanel";
+import { mobileSettingsStatus } from "./settings/mobileSettingsStatus";
 import { OtherSettingsSection } from "./settings/OtherSettingsSection";
 import { ProjectRootsSection } from "./settings/ProjectRootsSection";
 import { ProviderSettingsSection } from "./settings/ProviderSettingsSection";
@@ -58,7 +60,12 @@ import { SettingsDetailLayerProvider } from "./settings/SettingsModalShell";
 import { SoulSection } from "./settings/SoulSection";
 import { SttSettingsSection } from "./settings/SttSettingsSection";
 import { SystemSettingsForm } from "./settings/SystemSettingsForm";
-import { SettingsRow, SettingsRowGroup } from "./settings/shared";
+import {
+  SettingsNavigationRow,
+  SettingsRow,
+  SettingsRowGroup,
+  SettingsValueSelector,
+} from "./settings/shared";
 import { ToolPermissionsSection } from "./settings/ToolPermissionsSection";
 import type { SectionId, SettingsPageProps } from "./settings/types";
 
@@ -146,7 +153,7 @@ type NavDefinition = {
 const NAV_ITEMS: NavDefinition[] = [
   {
     id: "system",
-    icon: Settings2,
+    icon: Settings,
     descriptionKey: "settings.mobile.systemDescription",
   },
   {
@@ -167,7 +174,7 @@ const NAV_ITEMS: NavDefinition[] = [
   },
   {
     id: "computerUse",
-    icon: Cpu,
+    icon: MonitorSmartphone,
     descriptionKey: "settings.cua.description",
     desktopOnly: true,
   },
@@ -193,7 +200,7 @@ const NAV_ITEMS: NavDefinition[] = [
   },
   {
     id: "other",
-    icon: Terminal,
+    icon: MoreHorizontal,
     descriptionKey: "settings.mobile.otherDescription",
   },
   {
@@ -203,7 +210,7 @@ const NAV_ITEMS: NavDefinition[] = [
   },
   {
     id: "mobileAssistant",
-    icon: Mic,
+    icon: Shield,
     descriptionKey: "settings.mobile.assistantDescription",
     mobileOnly: true,
   },
@@ -241,6 +248,9 @@ export function SettingsPage(props: SettingsPageProps) {
   } = props;
   const { t } = useLocale();
   const compactViewport = useCompactViewport();
+  const currentVersion =
+    appUpdate.result?.currentVersion ??
+    (typeof __XGENT_APP_VERSION__ === "string" ? __XGENT_APP_VERSION__ : undefined);
   const compactSettings = nativeMobile || compactViewport;
   const [section, setSection] = useState<SectionId>(() => normalizeSettingsSection(initialSection));
   const [mobileDetailOpen, setMobileDetailOpen] = useState(
@@ -315,15 +325,15 @@ export function SettingsPage(props: SettingsPageProps) {
       [
         {
           label: t("settings.mobile.appearanceGroup"),
-          ids: new Set<SectionId>(["system", "providers"]),
+          ids: ["system", "providers"] as SectionId[],
         },
         {
           label: t("settings.mobile.personalGroup"),
-          ids: new Set<SectionId>(["soul", "memory", "mobileAssistant"]),
+          ids: ["soul", "memory", "mobileAssistant"] as SectionId[],
         },
         {
           label: t("settings.mobile.capabilitiesGroup"),
-          ids: new Set<SectionId>([
+          ids: [
             "mobileExecution",
             "computerUse",
             "toolPermissions",
@@ -333,12 +343,14 @@ export function SettingsPage(props: SettingsPageProps) {
             "access",
             "backup",
             "about",
-          ]),
+          ] as SectionId[],
         },
       ]
         .map((group) => ({
           ...group,
-          items: navItems.filter((item) => group.ids.has(item.id)),
+          items: group.ids
+            .map((id) => navItems.find((item) => item.id === id))
+            .filter((item) => !!item),
         }))
         .filter((group) => group.items.length > 0),
     [navItems, t],
@@ -397,7 +409,13 @@ export function SettingsPage(props: SettingsPageProps) {
           />
         );
       case "mobileExecution":
-        return <MobileExecutionSection settings={settings} setSettings={setSettings} />;
+        return (
+          <MobileExecutionSection
+            settings={settings}
+            setSettings={setSettings}
+            compact={compactSettings}
+          />
+        );
       case "mobileAssistant":
         return <MobileAssistantSection settings={settings} setSettings={setSettings} />;
       case "memory":
@@ -426,12 +444,25 @@ export function SettingsPage(props: SettingsPageProps) {
             settings={settings}
             setSettings={setSettings}
             reloadSettings={reloadSettings}
+            compact={compactSettings}
           />
         );
       case "computerUse":
-        return <ComputerUseSection settings={settings} setSettings={setSettings} />;
+        return (
+          <ComputerUseSection
+            settings={settings}
+            setSettings={setSettings}
+            compact={compactSettings}
+          />
+        );
       case "toolPermissions":
-        return <ToolPermissionsSection settings={settings} setSettings={setSettings} />;
+        return (
+          <ToolPermissionsSection
+            settings={settings}
+            setSettings={setSettings}
+            compact={compactSettings}
+          />
+        );
       case "projectRoots":
         return <ProjectRootsSection settings={settings} setSettings={setSettings} />;
       case "voice":
@@ -489,7 +520,7 @@ export function SettingsPage(props: SettingsPageProps) {
             className={`settings-page settings-page-compact${!mobileDetailOpen ? " settings-page-index" : ""}${sheetScrollsAccess ? " settings-page-sheet-scroll" : ""}`}
             data-edge-swipe-ignore
             header={
-              detailLayerDepth > 0 || !mobileDetailOpen ? undefined : (
+              detailLayerDepth > 0 ? undefined : mobileDetailOpen ? (
                 <VStack className="mobile-panel-header" width="100%" gap={0}>
                   <SettingsDetailHeader
                     title={sectionLabels[section]}
@@ -515,6 +546,18 @@ export function SettingsPage(props: SettingsPageProps) {
                     }
                   />
                 </VStack>
+              ) : (
+                <HStack className="settings-index-header" width="100%" hAlign="end">
+                  <IconButton
+                    className="settings-navigation-control settings-index-close"
+                    label={t("settings.close")}
+                    tooltip={t("settings.close")}
+                    icon={<Icon icon={X} size="md" color="inherit" />}
+                    variant="ghost"
+                    size="lg"
+                    onClick={onBack}
+                  />
+                </HStack>
               )
             }
             content={
@@ -547,31 +590,16 @@ export function SettingsPage(props: SettingsPageProps) {
                     style={{ marginInline: "auto" }}
                   >
                     <SaveStatus indicator={saveIndicator} />
-                    <SettingsRowGroup
-                      title={t("settings.native.theme")}
-                      titleEndContent={
-                        <IconButton
-                          className="settings-navigation-control settings-index-close"
-                          label={t("settings.close")}
-                          tooltip={t("settings.close")}
-                          icon={<Icon icon={X} size="md" color="inherit" />}
-                          variant="ghost"
-                          size="lg"
-                          onClick={onBack}
-                        />
-                      }
-                    >
+                    <SettingsRowGroup title={t("settings.native.theme")} hideTitle>
                       <SettingsRow
                         label={t("settings.native.appearance")}
                         icon={<Icon icon={Sun} size="md" color="inherit" />}
+                        controlLayout="value"
                       >
-                        <Selector
+                        <SettingsValueSelector
                           label={t("settings.native.appearance")}
                           isLabelHidden
                           value={settings.theme}
-                          variant="ghost"
-                          size="lg"
-                          presentation="adaptive"
                           options={THEME_OPTIONS.map((value) => ({
                             value,
                             label: t(`settings.native.${value}`),
@@ -587,14 +615,12 @@ export function SettingsPage(props: SettingsPageProps) {
                       <SettingsRow
                         label={t("settings.ui.preset")}
                         icon={<Icon icon={Palette} size="md" color="inherit" />}
+                        controlLayout="value"
                       >
-                        <Selector
+                        <SettingsValueSelector
                           label={t("settings.ui.preset")}
                           isLabelHidden
                           value={settings.customSettings.appearance.preset}
-                          variant="ghost"
-                          size="lg"
-                          presentation="adaptive"
                           options={UI_THEME_PRESETS.map((value) => ({
                             value,
                             label:
@@ -622,11 +648,16 @@ export function SettingsPage(props: SettingsPageProps) {
                     {mobileNavGroups.map((group) => (
                       <SettingsRowGroup key={group.label} title={group.label}>
                         {group.items.map((item) => (
-                          <ListItem
+                          <SettingsNavigationRow
                             key={item.id}
                             label={item.label}
-                            startContent={<Icon icon={item.icon} size="md" color="inherit" />}
-                            endContent={<Icon icon={ChevronRight} size="sm" color="tertiary" />}
+                            icon={<Icon icon={item.icon} size="md" color="inherit" />}
+                            status={
+                              item.id === "about" && currentVersion
+                                ? `v${currentVersion}`
+                                : mobileSettingsStatus(item.id, settings, t)
+                            }
+                            chevron={<Icon icon={ChevronRight} size="sm" color="tertiary" />}
                             onClick={() => {
                               setDetailParent(null);
                               setSection(item.id);

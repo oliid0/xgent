@@ -54,7 +54,9 @@ function createRunId() {
   return `mobile-install-${suffix}`.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 128);
 }
 
-export function MobileExecutionSection(_props: SettingsSectionProps) {
+export function MobileExecutionSection({
+  compact = false,
+}: SettingsSectionProps & { compact?: boolean }) {
   const { t } = useLocale();
   const browser = isBrowserRuntime();
   const [platform, setPlatform] = useState<RuntimePlatform>();
@@ -249,10 +251,10 @@ export function MobileExecutionSection(_props: SettingsSectionProps) {
     <Section padding={5} width="100%" className="mobile-execution-section">
       <VStack gap={4}>
         <HStack gap={3} hAlign="between" vAlign="start" wrap="wrap">
-          <Terminal />
+          {compact ? null : <Terminal />}
           <StackItem size="fill">
             <VStack gap={1}>
-              <Heading level={3}>{t("settings.accessMobileExecution")}</Heading>
+              {compact ? null : <Heading level={3}>{t("settings.accessMobileExecution")}</Heading>}
               <Text type="supporting" color="secondary" wordBreak="break-word">
                 {platform === "android"
                   ? t("settings.accessAndroidProotHint")

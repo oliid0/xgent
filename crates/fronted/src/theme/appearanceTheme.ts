@@ -17,6 +17,7 @@ export function createAppearanceTheme(appearance: AppearanceSettings, compact: b
   return defineTheme({
     name: `xgent-${appearance.preset}-${compact ? "compact" : "desktop"}-appearance`,
     extends: base,
+    ...(compact ? { typography: { scale: { base: 17, ratio: 1.18 } } } : {}),
     ...(appearance.customized
       ? {
           color: { accent: [appearance.accentLight, appearance.accentDark] as [string, string] },

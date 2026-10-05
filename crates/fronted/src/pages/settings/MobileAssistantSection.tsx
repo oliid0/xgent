@@ -104,10 +104,15 @@ function PermissionStateBadge({
           ? t("settings.mobileAssistant.requested")
           : t("settings.mobileAssistant.notRequested");
   return (
-    <StatusDot
-      label={label}
-      variant={state === "granted" ? "success" : state === "denied" ? "error" : "neutral"}
-    />
+    <HStack gap={2} vAlign="center">
+      <StatusDot
+        label={label}
+        variant={state === "granted" ? "success" : state === "denied" ? "error" : "neutral"}
+      />
+      <Text type="supporting" color="secondary" wordBreak="break-word">
+        {label}
+      </Text>
+    </HStack>
   );
 }
 
@@ -241,14 +246,23 @@ export function MobileAssistantSection({ settings, setSettings }: SettingsSectio
                 description={service.detail}
                 startContent={<Icon />}
                 endContent={
-                  <StatusDot
-                    label={
-                      service.available
-                        ? t("settings.mobileAssistant.available")
-                        : t("settings.mobileAssistant.unavailable")
-                    }
-                    variant={service.available ? "success" : "neutral"}
-                  />
+                  <HStack gap={2} vAlign="center">
+                    <StatusDot
+                      label={
+                        service.available
+                          ? t("settings.mobileAssistant.available")
+                          : t("settings.mobileAssistant.unavailable")
+                      }
+                      variant={service.available ? "success" : "neutral"}
+                    />
+                    <Text type="supporting" color="secondary" wordBreak="break-word">
+                      {t(
+                        service.available
+                          ? "settings.mobileAssistant.available"
+                          : "settings.mobileAssistant.unavailable",
+                      )}
+                    </Text>
+                  </HStack>
                 }
               />
             );

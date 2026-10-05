@@ -609,15 +609,14 @@ struct XgentIOSSheetPresentation: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isSettingsIndex {
-                if !isSettingsSession {
-                    Capsule()
-                        .fill(Color.secondary.opacity(0.32))
-                        .frame(width: 40, height: 4)
-                        .padding(.top, 10)
-                        .padding(.bottom, 2)
-                        .accessibilityHidden(true)
+            if isSettingsIndex {
+                HStack {
+                    Spacer(minLength: 0)
+                    trailingNavigation
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+            } else {
                 header
             }
             if let saveStatus {
@@ -627,8 +626,7 @@ struct XgentIOSSheetPresentation: View {
                     .padding(.bottom, 12)
             }
             if grouped {
-                XgentIOSSettingsForm(nodes: contentNodes, document: document, model: model,
-                    showsRootClose: isSettingsIndex)
+                XgentIOSSettingsForm(nodes: contentNodes, document: document, model: model)
             } else if contentNodes.contains(where: { $0.kind == .terminalLayout || $0.variant == "workspace-search-palette" }) {
                 XgentIOSNodes(nodes: contentNodes, document: document, model: model)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

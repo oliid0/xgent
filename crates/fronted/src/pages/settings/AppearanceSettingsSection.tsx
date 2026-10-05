@@ -1,8 +1,10 @@
 import { Button } from "@astryxdesign/core/Button";
+import { ListItem } from "@astryxdesign/core/List";
 import { Selector } from "@astryxdesign/core/Selector";
 import { HStack } from "@astryxdesign/core/Stack";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { useEffect, useState } from "react";
+import { Brain, LayoutGrid, Palette, Settings2 } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import { updateCustomSettings } from "../../lib/settings";
 import {
@@ -10,7 +12,12 @@ import {
   normalizeAppearance,
   UI_THEME_PRESETS,
 } from "../../lib/settings/appearance";
-import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
+import {
+  AgentActivationSwitch,
+  SettingsRow,
+  SettingsRowGroup,
+  SettingsValueSelector,
+} from "./shared";
 import type { SettingsSectionProps } from "./types";
 
 function AppearanceColorInput(props: {
@@ -62,8 +69,13 @@ function AppearanceColorInput(props: {
   );
 }
 
-export function AppearanceSettingsSection({ settings, setSettings }: SettingsSectionProps) {
+export function AppearanceSettingsSection({
+  settings,
+  setSettings,
+  compact = false,
+}: SettingsSectionProps & { compact?: boolean }) {
   const { t } = useLocale();
+  const ValueSelector = compact ? SettingsValueSelector : Selector;
   const appearance = settings.customSettings.appearance;
   const update = (patch: Partial<AppearanceSettings>) =>
     setSettings((previous) =>
@@ -76,6 +88,7 @@ export function AppearanceSettingsSection({ settings, setSettings }: SettingsSec
     <SettingsRowGroup title={t("settings.ui.title")}>
       <SettingsRow
         label={t("settings.ui.showThinking")}
+        icon={<Brain />}
         description={t("settings.ui.showThinkingDesc")}
       >
         <AgentActivationSwitch
@@ -84,8 +97,12 @@ export function AppearanceSettingsSection({ settings, setSettings }: SettingsSec
           onToggle={() => update({ showThinking: !appearance.showThinking })}
         />
       </SettingsRow>
-      <SettingsRow label={t("settings.ui.preset")}>
-        <Selector
+      <SettingsRow
+        label={t("settings.ui.preset")}
+        icon={<Palette />}
+        controlLayout={compact ? "value" : undefined}
+      >
+        <ValueSelector
           label={t("settings.ui.preset")}
           isLabelHidden
           value={appearance.preset}
@@ -103,7 +120,11 @@ export function AppearanceSettingsSection({ settings, setSettings }: SettingsSec
           }
         />
       </SettingsRow>
-      <SettingsRow label={t("settings.ui.customize")} description={t("settings.ui.customizeDesc")}>
+      <SettingsRow
+        label={t("settings.ui.customize")}
+        icon={<Settings2 />}
+        description={t("settings.ui.customizeDesc")}
+      >
         <AgentActivationSwitch
           title={t("settings.ui.customize")}
           checked={appearance.customized}
@@ -127,8 +148,12 @@ export function AppearanceSettingsSection({ settings, setSettings }: SettingsSec
               />
             </SettingsRow>
           ))}
-          <SettingsRow label={t("settings.ui.radius")}>
-            <Selector
+          <SettingsRow
+            label={t("settings.ui.radius")}
+            icon={<LayoutGrid />}
+            controlLayout={compact ? "value" : undefined}
+          >
+            <ValueSelector
               label={t("settings.ui.radius")}
               isLabelHidden
               value={String(appearance.radius)}
@@ -138,10 +163,14 @@ export function AppearanceSettingsSection({ settings, setSettings }: SettingsSec
               onChange={(value) => update({ radius: Number(value) })}
             />
           </SettingsRow>
-          <Button
-            label={t("settings.ui.reset")}
-            variant="secondary"
-            onClick={() => update({ ...normalizeAppearance({}), preset: appearance.preset })}
+          <ListItem
+            label={
+              <Button
+                label={t("settings.ui.reset")}
+                variant="ghost"
+                onClick={() => update({ ...normalizeAppearance({}), preset: appearance.preset })}
+              />
+            }
           />
         </>
       ) : null}

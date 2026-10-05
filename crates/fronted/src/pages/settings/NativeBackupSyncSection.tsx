@@ -6,6 +6,7 @@ import { presentationControls } from "../../presentation/controls";
 import { NativeSurface } from "../../presentation/NativeSurface";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
+import { backupLastSyncText } from "./backupManifestText";
 import { SYNC_PRESETS } from "./backupSyncForm";
 import type { useBackupSyncData } from "./useBackupSyncData";
 
@@ -16,7 +17,7 @@ export function NativeBackupSyncSection(props: {
   onBack?: () => void;
   nativeSettingsSurfaceId?: string;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [failure, setFailure] = useState<unknown>(null);
   if (failure) throw failure;
   const { data } = props;
@@ -200,7 +201,7 @@ export function NativeBackupSyncSection(props: {
           {
             id: "backup-last-sync",
             kind: "Text" as const,
-            text: `${t("settings.backupSyncLastAt")}${new Date(syncView.lastSyncAt).toLocaleString()}`,
+            text: backupLastSyncText(syncView.lastSyncAt, t, locale),
             secondary: true,
           },
         ]
@@ -265,6 +266,32 @@ export function NativeBackupSyncSection(props: {
       },
     ]),
   ];
+  const presentedNodes = mobile
+    ? nodes.flatMap((node) => {
+        if (node.id !== "backup-connection") return [node];
+        const fields = node.children?.find((child) => child.id === "backup-connection-fields");
+        const actions = node.children?.find((child) => child.id === "backup-transfer-actions");
+        const profileHint = fields?.children?.find((child) => child.id === "backup-profile-hint");
+        return [
+          {
+            ...node,
+            children: [
+              ...(node.children?.filter((child) => child.id === "backup-connection-description") ??
+                []),
+              ...(fields?.children
+                ?.filter((child) => child.id !== "backup-profile-hint")
+                .map((child) =>
+                  child.kind === "TextInput"
+                    ? { ...child, variant: "settings-stacked-field" }
+                    : child,
+                ) ?? []),
+            ],
+          },
+          ...(profileHint ? [profileHint] : []),
+          ...(actions ? [c.group("backup-actions", "", [actions])] : []),
+        ];
+      })
+    : nodes;
   return (
     <NativeSurface
       sessionSurface={props.nativeSettingsSurfaceId}
@@ -275,7 +302,7 @@ export function NativeBackupSyncSection(props: {
         formFactor: mobile ? "mobile" : "desktop",
         theme: createNativePresentationTheme(props.settings, mobile),
         dismissAction: "backup-back",
-        nodes,
+        nodes: presentedNodes,
       }}
       handlers={c.handlers}
       onError={setFailure}

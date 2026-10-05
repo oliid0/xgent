@@ -55,8 +55,33 @@ final class SidebarConversationRenderingTests: XCTestCase {
                 }
                 #else
                 let host = NSHostingView(rootView: view)
+                let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: 720),
+                                      styleMask: [.borderless], backing: .buffered, defer: false)
+                window.isReleasedWhenClosed = false
+                window.contentView = host
+                window.makeKeyAndOrderFront(nil)
+                defer { window.close() }
                 host.frame = CGRect(x: 0, y: 0, width: width, height: 720)
+                try await Task.sleep(nanoseconds: 300_000_000)
                 host.layoutSubtreeIfNeeded()
+                let elements = nativeMacAccessibilityTree(host)
+                for id in ["selected", "running", "ordinary"] {
+                    let selection = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == id })
+                    let menu = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "\(id):menu" })
+                    XCTAssertLessThanOrEqual(selection.accessibilityFrame().maxX, menu.accessibilityFrame().minX + 1)
+                    if workspace && !archived {
+                        let disclosure = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "\(id):disclosure" })
+                        XCTAssertGreaterThanOrEqual(disclosure.accessibilityFrame().width, 43.5)
+                        XCTAssertLessThanOrEqual(disclosure.accessibilityFrame().maxX, selection.accessibilityFrame().minX + 1)
+                        var actions: [XgentAction] = []
+                        model.actionSink = { actions.append($0) }
+                        XCTAssertTrue(disclosure.accessibilityPerformPress())
+                        try await Task.sleep(nanoseconds: 50_000_000)
+                        let action = try XCTUnwrap(actions.last)
+                        XCTAssertEqual(action.action, "\(id):disclosure")
+                        model.complete(XgentActionResult(surface: action.surface, requestId: action.requestId, ok: true))
+                    }
+                }
                 let strategy = Snapshotting<NSView, NSImage>.image(size: CGSize(width: width, height: 720))
                 let image = await withCheckedContinuation { continuation in
                     strategy.snapshot(host).run { continuation.resume(returning: $0) }
@@ -89,6 +114,16 @@ final class SidebarConversationRenderingTests: XCTestCase {
                     XCTAssertGreaterThanOrEqual(menuFrame.height, 43.5)
                     XCTAssertLessThanOrEqual(selectionFrame.maxX, menuFrame.minX + 1)
                     XCTAssertLessThanOrEqual(menuFrame.maxX, width + 1)
+                    if workspace && !archived {
+                        let disclosure = try XCTUnwrap(elements.first {
+                            $0.identifier == "\(id):disclosure" && $0.traits.contains(.button)
+                        })
+                        let frame = disclosure.shape.bezierPath.bounds
+                        XCTAssertGreaterThanOrEqual(frame.width, 43.5)
+                        XCTAssertGreaterThanOrEqual(frame.height, 43.5)
+                        XCTAssertLessThanOrEqual(frame.maxX, selectionFrame.minX + 1)
+                        XCTAssertFalse(disclosure.traits.contains(.notEnabled))
+                    }
                     for element in [selection, menu] {
                         let point = CGPoint(x: CGFloat(element.activationPoint.x), y: CGFloat(element.activationPoint.y))
                         XCTAssertTrue(point.x.isFinite && point.y.isFinite, "Activation coordinates must be finite")
@@ -102,12 +137,19 @@ final class SidebarConversationRenderingTests: XCTestCase {
 
     private func fixture(workspace: Bool = false, archived: Bool = false) throws -> XgentDocument {
         let nodes = ["selected", "running", "ordinary"].map { id -> [String: Any] in
-            ["id": id, "kind": "NavigationRow", "variant": workspace ? "sidebar-workspace-row" : "sidebar-conversation-row", "label": "\(id): Review browser results and prepare the workspace presentation",
-             "action": id, "selected": id == "selected", "status": id == "running" ? "running" : "completed", "secondary": archived,
-             "icon": "pin.fill", "children": [["id": "\(id):menu", "kind": "Menu", "variant": "compact", "icon": "ellipsis", "label": "Actions for \(id)", "children": [
+            var children: [[String: Any]] = []
+            if workspace && !archived {
+                children.append(["id": "\(id):disclosure", "kind": "IconButton", "variant": "sidebar-disclosure",
+                                 "icon": "chevron.forward", "label": "Expand \(id)", "action": "\(id):disclosure"])
+            }
+            children.append(["id": "\(id):menu", "kind": "Menu", "variant": "compact", "icon": "ellipsis",
+                             "label": "Actions for \(id)", "children": [
                 ["id": "\(id):rename", "kind": "Button", "label": "Rename", "action": "\(id):rename", "disabled": id == "running"],
                 ["id": "\(id):delete", "kind": "Button", "label": "Delete", "action": "\(id):delete", "destructive": true, "disabled": id == "running"],
-             ]]]]
+            ]])
+            return ["id": id, "kind": "NavigationRow", "variant": workspace ? "sidebar-workspace-row" : "sidebar-conversation-row", "label": "\(id): Review browser results and prepare the workspace presentation",
+             "action": id, "selected": id == "selected", "status": id == "running" ? "running" : "completed", "secondary": archived,
+             "icon": "pin.fill", "children": children]
         }
         let payload: [String: Any] = ["version": 1, "surface": "conversation-actions", "revision": 1, "mode": "sidebar",
                                     "title": "Conversations", "appearance": "light", "nodes": nodes]

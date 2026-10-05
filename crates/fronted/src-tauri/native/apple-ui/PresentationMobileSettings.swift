@@ -52,7 +52,6 @@ struct XgentIOSSettingsForm: View {
     let nodes: [XgentNode]
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
-    var showsRootClose = false
 
     private var sections: [XgentSettingsFormSection] { XgentSettingsFormSection.sections(nodes) }
     private var route: String { nodes.first(where: { $0.kind == .settingsGroup })?.id ?? document.id }
@@ -61,11 +60,9 @@ struct XgentIOSSettingsForm: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 28) {
                 ForEach(sections) { section in
-                    let closesHere = showsRootClose && section.id == sections.first?.id && document.dismissAction != nil
-                    VStack(alignment: .leading, spacing: closesHere ? 0 : 10) {
-                        if !section.labels.isEmpty || closesHere {
-                            XgentIOSSettingsSectionHeader(labels: section.labels, document: document,
-                                model: model, showsClose: closesHere)
+                    VStack(alignment: .leading, spacing: 10) {
+                        if !section.labels.isEmpty {
+                            XgentIOSSettingsSectionHeader(labels: section.labels)
                         }
                         if !section.leadingNotes.isEmpty {
                             notes(section.leadingNotes).padding(.horizontal, 16)
@@ -78,7 +75,7 @@ struct XgentIOSSettingsForm: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, showsRootClose ? 16 : 20)
+            .padding(.top, 20)
             .padding(.bottom, 32)
         }
         .environment(\.xgentIOSFormRow, true)

@@ -53,6 +53,7 @@ import { GlobalShortcutsSection } from "../pages/settings/GlobalShortcutsSection
 import { HooksSection } from "../pages/settings/HooksSection";
 import { MobileEnvironmentBrowser } from "../pages/settings/MobileEnvironmentBrowser";
 import { MemoryPanel } from "../pages/settings/memory/MemoryPanel";
+import { mobileSettingsStatus } from "../pages/settings/mobileSettingsStatus";
 import { NativeProviderModelSettings } from "../pages/settings/NativeProviderModelSettings";
 import { NativeProviderRequestSettings } from "../pages/settings/NativeProviderRequestSettings";
 import { NativeProviderRuntimeSettings } from "../pages/settings/NativeProviderRuntimeSettings";
@@ -737,9 +738,12 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             ? t("settings.native.shellInstallingEssentials")
             : t("app.loading"),
     });
-  const navigate = (id: string, icon: string, description?: string) =>
-    row(
-      "nav:" + id,
+  const currentVersion =
+    props.appUpdate.result?.currentVersion ??
+    (typeof __XGENT_APP_VERSION__ === "string" ? __XGENT_APP_VERSION__ : undefined);
+  const navigate = (id: SectionId, icon: string, description?: string): PresentationNode => ({
+    ...row(
+      `nav:${id}`,
       titles[id],
       icon,
       () => {
@@ -747,7 +751,17 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         setPage(id);
       },
       description,
-    );
+    ),
+    ...(nativeMobile && !page
+      ? {
+          variant: "settings-index-navigation",
+          value:
+            id === "about" && currentVersion
+              ? `v${currentVersion}`
+              : mobileSettingsStatus(id, settings, t),
+        }
+      : {}),
+  });
   const visible = (id: SectionId) => !props.hiddenSections?.includes(id);
 
   if (!page && nativeMobile) {
@@ -759,7 +773,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         }),
       );
     nodes.push(
-      c.group("mobile-theme", t("settings.native.theme"), [
+      c.group("mobile-theme", "", [
         c.select(
           "theme",
           t("settings.native.appearance"),
@@ -791,71 +805,10 @@ export function NativeSettingsPage(props: SettingsPageProps) {
               customized: false,
             }),
         ),
-        c.toggle(
-          "appearance-customized",
-          t("settings.ui.customize"),
-          appearance.customized,
-          (customized) => updateAppearance({ customized }),
-        ),
-        ...(appearance.customized
-          ? [
-              {
-                ...c.color(
-                  "accent-light",
-                  t("settings.ui.accentLight"),
-                  appearance.accentLight,
-                  (accentLight) => updateAppearance({ accentLight }),
-                ),
-                accessibilityHint: t("settings.ui.colorFormat"),
-              },
-              {
-                ...c.color(
-                  "accent-dark",
-                  t("settings.ui.accentDark"),
-                  appearance.accentDark,
-                  (accentDark) => updateAppearance({ accentDark }),
-                ),
-                accessibilityHint: t("settings.ui.colorFormat"),
-              },
-              {
-                ...c.color(
-                  "sidebar-light",
-                  t("settings.ui.sidebarLight"),
-                  appearance.sidebarLight,
-                  (sidebarLight) => updateAppearance({ sidebarLight }),
-                ),
-                accessibilityHint: t("settings.ui.colorFormat"),
-              },
-              {
-                ...c.color(
-                  "sidebar-dark",
-                  t("settings.ui.sidebarDark"),
-                  appearance.sidebarDark,
-                  (sidebarDark) => updateAppearance({ sidebarDark }),
-                ),
-                accessibilityHint: t("settings.ui.colorFormat"),
-              },
-              c.select(
-                "appearance-radius",
-                t("settings.ui.radius"),
-                String(appearance.radius),
-                [...new Set([0, 8, 12, 16, 24, 32, appearance.radius])]
-                  .sort((a, b) => a - b)
-                  .map((value) => ({ value: String(value), label: `${value}px` })),
-                (radius) => updateAppearance({ radius: Number(radius) }),
-              ),
-              c.action("appearance-reset", t("settings.ui.reset"), () =>
-                updateAppearance({
-                  ...normalizeSettings({}).customSettings.appearance,
-                  preset: appearance.preset,
-                }),
-              ),
-            ]
-          : []),
       ]),
       c.group("mobile-appearance", t("settings.mobile.appearanceGroup"), [
         ...(visible("system")
-          ? [navigate("system", "slider.horizontal.3", t("settings.mobile.systemDescription"))]
+          ? [navigate("system", "gearshape", t("settings.mobile.systemDescription"))]
           : []),
         ...(visible("providers")
           ? [navigate("providers", "cpu", t("settings.mobile.providersDescription"))]
@@ -868,20 +821,20 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         ...(visible("memory")
           ? [navigate("memory", "brain", t("settings.mobile.memoryDescription"))]
           : []),
+        ...(visible("mobileAssistant")
+          ? [navigate("mobileAssistant", "shield", t("settings.mobile.assistantDescription"))]
+          : []),
       ]),
       c.group("mobile-capabilities", t("settings.mobile.capabilitiesGroup"), [
-        ...(visible("mobileAssistant")
-          ? [navigate("mobileAssistant", "hand.raised", t("settings.mobile.assistantDescription"))]
+        ...(visible("mobileExecution")
+          ? [navigate("mobileExecution", "terminal", t("settings.native.shellEnvironment"))]
           : []),
         ...(visible("toolPermissions")
           ? [navigate("toolPermissions", "lock.shield", t("settings.toolPermissionsTitle"))]
           : []),
-        ...(visible("mobileExecution")
-          ? [navigate("mobileExecution", "terminal", t("settings.native.shellEnvironment"))]
-          : []),
         ...(visible("voice") ? [navigate("voice", "mic", t("settings.stt.desc"))] : []),
         ...(visible("other")
-          ? [navigate("other", "terminal", t("settings.mobile.otherDescription"))]
+          ? [navigate("other", "ellipsis.circle", t("settings.mobile.otherDescription"))]
           : []),
         ...(visible("access")
           ? [navigate("access", "icloud", t("settings.mobile.accessDescription"))]
@@ -1817,16 +1770,27 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const settingIcons: Record<string, string> = {
     theme: "sun.max",
     "appearance-preset": "paintpalette",
+    mode: "terminal",
     language: "globe",
     thinking: "brain",
+    "appearance-customized": "slider.horizontal.3",
+    "appearance-radius": "rectangle.roundedtop",
+    "font-scale:sidebar": "textformat.size",
+    "font-scale:chat": "textformat.size",
+    "font-scale:workspaceTools": "textformat.size",
+    "font-family:interfaceFontFamily": "textformat",
+    "font-family:chatFontFamily": "textformat",
+    "font-family:codeFontFamily": "textformat",
   };
+  function withSettingIcons(node: PresentationNode): PresentationNode {
+    return {
+      ...node,
+      icon: node.icon ?? settingIcons[node.id],
+      children: node.children?.map(withSettingIcons),
+    };
+  }
   const renderedNodes: PresentationNode[] = nativeMobile
-    ? nodes.map((node) => ({
-        ...node,
-        children: node.children?.map((child) =>
-          settingIcons[child.id] ? { ...child, icon: settingIcons[child.id] } : child,
-        ),
-      }))
+    ? nodes.map(withSettingIcons)
     : [
         {
           id: "settings-layout",

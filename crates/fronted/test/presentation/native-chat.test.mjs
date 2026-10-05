@@ -612,6 +612,44 @@ test("native sidebar keeps root folders visible and nests grouped workspaces and
   h.unmount();
 });
 
+test("native workspace disclosures collapse history without selecting a workspace or closing its sidebar", async () => {
+  for (const mobile of [false, true]) {
+    const selected = [];
+    const project = { id: "a", name: "Project A", path: "/a" };
+    const h = harness({
+      projects: [project],
+      onSelectProject: item => selected.push(item.id),
+      sidebarStore: {
+        subscribe: () => () => {},
+        getSnapshot: () => sidebarSnapshot([{ id: "work", title: "Existing work", cwd: project.path }]),
+        loadWorkspaceHistory() {},
+      },
+    }, { mobile });
+    try {
+      assert.equal((await h.dispatch("sidebar")).ok, true);
+      const rows = () => {
+        h.render();
+        return h.documents().find(item => item.mode === "sidebar").nodes[0].children
+          .find(node => node.id === "sidebar-list").children;
+      };
+      const disclosure = () => rows().find(node => node.id === "project:a").children
+        .find(node => node.id === "project-disclosure:a");
+      assert.equal(disclosure().value, false);
+      assert.match(disclosure().label, /workspaceExpand/);
+      assert.equal((await h.dispatch(disclosure().action, null, "sidebar")).ok, true);
+      assert.equal(disclosure().value, true);
+      assert.ok(rows().some(node => node.id === "workspace-conversation:work"));
+      assert.match(disclosure().label, /workspaceCollapse/);
+      assert.equal((await h.dispatch(disclosure().action, null, "sidebar")).ok, true);
+      assert.equal(disclosure().value, false);
+      assert.ok(!rows().some(node => node.id === "workspace-conversation:work"));
+      assert.deepEqual(selected, [], "Disclosure must not change the active workspace");
+      assert.equal((await h.dispatch("project:a", null, "sidebar")).ok, true);
+      assert.deepEqual(selected, ["a"], "The separate title still selects the workspace");
+    } finally { h.unmount(); }
+  }
+});
+
 test("native archived workspaces start folded, reject selection and retain working restore menus", async () => {
   const restored = [], selected = [];
   const project = { id: "archived", name: "Archived project", path: "/archived" };
@@ -628,6 +666,7 @@ test("native archived workspaces start folded, reject selection and retain worki
   assert.equal(rows().some(node => node.id === "project:archived"), false);
   assert.equal((await h.dispatch("archived-projects-label", null, "sidebar")).ok, true);
   const row = rows().find(node => node.id === "project:archived");
+  assert.ok(!row.children.some(node => node.variant === "sidebar-disclosure"));
   assert.equal(row.secondary, true);
   assert.notEqual(row.disabled, true, "only selection is disabled, rather than the entire row and its restore menu");
   assert.equal((await h.dispatch("project:archived", null, "sidebar")).ok, false);

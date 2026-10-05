@@ -13,7 +13,7 @@ function harness() {
     "../lib/responsive/compactViewport": { useCompactViewport: () => true },
     "../lib/useMobileBackNavigation": { useMobileBackNavigation: (_enabled, callback) => { nativeBack = callback; } },
     "./settings/SettingsModalShell": { SettingsDetailLayerProvider: "SettingsDetailLayerProvider" },
-    "./settings/shared": { SettingsRow: "SettingsRow", SettingsRowGroup: "SettingsRowGroup" },
+    "./settings/shared": { SettingsNavigationRow: "SettingsNavigationRow", SettingsRow: "SettingsRow", SettingsRowGroup: "SettingsRowGroup", SettingsValueSelector: "Selector" },
     "./settings/SettingsDetailHeader": { SettingsDetailHeader: "SettingsDetailHeader" },
   };
   for (const name of ["AboutSection", "AccessSection", "BackupSyncSection", "ComputerUseSection",
@@ -27,7 +27,7 @@ function harness() {
     Section: ["Section"], Selector: ["Selector"], StatusDot: ["StatusDot"], Text: ["Heading", "Text"], TextInput: ["TextInput"],
   })) mocks[`@astryxdesign/core/${module}`] = Object.fromEntries(names.map(name => [name, name]));
   const { SettingsPage } = createTsModuleLoader({ mocks }).loadModule("src/pages/SettingsPage.tsx");
-  const props = { settings, setSettings() {}, saveState: { status: "saved" }, onBack() {}, nativeMobile: true, appUpdate: {} };
+  const props = { settings, setSettings() {}, saveState: { status: "saved" }, onBack() {}, nativeMobile: true, appUpdate: { result: { currentVersion: "1.0.0" } } };
   const render = () => hooks.render(() => SettingsPage(props));
   function walk(type, node) {
     if (Array.isArray(node)) return node.map(child => walk(type, child)).find(Boolean);
@@ -37,8 +37,36 @@ function harness() {
       const result = walk(type, node.props[key]); if (result) return result;
     }
   }
-  return { props, render, find: type => walk(type, render()), back: () => nativeBack() };
+  function all(type, node) {
+    if (Array.isArray(node)) return node.flatMap(child => all(type, child));
+    if (!node?.props) return [];
+    return [
+      ...(node.type === type || node.type?.name === type ? [node] : []),
+      ...["children", "header", "content", "titleEndContent", "startContent", "endContent"].flatMap(key => all(type, node.props[key])),
+    ];
+  }
+  return { props, render, find: type => walk(type, render()), findAll: type => all(type, render()), back: () => nativeBack() };
 }
+
+test("compact settings index keeps icons, current configuration and matching mobile route order", () => {
+  const h = harness();
+  const rows = () => h.findAll("SettingsNavigationRow");
+  assert.deepEqual(rows().map(row => row.props.label), [
+    "settings.navSystem", "settings.navProviders", "settings.navSoul", "settings.navMemory", "settings.navMobileAssistant",
+    "settings.navMobileExecution", "settings.navToolPermissions", "settings.navVoice", "settings.navOther", "settings.navAccess", "settings.navBackup", "settings.navAbout",
+  ]);
+  assert.ok(rows().every(row => row.props.icon && typeof row.props.onClick === "function"));
+  h.props.settings = { ...h.props.settings, locale: "en-US", stt: { ...h.props.settings.stt, enabled: true }, access: { ...h.props.settings.access, cloudExecutionEnabled: true } };
+  const status = label => rows().find(row => row.props.label === label).props.status;
+  assert.equal(status("settings.navSystem"), "settings.english");
+  assert.equal(status("settings.navVoice"), "settings.mobile.enabled");
+  assert.equal(status("settings.navAccess"), "settings.mobile.localAndCloud");
+  assert.equal(status("settings.navAbout"), "v1.0.0");
+  rows().find(row => row.props.label === "settings.navVoice").props.onClick();
+  assert.equal(h.find("SettingsDetailHeader").props.title, "settings.navVoice");
+  h.back();
+  assert.equal(rows().length, 12, "hardware Back returns to the same settings index");
+});
 
 test("compact settings hide successful saves and preserve actual error feedback on index and detail", () => {
   const h = harness();

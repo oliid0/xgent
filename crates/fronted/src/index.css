@@ -3425,7 +3425,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     max-width: 16rem;
     min-width: 0;
   }
-  .settings-page-compact [data-settings-section] .astryx-grid {
+  .settings-page-compact [data-settings-section] .astryx-grid:not(.compact-backup-actions):not(.compact-policy-actions):not(.compact-memory-actions) {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -3538,6 +3538,73 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   background: color-mix(in srgb, var(--color-error) 10%, transparent);
 }
 
+/* SideNavItem has its own full-width root outside the primary control.
+   Give that root a bounded flex slot beside disclosure and menu controls. */
+.workspace-project-title,
+.workspace-project-title > div,
+.sidebar-history-title,
+.sidebar-history-title > div {
+  min-width: 0;
+  max-width: 100%;
+}
+.workspace-project-title {
+  flex: 1 1 0%;
+}
+.workspace-project-title .astryx-side-nav-item,
+.sidebar-history-title .astryx-side-nav-item {
+  height: auto;
+  min-height: 32px;
+  font-size: calc(14px * var(--zone-font-scale, 1));
+}
+.workspace-project-title .astryx-side-nav-item > span,
+.sidebar-history-title .astryx-side-nav-item > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: visible;
+}
+.sidebar-row-actions[data-touch-actions="true"] {
+  max-width: none;
+  opacity: 1;
+}
+.sidebar-row-actions[data-touch-actions="true"] .sidebar-row-action-buttons {
+  opacity: 1;
+  gap: 2px;
+}
+.workspace-project-row[data-touch-actions="true"] .astryx-side-nav-item,
+.chat-history-row[data-touch-actions="true"] .astryx-side-nav-item {
+  min-height: 44px;
+}
+.workspace-group-toggle {
+  height: auto;
+  min-height: 32px;
+  white-space: normal;
+  padding-block: 6px;
+}
+.workspace-group-name {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+@media (pointer: coarse) {
+  .workspace-group-toggle,
+  .workspace-project-title .astryx-side-nav-item,
+  .sidebar-history-title .astryx-side-nav-item,
+  .workspace-disclosure-control,
+  .workspace-file-tree-actions .astryx-button {
+    min-height: 44px;
+  }
+}
+.workspace-file-tree-panel {
+  min-width: 0;
+  container: workspace-files / inline-size;
+}
+.workspace-file-tree-actions .astryx-button {
+  height: auto;
+  min-height: 44px;
+  padding-block: 8px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 [data-transcript-context-trigger] {
   width: 100%;
   height: 100%;
@@ -3626,10 +3693,44 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   background: var(--color-background-body);
 }
 
-/* Astryx 0.6.3 renders its decorative handle as this first direct child.
-   Settings uses explicit navigation and close controls instead. */
-.settings-bottom-sheet > div[aria-hidden="true"]:first-child {
+/* Astryx 0.6.3 has a decorative handle before its scroll body. The app's
+   sheets use explicit actions and navigation without a grabber line. */
+.astryx-bottom-sheet > div[aria-hidden="true"]:first-child {
   display: none;
+}
+
+.settings-navigation-row > span:last-child {
+  min-width: 0;
+  max-width: 45%;
+}
+.settings-navigation-row .settings-navigation-status {
+  min-width: 0;
+  text-align: end;
+}
+.settings-page-compact :is(.settings-navigation-row, .settings-control-row) > span:first-child:has(> .astryx-icon) {
+  width: 24px;
+  flex-shrink: 0;
+  justify-content: center;
+}
+.settings-page-compact :is(.settings-navigation-row, .settings-control-row) > span:first-child > .astryx-icon {
+  width: 22px;
+  height: 22px;
+  color: inherit;
+}
+
+.settings-page-compact .settings-row-group .astryx-list-item {
+  border-block-end-width: 0;
+}
+.settings-page-compact .settings-row-group .astryx-list-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 16px 0;
+  border-block-end: 1px solid var(--color-border);
+  pointer-events: none;
+}
+.settings-page-compact .settings-row-group .astryx-list-item:has(> span:first-child > .astryx-icon)::after {
+  inset-inline-start: 48px;
 }
 
 .settings-page-compact .settings-row-group-heading {
@@ -3643,12 +3744,8 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   overflow-wrap: anywhere;
 }
 
-.settings-page-index .settings-row-group:first-child {
-  gap: 0;
-}
-
-.settings-page-index .settings-row-group:first-child > .settings-row-group-heading {
-  padding-inline-end: 0;
+.settings-index-header {
+  padding: 12px 16px 0;
 }
 
 .settings-page-index .settings-index-close {
@@ -4185,6 +4282,72 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   min-width: 0;
   max-width: 100%;
 }
+
+.settings-control-row[data-control-layout="value"] {
+  flex-wrap: nowrap;
+}
+.settings-control-row[data-control-layout="value"] > span:last-child {
+  min-width: 0;
+  max-width: 50%;
+}
+.settings-control-row[data-control-layout="value"] > span:last-child > *,
+.settings-control-row[data-control-layout="value"] .astryx-selector,
+.settings-control-row[data-control-layout="value"] .astryx-field {
+  min-width: 0;
+  max-width: 100%;
+}
+.settings-control-row[data-control-layout="value"] .astryx-selector {
+  font-weight: inherit;
+}
+.settings-page-compact .settings-control-row .astryx-selector {
+  min-height: 44px;
+  padding-block: 0;
+}
+/* Selector's clickable padded div contains the actual focusable combobox.
+   Keep its semantic target as tall as the visible mobile control. */
+.settings-page-compact .settings-control-row .astryx-selector > button:first-of-type {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* The compact form keeps the visible iOS-sized track inside a 44px tap target. */
+.settings-page-compact .astryx-switch-field div:has(> input[role="switch"]) {
+  width: 51px;
+  height: 44px;
+}
+.settings-page-compact .astryx-switch-field input[role="switch"] {
+  width: 51px;
+  height: 44px;
+}
+.settings-page-compact .astryx-switch {
+  width: 51px;
+  height: 31px;
+  padding: 2px;
+}
+.settings-page-compact .astryx-switch-field:has(input:checked) .astryx-switch {
+  background-color: #34c759;
+}
+.settings-page-compact .astryx-switch-thumb {
+  width: 27px;
+  height: 27px;
+  background-color: white;
+  transform: translateX(0);
+}
+.settings-page-compact .astryx-switch-field:has(input:checked) .astryx-switch-thumb {
+  transform: translateX(20px);
+}
+.settings-page-compact [dir="rtl"] .astryx-switch-field:has(input:checked) .astryx-switch-thumb,
+[dir="rtl"] .settings-page-compact .astryx-switch-field:has(input:checked) .astryx-switch-thumb {
+  transform: translateX(-20px);
+}
+@media (forced-colors: active) {
+  .settings-page-compact .astryx-switch-field:has(input:checked) .astryx-switch {
+    background-color: Highlight;
+  }
+  .settings-page-compact .astryx-switch-thumb {
+    background-color: Canvas;
+  }
+}
 .settings-page-index .astryx-selector[data-variant="ghost"] {
   color: var(--color-text-secondary);
 }
@@ -4192,24 +4355,24 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   .astryx-section {
     padding: var(--spacing-3);
   }
-  .astryx-grid {
+  .astryx-grid:not(.compact-backup-actions):not(.compact-policy-actions):not(.compact-memory-actions) {
     grid-template-columns: minmax(0, 1fr);
   }
   .settings-tool-permissions-category-header {
     flex-wrap: wrap;
   }
-  .settings-control-row {
+  .settings-control-row:not([data-control-layout="value"]) {
     flex-wrap: wrap;
     row-gap: var(--spacing-3);
   }
   /* Astryx 0.6.0 Item places endContent in its final direct span. Move
      controls below the label instead of shrinking the label to zero. */
-  .settings-control-row > span:last-child {
+  .settings-control-row:not([data-control-layout="value"]):not(:has([role="switch"])) > span:last-child {
     flex: 0 0 100%;
     width: 100%;
     justify-content: flex-start;
   }
-  .settings-control-row > span:last-child > * {
+  .settings-control-row:not([data-control-layout="value"]):not(:has([role="switch"])) > span:last-child > * {
     width: 100%;
     min-width: 0;
     max-width: 100%;
@@ -4306,6 +4469,37 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 .settings-page-compact .settings-wrapping-action > span > span {
   overflow: visible;
   text-overflow: clip;
+}
+.compact-memory-settings-form .settings-control-row[data-control-layout="value"] .astryx-selector {
+  padding-inline: 4px;
+  gap: 4px;
+}
+.compact-memory-model-row .astryx-complex-selector {
+  height: auto;
+  min-height: 44px;
+  padding-block: 0;
+}
+.compact-memory-model-row .astryx-complex-selector > button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.compact-memory-model-row .astryx-complex-selector > button > span {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+.compact-memory-settings-form .astryx-time-input {
+  height: auto;
+  min-height: 44px;
+}
+.compact-memory-settings-form .astryx-time-input input {
+  min-width: 0;
+  min-height: 44px;
+}
+.compact-memory-settings-form .astryx-time-input button {
+  min-width: 44px;
+  min-height: 44px;
 }
 .settings-page-compact [data-settings-section] .settings-cron-view-tabs {
   grid-template-columns: repeat(2, minmax(0, 1fr));

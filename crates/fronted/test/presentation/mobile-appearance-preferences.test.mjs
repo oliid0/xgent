@@ -12,11 +12,12 @@ test("Android appearance exposes all font zones, commits custom names and preser
       return [states[index], next => { states[index] = typeof next === "function" ? next(states[index]) : next; }];
     } },
     "@astryxdesign/core/Layout": { VStack: "VStack" },
+    "@astryxdesign/core/List": { ListItem: "ListItem" },
     "@astryxdesign/core/Selector": { Selector: "Selector" },
     "@astryxdesign/core/TextInput": { TextInput: "TextInput" },
     "../../i18n": { useLocale: () => ({ t: key => key }) },
     "./AppearanceSettingsSection": { AppearanceSettingsSection: "AppearanceSettingsSection" },
-    "./shared": { SettingsRow: "SettingsRow", SettingsRowGroup: "SettingsRowGroup" },
+    "./shared": { SettingsRow: "SettingsRow", SettingsRowGroup: "SettingsRowGroup", SettingsValueSelector: "Selector" },
   } });
   const { MobileAppearanceSettings } = loader.loadModule("src/pages/settings/MobileAppearanceSettings.tsx");
   const { getDefaultSettings } = loader.loadModule("src/lib/settings/index.ts");
@@ -25,7 +26,7 @@ test("Android appearance exposes all font zones, commits custom names and preser
   function flatten(node) {
     if (Array.isArray(node)) return node.flatMap(flatten);
     if (!node || typeof node !== "object") return [];
-    return [node, ...flatten(node.props?.children)];
+    return [node, ...flatten(node.props?.children), ...flatten(node.props?.label)];
   }
   function render() {
     cursor = 0;

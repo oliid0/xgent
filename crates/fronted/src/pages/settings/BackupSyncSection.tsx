@@ -10,18 +10,17 @@ import { useConfirmDialog } from "../../components/astryx/useConfirmDialog";
 import { AlertTriangle, Archive, ArchiveRestore, Cloud, Shield } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
+import { backupLastSyncText } from "./backupManifestText";
 import { SYNC_PRESETS } from "./backupSyncForm";
+import { CompactBackupSyncForm } from "./CompactBackupSyncForm";
 import { NativeBackupSyncSection } from "./NativeBackupSyncSection";
 import type { SettingsSectionProps } from "./types";
 import { useBackupSyncData } from "./useBackupSyncData";
 
-function formatTimestamp(value: number): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
-}
-
-export function BackupSyncSection(props: SettingsSectionProps & { onBack?: () => void }) {
-  const { t } = useLocale();
+export function BackupSyncSection(
+  props: SettingsSectionProps & { onBack?: () => void; compact?: boolean },
+) {
+  const { t, locale } = useLocale();
   const { confirm, dialog } = useConfirmDialog();
   const data = useBackupSyncData(props, confirm, t);
   const {
@@ -53,6 +52,14 @@ export function BackupSyncSection(props: SettingsSectionProps & { onBack?: () =>
           onBack={props.onBack}
           nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
         />
+        {dialog}
+      </>
+    );
+
+  if (props.compact)
+    return (
+      <>
+        <CompactBackupSyncForm data={data} />
         {dialog}
       </>
     );
@@ -351,8 +358,7 @@ export function BackupSyncSection(props: SettingsSectionProps & { onBack?: () =>
             display="block"
             className="text-xs text-muted-foreground"
           >
-            {t("settings.backupSyncLastAt")}
-            {formatTimestamp(syncView.lastSyncAt)}
+            {backupLastSyncText(syncView.lastSyncAt, t, locale)}
           </AstryxText>
         ) : null}
 

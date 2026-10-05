@@ -1,7 +1,8 @@
 import { VStack } from "@astryxdesign/core/Layout";
-import { Selector } from "@astryxdesign/core/Selector";
+import { ListItem } from "@astryxdesign/core/List";
 import { TextInput } from "@astryxdesign/core/TextInput";
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { TextSelect } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import { updateCustomSettings } from "../../lib/settings";
 import {
@@ -14,7 +15,7 @@ import {
   toFontFamilySelectValue,
 } from "../../lib/system/fontFamily";
 import { AppearanceSettingsSection } from "./AppearanceSettingsSection";
-import { SettingsRow, SettingsRowGroup } from "./shared";
+import { SettingsRow, SettingsRowGroup, SettingsValueSelector } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
 /** Android and the native Apple forms persist the same mobile appearance fields. */
@@ -44,7 +45,7 @@ export function MobileAppearanceSettings({ settings, setSettings }: SettingsSect
 
   return (
     <VStack width="100%" gap={4}>
-      <AppearanceSettingsSection settings={settings} setSettings={setSettings} />
+      <AppearanceSettingsSection settings={settings} setSettings={setSettings} compact />
       <SettingsRowGroup title={t("settings.fontFamily")}>
         {fields.map(([key, label]) => {
           const selected = toFontFamilySelectValue(
@@ -53,13 +54,12 @@ export function MobileAppearanceSettings({ settings, setSettings }: SettingsSect
             custom[key],
           );
           return (
-            <VStack key={key} width="100%" gap={2}>
-              <SettingsRow label={t(label)}>
-                <Selector
+            <Fragment key={key}>
+              <SettingsRow label={t(label)} icon={<TextSelect />} controlLayout="value">
+                <SettingsValueSelector
                   label={t(label)}
                   isLabelHidden
                   value={selected}
-                  width="min(100%, var(--xgent-settings-control-width))"
                   hasSearch
                   options={[
                     {
@@ -92,22 +92,27 @@ export function MobileAppearanceSettings({ settings, setSettings }: SettingsSect
                 />
               </SettingsRow>
               {selected === FONT_FAMILY_CUSTOM_SELECT_VALUE ? (
-                <TextInput
-                  label={t("settings.fontFamilyCustom")}
-                  placeholder={t("settings.fontFamilyPlaceholder")}
-                  value={drafts[key] ?? settings.customSettings[key]}
-                  width="100%"
-                  onChange={(value) => setDrafts((previous) => ({ ...previous, [key]: value }))}
-                  onBlur={() => commit(key)}
-                  onEnter={() => commit(key)}
-                  status={
-                    errors[key]
-                      ? { type: "error", message: t("settings.fontFamilyInvalid") }
-                      : undefined
+                <ListItem
+                  label={
+                    <TextInput
+                      label={t("settings.fontFamilyCustom")}
+                      isLabelHidden
+                      placeholder={t("settings.fontFamilyPlaceholder")}
+                      value={drafts[key] ?? settings.customSettings[key]}
+                      width="100%"
+                      onChange={(value) => setDrafts((previous) => ({ ...previous, [key]: value }))}
+                      onBlur={() => commit(key)}
+                      onEnter={() => commit(key)}
+                      status={
+                        errors[key]
+                          ? { type: "error", message: t("settings.fontFamilyInvalid") }
+                          : undefined
+                      }
+                    />
                   }
                 />
               ) : null}
-            </VStack>
+            </Fragment>
           );
         })}
       </SettingsRowGroup>
@@ -119,12 +124,11 @@ export function MobileAppearanceSettings({ settings, setSettings }: SettingsSect
             ["workspaceTools", "settings.fontSizeWorkspaceTools"],
           ] as const
         ).map(([zone, label]) => (
-          <SettingsRow key={zone} label={t(label)}>
-            <Selector
+          <SettingsRow key={zone} label={t(label)} icon={<TextSelect />} controlLayout="value">
+            <SettingsValueSelector
               label={t(label)}
               isLabelHidden
               value={String(settings.customSettings.fontScale[zone])}
-              width="min(100%, var(--xgent-settings-control-width))"
               options={[...new Set([0.9, 1, 1.1, 1.2, settings.customSettings.fontScale[zone]])]
                 .sort((a, b) => a - b)
                 .map((value) => ({ value: String(value), label: `${Math.round(value * 100)}%` }))}

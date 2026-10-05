@@ -220,6 +220,7 @@ export function MemoryPanel(props: {
             void reload();
           }}
           nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
+          compact={props.compact}
         />
       );
     return (
@@ -238,6 +239,7 @@ export function MemoryPanel(props: {
           t={t}
           onClose={() => setSettingsDrawerOpen(false)}
           onRequestWipe={wipeAll}
+          compact={props.compact}
           onOrganizerRunQueued={(runId) => watchOrganizerRun(runId)}
           onMemoryChanged={() => {
             void reload();

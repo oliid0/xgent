@@ -274,7 +274,8 @@ private struct XgentNodeControlModifier: ViewModifier {
     }
 
     @ViewBuilder func body(content: Content) -> some View {
-        if isContainer || node.variant == "sidebar-conversation-row" || node.variant == "memory-project" || node.kind == .colorInput ||
+        if isContainer || node.variant == "sidebar-conversation-row" || node.variant == "sidebar-workspace-row" ||
+           node.variant == "memory-project" || node.kind == .colorInput ||
            node.kind == .spreadsheetGrid || node.variant == "workspace-file-layout" ||
            node.variant == "workspace-file-toolbar" || node.variant == "workspace-file-sheets" ||
            node.variant == "workspace-file-metadata" || node.variant == "workspace-file-annotations" ||
@@ -619,7 +620,7 @@ struct XgentSheetView: View {
         navigationContent
         #if os(iOS)
         .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
+        .presentationDragIndicator(.hidden)
         #endif
         .frame(minWidth: 300, minHeight: 360)
         .background { XgentThemeBackground().ignoresSafeArea() }

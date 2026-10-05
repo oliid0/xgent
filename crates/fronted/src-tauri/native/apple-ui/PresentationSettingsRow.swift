@@ -20,6 +20,7 @@ struct XgentSettingsValueRow<Content: View>: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.xgentPresentationTheme) private var theme
     @ScaledMetric(relativeTo: .subheadline) private var detailScale = 1.0
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 22
 
     init(node: XgentNode, showsDescription: Bool = true, @ViewBuilder content: () -> Content) {
         self.node = node
@@ -30,7 +31,10 @@ struct XgentSettingsValueRow<Content: View>: View {
     private var label: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             if let icon = node.icon {
-                Image(systemName: icon).frame(width: 24).accessibilityHidden(true)
+                Image(systemName: icon)
+                    .font(.system(size: iconSize, weight: .regular))
+                    .frame(width: max(24, iconSize))
+                    .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 4) {
                 XgentFieldLabel(node: node)

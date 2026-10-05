@@ -7,7 +7,7 @@ import { MobileNav } from "@astryxdesign/core/MobileNav";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { Stack as AstryxStack, StackItem, VStack } from "@astryxdesign/core/Stack";
-import { Text as AstryxText, Text } from "@astryxdesign/core/Text";
+import { Text as AstryxText } from "@astryxdesign/core/Text";
 import { TextInput as Input } from "@astryxdesign/core/TextInput";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
@@ -331,7 +331,7 @@ function useStableEvent<Args extends unknown[], Return>(
   return useCallback((...args: Args) => handlerRef.current(...args), []);
 }
 
-const HistoryRow = memo(function HistoryRow(props: {
+export const HistoryRow = memo(function HistoryRow(props: {
   item: SidebarConversation;
   isActive: boolean;
   isRunning: boolean;
@@ -487,6 +487,7 @@ const HistoryRow = memo(function HistoryRow(props: {
     <AstryxGrid
       data-active={isActive ? "true" : undefined}
       data-selected={isSelected ? "true" : undefined}
+      data-touch-actions={touchActions ? "true" : undefined}
       className={cn(
         "chat-history-row group/item grid min-h-8 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center rounded-lg transition-colors",
         isSelected
@@ -529,19 +530,29 @@ const HistoryRow = memo(function HistoryRow(props: {
           />
         </AstryxStack>
       ) : (
-        <SideNavItem
-          label={item.title}
-          size="sm"
-          isSelected={isActive || isSelected}
-          onClick={handleSelect}
-          className="min-w-0"
-        />
+        <AstryxStack direction="vertical" className="sidebar-history-title min-w-0">
+          <SideNavItem
+            label={item.title}
+            size={touchActions ? "lg" : "sm"}
+            isSelected={isActive || isSelected}
+            onClick={handleSelect}
+            className="min-w-0"
+            endContent={
+              touchActions && isRunning ? (
+                <span role="img" aria-label={t("chat.statusRunningReply")}>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </span>
+              ) : undefined
+            }
+          />
+        </AstryxStack>
       )}
       {!isRenaming ? (
         <AstryxStack
           direction="horizontal"
+          data-touch-actions={touchActions ? "true" : undefined}
           className={cn(
-            "relative flex items-center justify-end overflow-hidden transition-[max-width,opacity] duration-200 ease-out",
+            "sidebar-row-actions relative flex items-center justify-end overflow-hidden transition-[max-width,opacity] duration-200 ease-out",
             isRunning
               ? "max-w-7 opacity-100 group-hover/item:max-w-16 group-focus-within/item:max-w-16"
               : "max-w-0 opacity-0 group-hover/item:max-w-16 group-hover/item:opacity-100 group-focus-within/item:max-w-16 group-focus-within/item:opacity-100",
@@ -549,7 +560,7 @@ const HistoryRow = memo(function HistoryRow(props: {
             menuOpen && "max-w-16 opacity-100",
           )}
         >
-          {isRunning ? (
+          {isRunning && !touchActions ? (
             <AstryxStack
               as="span"
               direction="horizontal"
@@ -567,7 +578,7 @@ const HistoryRow = memo(function HistoryRow(props: {
           <AstryxStack
             direction="horizontal"
             className={cn(
-              "flex items-center gap-0.5 transition-opacity duration-200",
+              "sidebar-row-action-buttons flex items-center gap-0.5 transition-opacity duration-200",
               isRunning
                 ? "opacity-0 group-hover/item:opacity-100 group-focus-within/item:opacity-100"
                 : "opacity-100",
@@ -576,7 +587,7 @@ const HistoryRow = memo(function HistoryRow(props: {
           >
             <IconButton
               variant="ghost"
-              size="sm"
+              size={touchActions ? "lg" : "sm"}
               label={item.isPinned ? t("chat.conversationUnpin") : t("chat.conversationPin")}
               tooltip={item.isPinned ? t("chat.conversationUnpin") : t("chat.conversationPin")}
               icon={item.isPinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
@@ -585,7 +596,7 @@ const HistoryRow = memo(function HistoryRow(props: {
             />
             <MoreMenu
               label={t("chat.conversationMore")}
-              size="sm"
+              size={touchActions ? "lg" : "sm"}
               placement={touchActions ? "below" : "end"}
               alignment={touchActions ? "end" : "start"}
               onOpenChange={setMenuOpen}
@@ -650,7 +661,7 @@ const HistoryRow = memo(function HistoryRow(props: {
   );
 });
 
-const ProjectRow = memo(function ProjectRow(props: {
+export const ProjectRow = memo(function ProjectRow(props: {
   project: WorkspaceProject;
   isActive: boolean;
   isMissing: boolean;
@@ -815,6 +826,7 @@ const ProjectRow = memo(function ProjectRow(props: {
       data-active={isActive ? "true" : undefined}
       data-archived={isArchived ? "true" : undefined}
       data-missing={isMissing ? "true" : undefined}
+      data-touch-actions={touchActions ? "true" : undefined}
       className={cn(
         "workspace-project-row group/project grid min-h-8 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center rounded-lg transition-colors",
         isMissing
@@ -882,34 +894,44 @@ const ProjectRow = memo(function ProjectRow(props: {
               className="workspace-disclosure-control shrink-0 text-muted-foreground hover:text-foreground"
             />
           ) : null}
-          <SideNavItem
-            label={project.name}
-            icon={isArchived ? ProjectFolderIcon : undefined}
-            size="sm"
-            isSelected={isActive}
-            isDisabled={isArchived}
-            className={cn(
-              "min-w-0 flex-1",
-              isMissing
-                ? "hover:text-destructive focus-visible:bg-destructive/10"
-                : isArchived
-                  ? "cursor-default"
-                  : "hover:text-foreground",
-            )}
-            onClick={() => {
-              if (!isArchived) {
-                onSelectProject(project);
-                onToggleExpanded?.(project);
+          <AstryxStack direction="vertical" className="workspace-project-title min-w-0 flex-1">
+            <SideNavItem
+              label={project.name}
+              icon={isArchived ? ProjectFolderIcon : undefined}
+              size={touchActions ? "lg" : "sm"}
+              isSelected={isActive}
+              isDisabled={isArchived}
+              endContent={
+                touchActions && isRunning && !isMissing ? (
+                  <span role="img" aria-label={t("chat.statusRunningReply")}>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </span>
+                ) : undefined
               }
-            }}
-          />
+              className={cn(
+                "min-w-0 flex-1",
+                isMissing
+                  ? "hover:text-destructive focus-visible:bg-destructive/10"
+                  : isArchived
+                    ? "cursor-default"
+                    : "hover:text-foreground",
+              )}
+              onClick={() => {
+                if (!isArchived) {
+                  onSelectProject(project);
+                  onToggleExpanded?.(project);
+                }
+              }}
+            />
+          </AstryxStack>
         </AstryxStack>
       )}
       {!isRenaming ? (
         <AstryxStack
           direction="horizontal"
+          data-touch-actions={touchActions ? "true" : undefined}
           className={cn(
-            "relative flex items-center justify-end overflow-hidden transition-[max-width,opacity] duration-200 ease-out",
+            "sidebar-row-actions relative flex items-center justify-end overflow-hidden transition-[max-width,opacity] duration-200 ease-out",
             isMissing
               ? "max-w-8 opacity-100"
               : isRunning
@@ -919,7 +941,7 @@ const ProjectRow = memo(function ProjectRow(props: {
             menuOpen && "max-w-16 opacity-100",
           )}
         >
-          {isRunning && !isMissing ? (
+          {isRunning && !isMissing && !touchActions ? (
             <AstryxStack
               as="span"
               direction="horizontal"
@@ -937,7 +959,7 @@ const ProjectRow = memo(function ProjectRow(props: {
           <AstryxStack
             direction="horizontal"
             className={cn(
-              "flex items-center gap-0.5 transition-opacity duration-200",
+              "sidebar-row-action-buttons flex items-center gap-0.5 transition-opacity duration-200",
               isRunning && !isMissing
                 ? "opacity-0 group-hover/project:opacity-100 group-focus-within/project:opacity-100"
                 : "opacity-100",
@@ -948,7 +970,7 @@ const ProjectRow = memo(function ProjectRow(props: {
               !isDefaultProject ? (
                 <IconButton
                   variant="destructive"
-                  size="sm"
+                  size={touchActions ? "lg" : "sm"}
                   label={t("chat.workspaceRemove")}
                   tooltip={t("chat.workspaceRemove")}
                   icon={<Trash2 aria-hidden="true" />}
@@ -960,7 +982,7 @@ const ProjectRow = memo(function ProjectRow(props: {
                 {!isArchived ? (
                   <IconButton
                     variant="ghost"
-                    size="sm"
+                    size={touchActions ? "lg" : "sm"}
                     label={isPinned ? t("chat.workspaceUnpin") : t("chat.workspacePin")}
                     tooltip={isPinned ? t("chat.workspaceUnpin") : t("chat.workspacePin")}
                     icon={isPinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
@@ -969,7 +991,7 @@ const ProjectRow = memo(function ProjectRow(props: {
                 ) : null}
                 <MoreMenu
                   label={t("chat.workspaceMore")}
-                  size="sm"
+                  size={touchActions ? "lg" : "sm"}
                   placement={touchActions ? "below" : "end"}
                   alignment={touchActions ? "end" : "start"}
                   onOpenChange={setMenuOpen}
@@ -2197,6 +2219,18 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     title={t("chat.workspaceSection")}
                     endContent={
                       <>
+                        <IconButton
+                          label={t("chat.workspaceGroupCreate")}
+                          tooltip={t("chat.workspaceGroupCreate")}
+                          icon={<FolderTree aria-hidden="true" />}
+                          variant="ghost"
+                          size={mobileExperience ? "lg" : "md"}
+                          isDisabled={!onCreateWorkspaceGroup}
+                          onClick={() => {
+                            setCreatingWorkspaceGroup(true);
+                            setWorkspaceGroupDraft("");
+                          }}
+                        />
                         <MoreMenu
                           label={t("chat.workspaceMore")}
                           size={mobileExperience ? "lg" : "sm"}
@@ -2214,16 +2248,6 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                                   },
                                 ]
                               : []),
-                            {
-                              id: "workspace-group-create",
-                              label: t("chat.workspaceGroupCreate"),
-                              icon: <FolderTree aria-hidden="true" />,
-                              isDisabled: !onCreateWorkspaceGroup,
-                              onClick: () => {
-                                setCreatingWorkspaceGroup(true);
-                                setWorkspaceGroupDraft("");
-                              },
-                            },
                             {
                               id: "workspace-create",
                               label: t("chat.workspaceCreate"),
@@ -2315,7 +2339,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                         <AstryxStack direction="vertical" key={group.id} className="pt-0.5">
                           <AstryxStack
                             direction="horizontal"
-                            className="group/workspace-group flex h-7 items-center gap-1 rounded-md px-1"
+                            className="workspace-group-row group/workspace-group flex min-h-7 items-center gap-1 rounded-md px-1"
                           >
                             {isRenamingGroup ? (
                               <AstryxStack
@@ -2365,7 +2389,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                                   type="button"
                                   aria-expanded={!group.collapsed}
                                   onClick={() => onToggleWorkspaceGroupCollapsed?.(group.id)}
-                                  className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 text-left text-[calc(11.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground hover:text-foreground"
+                                  className="workspace-group-toggle flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 text-left text-[calc(11.5px*var(--zone-font-scale,1))] font-medium text-muted-foreground hover:text-foreground"
                                 >
                                   {group.collapsed ? (
                                     <FolderClosed className="h-4 w-4 shrink-0" />
@@ -2375,7 +2399,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                                   <AstryxText
                                     as="span"
                                     type="inherit"
-                                    className="min-w-0 flex-1 truncate"
+                                    className="workspace-group-name min-w-0 flex-1"
                                   >
                                     {group.name}
                                   </AstryxText>
@@ -2389,6 +2413,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                                 </AstryxButton>
                                 <MoreMenu
                                   label={t("chat.workspaceGroupMore")}
+                                  size={mobileExperience ? "lg" : "sm"}
                                   placement="end"
                                   alignment="start"
                                   items={[
@@ -2855,7 +2880,6 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
         height="hug"
       >
         <VStack gap={3} padding={4}>
-          <Text type="label">{t("sidebar.soul")}</Text>
           <SoulPresetPicker
             mobile
             presets={soul.presets}

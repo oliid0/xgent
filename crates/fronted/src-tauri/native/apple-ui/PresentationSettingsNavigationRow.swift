@@ -7,7 +7,7 @@ struct XgentSettingsNavigationRow: View {
 
     private var row: some View {
         HStack(spacing: 12) {
-            XgentSettingsValueRow(node: node) {
+            XgentSettingsValueRow(node: node, showsDescription: node.variant != "settings-index-navigation") {
                 if let value = node.value?.text, !value.isEmpty {
                     Text(value).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }

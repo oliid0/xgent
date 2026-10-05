@@ -19,7 +19,7 @@ import {
   resetToolPolicies,
   settingsToolsForCategory,
 } from "../../lib/tools/toolPolicySettings";
-import { SettingsRow, SettingsRowGroup } from "./shared";
+import { SettingsRow, SettingsRowGroup, SettingsValueSelector } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
 const POLICY_OPTIONS: readonly ToolPolicy[] = ["allow", "ask", "deny"];
@@ -30,7 +30,11 @@ const COMMAND_SAFETY_OPTIONS: readonly CommandSafetyMode[] = [
   "sandboxOffline",
 ];
 
-export function ToolPermissionsSection({ settings, setSettings }: SettingsSectionProps) {
+export function ToolPermissionsSection({
+  settings,
+  setSettings,
+  compact = false,
+}: SettingsSectionProps & { compact?: boolean }) {
   const { t } = useLocale();
   const nativeMobile = isNativeMobileRuntime();
   const policies = Object.fromEntries(
@@ -49,13 +53,15 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
 
   return (
     <VStack gap={5} width="100%" className="settings-tool-permissions">
-      <Section padding={4} width="100%">
+      <VStack padding={compact ? 0 : 4} width="100%">
         <VStack gap={3} width="100%">
           <HStack gap={3} vAlign="start" wrap="wrap">
-            <Icon icon={Shield} size="md" />
+            {!compact ? <Icon icon={Shield} size="md" /> : null}
             <StackItem size="fill">
               <VStack gap={1}>
-                <Heading level={2}>{t("settings.toolPermissionsTitle")}</Heading>
+                {!compact ? (
+                  <Heading level={2}>{t("settings.toolPermissionsTitle")}</Heading>
+                ) : null}
                 <Text type="supporting" color="secondary">
                   {t("settings.toolPermissionsDesc")}
                 </Text>
@@ -66,7 +72,7 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
                 type="button"
                 label={t("settings.toolPermissionsReset")}
                 variant="ghost"
-                size="sm"
+                size={compact ? "lg" : "sm"}
                 onClick={() => setSettings(resetToolPolicies)}
               />
             ) : null}
@@ -83,7 +89,7 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
             </Text>
           </Grid>
         </VStack>
-      </Section>
+      </VStack>
 
       {!nativeMobile ? (
         <SettingsRowGroup title={t("settings.commandSafety.title")} hideTitle>
@@ -94,6 +100,8 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
             <Selector
               label={t("settings.commandSafety.title")}
               isLabelHidden
+              size={compact ? "lg" : "md"}
+              presentation={compact ? "adaptive" : undefined}
               value={settings.system.commandSafetyMode}
               options={COMMAND_SAFETY_OPTIONS.map((mode) => ({
                 value: mode,
@@ -124,19 +132,44 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
               className="settings-tool-permissions-category-header"
             >
               <Heading level={3}>{t(category.labelKey)}</Heading>
-              <ButtonGroup label={t("settings.toolPermissionsApplyCategory")} size="sm">
-                {POLICY_OPTIONS.map((policy) => (
-                  <Button
-                    key={policy}
-                    type="button"
-                    label={t(`settings.toolPolicy.${policy}`)}
-                    variant="ghost"
-                    size="sm"
-                    tooltip={`${t("settings.toolPermissionsApplyCategory")} ${t(`settings.toolPolicy.${policy}`)}`}
-                    onClick={() => setCategoryPolicy(toolNames, policy)}
-                  />
-                ))}
-              </ButtonGroup>
+              {compact ? (
+                <Grid
+                  columns={{ minWidth: 80, max: 3 }}
+                  gap={2}
+                  width="100%"
+                  role="group"
+                  aria-label={t("settings.toolPermissionsApplyCategory")}
+                  className="compact-policy-actions"
+                >
+                  {POLICY_OPTIONS.map((policy) => (
+                    <Button
+                      key={policy}
+                      type="button"
+                      label={t(`settings.toolPolicy.${policy}`)}
+                      variant="ghost"
+                      size="lg"
+                      width="100%"
+                      className="settings-wrapping-action"
+                      tooltip={`${t("settings.toolPermissionsApplyCategory")} ${t(`settings.toolPolicy.${policy}`)}`}
+                      onClick={() => setCategoryPolicy(toolNames, policy)}
+                    />
+                  ))}
+                </Grid>
+              ) : (
+                <ButtonGroup label={t("settings.toolPermissionsApplyCategory")} size="sm">
+                  {POLICY_OPTIONS.map((policy) => (
+                    <Button
+                      key={policy}
+                      type="button"
+                      label={t(`settings.toolPolicy.${policy}`)}
+                      variant="ghost"
+                      size="sm"
+                      tooltip={`${t("settings.toolPermissionsApplyCategory")} ${t(`settings.toolPolicy.${policy}`)}`}
+                      onClick={() => setCategoryPolicy(toolNames, policy)}
+                    />
+                  ))}
+                </ButtonGroup>
+              )}
             </HStack>
             <List density="balanced" hasDividers>
               {tools.map((tool) => {
@@ -149,25 +182,55 @@ export function ToolPermissionsSection({ settings, setSettings }: SettingsSectio
                   <ListItem
                     className="settings-control-row settings-tool-policy-row"
                     key={tool.id}
-                    label={translatedName === nameKey ? tool.toolName : translatedName}
-                    description={
-                      <Text type="supporting" color="secondary" wordBreak="break-word">
-                        {translatedDesc === descKey ? tool.toolName : translatedDesc}
-                      </Text>
+                    label={
+                      compact ? (
+                        <Text type="body" wordBreak="break-word">
+                          {translatedName === nameKey ? tool.toolName : translatedName}
+                        </Text>
+                      ) : translatedName === nameKey ? (
+                        tool.toolName
+                      ) : (
+                        translatedName
+                      )
                     }
-                    startContent={<Code>{tool.toolName}</Code>}
+                    description={
+                      <VStack gap={1}>
+                        {compact ? (
+                          <Text type="supporting" color="secondary" wordBreak="break-word">
+                            {tool.toolName}
+                          </Text>
+                        ) : null}
+                        <Text type="supporting" color="secondary" wordBreak="break-word">
+                          {translatedDesc === descKey ? tool.toolName : translatedDesc}
+                        </Text>
+                      </VStack>
+                    }
+                    startContent={compact ? undefined : <Code>{tool.toolName}</Code>}
                     endContent={
-                      <Selector
-                        value={policy}
-                        onChange={(value) => setToolPolicy(tool.toolName, value as ToolPolicy)}
-                        label={translatedName === nameKey ? tool.toolName : translatedName}
-                        isLabelHidden
-                        size="sm"
-                        options={POLICY_OPTIONS.map((option) => ({
-                          value: option,
-                          label: t(`settings.toolPolicy.${option}`),
-                        }))}
-                      />
+                      compact ? (
+                        <SettingsValueSelector
+                          value={policy}
+                          onChange={(value) => setToolPolicy(tool.toolName, value as ToolPolicy)}
+                          label={translatedName === nameKey ? tool.toolName : translatedName}
+                          isLabelHidden
+                          options={POLICY_OPTIONS.map((option) => ({
+                            value: option,
+                            label: t(`settings.toolPolicy.${option}`),
+                          }))}
+                        />
+                      ) : (
+                        <Selector
+                          value={policy}
+                          onChange={(value) => setToolPolicy(tool.toolName, value as ToolPolicy)}
+                          label={translatedName === nameKey ? tool.toolName : translatedName}
+                          isLabelHidden
+                          size="sm"
+                          options={POLICY_OPTIONS.map((option) => ({
+                            value: option,
+                            label: t(`settings.toolPolicy.${option}`),
+                          }))}
+                        />
+                      )
                     }
                   />
                 );

@@ -19,6 +19,16 @@ struct XgentSidebarSectionHeading: View {
             ForEach(node.children ?? []) { action in
                 if action.kind == .menu {
                     XgentNativeMenu(node: action, document: document, model: model)
+                } else if action.kind == .iconButton {
+                    Button { model.send(action, in: document) } label: {
+                        Image(systemName: action.icon ?? "plus")
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(action.disabled == true || model.isBusy(action, in: document))
+                    .accessibilityIdentifier(action.id)
+                    .accessibilityLabel(action.accessibilityLabel ?? action.label ?? "")
+                    .help(action.label ?? "")
                 }
             }
         }

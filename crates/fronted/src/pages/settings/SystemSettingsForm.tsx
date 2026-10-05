@@ -6,6 +6,7 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { isBrowserRuntime } from "@xgent/runtime";
 import { useEffect, useMemo, useState } from "react";
+import { Globe, Terminal } from "../../components/icons";
 import { SUPPORTED_LOCALES, useLocale } from "../../i18n";
 import { inferRuntimePlatform, isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import {
@@ -39,7 +40,12 @@ import { supportsApplePresentation } from "../../runtime/applePresentation";
 import { AppearanceSettingsSection } from "./AppearanceSettingsSection";
 import { MobileAppearanceSettings } from "./MobileAppearanceSettings";
 import { SecretTextInput } from "./SecretTextInput";
-import { AgentActivationSwitch, SettingsRow, SettingsRowGroup } from "./shared";
+import {
+  AgentActivationSwitch,
+  SettingsRow,
+  SettingsRowGroup,
+  SettingsValueSelector,
+} from "./shared";
 import type { SettingsSectionProps } from "./types";
 
 const FONT_SCALE_OPTIONS = [0.9, 1, 1.1, 1.2] as const;
@@ -62,24 +68,25 @@ export function SystemSettingsForm(props: SystemSettingsFormProps) {
   );
 }
 
-function MobileSystemSettingsForm({ settings, setSettings }: SystemSettingsFormProps) {
+export function MobileSystemSettingsForm({ settings, setSettings }: SystemSettingsFormProps) {
   const { t } = useLocale();
   return (
     <VStack width="100%" gap={2}>
       <SettingsRowGroup title={t("settings.executionMode")} hideTitle>
         <SettingsRow
           label={t("settings.executionMode")}
+          icon={<Terminal />}
+          controlLayout="value"
           description={
             settings.system.executionMode === "text"
               ? t("settings.chatModeDesc")
               : t("settings.agentModeDesc")
           }
         >
-          <Selector
+          <SettingsValueSelector
             label={t("settings.executionMode")}
             isLabelHidden
             value={settings.system.executionMode === "text" ? "text" : "tools"}
-            width={CONTROL_WIDTH}
             options={[
               { value: "text", label: t("settings.chatMode") },
               { value: "tools", label: t("settings.agentMode") },
@@ -93,12 +100,11 @@ function MobileSystemSettingsForm({ settings, setSettings }: SystemSettingsFormP
             }
           />
         </SettingsRow>
-        <SettingsRow label={t("settings.language")}>
-          <Selector
+        <SettingsRow label={t("settings.language")} icon={<Globe />} controlLayout="value">
+          <SettingsValueSelector
             label={t("settings.language")}
             isLabelHidden
             value={settings.locale}
-            width={CONTROL_WIDTH}
             options={SUPPORTED_LOCALES.map((locale) => ({
               value: locale,
               label:

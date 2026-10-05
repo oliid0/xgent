@@ -87,10 +87,12 @@ test("directory row and chevron toggles use the latest state before React rerend
   const tree = h.find("Section", props => !!props.onClickCapture);
   const item = { dataset: { treeId: "nested" } };
   const target = { closest: selector => selector === "[data-tree-toggle]" ? {} : item };
-  tree.props.onClickCapture({ target });
+  let stopped = 0;
+  tree.props.onClickCapture({ target, stopPropagation() { stopped++; } });
   assert.deepEqual(h.state.expandedPaths, [""]);
-  tree.props.onClickCapture({ target });
+  tree.props.onClickCapture({ target, stopPropagation() { stopped++; } });
   assert.deepEqual(h.state.expandedPaths, ["", "nested"]);
+  assert.equal(stopped, 2, "TreeList's private override must never shadow row/reveal expansion");
 });
 
 test("keyboard collapse and expand persist while navigation arrows and leaf rows leave state intact", t => {
@@ -98,7 +100,9 @@ test("keyboard collapse and expand persist while navigation arrows and leaf rows
   const capture = h.find("Section", props => !!props.onKeyDownCapture).props.onKeyDownCapture;
   let expanded = "true", path = "nested";
   const item = { dataset: { get treeId() { return path; } }, getAttribute: () => expanded };
-  const event = key => ({ key, target: { closest: () => item } });
+  let prevented = 0, stopped = 0;
+  const event = key => ({ key, target: { closest: () => item },
+    preventDefault() { prevented++; }, stopPropagation() { stopped++; } });
   capture(event("ArrowLeft"));
   assert.deepEqual(h.state.expandedPaths, [""]);
   expanded = "false";
@@ -113,6 +117,8 @@ test("keyboard collapse and expand persist while navigation arrows and leaf rows
   path = "nested";
   capture({ ...event("ArrowLeft"), ctrlKey: true });
   assert.deepEqual(h.state.expandedPaths, ["", "nested"]);
+  assert.equal(prevented, 2);
+  assert.equal(stopped, 2, "Only expansion arrows are consumed; focus navigation stays with TreeList");
 });
 
 test("shared file forms preserve their directory and reserve duplicate submissions before rerender", async t => {

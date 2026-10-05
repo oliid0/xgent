@@ -79,6 +79,15 @@ final class MobileSettingsDrawerTests: XCTestCase {
             let close = try XCTUnwrap(elements.first { $0.identifier == "presentation-sheet-close" })
             let appearance = try XCTUnwrap(elements.first { $0.identifier == "theme" && $0.traits.contains(.button) })
             XCTAssertEqual(appearance.value, "System")
+            let general = try XCTUnwrap(elements.first { $0.identifier == "nav:system" && $0.traits.contains(.button) })
+            XCTAssertEqual(general.label, "General")
+            XCTAssertEqual(general.value, "English")
+            let generalBounds = general.shape.bezierPath.bounds
+            XCTAssertGreaterThanOrEqual(generalBounds.height, 44)
+            XCTAssertGreaterThanOrEqual(generalBounds.minX, -1)
+            XCTAssertLessThanOrEqual(generalBounds.maxX, width + 1)
+            XCTAssertFalse(elements.contains { $0.label == "Language, appearance and detailed interface preferences" },
+                "Index descriptions remain hints rather than adding a second visible line")
             let closeBounds = close.shape.bezierPath.bounds
             XCTAssertGreaterThanOrEqual(closeBounds.height, 44)
             XCTAssertGreaterThanOrEqual(closeBounds.minX, -1)
@@ -88,6 +97,27 @@ final class MobileSettingsDrawerTests: XCTestCase {
             let name = "settings-index-drawer-\(Int(width))-\(size)"
             try attachNativeAccessibilityEvidence(hierarchy, name: name)
             try attachCompositedNativeScreenshot(of: window, name: name)
+
+            let scroll = try XCTUnwrap(scrollViews(in: window).first {
+                $0.contentSize.height > $0.bounds.height + 44
+            }, "The full settings index needs a scrollable list")
+            for _ in 0..<2 {
+                scroll.setContentOffset(CGPoint(x: 0,
+                    y: max(0, scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom)),
+                    animated: false)
+                try await Task.sleep(for: .milliseconds(150))
+                window.layoutIfNeeded()
+            }
+            let scrolled = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: window)
+            let scrolledElements = scrolled.flattenToElements()
+            let scrolledClose = try XCTUnwrap(scrolledElements.first { $0.identifier == "presentation-sheet-close" })
+            XCTAssertEqual(scrolledClose.shape.bezierPath.bounds.minY, closeBounds.minY, accuracy: 1,
+                "Closing settings must remain reachable while the index scrolls")
+            let about = try XCTUnwrap(scrolledElements.first { $0.identifier == "nav:about" && $0.traits.contains(.button) })
+            XCTAssertGreaterThanOrEqual(about.shape.bezierPath.bounds.minY, 0)
+            XCTAssertLessThanOrEqual(about.shape.bezierPath.bounds.maxY, window.bounds.height + 1)
+            try attachNativeAccessibilityEvidence(scrolled, name: "\(name)-scrolled")
+            try attachCompositedNativeScreenshot(of: window, name: "\(name)-scrolled")
 
             // Use the same live surface as production routing: removing the
             // index section and adding Back must restore the detail header.
@@ -147,16 +177,34 @@ final class MobileSettingsDrawerTests: XCTestCase {
         XCTFail("The mounted native drawer did not show \(id)")
     }
 
+    @MainActor private func scrollViews(in view: UIView) -> [UIScrollView] {
+        let current = (view as? UIScrollView).map { [$0] } ?? []
+        return current + view.subviews.flatMap { scrollViews(in: $0) }
+    }
+
     private var indexNodes: [[String: Any]] {
-        [node("mobile-theme", "SettingsGroup", ["label": "Theme", "children": [
+        [node("mobile-theme", "SettingsGroup", ["label": "", "children": [
             node("theme", "Selector", ["label": "Appearance", "icon": "sun.max", "value": "system", "action": "theme",
                 "options": [["value": "system", "label": "System"], ["value": "dark", "label": "Dark"]]]),
-            node("appearance-preset", "Selector", ["label": "Theme preset", "value": "current", "action": "preset",
+            node("appearance-preset", "Selector", ["label": "Theme preset", "icon": "paintpalette", "value": "current", "action": "preset",
                 "options": [["value": "current", "label": "Current theme"]]]),
-            node("appearance-customized", "Switch", ["label": "Custom appearance", "value": false, "action": "customize"]),
         ]]), node("mobile-appearance", "SettingsGroup", ["label": "App settings", "children": [
-            node("nav:system", "NavigationRow", ["label": "General", "icon": "gearshape", "action": "general"]),
-            node("nav:providers", "NavigationRow", ["label": "Providers", "icon": "cpu", "action": "providers"]),
+            node("nav:system", "NavigationRow", ["label": "General", "icon": "gearshape", "action": "general",
+                "variant": "settings-index-navigation", "value": "English", "text": "Language, appearance and detailed interface preferences"]),
+            node("nav:providers", "NavigationRow", ["label": "Providers", "icon": "cpu", "action": "providers",
+                "variant": "settings-index-navigation", "value": "5 providers"]),
+        ]]), node("mobile-personal", "SettingsGroup", ["label": "Personalization", "children": [
+            node("nav:soul", "NavigationRow", ["label": "Soul", "icon": "sparkles", "action": "soul", "variant": "settings-index-navigation"]),
+            node("nav:memory", "NavigationRow", ["label": "Memory", "icon": "brain", "action": "memory", "variant": "settings-index-navigation"]),
+            node("nav:mobileAssistant", "NavigationRow", ["label": "Personal Assistant", "icon": "shield", "action": "assistant", "variant": "settings-index-navigation"]),
+        ]]), node("mobile-capabilities", "SettingsGroup", ["label": "Capabilities and connections", "children": [
+            node("nav:mobileExecution", "NavigationRow", ["label": "Shell Management", "icon": "terminal", "action": "shell", "variant": "settings-index-navigation"]),
+            node("nav:toolPermissions", "NavigationRow", ["label": "Tool Permissions", "icon": "lock.shield", "action": "permissions", "variant": "settings-index-navigation", "value": "Default"]),
+            node("nav:voice", "NavigationRow", ["label": "Voice Input", "icon": "mic", "action": "voice", "variant": "settings-index-navigation", "value": "Off"]),
+            node("nav:other", "NavigationRow", ["label": "Other", "icon": "ellipsis", "action": "other", "variant": "settings-index-navigation"]),
+            node("nav:access", "NavigationRow", ["label": "Local & Cloud", "icon": "icloud", "action": "access", "variant": "settings-index-navigation", "value": "Local"]),
+            node("nav:backup", "NavigationRow", ["label": "Backup & Sync", "icon": "archivebox", "action": "backup", "variant": "settings-index-navigation"]),
+            node("nav:about", "NavigationRow", ["label": "About", "icon": "info.circle", "action": "about", "variant": "settings-index-navigation", "value": "v1.0"]),
         ]])]
     }
 

@@ -63,7 +63,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
   const render = () => {
     cursor = 0;
     const result = NativeSettingsPage({ settings, setSettings: (update) => { settings = update(settings); },
-      nativeMobile: mobile, initialSection: "system", saveState: { status: "saved" }, onBack() {}, appUpdate: {} });
+      nativeMobile: mobile, initialSection: "system", saveState: { status: "saved" }, onBack() {}, appUpdate: { result: { currentVersion: "1.0.0" } } });
     document = result.props.document;
     rendered = result;
     if (result.props.handlers) registry.register("settings", result.props.handlers);
@@ -92,34 +92,39 @@ test("native settings mirrors compact navigation and persists shared system, pro
       group.children.map((node) => node.id),
     ]),
     [
-      ["mobile-theme", "settings.native.theme", ["theme", "appearance-preset", "appearance-customized"]],
+      ["mobile-theme", "", ["theme", "appearance-preset"]],
       ["mobile-appearance", "settings.mobile.appearanceGroup", ["nav:system", "nav:providers"]],
-      ["mobile-personal", "settings.mobile.personalGroup", ["nav:soul", "nav:memory"]],
+      ["mobile-personal", "settings.mobile.personalGroup", ["nav:soul", "nav:memory", "nav:mobileAssistant"]],
       ["mobile-capabilities", "settings.mobile.capabilitiesGroup", [
-        "nav:mobileAssistant", "nav:toolPermissions", "nav:mobileExecution", "nav:voice", "nav:other", "nav:access", "nav:backup", "nav:about",
+        "nav:mobileExecution", "nav:toolPermissions", "nav:voice", "nav:other", "nav:access", "nav:backup", "nav:about",
       ]],
     ],
   );
   assert.ok(!document.nodes.some((node) => node.id === "save-status"));
   const navigationRows = document.nodes.flatMap((node) => node.children ?? []).filter((node) => node.kind === "NavigationRow");
   assert.ok(navigationRows.every((node) => node.text), "compact navigation keeps row descriptions");
+  assert.ok(navigationRows.every((node) => node.icon && node.variant === "settings-index-navigation"), "index rows render icons and keep explanations as accessibility hints");
+  assert.equal(navigationRows.find(node => node.id === "nav:system").value, "settings.chinese");
+  assert.equal(navigationRows.find(node => node.id === "nav:voice").value, "settings.mobile.disabled");
+  assert.equal(document.nodes.find(node => node.id === "mobile-theme").children[0].icon, "sun.max");
   assert.equal(document.formFactor, "mobile");
   assert.deepEqual(document.theme, { marker: "theme" });
   assert.equal((await dispatch("theme", "light")).ok, true);
   assert.equal(settings.theme, "light");
   assert.equal((await dispatch("appearance-preset", "stone")).ok, true);
   assert.equal(settings.customSettings.appearance.preset, "stone");
+  await dispatch("nav:system");
   assert.equal((await dispatch("appearance-customized", true)).ok, true);
   assert.deepEqual(
-    document.nodes.find((node) => node.id === "mobile-theme").children.slice(3).map((node) => node.id),
-    ["accent-light", "accent-dark", "sidebar-light", "sidebar-dark", "appearance-radius", "appearance-reset"],
+    document.nodes.find((node) => node.id === "desktop-appearance").children.slice(3).map((node) => node.id),
+    ["appearance-color:accentLight", "appearance-color:accentDark", "appearance-color:sidebarLight", "appearance-color:sidebarDark", "appearance-radius", "appearance-reset"],
   );
-  assert.equal((await dispatch("accent-light", "#ABCDEF")).ok, true);
-  assert.equal((await dispatch("accent-dark", "#123456")).ok, true);
+  assert.equal((await dispatch("appearance-color:accentLight", "#ABCDEF")).ok, true);
+  assert.equal((await dispatch("appearance-color:accentDark", "#123456")).ok, true);
   assert.equal(settings.customSettings.appearance.accentLight, "#abcdef");
   assert.equal(settings.customSettings.appearance.accentDark, "#123456");
-  assert.equal((await dispatch("sidebar-light", "#121212")).ok, true);
-  assert.equal((await dispatch("sidebar-dark", "#343434")).ok, true);
+  assert.equal((await dispatch("appearance-color:sidebarLight", "#121212")).ok, true);
+  assert.equal((await dispatch("appearance-color:sidebarDark", "#343434")).ok, true);
   assert.equal((await dispatch("appearance-radius", "24")).ok, true);
   assert.equal(settings.customSettings.appearance.sidebarLight, "#121212");
   assert.equal(settings.customSettings.appearance.sidebarDark, "#343434");
@@ -129,6 +134,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(settings.customSettings.appearance.customized, false);
   assert.equal((await dispatch("appearance-preset", "matcha")).ok, true);
   assert.equal(settings.customSettings.appearance.customized, false);
+  await dispatch("back");
   assert.ok(!document.nodes.find((node) => node.id === "mobile-theme").children.some((node) => node.id === "accent-light"));
   await dispatch("nav:system");
   assert.ok(document.nodes.some((node) => node.id === "save-status"));

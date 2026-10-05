@@ -10,6 +10,8 @@ struct XgentComposerSuggestions: View {
     var floatsAboveInput = false
     @ScaledMetric(relativeTo: .body) private var maximumHeight: CGFloat = 180
     @State private var contentHeight: CGFloat = 180
+    @ScaledMetric(relativeTo: .body) private var bodyScale = 1.0
+    @ScaledMetric(relativeTo: .subheadline) private var supportingScale = 1.0
 
     init(node: XgentNode, document: XgentDocument, model: XgentPresentationModel, floatsAboveInput: Bool = false) {
         self.node = node; self.document = document; self.model = model
@@ -18,13 +20,29 @@ struct XgentComposerSuggestions: View {
     }
 
     private var viewportHeight: CGFloat { min(max(contentHeight, 44), min(maximumHeight, 260)) }
+    private var bodyFont: Font {
+        #if os(iOS)
+        let size = 17.0
+        #else
+        let size = theme.typography.body
+        #endif
+        return XgentFonts.body(theme.fontFamily, size: CGFloat(size * theme.fontScale) * bodyScale)
+    }
+    private var supportingFont: Font {
+        #if os(iOS)
+        let size = 15.0
+        #else
+        let size = theme.typography.supporting
+        #endif
+        return XgentFonts.body(theme.fontFamily, size: CGFloat(size * theme.fontScale) * supportingScale)
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
           ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if let label = node.label {
-                    Text(label).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                    Text(label).font(supportingFont.weight(.semibold)).foregroundStyle(.secondary)
                         .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 4)
                         .accessibilityAddTraits(.isHeader)
                 }
@@ -34,9 +52,9 @@ struct XgentComposerSuggestions: View {
                             HStack(alignment: .center, spacing: 12) {
                                 if let icon = child.icon { Image(systemName: icon).frame(width: 24).accessibilityHidden(true) }
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(child.label ?? "").font(.body).fixedSize(horizontal: false, vertical: true)
+                                    Text(child.label ?? "").font(bodyFont).fixedSize(horizontal: false, vertical: true)
                                     if let text = child.text, !text.isEmpty {
-                                        Text(text).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                                        Text(text).font(supportingFont).foregroundStyle(.secondary).lineLimit(2)
                                     }
                                 }
                                 Spacer(minLength: 0)
@@ -53,7 +71,7 @@ struct XgentComposerSuggestions: View {
                         .accessibilityAddTraits(keyboard.selectedID(menu: node, document: document) == child.id ? .isSelected : [])
                         .id(child.id)
                     } else {
-                        Text(child.text ?? "").font(.subheadline).foregroundStyle(.secondary)
+                        Text(child.text ?? "").font(supportingFont).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true).padding(14)
                     }
                 }

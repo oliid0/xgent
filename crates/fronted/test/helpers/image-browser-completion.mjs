@@ -1,27 +1,29 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 /** Wait for actual image decode/encoding completion, independent of virtual time. */
-export async function imageBrowserCompletion(browser, fileURL, directory) {
+export async function imageBrowserCompletion(browser, fileURL, directory, options = {}) {
   const profile = path.join(directory, "image-profile");
   const child = spawn(browser, ["--headless", "--disable-gpu", "--no-first-run",
     "--no-default-browser-check", "--no-sandbox", "--allow-file-access-from-files",
     "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
     "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=0",
     `--user-data-dir=${profile}`, "about:blank"], { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
-  let stderr = "", ended = false, launchError;
+  let stderr = "", ended = false, exitCode, launchError;
   child.stderr.on("data", chunk => { stderr = (stderr + chunk).slice(-2000); });
   const exited = new Promise(resolve => {
-    child.once("exit", () => { ended = true; resolve(); });
+    child.once("exit", code => { exitCode = code; ended = true; resolve(); });
     child.once("error", error => { launchError = error; ended = true; resolve(); });
   });
-  let socket, rejectPending = () => {};
+  let socket, closeBrowser, rejectPending = () => {};
   try {
     const deadline = Date.now() + 30000;
     let port;
-    while (Date.now() < deadline && !ended) {
+    // Edge can successfully delegate startup to another process on Windows.
+    // The launcher's exit(0) does not mean the owned browser has stopped.
+    while (Date.now() < deadline && (!ended || exitCode === 0)) {
       try {
         const active = await readFile(path.join(profile, "DevToolsActivePort"), "utf8");
         const candidate = Number(active.split("\n")[0]);
@@ -69,12 +71,18 @@ export async function imageBrowserCompletion(browser, fileURL, directory) {
       try { socket.send(JSON.stringify({ id, method, params })); }
       catch (error) { pending.delete(id); clearTimeout(timer); reject(error); }
     });
+    closeBrowser = () => send("Browser.close", {}, 3000).catch(() => {});
     await send("Page.enable");
+    if (options.viewport) {
+      const { width, height, mobile = false } = options.viewport;
+      await send("Emulation.setDeviceMetricsOverride", { width, height, mobile, deviceScaleFactor: 1 });
+      await send("Emulation.setTouchEmulationEnabled", { enabled: mobile });
+    }
     const navigation = await send("Page.navigate", { url: fileURL });
     if (navigation.errorText) throw new Error(`Image fixture navigation failed: ${navigation.errorText}`);
     await send("Page.bringToFront");
     // Await this file's actual load event before creating a promise in its execution context.
-    while (!loaded && Date.now() < deadline && !ended) await delay(20);
+    while (!loaded && Date.now() < deadline) await delay(20);
     if (!loaded) throw new Error(`Image browser did not load its fixture: ${stderr}`);
     const evaluated = await send("Runtime.evaluate", {
       expression: `new Promise((resolve, reject) => {
@@ -92,9 +100,33 @@ export async function imageBrowserCompletion(browser, fileURL, directory) {
     if (evaluated.exceptionDetails) throw new Error(evaluated.exceptionDetails.exception?.description ?? evaluated.exceptionDetails.text);
     if (typeof evaluated.result?.value !== "string") throw new Error("Image browser returned no completion result");
     const encoded = evaluated.result.value;
-    await send("Browser.close", {}, 3000).catch(() => {});
+    if (options.screenshotPath) {
+      const metrics = await send("Page.getLayoutMetrics");
+      const size = metrics.cssContentSize ?? metrics.contentSize;
+      let clip = { x: 0, y: 0, width: size.width, height: size.height, scale: 1 };
+      if (options.screenshotSelector) {
+        const selected = await send("Runtime.evaluate", {
+          expression: `(() => {
+            const element = document.querySelector(${JSON.stringify(options.screenshotSelector)});
+            if (!element) throw new Error("Screenshot fixture was not found");
+            const bounds = element.getBoundingClientRect();
+            return {x:bounds.x + scrollX,y:bounds.y + scrollY,width:bounds.width,height:bounds.height,scale:1};
+          })()`, returnByValue: true,
+        });
+        if (selected.exceptionDetails) throw new Error(selected.exceptionDetails.text);
+        clip = selected.result.value;
+      }
+      const screenshot = await send("Page.captureScreenshot", {
+        format: "png", captureBeyondViewport: true,
+        clip,
+      });
+      await writeFile(options.screenshotPath, Buffer.from(screenshot.data, "base64"));
+    }
+    await closeBrowser();
+    closeBrowser = undefined;
     return encoded;
   } finally {
+    await closeBrowser?.();
     rejectPending(new Error("Image browser fixture ended"));
     socket?.close();
     if (!ended) {

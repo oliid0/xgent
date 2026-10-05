@@ -115,6 +115,7 @@ struct XgentSelectionPresentation: ViewModifier {
         content.sheet(isPresented: $isPresented) {
             XgentSelectionPicker(node: node, document: document, model: model, isPresented: $isPresented)
                 .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
         }
         #else
         content.popover(isPresented: $isPresented) {

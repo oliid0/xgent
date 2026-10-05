@@ -12,22 +12,22 @@ test("Astryx and native policy handlers preserve rapid consecutive edits and per
   const loader = createTsModuleLoader({ mocks: {
     "../../i18n": { useLocale: () => ({ t: key => key }) },
     "../../lib/runtimePlatform": { isNativeMobileRuntime: () => false },
-    "./shared": { SettingsRow: "SettingsRow", SettingsRowGroup: "SettingsRowGroup" },
+    "./shared": { SettingsRow: "SettingsRow", SettingsRowGroup: "SettingsRowGroup", SettingsValueSelector: "SettingsValueSelector" },
   } });
   const { ToolPermissionsSection } = loader.loadModule("src/pages/settings/ToolPermissionsSection.tsx");
   const { createNativeToolPermissions } = loader.loadModule("src/presentation/nativeToolPermissions.ts");
   const { getDefaultSettings, updateSystem } = loader.loadModule("src/lib/settings/index.ts");
-  for (const native of [false, true]) {
+  for (const native of [false, "compact", true]) {
     let settings = updateSystem(getDefaultSettings(), { toolPolicies: {
       "personal:clipboard": "ask", Read: "deny", ExternalTool: "ask",
     } });
     const props = { settings, setSettings: update => settings = update(settings) };
-    if (native) {
+    if (native === true) {
       const document = createNativeToolPermissions(props, false, key => key);
       document.handlers.get("policy:Bash").run("deny");
       document.handlers.get("policy:Write").run("ask");
     } else {
-      const tree = elements(ToolPermissionsSection(props));
+      const tree = elements(ToolPermissionsSection({ ...props, compact: native === "compact" }));
       const control = name => tree.find(item => item.props?.label === name && item.props?.options?.length === 3);
       // Both handlers still reference the same old document; settings are current.
       control("Bash").props.onChange("deny");

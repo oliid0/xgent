@@ -1204,6 +1204,15 @@ export function NativeChatPage(props: NativeChatPageProps) {
       ),
     );
     const visible = conversations.slice(0, state?.limit ?? 10);
+    const toggleExpanded = () => {
+      if (archived) return;
+      setExpandedProjectIds((current) => {
+        const next = new Set(current);
+        if (next.has(project.id)) next.delete(project.id);
+        else next.add(project.id);
+        return next;
+      });
+    };
     return [
       {
         ...sidebarButton(
@@ -1211,12 +1220,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
           project.name,
           () => {
             if (archived) return;
-            setExpandedProjectIds((current) => {
-              const next = new Set(current);
-              if (next.has(project.id)) next.delete(project.id);
-              else next.add(project.id);
-              return next;
-            });
+            toggleExpanded();
             props.onSelectProject(project);
           },
           !archived,
@@ -1229,7 +1233,24 @@ export function NativeChatPage(props: NativeChatPageProps) {
         accessibilityValue: sidebar.runningWorkdirPathKeys.has(key)
           ? t("chat.statusRunningReply")
           : undefined,
-        children: [workspaceActions.projectMenu(project)],
+        children: [
+          ...(!archived
+            ? [
+                {
+                  ...sidebarButton(
+                    `project-disclosure:${project.id}`,
+                    `${t(expanded ? "chat.workspaceCollapse" : "chat.workspaceExpand")} ${project.name}`,
+                    toggleExpanded,
+                  ),
+                  kind: "IconButton" as const,
+                  variant: "sidebar-disclosure",
+                  icon: expanded ? "chevron.down" : "chevron.forward",
+                  value: expanded,
+                },
+              ]
+            : []),
+          workspaceActions.projectMenu(project),
+        ],
         indent,
       },
       ...(expanded && !archived
@@ -1306,7 +1327,21 @@ export function NativeChatPage(props: NativeChatPageProps) {
           ),
           icon: group.collapsed ? "folder" : "folder.fill",
           variant: "sidebar-workspace-row",
-          children: [workspaceActions.groupMenu(group)],
+          children: [
+            {
+              ...sidebarButton(
+                `group-disclosure:${group.id}`,
+                `${t(group.collapsed ? "chat.workspaceExpand" : "chat.workspaceCollapse")} ${group.name}`,
+                () => props.onToggleWorkspaceGroupCollapsed?.(group.id),
+                !!props.onToggleWorkspaceGroupCollapsed,
+              ),
+              kind: "IconButton" as const,
+              variant: "sidebar-disclosure",
+              icon: group.collapsed ? "chevron.forward" : "chevron.down",
+              value: !group.collapsed,
+            },
+            workspaceActions.groupMenu(group),
+          ],
         },
         ...(!group.collapsed ? members.flatMap((project) => projectSidebarRows(project, 18)) : []),
       ];
@@ -1698,7 +1733,10 @@ export function NativeChatPage(props: NativeChatPageProps) {
                         kind: "HStack",
                         variant: "sidebar-section-heading",
                         text: t("chat.workspaceSection"),
-                        children: [workspaceActions.workspaceMenu],
+                        children: [
+                          ...(workspaceActions.createGroup ? [workspaceActions.createGroup] : []),
+                          workspaceActions.workspaceMenu,
+                        ],
                       },
                       ...projectNodes,
                       { id: "recents-label", kind: "Heading", text: t("chat.recentConversation") },

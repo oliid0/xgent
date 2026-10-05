@@ -10,6 +10,56 @@ import AppKit
 @testable import XgentNativeUI
 
 final class SelectionPickerRenderingTests: XCTestCase {
+    #if os(iOS)
+    @MainActor func testStackedModelSelectorKeepsTheFullSelectedNameAndWidthInsideASettingsRow() async throws {
+        let selectedName = "A selected multilingual model with a very long provider and model name 用户模型"
+        for width in [CGFloat(240), CGFloat(320), CGFloat(390)] {
+            for size in [DynamicTypeSize.large, .accessibility3] {
+                let payload: [String: Any] = ["version": 1, "surface": "memory-model", "revision": 1,
+                    "mode": "root", "title": "Memory settings", "appearance": "light", "formFactor": "mobile",
+                    "nodes": [["id": "memory-organizer-model", "kind": "Selector",
+                        "variant": "searchable-stacked-selector", "label": "Memory organization", "icon": "cpu",
+                        "value": "provider::model", "action": "select",
+                        "options": [["value": "", "label": "Not selected"], ["value": "provider::model", "label": selectedName]]]]]
+                let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
+                try document.validate()
+                let model = XgentPresentationModel()
+                model.update(document)
+                let selectedNode = try XCTUnwrap(document.nodes.first)
+                let view = ScrollView {
+                    XgentSelector(node: selectedNode, document: document, model: model)
+                        .environment(\.xgentSettingsRow, true)
+                        .padding(.horizontal, 32)
+                }
+                    .dynamicTypeSize(size)
+                    .frame(width: width, height: 844, alignment: .topLeading)
+                let host = UIHostingController(rootView: view)
+                host.safeAreaRegions = []
+                let window = UIWindow(frame: CGRect(x: 0, y: 0, width: width, height: 844))
+                window.rootViewController = host
+                window.makeKeyAndVisible()
+                defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
+                host.view.layoutIfNeeded()
+                try await Task.sleep(for: .milliseconds(200))
+                let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: window)
+                let selection = try XCTUnwrap(hierarchy.flattenToElements().first {
+                    $0.identifier == "memory-organizer-model" && $0.traits.contains(.button)
+                })
+                XCTAssertEqual(selection.value, selectedName)
+                let bounds = selection.shape.bezierPath.bounds
+                XCTAssertGreaterThanOrEqual(bounds.width, width - 66,
+                    "The picker belongs below the label and uses the full card width")
+                XCTAssertGreaterThanOrEqual(bounds.height, 44)
+                XCTAssertGreaterThanOrEqual(bounds.minX, 31)
+                XCTAssertLessThanOrEqual(bounds.maxX, width - 31)
+                let name = "memory-stacked-model-\(Int(width))-\(size)"
+                try attachNativeAccessibilityEvidence(hierarchy, name: name)
+                try attachCompositedNativeScreenshot(of: window, name: name)
+            }
+        }
+    }
+    #endif
+
     @MainActor func testSearchableFontPickerFitsNarrowWideAndAccessibleLayouts() async throws {
         #if os(macOS)
         let accessibilitySession = try NativeMacAccessibilitySession()

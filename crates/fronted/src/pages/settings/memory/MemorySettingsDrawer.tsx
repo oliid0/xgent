@@ -40,6 +40,7 @@ import { NativeSurface } from "../../../presentation/NativeSurface";
 import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
 import type { PresentationNode } from "../../../presentation/types";
 import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
+import { CompactMemorySettingsForm } from "./CompactMemorySettingsForm";
 import { OrganizerHistoryModal } from "./OrganizerHistoryModal";
 import {
   formatTime,
@@ -79,6 +80,7 @@ export function MemorySettingsDrawer(props: {
   onOrganizerRunQueued?: (runId: string) => void;
   onMemoryChanged?: () => void;
   nativeSettingsSurfaceId?: string;
+  compact?: boolean;
 }) {
   const {
     modelOptions,
@@ -90,13 +92,13 @@ export function MemorySettingsDrawer(props: {
     notice,
     t,
     onClose,
-    onRequestWipe,
-    onOrganizerRunQueued,
     onMemoryChanged,
   } = props;
+  const compact = props.compact ?? isNativeMobileRuntime();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [organizerFeedback, setOrganizerFeedback] = useState<string | null>(null);
   const [organizerSubmitting, setOrganizerSubmitting] = useState(false);
+  const [wipeSubmitting, setWipeSubmitting] = useState(false);
   const [drawerWipeConfirmOpen, setDrawerWipeConfirmOpen] = useState(false);
   const [quotaSummary, setQuotaSummary] = useState<MemoryQuotaSummaryResponse | null>(null);
   const memoryOrganizerModel = memoryModelValue(settings.memory.organizerModel);
@@ -109,6 +111,20 @@ export function MemorySettingsDrawer(props: {
   const organizerTimingDisabled =
     !settings.memory.organizerEnabled || settings.memory.organizerSchedule.frequency === "none";
   const quotaLadder = useMemo(() => deriveQuotaLadder(quotaSummary), [quotaSummary]);
+  const busy = saving || organizerSubmitting || wipeSubmitting;
+  const latestProps = useRef(props);
+  latestProps.current = props;
+  const operationSession = useRef({ active: true, pending: false, workdir });
+
+  useEffect(() => {
+    const session = { active: true, pending: false, workdir };
+    operationSession.current = session;
+    setOrganizerSubmitting(false);
+    setWipeSubmitting(false);
+    return () => {
+      session.active = false;
+    };
+  }, [workdir]);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,6 +204,7 @@ export function MemorySettingsDrawer(props: {
         placeholder={noneLabel}
         noneLabel={noneLabel}
         ariaLabel={ariaLabel}
+        disabled={busy}
       />
     );
   }
@@ -254,37 +271,67 @@ export function MemorySettingsDrawer(props: {
   }
 
   async function handleRunNow() {
+    const session = operationSession.current;
+    const current = latestProps.current;
+    if (!session.active || session.workdir !== workdir || session.pending || current.saving) return;
     setOrganizerFeedback(null);
-    if (!settings.memory.organizerModel) {
+    if (!current.settings.memory.organizerModel) {
       setOrganizerFeedback(t("settings.memoryOrganizerNoModel"));
       return;
     }
+    session.pending = true;
     setOrganizerSubmitting(true);
     try {
       const response = await memoryOrganizeRunCreate({
         trigger: "manual",
-        model: settings.memory.organizerModel,
-        scope: settings.memory.organizerScope,
-        mode: settings.memory.organizerMode,
+        model: current.settings.memory.organizerModel,
+        scope: current.settings.memory.organizerScope,
+        mode: current.settings.memory.organizerMode,
       });
+      // An accepted global queue entry still needs its worker after navigation.
+      const runnerPoked =
+        !response.alreadyRunning && canRunOrganizerLocally ? pokeMemoryOrganizer() : false;
+      if (!session.active || operationSession.current !== session) return;
       const runId = response.run?.runId ?? response.activeRun?.runId;
       if (runId) {
-        onOrganizerRunQueued?.(runId);
+        latestProps.current.onOrganizerRunQueued?.(runId);
       }
       if (response.alreadyRunning) {
         setOrganizerFeedback(t("settings.memoryOrganizerAlreadyRunning"));
         setHistoryOpen(true);
         return;
       }
-      const runnerPoked = canRunOrganizerLocally ? pokeMemoryOrganizer() : false;
       setOrganizerFeedback(
         t(runnerPoked ? "settings.memoryOrganizerQueued" : "settings.memoryOrganizerQueuedRemote"),
       );
       setHistoryOpen(true);
     } catch (err) {
-      setOrganizerFeedback(formatMemoryError(err));
+      if (session.active && operationSession.current === session)
+        setOrganizerFeedback(formatMemoryError(err));
     } finally {
-      setOrganizerSubmitting(false);
+      session.pending = false;
+      if (session.active && operationSession.current === session) setOrganizerSubmitting(false);
+    }
+  }
+
+  async function handleConfirmWipe() {
+    const session = operationSession.current;
+    if (
+      !session.active ||
+      session.workdir !== workdir ||
+      session.pending ||
+      latestProps.current.saving
+    )
+      return;
+    session.pending = true;
+    setWipeSubmitting(true);
+    try {
+      const completed = await latestProps.current.onRequestWipe();
+      if (completed !== false && session.active && operationSession.current === session)
+        setDrawerWipeConfirmOpen(false);
+    } finally {
+      session.pending = false;
+      if (session.active && operationSession.current === session) setWipeSubmitting(false);
     }
   }
 
@@ -303,11 +350,27 @@ export function MemorySettingsDrawer(props: {
 
   if (isApplePresentationRuntime()) {
     const c = presentationControls();
-    const busy = saving || organizerSubmitting;
     const options = (empty: string) => [
       { value: "", label: t(empty) },
       ...modelOptions.map((option) => ({ value: option.value, label: option.label })),
     ];
+    const modelSelect = (
+      id: string,
+      label: string,
+      value: string,
+      empty: string,
+      onChange: (value: string) => void,
+    ): PresentationNode => ({
+      ...c.select(id, label, value, options(empty), onChange, !busy),
+      icon: "cpu",
+      variant: "searchable-stacked-selector",
+      children: [
+        { id: `${id}:search`, kind: "Text", label: t("chat.searchModel") },
+        { id: `${id}:empty`, kind: "EmptyState", label: t("chat.noModelFound") },
+        { id: `${id}:search-clear-label`, kind: "Text", label: t("chat.history.searchClear") },
+        { id: `${id}:close`, kind: "Text", label: t("settings.cancel") },
+      ],
+    });
     const nodes: PresentationNode[] = [
       c.action("back", t("settings.memorySettingsClose"), onClose, !busy),
     ];
@@ -344,9 +407,7 @@ export function MemorySettingsDrawer(props: {
             ...c.action(
               "memory-settings-wipe-confirm-action",
               t("settings.memoryWipeAll"),
-              async () => {
-                if ((await onRequestWipe()) !== false) setDrawerWipeConfirmOpen(false);
-              },
+              handleConfirmWipe,
               !busy,
             ),
             destructive: true,
@@ -374,21 +435,19 @@ export function MemorySettingsDrawer(props: {
         /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
       nodes.push(
         c.group("memory-driver-models", t("settings.memoryDriverModels"), [
-          c.select(
+          modelSelect(
             "memory-organizer-model",
             t("settings.memoryOrganizerModel"),
             memoryOrganizerModel,
-            options("settings.memoryModelNone"),
+            "settings.memoryModelNone",
             handleOrganizerModelChange,
-            !busy,
           ),
-          c.select(
+          modelSelect(
             "memory-summary-model",
             t("settings.memorySummaryModel"),
             conversationSummaryModel,
-            options("settings.memorySummaryModelFollow"),
+            "settings.memorySummaryModelFollow",
             handleSummaryModelChange,
-            !busy,
           ),
           ...(modelOptions.length
             ? []
@@ -531,21 +590,25 @@ export function MemorySettingsDrawer(props: {
       role="region"
       aria-label={t("settings.memorySettingsTitle")}
     >
-      <AstryxStack
-        direction="vertical"
+      <VStack
         as="aside"
-        className="relative flex h-full w-full flex-col overflow-hidden"
+        width="100%"
+        height="100%"
+        minHeight={0}
+        gap={0}
+        style={{ overflow: "hidden" }}
       >
         <VStack paddingBlockStart={2}>
           <SettingsDetailHeader
             title={t("settings.memorySettingsTitle")}
-            subtitle={t("settings.memorySettingsLocalOnly")}
+            subtitle={compact ? undefined : t("settings.memorySettingsLocalOnly")}
             startContent={
               <IconButton
                 label={t("settings.memorySettingsClose")}
                 tooltip={t("settings.memorySettingsClose")}
                 variant="ghost"
                 size="lg"
+                isDisabled={busy}
                 icon={<ChevronLeft />}
                 onClick={onClose}
               />
@@ -553,202 +616,272 @@ export function MemorySettingsDrawer(props: {
           />
         </VStack>
 
-        <AstryxStack
-          direction="vertical"
-          className="relative min-h-0 flex-1 overflow-y-auto px-5 py-5"
-        >
-          <AstryxStack direction="vertical" className="space-y-6">
-            {quotaLadder.level !== "normal" &&
-            quotaLadder.bannerKey &&
-            quotaLadder.tightestScope ? (
-              <Banner
-                status={
-                  quotaLadder.level === "critical" || quotaLadder.level === "exhausted"
-                    ? "error"
-                    : "warning"
-                }
-                title={t(quotaLadder.bannerKey)
-                  .replace("{scope}", memoryScopeLabel(quotaLadder.tightestScope.scope, t))
-                  .replace("{used}", String(quotaLadder.tightestScope.used))
-                  .replace("{limit}", String(quotaLadder.tightestScope.limit))}
-                collapsible={false}
-              />
-            ) : null}
-
-            <AstryxStack direction="vertical" as="section" className="space-y-2">
-              <Heading level={4}>{t("settings.memoryDriverModels")}</Heading>
-              <AstryxStack direction="vertical" className="space-y-4">
-                <VStack gap={1}>
-                  <Text type="supporting" color="secondary">
-                    {t("settings.memoryOrganizerModel")}
-                  </Text>
-                  {renderModelSelect(
-                    memoryOrganizerModel,
-                    handleOrganizerModelChange,
-                    t("settings.memoryOrganizerModel"),
-                    t("settings.memoryModelNone"),
-                  )}
-                </VStack>
-                <Divider />
-                <VStack gap={1}>
-                  <Text type="supporting" color="secondary">
-                    {t("settings.memorySummaryModel")}
-                  </Text>
-                  {renderModelSelect(
-                    conversationSummaryModel,
-                    handleSummaryModelChange,
-                    t("settings.memorySummaryModel"),
-                    t("settings.memorySummaryModelFollow"),
-                  )}
-                </VStack>
-                {modelOptions.length === 0 ? (
-                  <Banner
-                    status="warning"
-                    title={t("settings.memoryModelEmpty")}
-                    collapsible={false}
-                  />
-                ) : null}
-              </AstryxStack>
-            </AstryxStack>
-
-            <AstryxStack direction="vertical" as="section" className="space-y-2">
-              <AstryxStack
-                direction="horizontal"
-                className="flex items-center justify-between gap-2 px-1"
-              >
-                <Heading level={4}>{t("settings.memoryOrganizerTitle")}</Heading>
-                <Switch
-                  label={t("settings.memoryOrganizerToggle")}
-                  isLabelHidden
-                  value={settings.memory.organizerEnabled}
-                  isDisabled={!canEnableOrganizer}
-                  onChange={handleOrganizerToggle}
-                />
-              </AstryxStack>
-              <AstryxStack direction="vertical" className="space-y-4">
-                <AstryxStack direction="vertical" className="space-y-3">
-                  <AstryxGrid className="memory-organizer-schedule-grid">
-                    <Selector
-                      label={t("settings.memoryOrganizerSchedule")}
-                      value={settings.memory.organizerSchedule.frequency}
-                      isDisabled={!canEnableOrganizer}
-                      onChange={(next) =>
-                        updateOrganizerSchedule({
-                          frequency: next as MemoryOrganizerFrequency,
-                        })
+        {compact ? (
+          <VStack
+            width="100%"
+            minHeight={0}
+            gap={0}
+            isScrollable
+            padding={4}
+            style={{ flex: "1 1 0" }}
+          >
+            <div data-settings-section="memory-organizer" style={{ width: "100%" }}>
+              <CompactMemorySettingsForm
+                memory={settings.memory}
+                organizerModel={renderModelSelect(
+                  memoryOrganizerModel,
+                  handleOrganizerModelChange,
+                  t("settings.memoryOrganizerModel"),
+                  t("settings.memoryModelNone"),
+                )}
+                summaryModel={renderModelSelect(
+                  conversationSummaryModel,
+                  handleSummaryModelChange,
+                  t("settings.memorySummaryModel"),
+                  t("settings.memorySummaryModelFollow"),
+                )}
+                canEnableOrganizer={canEnableOrganizer}
+                modelsEmpty={modelOptions.length === 0}
+                timingDisabled={organizerTimingDisabled}
+                timeDraft={timeLocalDraft}
+                busy={busy}
+                submitting={organizerSubmitting}
+                error={error}
+                notice={notice}
+                feedback={organizerFeedback}
+                quotaWarning={
+                  quotaLadder.bannerKey && quotaLadder.tightestScope ? (
+                    <Banner
+                      status={
+                        quotaLadder.level === "critical" || quotaLadder.level === "exhausted"
+                          ? "error"
+                          : "warning"
                       }
-                      options={MEMORY_ORGANIZER_FREQUENCIES.map((item) => ({
-                        value: item.value,
-                        label: t(item.labelKey),
-                      }))}
+                      title={t(quotaLadder.bannerKey)
+                        .replace("{scope}", memoryScopeLabel(quotaLadder.tightestScope.scope, t))
+                        .replace("{used}", String(quotaLadder.tightestScope.used))
+                        .replace("{limit}", String(quotaLadder.tightestScope.limit))}
+                      collapsible={false}
                     />
-                    <TimeInput
-                      label={t("settings.memoryOrganizerTime")}
-                      value={(timeLocalDraft || undefined) as ISOTimeString | undefined}
-                      onChange={(nextValue) => setTimeLocalDraft(nextValue ?? "")}
-                      isDisabled={organizerTimingDisabled}
-                      hourFormat="24h"
-                      size="sm"
-                      width="100%"
+                  ) : undefined
+                }
+                t={t}
+                onToggle={handleOrganizerToggle}
+                onScheduleChange={updateOrganizerSchedule}
+                onTimeChange={setTimeLocalDraft}
+                onScopeChange={(organizerScope) =>
+                  setSettings((prev) => updateMemorySettings(prev, { organizerScope }))
+                }
+                onModeChange={(organizerMode) =>
+                  setSettings((prev) => updateMemorySettings(prev, { organizerMode }))
+                }
+                onHistory={() => setHistoryOpen(true)}
+                onRun={() => void handleRunNow()}
+                onWipe={() => setDrawerWipeConfirmOpen(true)}
+              />
+            </div>
+          </VStack>
+        ) : (
+          <AstryxStack
+            direction="vertical"
+            className="relative min-h-0 flex-1 overflow-y-auto px-5 py-5"
+          >
+            <AstryxStack direction="vertical" className="space-y-6">
+              {quotaLadder.level !== "normal" &&
+              quotaLadder.bannerKey &&
+              quotaLadder.tightestScope ? (
+                <Banner
+                  status={
+                    quotaLadder.level === "critical" || quotaLadder.level === "exhausted"
+                      ? "error"
+                      : "warning"
+                  }
+                  title={t(quotaLadder.bannerKey)
+                    .replace("{scope}", memoryScopeLabel(quotaLadder.tightestScope.scope, t))
+                    .replace("{used}", String(quotaLadder.tightestScope.used))
+                    .replace("{limit}", String(quotaLadder.tightestScope.limit))}
+                  collapsible={false}
+                />
+              ) : null}
+
+              <AstryxStack direction="vertical" as="section" className="space-y-2">
+                <Heading level={4}>{t("settings.memoryDriverModels")}</Heading>
+                <AstryxStack direction="vertical" className="space-y-4">
+                  <VStack gap={1}>
+                    <Text type="supporting" color="secondary">
+                      {t("settings.memoryOrganizerModel")}
+                    </Text>
+                    {renderModelSelect(
+                      memoryOrganizerModel,
+                      handleOrganizerModelChange,
+                      t("settings.memoryOrganizerModel"),
+                      t("settings.memoryModelNone"),
+                    )}
+                  </VStack>
+                  <Divider />
+                  <VStack gap={1}>
+                    <Text type="supporting" color="secondary">
+                      {t("settings.memorySummaryModel")}
+                    </Text>
+                    {renderModelSelect(
+                      conversationSummaryModel,
+                      handleSummaryModelChange,
+                      t("settings.memorySummaryModel"),
+                      t("settings.memorySummaryModelFollow"),
+                    )}
+                  </VStack>
+                  {modelOptions.length === 0 ? (
+                    <Banner
+                      status="warning"
+                      title={t("settings.memoryModelEmpty")}
+                      collapsible={false}
                     />
-                  </AstryxGrid>
-                  {settings.memory.organizerSchedule.frequency === "weekly" ? (
-                    <Selector
-                      label={t("settings.memoryOrganizerWeekday")}
-                      value={String(settings.memory.organizerSchedule.weekday ?? 1)}
-                      isDisabled={organizerTimingDisabled}
-                      onChange={(next) => updateOrganizerSchedule({ weekday: Number(next) })}
-                      options={MEMORY_ORGANIZER_WEEKDAYS.map((key, index) => ({
-                        value: String(index),
-                        label: t(key),
-                      }))}
-                    />
-                  ) : null}
-                  <AstryxGrid className="grid grid-cols-2 gap-2.5">
-                    <Selector
-                      label={t("settings.memoryOrganizerScope")}
-                      value={settings.memory.organizerScope}
-                      onChange={(next) => {
-                        const organizerScope = next as MemoryOrganizerScope;
-                        setSettings((prev) => updateMemorySettings(prev, { organizerScope }));
-                      }}
-                      options={MEMORY_ORGANIZER_SCOPES.map((item) => ({
-                        value: item.value,
-                        label: t(item.labelKey),
-                      }))}
-                    />
-                    <Selector
-                      label={t("settings.memoryOrganizerMode")}
-                      value={settings.memory.organizerMode}
-                      onChange={(next) => {
-                        const organizerMode = next as MemoryOrganizerMode;
-                        setSettings((prev) => updateMemorySettings(prev, { organizerMode }));
-                      }}
-                      options={MEMORY_ORGANIZER_MODES.map((item) => ({
-                        value: item.value,
-                        label: t(item.labelKey),
-                      }))}
-                    />
-                  </AstryxGrid>
-                  {settings.memory.organizerEnabled && settings.memory.organizerNextRunAt ? (
-                    <HStack width="100%" gap={2} vAlign="center" hAlign="between">
-                      <HStack gap={2} vAlign="center">
-                        <StatusDot variant="success" label={t("settings.memoryOrganizerNextRun")} />
-                        <Text type="supporting" color="secondary">
-                          {t("settings.memoryOrganizerNextRun")}
-                        </Text>
-                      </HStack>
-                      <Text type="supporting" color="secondary">
-                        {formatTime(settings.memory.organizerNextRunAt)}
-                      </Text>
-                    </HStack>
-                  ) : null}
-                  {organizerFeedback ? (
-                    <Banner status="info" title={organizerFeedback} collapsible={false} />
                   ) : null}
                 </AstryxStack>
               </AstryxStack>
-              <HStack width="100%" gap={2} vAlign="center">
-                <AstryxNativeButton
-                  label={t("settings.memoryOrganizerHistory")}
-                  variant="secondary"
-                  size="sm"
-                  width="100%"
-                  onClick={() => setHistoryOpen(true)}
-                />
-                <AstryxNativeButton
-                  label={t("settings.memoryOrganizerRunNow")}
-                  variant="primary"
-                  size="sm"
-                  width="100%"
-                  isLoading={organizerSubmitting}
-                  isDisabled={!settings.memory.organizerModel || organizerSubmitting}
-                  onClick={() => void handleRunNow()}
-                />
-              </HStack>
-            </AstryxStack>
 
-            <AstryxStack direction="vertical" as="section" className="space-y-2">
-              <Heading level={4}>{t("settings.memorySettingsDangerZone")}</Heading>
-              {error ? <Banner status="error" title={error} collapsible={false} /> : null}
-              {notice ? <Banner status="success" title={notice} collapsible={false} /> : null}
-              <AstryxStack direction="vertical" className="space-y-3">
-                <Text type="supporting" color="secondary">
-                  {t("settings.memorySettingsWipeDescription")}
-                </Text>
-                <AstryxNativeButton
-                  label={t("settings.memoryWipeAll")}
-                  variant="destructive"
-                  size="sm"
-                  width="100%"
-                  onClick={() => setDrawerWipeConfirmOpen(true)}
-                  isDisabled={saving}
-                />
+              <AstryxStack direction="vertical" as="section" className="space-y-2">
+                <AstryxStack
+                  direction="horizontal"
+                  className="flex items-center justify-between gap-2 px-1"
+                >
+                  <Heading level={4}>{t("settings.memoryOrganizerTitle")}</Heading>
+                  <Switch
+                    label={t("settings.memoryOrganizerToggle")}
+                    isLabelHidden
+                    value={settings.memory.organizerEnabled}
+                    isDisabled={!canEnableOrganizer}
+                    onChange={handleOrganizerToggle}
+                  />
+                </AstryxStack>
+                <AstryxStack direction="vertical" className="space-y-4">
+                  <AstryxStack direction="vertical" className="space-y-3">
+                    <AstryxGrid className="memory-organizer-schedule-grid">
+                      <Selector
+                        label={t("settings.memoryOrganizerSchedule")}
+                        value={settings.memory.organizerSchedule.frequency}
+                        isDisabled={!canEnableOrganizer}
+                        onChange={(next) =>
+                          updateOrganizerSchedule({
+                            frequency: next as MemoryOrganizerFrequency,
+                          })
+                        }
+                        options={MEMORY_ORGANIZER_FREQUENCIES.map((item) => ({
+                          value: item.value,
+                          label: t(item.labelKey),
+                        }))}
+                      />
+                      <TimeInput
+                        label={t("settings.memoryOrganizerTime")}
+                        value={(timeLocalDraft || undefined) as ISOTimeString | undefined}
+                        onChange={(nextValue) => setTimeLocalDraft(nextValue ?? "")}
+                        isDisabled={organizerTimingDisabled}
+                        hourFormat="24h"
+                        size="sm"
+                        width="100%"
+                      />
+                    </AstryxGrid>
+                    {settings.memory.organizerSchedule.frequency === "weekly" ? (
+                      <Selector
+                        label={t("settings.memoryOrganizerWeekday")}
+                        value={String(settings.memory.organizerSchedule.weekday ?? 1)}
+                        isDisabled={organizerTimingDisabled}
+                        onChange={(next) => updateOrganizerSchedule({ weekday: Number(next) })}
+                        options={MEMORY_ORGANIZER_WEEKDAYS.map((key, index) => ({
+                          value: String(index),
+                          label: t(key),
+                        }))}
+                      />
+                    ) : null}
+                    <AstryxGrid className="grid grid-cols-2 gap-2.5">
+                      <Selector
+                        label={t("settings.memoryOrganizerScope")}
+                        value={settings.memory.organizerScope}
+                        onChange={(next) => {
+                          const organizerScope = next as MemoryOrganizerScope;
+                          setSettings((prev) => updateMemorySettings(prev, { organizerScope }));
+                        }}
+                        options={MEMORY_ORGANIZER_SCOPES.map((item) => ({
+                          value: item.value,
+                          label: t(item.labelKey),
+                        }))}
+                      />
+                      <Selector
+                        label={t("settings.memoryOrganizerMode")}
+                        value={settings.memory.organizerMode}
+                        onChange={(next) => {
+                          const organizerMode = next as MemoryOrganizerMode;
+                          setSettings((prev) => updateMemorySettings(prev, { organizerMode }));
+                        }}
+                        options={MEMORY_ORGANIZER_MODES.map((item) => ({
+                          value: item.value,
+                          label: t(item.labelKey),
+                        }))}
+                      />
+                    </AstryxGrid>
+                    {settings.memory.organizerEnabled && settings.memory.organizerNextRunAt ? (
+                      <HStack width="100%" gap={2} vAlign="center" hAlign="between">
+                        <HStack gap={2} vAlign="center">
+                          <StatusDot
+                            variant="success"
+                            label={t("settings.memoryOrganizerNextRun")}
+                          />
+                          <Text type="supporting" color="secondary">
+                            {t("settings.memoryOrganizerNextRun")}
+                          </Text>
+                        </HStack>
+                        <Text type="supporting" color="secondary">
+                          {formatTime(settings.memory.organizerNextRunAt)}
+                        </Text>
+                      </HStack>
+                    ) : null}
+                    {organizerFeedback ? (
+                      <Banner status="info" title={organizerFeedback} collapsible={false} />
+                    ) : null}
+                  </AstryxStack>
+                </AstryxStack>
+                <HStack width="100%" gap={2} vAlign="center">
+                  <AstryxNativeButton
+                    label={t("settings.memoryOrganizerHistory")}
+                    variant="secondary"
+                    size="sm"
+                    width="100%"
+                    onClick={() => setHistoryOpen(true)}
+                  />
+                  <AstryxNativeButton
+                    label={t("settings.memoryOrganizerRunNow")}
+                    variant="primary"
+                    size="sm"
+                    width="100%"
+                    isLoading={organizerSubmitting}
+                    isDisabled={!settings.memory.organizerModel || organizerSubmitting}
+                    onClick={() => void handleRunNow()}
+                  />
+                </HStack>
+              </AstryxStack>
+
+              <AstryxStack direction="vertical" as="section" className="space-y-2">
+                <Heading level={4}>{t("settings.memorySettingsDangerZone")}</Heading>
+                {error ? <Banner status="error" title={error} collapsible={false} /> : null}
+                {notice ? <Banner status="success" title={notice} collapsible={false} /> : null}
+                <AstryxStack direction="vertical" className="space-y-3">
+                  <Text type="supporting" color="secondary">
+                    {t("settings.memorySettingsWipeDescription")}
+                  </Text>
+                  <AstryxNativeButton
+                    label={t("settings.memoryWipeAll")}
+                    variant="destructive"
+                    size="sm"
+                    width="100%"
+                    onClick={() => setDrawerWipeConfirmOpen(true)}
+                    isDisabled={saving}
+                  />
+                </AstryxStack>
               </AstryxStack>
             </AstryxStack>
           </AstryxStack>
-        </AstryxStack>
-      </AstryxStack>
+        )}
+      </VStack>
       <AlertDialog
         isOpen={drawerWipeConfirmOpen}
         onOpenChange={setDrawerWipeConfirmOpen}
@@ -757,10 +890,8 @@ export function MemorySettingsDrawer(props: {
         actionLabel={t("settings.memoryWipeAll")}
         cancelLabel={t("settings.memoryCancel")}
         actionVariant="destructive"
-        isActionLoading={saving}
-        onAction={async () => {
-          await onRequestWipe();
-        }}
+        isActionLoading={saving || wipeSubmitting}
+        onAction={handleConfirmWipe}
       />
     </VStack>
   );

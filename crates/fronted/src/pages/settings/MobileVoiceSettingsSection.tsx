@@ -70,7 +70,7 @@ export function MobileVoiceSettingsSection({
             }
           />
         </SettingsRow>
-        <SettingsRow label={t("settings.native.status")} icon={<Mic />}>
+        <SettingsRow label={speechLabel} icon={<Mic />}>
           <StatusDot
             label={speechLabel}
             variant={status?.voiceInputAvailable ? "success" : status ? "warning" : "neutral"}

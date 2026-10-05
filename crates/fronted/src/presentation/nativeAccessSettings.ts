@@ -42,6 +42,8 @@ export function useNativeAccessSettings(
     active: enabled,
     revision: 0,
     localRevision: 0,
+    vaultRevision: 0,
+    lanRevision: 0,
     busy: "",
   }));
   operation.active = enabled;
@@ -72,16 +74,25 @@ export function useNativeAccessSettings(
 
   async function refreshLocal(current: () => boolean) {
     const revision = ++operation.localRevision;
-    const status = await invoke<LocalAccessStatus>("local_access_status");
-    if (current() && revision === operation.localRevision) setLocal(status);
+    try {
+      const status = await invoke<LocalAccessStatus>("local_access_status");
+      if (current() && revision === operation.localRevision) setLocal(status);
+    } catch (cause) {
+      if (current() && revision === operation.localRevision) throw cause;
+    }
   }
 
   async function refreshLan(current: () => boolean) {
-    const status = await invoke<LanPcClientStatus>("lan_pc_status");
-    if (!current()) return;
-    setLan(status);
-    const address = normalizeComparableLanUrl(status.baseUrl);
-    if (status.paired && address) patch({ lanControlUrl: `${address}/` });
+    const revision = ++operation.lanRevision;
+    try {
+      const status = await invoke<LanPcClientStatus>("lan_pc_status");
+      if (!current() || revision !== operation.lanRevision) return;
+      setLan(status);
+      const address = normalizeComparableLanUrl(status.baseUrl);
+      if (status.paired && address) patch({ lanControlUrl: `${address}/` });
+    } catch (cause) {
+      if (current() && revision === operation.lanRevision) throw cause;
+    }
   }
 
   useEffect(() => {
@@ -99,11 +110,14 @@ export function useNativeAccessSettings(
       if (current()) setError(cause instanceof Error ? cause.message : String(cause));
     };
     // Each service can fail independently; a vault failure must not hide pairing.
+    const vaultRevision = ++operation.vaultRevision;
     void invoke<CloudSecretVaultStatus>("cloud_secret_vault_status")
       .then((status) => {
-        if (current()) setVault(status);
+        if (current() && vaultRevision === operation.vaultRevision) setVault(status);
       })
-      .catch(report);
+      .catch((cause) => {
+        if (vaultRevision === operation.vaultRevision) report(cause);
+      });
     if (mobile) void refreshLan(current).catch(report);
     else {
       let stop: (() => void) | undefined;
@@ -197,6 +211,7 @@ export function useNativeAccessSettings(
           t("settings.accessPairComputer"),
           () =>
             run("lan-pair", async (current) => {
+              operation.lanRevision++;
               const baseUrl = normalizeLanControlUrl(settings.access.lanControlUrl);
               const status = await invoke<LanPcClientStatus>("lan_pc_pair", {
                 baseUrl,
@@ -204,8 +219,9 @@ export function useNativeAccessSettings(
                 deviceName: deviceName.trim(),
               });
               if (current()) {
+                operation.lanRevision++;
                 setLan(status);
-                setPairingCode("");
+                setPairingCode((previous) => (previous === pairingCode ? "" : previous));
                 patch({
                   lanControlUrl: status.baseUrl ? normalizeLanControlUrl(status.baseUrl) : baseUrl,
                 });
@@ -229,8 +245,10 @@ export function useNativeAccessSettings(
                 t("settings.accessDisconnectComputer"),
                 () =>
                   run("lan-disconnect", async (current) => {
+                    operation.lanRevision++;
                     const status = await invoke<LanPcClientStatus>("lan_pc_disconnect");
                     if (current()) {
+                      operation.lanRevision++;
                       setLan(status);
                       patch({ preferLanPcExecution: false });
                     }
@@ -484,13 +502,15 @@ export function useNativeAccessSettings(
         t("settings.accessSaveToken"),
         () =>
           run("github-token-save", async (current) => {
+            operation.vaultRevision++;
             const status = await invoke<CloudSecretVaultStatus>(
               "cloud_secret_vault_set_github_token",
               { username: settings.access.githubOwner, token },
             );
             if (current()) {
+              operation.vaultRevision++;
               setVault(status);
-              setToken("");
+              setToken((previous) => (previous === token ? "" : previous));
             }
           }),
         available && !!settings.access.githubOwner.trim() && !!token.trim(),
@@ -503,10 +523,12 @@ export function useNativeAccessSettings(
                 t("settings.accessRemoveToken"),
                 () =>
                   run("github-token-remove", async (current) => {
+                    operation.vaultRevision++;
                     const status = await invoke<CloudSecretVaultStatus>(
                       "cloud_secret_vault_remove_github_token",
                     );
                     if (current()) {
+                      operation.vaultRevision++;
                       setVault(status);
                       setToken("");
                     }

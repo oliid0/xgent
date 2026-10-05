@@ -22,7 +22,8 @@ export function ComputerUseSection({
   setSettings,
   onBack,
   nativeSettingsSurfaceId,
-}: SettingsSectionProps & { onBack?: () => void }) {
+  compact: compactLayout = false,
+}: SettingsSectionProps & { onBack?: () => void; compact?: boolean }) {
   const { t } = useLocale();
   const { confirm, dialog } = useConfirmDialog();
   const {
@@ -272,7 +273,7 @@ export function ComputerUseSection({
     <>
       <Section padding={4} width="100%">
         <VStack gap={3} width="100%">
-          <Heading level={3}>{t("settings.cua.title")}</Heading>
+          {compactLayout ? null : <Heading level={3}>{t("settings.cua.title")}</Heading>}
           <Text type="supporting" color="secondary">
             {t("settings.cua.description")}
           </Text>

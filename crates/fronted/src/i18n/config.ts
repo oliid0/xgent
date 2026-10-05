@@ -12,6 +12,13 @@ export const SUPPORTED_LOCALES = ["system", "zh-CN", "en-US"] as const satisfies
 
 export const translations: Record<ResolvedLocale, Record<string, string>> = {
   "zh-CN": {
+    "settings.mobile.providerCount": "{count} 个供应商",
+    "settings.mobile.policyCount": "{count} 项自定义",
+    "settings.mobile.defaultPolicy": "默认",
+    "settings.mobile.enabled": "已开启",
+    "settings.mobile.disabled": "已关闭",
+    "settings.mobile.local": "本地",
+    "settings.mobile.localAndCloud": "本地与云",
     "presentation.loadEarlier": "加载更早的消息",
     "presentation.loadMore": "加载更多",
     "presentation.retry": "重试",
@@ -2996,6 +3003,13 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
   },
 
   "en-US": {
+    "settings.mobile.providerCount": "{count} providers",
+    "settings.mobile.policyCount": "{count} overrides",
+    "settings.mobile.defaultPolicy": "Default",
+    "settings.mobile.enabled": "On",
+    "settings.mobile.disabled": "Off",
+    "settings.mobile.local": "Local",
+    "settings.mobile.localAndCloud": "Local and cloud",
     "presentation.loadEarlier": "Load earlier messages",
     "presentation.loadMore": "Load more",
     "presentation.retry": "Retry",

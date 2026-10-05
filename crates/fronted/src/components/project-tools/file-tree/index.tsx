@@ -317,6 +317,10 @@ export function FileTreePanel(props: {
       const item = target.closest<HTMLElement>("[data-tree-id]");
       const path = item?.dataset.treeId;
       if (path === undefined || nodesRef.current[path]?.kind !== "dir") return;
+      // TreeList keeps a private expansion override after its toggle runs.
+      // Prevent that second owner: row clicks, reveal and persisted expansion
+      // must all render the same shared state through item.isExpanded.
+      event.stopPropagation();
       toggleDirectory(path);
     },
     [toggleDirectory],
@@ -338,12 +342,14 @@ export function FileTreePanel(props: {
       const path = item?.dataset.treeId;
       if (path === undefined || nodesRef.current[path]?.kind !== "dir") return;
       const expanded = item.getAttribute("aria-expanded");
-      // TreeList handles focus and its visual state. Persist only the arrow
-      // that changes expansion; the other arrow moves focus.
+      // Own expansion, while leaving focus-only arrows to TreeList. Allowing
+      // its private toggle here would override later row/reveal updates.
       if (
         (event.key === "ArrowLeft" && expanded === "true") ||
         (event.key === "ArrowRight" && expanded === "false")
       ) {
+        event.preventDefault();
+        event.stopPropagation();
         const next =
           event.key === "ArrowRight"
             ? addExpandedPaths(expandedRef.current, [path])
@@ -630,7 +636,7 @@ export function FileTreePanel(props: {
     nodes[contextMenu?.path ?? selectedPath] ?? nodes[selectedPath] ?? nodes[ROOT_PATH];
 
   return (
-    <VStack ref={panelRef} height="100%" gap={0}>
+    <VStack ref={panelRef} height="100%" gap={0} className="workspace-file-tree-panel">
       <Section variant="transparent" padding={2} dividers={["bottom"]}>
         <HStack gap={2} vAlign="center">
           <StackItem size="fill">
@@ -659,7 +665,12 @@ export function FileTreePanel(props: {
 
       {touchActions ? (
         <Section variant="transparent" padding={1.5} dividers={["bottom"]}>
-          <Grid columns={4} gap={1} width="100%">
+          <Grid
+            columns={{ minWidth: 128, max: 4 }}
+            gap={1}
+            width="100%"
+            className="workspace-file-tree-actions"
+          >
             <Button
               label={t("projectTools.fileTree.newFile")}
               variant="ghost"

@@ -6,6 +6,9 @@ struct XgentSidebarSoulPicker: View {
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
     let close: () -> Void
+    @Environment(\.xgentPresentationTheme) private var theme
+    @ScaledMetric(relativeTo: .body) private var bodyScale = 1.0
+    @ScaledMetric(relativeTo: .headline) private var headingScale = 1.0
 
     private var current: XgentNode {
         model.documents.first { $0.surface == document.surface }?.node(id: menu.id) ?? menu
@@ -17,7 +20,8 @@ struct XgentSidebarSoulPicker: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text(current.label ?? "").font(.headline)
+                Text(current.label ?? "")
+                    .font(XgentFonts.body(theme.fontFamily, size: CGFloat(17 * theme.fontScale) * headingScale, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 VStack(spacing: 0) {
@@ -42,7 +46,7 @@ struct XgentSidebarSoulPicker: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: item.icon ?? "sparkles").frame(width: 24)
-                Text(item.label ?? "").font(.body)
+                Text(item.label ?? "").font(XgentFonts.body(theme.fontFamily, size: CGFloat(17 * theme.fontScale) * bodyScale))
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if item.selected == true { Image(systemName: "checkmark").foregroundStyle(.tint) }

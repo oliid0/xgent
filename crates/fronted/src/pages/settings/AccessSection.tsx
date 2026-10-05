@@ -70,15 +70,16 @@ function updateAccess(
 }
 
 function setLocalCapabilityBlocked(
-  settings: AppSettings,
   setSettings: SettingsSectionProps["setSettings"],
   capability: LocalAccessCapability,
   blocked: boolean,
 ) {
-  const next = new Set(settings.access.blockedLocalCapabilities);
-  if (blocked) next.add(capability);
-  else next.delete(capability);
-  updateAccess(setSettings, { blockedLocalCapabilities: Array.from(next) });
+  setSettings((previous) => {
+    const next = new Set(previous.access.blockedLocalCapabilities);
+    if (blocked) next.add(capability);
+    else next.delete(capability);
+    return { ...previous, access: { ...previous.access, blockedLocalCapabilities: [...next] } };
+  });
 }
 
 function CopyButton({ value, label }: { value: string; label: string }) {
@@ -124,70 +125,131 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
   );
   const [actionError, setActionError] = useState("");
   const [busyAction, setBusyAction] = useState("");
+  const [operation] = useState(() => ({
+    active: !browser,
+    mobile: nativeMobile,
+    revision: 0,
+    localRevision: 0,
+    vaultRevision: 0,
+    lanRevision: 0,
+    busy: "",
+  }));
+  operation.mobile = nativeMobile;
+
+  const captureCurrent = useCallback(() => {
+    const revision = operation.revision;
+    return () =>
+      operation.active && operation.mobile === nativeMobile && operation.revision === revision;
+  }, [nativeMobile, operation]);
+
+  useEffect(() => {
+    operation.active = !browser;
+    operation.revision++;
+    operation.busy = "";
+    setBusyAction("");
+    return () => {
+      operation.active = false;
+      operation.revision++;
+    };
+  }, [browser, nativeMobile, operation]);
 
   const refreshLocalStatus = useCallback(async () => {
-    if (nativeMobile) return;
+    if (browser || nativeMobile || !operation.active) return;
+    const current = captureCurrent();
+    const revision = ++operation.localRevision;
     try {
-      setLocalStatus(await invoke<LocalAccessStatus>("local_access_status"));
+      const next = await invoke<LocalAccessStatus>("local_access_status");
+      if (current() && revision === operation.localRevision) setLocalStatus(next);
     } catch (error) {
+      if (!current() || revision !== operation.localRevision) return;
       setLocalStatus((previous) => ({
         ...previous,
         running: false,
         lastError: error instanceof Error ? error.message : String(error),
       }));
     }
-  }, [nativeMobile]);
+  }, [browser, captureCurrent, nativeMobile, operation]);
 
   const refreshVaultStatus = useCallback(async () => {
     if (browser) return;
+    const current = captureCurrent();
+    const revision = ++operation.vaultRevision;
     try {
-      setVaultStatus(await invoke<CloudSecretVaultStatus>("cloud_secret_vault_status"));
+      const next = await invoke<CloudSecretVaultStatus>("cloud_secret_vault_status");
+      if (current() && revision === operation.vaultRevision) setVaultStatus(next);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : String(error));
+      if (current() && revision === operation.vaultRevision)
+        setActionError(error instanceof Error ? error.message : String(error));
     }
-  }, [browser]);
+  }, [browser, captureCurrent, operation]);
 
   const refreshLanPcStatus = useCallback(async () => {
     if (browser || !nativeMobile) return;
-    const next = await invoke<LanPcClientStatus>("lan_pc_status");
-    setLanPcStatus(next);
-    const authoritativeUrl = normalizeComparableLanUrl(next.baseUrl);
-    if (next.paired && authoritativeUrl) {
-      updateAccess(setSettings, { lanControlUrl: `${authoritativeUrl}/` });
+    const current = captureCurrent();
+    const revision = ++operation.lanRevision;
+    try {
+      const next = await invoke<LanPcClientStatus>("lan_pc_status");
+      if (!current() || revision !== operation.lanRevision) return;
+      setLanPcStatus(next);
+      const authoritativeUrl = normalizeComparableLanUrl(next.baseUrl);
+      if (next.paired && authoritativeUrl) {
+        updateAccess(setSettings, { lanControlUrl: `${authoritativeUrl}/` });
+      }
+    } catch (error) {
+      if (current() && revision === operation.lanRevision) throw error;
     }
-  }, [browser, nativeMobile, setSettings]);
+  }, [browser, captureCurrent, nativeMobile, operation, setSettings]);
 
   useEffect(() => {
     if (browser) return;
     void refreshVaultStatus();
-    if (nativeMobile) void refreshLanPcStatus();
-  }, [browser, nativeMobile, refreshLanPcStatus, refreshVaultStatus]);
+    if (nativeMobile) {
+      const current = captureCurrent();
+      void refreshLanPcStatus().catch((error) => {
+        if (current()) setActionError(error instanceof Error ? error.message : String(error));
+      });
+    }
+  }, [browser, captureCurrent, nativeMobile, refreshLanPcStatus, refreshVaultStatus]);
 
   useEffect(() => {
     if (browser || nativeMobile) return;
     let disposed = false;
+    const current = captureCurrent();
     let stopListening: (() => void) | undefined;
     let statusTimer: number | undefined;
     void listen<LocalAccessStatus>("local-access:status", (event) => {
-      if (!disposed) setLocalStatus(event.payload);
+      if (!disposed && current()) {
+        operation.localRevision++;
+        setLocalStatus(event.payload);
+      }
     })
       .then((unlisten) => {
-        if (disposed) return unlisten();
+        if (disposed || !current()) return unlisten();
         stopListening = unlisten;
         return refreshLocalStatus();
       })
-      .catch(() => refreshLocalStatus())
+      .catch(() => {
+        if (!disposed && current()) return refreshLocalStatus();
+      })
       .finally(() => {
-        if (!disposed && settings.access.webUiEnabled) {
+        if (!disposed && current() && settings.access.webUiEnabled) {
           statusTimer = window.setInterval(() => void refreshLocalStatus(), 2_000);
         }
       });
     return () => {
       disposed = true;
+      operation.localRevision++;
       if (statusTimer !== undefined) window.clearInterval(statusTimer);
       stopListening?.();
     };
-  }, [browser, nativeMobile, refreshLocalStatus, settings.access.webUiEnabled]);
+  }, [
+    browser,
+    captureCurrent,
+    nativeMobile,
+    operation,
+    refreshLocalStatus,
+    settings.access.webUiEnabled,
+  ]);
 
   const endpoint = useMemo(
     () => localStatus.urls[0] ?? `http://127.0.0.1:${settings.access.webUiPort}`,
@@ -211,15 +273,21 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
           ? t("settings.accessFailed")
           : t("settings.accessStopped");
 
-  async function runAction(name: string, action: () => Promise<void>) {
+  async function runAction(name: string, action: (current: () => boolean) => Promise<void>) {
+    if (browser || !operation.active || operation.mobile !== nativeMobile || operation.busy) return;
+    const current = captureCurrent();
+    operation.busy = name;
     setActionError("");
     setBusyAction(name);
     try {
-      await action();
+      await action(current);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : String(error));
+      if (current()) setActionError(error instanceof Error ? error.message : String(error));
     } finally {
-      setBusyAction("");
+      if (current()) {
+        operation.busy = "";
+        setBusyAction("");
+      }
     }
   }
 
@@ -275,13 +343,16 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                 variant="secondary"
                 isDisabled={browser || busyAction !== ""}
                 onClick={() =>
-                  void runAction("remove-token", async () => {
-                    setVaultStatus(
-                      await invoke<CloudSecretVaultStatus>(
-                        "cloud_secret_vault_remove_github_token",
-                      ),
+                  void runAction("remove-token", async (current) => {
+                    operation.vaultRevision++;
+                    const next = await invoke<CloudSecretVaultStatus>(
+                      "cloud_secret_vault_remove_github_token",
                     );
-                    setGithubToken("");
+                    if (current()) {
+                      operation.vaultRevision++;
+                      setVaultStatus(next);
+                      setGithubToken("");
+                    }
                   })
                 }
               />
@@ -297,14 +368,20 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                 busyAction !== ""
               }
               onClick={() =>
-                void runAction("save-token", async () => {
-                  setVaultStatus(
-                    await invoke<CloudSecretVaultStatus>("cloud_secret_vault_set_github_token", {
+                void runAction("save-token", async (current) => {
+                  operation.vaultRevision++;
+                  const next = await invoke<CloudSecretVaultStatus>(
+                    "cloud_secret_vault_set_github_token",
+                    {
                       username: settings.access.githubOwner,
                       token: githubToken,
-                    }),
+                    },
                   );
-                  setGithubToken("");
+                  if (current()) {
+                    operation.vaultRevision++;
+                    setVaultStatus(next);
+                    setGithubToken((previous) => (previous === githubToken ? "" : previous));
+                  }
                 })
               }
             />
@@ -407,16 +484,24 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                   busyAction !== ""
                 }
                 onClick={() =>
-                  void runAction("lan-pair", async () => {
+                  void runAction("lan-pair", async (current) => {
+                    operation.lanRevision++;
                     const url = normalizeLanControlUrl(settings.access.lanControlUrl);
-                    updateAccess(setSettings, { lanControlUrl: url });
                     const next = await invoke<LanPcClientStatus>("lan_pc_pair", {
                       baseUrl: url,
                       code: lanPairingCode,
                       deviceName: lanDeviceName.trim(),
                     });
-                    setLanPcStatus(next);
-                    setLanPairingCode("");
+                    if (current()) {
+                      operation.lanRevision++;
+                      setLanPcStatus(next);
+                      setLanPairingCode((previous) =>
+                        previous === lanPairingCode ? "" : previous,
+                      );
+                      updateAccess(setSettings, {
+                        lanControlUrl: next.baseUrl ? normalizeLanControlUrl(next.baseUrl) : url,
+                      });
+                    }
                   })
                 }
               />
@@ -426,9 +511,14 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                   variant="secondary"
                   isDisabled={busyAction !== ""}
                   onClick={() =>
-                    void runAction("lan-disconnect", async () => {
-                      setLanPcStatus(await invoke<LanPcClientStatus>("lan_pc_disconnect"));
-                      updateAccess(setSettings, { preferLanPcExecution: false });
+                    void runAction("lan-disconnect", async (current) => {
+                      operation.lanRevision++;
+                      const next = await invoke<LanPcClientStatus>("lan_pc_disconnect");
+                      if (current()) {
+                        operation.lanRevision++;
+                        setLanPcStatus(next);
+                        updateAccess(setSettings, { preferLanPcExecution: false });
+                      }
                     })
                   }
                 />
@@ -464,15 +554,17 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
               isLoading={busyAction === "lan-control"}
               isDisabled={!settings.access.lanControlUrl.trim() || busyAction !== ""}
               onClick={() =>
-                void runAction("lan-control", async () => {
+                void runAction("lan-control", async (current) => {
                   const url = normalizeLanControlUrl(settings.access.lanControlUrl);
-                  updateAccess(setSettings, { lanControlUrl: url });
                   await browserSessionController.ensureSession({
                     sessionId: "lan-control",
                     url,
                     visible: false,
                   });
-                  browserSessionController.openPanel("lan-control", "user");
+                  if (current()) {
+                    updateAccess(setSettings, { lanControlUrl: url });
+                    browserSessionController.openPanel("lan-control", "user");
+                  }
                 })
               }
             />
@@ -576,9 +668,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                     isLabelHidden
                     value={settings.access.blockedLocalCapabilities.includes("terminal")}
                     isDisabled={browser}
-                    onChange={(value) =>
-                      setLocalCapabilityBlocked(settings, setSettings, "terminal", value)
-                    }
+                    onChange={(value) => setLocalCapabilityBlocked(setSettings, "terminal", value)}
                   />
                 }
               />
@@ -593,7 +683,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                     value={settings.access.blockedLocalCapabilities.includes("browser_automation")}
                     isDisabled={browser}
                     onChange={(value) =>
-                      setLocalCapabilityBlocked(settings, setSettings, "browser_automation", value)
+                      setLocalCapabilityBlocked(setSettings, "browser_automation", value)
                     }
                   />
                 }
@@ -608,9 +698,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                     isLabelHidden
                     value={settings.access.blockedLocalCapabilities.includes("ssh")}
                     isDisabled={browser}
-                    onChange={(value) =>
-                      setLocalCapabilityBlocked(settings, setSettings, "ssh", value)
-                    }
+                    onChange={(value) => setLocalCapabilityBlocked(setSettings, "ssh", value)}
                   />
                 }
               />
@@ -624,9 +712,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                     isLabelHidden
                     value={settings.access.blockedLocalCapabilities.includes("git")}
                     isDisabled={browser}
-                    onChange={(value) =>
-                      setLocalCapabilityBlocked(settings, setSettings, "git", value)
-                    }
+                    onChange={(value) => setLocalCapabilityBlocked(setSettings, "git", value)}
                   />
                 }
               />
@@ -641,7 +727,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                     value={settings.access.blockedLocalCapabilities.includes("file_write")}
                     isDisabled={browser}
                     onChange={(value) =>
-                      setLocalCapabilityBlocked(settings, setSettings, "file_write", value)
+                      setLocalCapabilityBlocked(setSettings, "file_write", value)
                     }
                   />
                 }
@@ -667,10 +753,14 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                 isLoading={busyAction === "pair"}
                 isDisabled={!settings.access.webUiEnabled || busyAction !== "" || browser}
                 onClick={() =>
-                  void runAction("pair", async () => {
-                    setLocalStatus(
-                      await invoke<LocalAccessStatus>("local_access_rotate_pairing_code"),
+                  void runAction("pair", async (current) => {
+                    const next = await invoke<LocalAccessStatus>(
+                      "local_access_rotate_pairing_code",
                     );
+                    if (current()) {
+                      operation.localRevision++;
+                      setLocalStatus(next);
+                    }
                   })
                 }
               />
@@ -697,12 +787,17 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                           size="sm"
                           isDisabled={browser || busyAction !== ""}
                           onClick={() =>
-                            void runAction(revokeAction, async () => {
-                              setLocalStatus(
-                                await invoke<LocalAccessStatus>("local_access_revoke_device", {
+                            void runAction(revokeAction, async (current) => {
+                              const next = await invoke<LocalAccessStatus>(
+                                "local_access_revoke_device",
+                                {
                                   deviceId: device.deviceId,
-                                }),
+                                },
                               );
+                              if (current()) {
+                                operation.localRevision++;
+                                setLocalStatus(next);
+                              }
                             })
                           }
                         />

@@ -33,7 +33,7 @@ function harness(context) {
   let controls, menus, request = 0;
   const render = () => {
     controls = hooks.render(() => useNativeWorkspaceActions(props, key => key));
-    menus = [...props.projects.map(controls.projectMenu), ...props.workspaceProjectGroups.map(controls.groupMenu), controls.workspaceMenu];
+    menus = [...props.projects.map(controls.projectMenu), ...props.workspaceProjectGroups.map(controls.groupMenu), controls.workspaceMenu, ...(controls.createGroup ? [controls.createGroup] : [])];
     registry.register("sidebar", controls.handlers);
     if (controls.dialog) registry.register("dialog", controls.dialog.handlers);
     else registry.remove("dialog");
@@ -54,6 +54,9 @@ function harness(context) {
 
 test("workspace menus invoke shared project handlers and preserve default, running and archive constraints", async context => {
   const h = harness(context);
+  assert.ok(!h.node("workspace-actions").children.some(node => node.id === "workspace-create-group"),
+    "Folder creation belongs to the heading control, outside the more menu");
+  assert.equal(h.node("workspace-create-group").kind, "IconButton");
   for (const [action, expected] of [["pin", ["pin", "p", true]], ["settings", ["settings", "p"]],
     ["new-chat", ["new-chat", "p"]], ["browse-tree", ["tree", "p"]], ["browse-system", ["finder", "p"]],
     ["archive", ["archive", "p"]], ["group:g", ["move", "/project", "g"]], ["ungrouped", ["move", "/project", null]]]) {

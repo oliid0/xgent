@@ -1,5 +1,11 @@
 import type { BackupDomainCounts, BackupManifest } from "../../lib/backup";
 
+export function backupLastSyncText(value: number, t: (key: string) => string, locale?: string) {
+  const date = new Date(value);
+  const time = Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString(locale);
+  return t("settings.backupSyncLastAt").replace("{time}", time);
+}
+
 export function summarizeBackupDomains(counts: BackupDomainCounts, t: (key: string) => string) {
   return [
     `${t("settings.backupDomainProviders")} ${counts.providers}`,

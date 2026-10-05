@@ -12,6 +12,7 @@ type SecretTextInputProps = {
   description?: string;
   placeholder?: string;
   isDisabled?: boolean;
+  compact?: boolean;
   disabledMessage?: string;
   onChange: (value: string) => void;
   onBlur?: () => void;
@@ -27,6 +28,7 @@ export function SecretTextInput(props: SecretTextInputProps) {
 
   return (
     <InputGroup
+      size={props.compact ? "lg" : "md"}
       label={props.label}
       description={props.description}
       isDisabled={props.isDisabled}
@@ -51,7 +53,7 @@ export function SecretTextInput(props: SecretTextInputProps) {
         tooltip={visibilityLabel}
         icon={<Icon icon={visible ? EyeOff : Eye} size="sm" color="inherit" />}
         variant="ghost"
-        size="sm"
+        size={props.compact ? "lg" : "sm"}
         isDisabled={props.isDisabled}
         onClick={() => setVisible((current) => !current)}
       />

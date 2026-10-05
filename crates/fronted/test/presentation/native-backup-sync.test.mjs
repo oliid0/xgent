@@ -54,9 +54,21 @@ function harness(options = {}) {
     "../../lib/runtimePlatform": { isNativeMobileRuntime: () => options.mobile !== false },
     "../../presentation/NativeSurface": { NativeSurface: "NativeSurface" },
     "../../presentation/nativeTheme": { createNativePresentationTheme: () => undefined },
+    "@astryxdesign/core/Banner": { Banner: "Banner" },
+    "@astryxdesign/core/Button": { Button: "Button" },
+    "@astryxdesign/core/Grid": { Grid: "Grid" },
+    "@astryxdesign/core/Layout": { VStack: "VStack" },
+    "@astryxdesign/core/List": { ListItem: "ListItem" },
+    "@astryxdesign/core/Spinner": { Spinner: "Spinner" },
+    "@astryxdesign/core/Switch": { Switch: "Switch" },
+    "@astryxdesign/core/Text": { Text: "Text" },
+    "@astryxdesign/core/TextInput": { TextInput: "TextInput" },
+    "./SecretTextInput": { SecretTextInput: "SecretTextInput" },
+    "./shared": { SettingsRow: "SettingsRow", SettingsRowGroup: "SettingsRowGroup", SettingsValueSelector: "Selector" },
   } });
   const { useBackupSyncData } = loader.loadModule("src/pages/settings/useBackupSyncData.ts");
   const { NativeBackupSyncSection } = loader.loadModule("src/pages/settings/NativeBackupSyncSection.tsx");
+  const { CompactBackupSyncForm } = loader.loadModule("src/pages/settings/CompactBackupSyncForm.tsx");
   const { getDefaultSettings } = loader.loadModule("src/lib/settings/index.ts");
   const { validatePresentationDocument } = loader.loadModule("src/presentation/validateDocument.ts");
   let settings = getDefaultSettings(), data;
@@ -83,11 +95,82 @@ function harness(options = {}) {
     assert.equal(handler.accepts(value), true, `${id} accepts payload`);
     await handler.run(value); await tick(); return render();
   };
-  return { render, dispatch, calls, confirmations, unmount: () => hooks.unmount(), replay: () => hooks.replayEffects(),
+  return { render, dispatch, calls, confirmations, compact: () => CompactBackupSyncForm({ data }), unmount: () => hooks.unmount(), replay: () => hooks.replayEffects(),
     event: payload => listener({ payload }), get stops() { return stops; }, get reloads() { return reloads; },
     get backs() { return backs; }, get data() { return data; }, get settings() { return settings; } };
 }
 const count = (h, command) => h.calls.filter(([name]) => name === `settings_backup_${command}`).length;
+const compactElements = node => {
+  if (Array.isArray(node)) return node.flatMap(compactElements);
+  if (!node || typeof node !== "object" || !node.props) return [];
+  return [node, ...compactElements(node.props.children), ...compactElements(node.props.label)];
+};
+const compactAction = (h, id) => compactElements(h.compact()).find(node => node.props["data-backup-action"] === id);
+
+test("backup timestamps use the real localized template instead of exposing its time placeholder", () => {
+  const loader = createTsModuleLoader();
+  const { translations } = loader.loadModule("src/i18n/config.ts");
+  const { backupLastSyncText } = loader.loadModule("src/pages/settings/backupManifestText.ts");
+  for (const locale of ["en-US", "zh-CN"]) {
+    const value = 1800000000000;
+    const text = backupLastSyncText(value, key => translations[locale][key], locale);
+    assert.ok(!text.includes("{time}"));
+    assert.ok(text.includes(new Date(value).toLocaleString(locale)));
+    assert.ok(text.startsWith(locale === "en-US" ? "Last sync: " : "上次同步："));
+  }
+});
+
+test("compact backup field edits and transfer actions use the same guarded controller as native settings", async () => {
+  for (const mobile of [true, false]) {
+    const h = harness({ mobile }); h.render(); await tick(); h.render();
+    let elements = compactElements(h.compact());
+    const field = label => elements.find(node => node.type === "TextInput" && node.props.label === label);
+    assert.ok(field("settings.backupSyncUrl"));
+    assert.ok(field("settings.backupSyncUsername"));
+    assert.ok(field("settings.backupSyncRemoteDir"));
+    assert.ok(field("settings.backupSyncProfile"));
+    const secret = elements.find(node => node.type === "SecretTextInput");
+    assert.equal(secret.props.value, "");
+    assert.equal(secret.props.compact, true);
+    assert.equal(secret.props.placeholder, "settings.backupSyncPasswordSaved");
+    assert.equal(elements.some(node => node.type === "Button" && node.props.label === "settings.backupExport"), !mobile);
+    const oldUpload = compactAction(h, "upload");
+    field("settings.backupSyncUrl").props.onChange("https://updated.example.com/dav/");
+    oldUpload.props.onClick(); await tick(); h.render();
+    assert.equal(count(h, "upload"), 0, "a stale enabled button cannot upload an unsaved form");
+    assert.equal(compactAction(h, "upload").props.isDisabled, true);
+    assert.equal(compactAction(h, "save").props.isDisabled, false);
+    compactAction(h, "save").props.onClick(); await tick(); h.render();
+    const request = h.calls.find(([name]) => name === "settings_backup_save_sync_config")[1].config;
+    assert.equal(request.url, "https://updated.example.com/dav/");
+    assert.equal(request.password, "");
+    assert.equal(request.passwordTouched, false);
+    assert.equal(compactAction(h, "upload").props.isDisabled, false);
+    elements = compactElements(h.compact());
+    elements.find(node => node.type === "Button" && node.props.label === "settings.backupSyncClearPassword").props.onClick();
+    h.render();
+    assert.equal(h.data.form.passwordTouched, true);
+    const retired = compactAction(h, "save"); h.unmount();
+    retired.props.onClick(); await tick();
+    assert.equal(count(h, "save_sync_config"), 1, "retired compact buttons cannot start another save");
+  }
+});
+
+test("compact backup reports the current transfer and locks all sibling actions before a rerender", async () => {
+  const pause = deferred();
+  const h = harness({ commands: { settings_backup_test_sync_connection: () => pause.promise } });
+  h.render(); await tick(); h.render();
+  const testButton = compactAction(h, "test"), save = compactAction(h, "save");
+  testButton.props.onClick(); save.props.onClick(); await tick(); h.render();
+  assert.equal(count(h, "test_sync_connection"), 1);
+  assert.equal(count(h, "save_sync_config"), 0);
+  assert.equal(compactAction(h, "test").props.isLoading, true);
+  for (const action of ["save", "test", "upload", "download"]) assert.equal(compactAction(h, action).props.isDisabled, true);
+  pause.resolve(); await tick(); h.render();
+  assert.equal(compactAction(h, "test").props.isLoading, false);
+  assert.equal(compactAction(h, "save").props.isDisabled, false);
+  h.unmount();
+});
 
 test("native backup retains settings surface, secure input, presets and desktop-only local commands", async () => {
   for (const mobile of [true, false]) {
@@ -101,9 +184,14 @@ test("native backup retains settings surface, secure input, presets and desktop-
     assert.equal(s.document.nodes.some(node => node.id === "backup-back"), false,
       "Desktop uses the settings shell close; mobile has one native header Back");
     const connection = s.document.nodes.find(node => node.id === "backup-connection");
-    const fields = connection.children.find(node => node.variant === "backup-connection-fields").children;
+    const fields = mobile ? connection.children : connection.children.find(node => node.variant === "backup-connection-fields").children;
     assert.equal(fields.find(node => node.id === "backup-password").secure, true);
     assert.equal(fields.find(node => node.id === "backup-preset").options.length, 4);
+    if (mobile) {
+      assert.equal(fields.filter(node => node.kind === "TextInput").length, 5);
+      assert.ok(fields.filter(node => node.kind === "TextInput").every(node => node.variant === "settings-stacked-field"));
+      assert.ok(s.document.nodes.find(node => node.id === "backup-actions"));
+    }
     assert.equal(s.handlers.has("backup-import"), !mobile);
     assert.equal(s.handlers.has("backup-export"), !mobile);
     await h.data.handleImport(); await h.data.handleExport();
