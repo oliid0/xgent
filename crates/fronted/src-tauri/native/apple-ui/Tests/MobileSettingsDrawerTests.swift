@@ -152,7 +152,7 @@ final class MobileSettingsDrawerTests: XCTestCase {
         fields.merging(["id": id, "kind": kind]) { _, value in value }
     }
 
-    private func document(surface: String = "settings", mode: String = "sheet", title: String = "Settings",
+    private func document(surface: String = "settings:real-session-uuid", mode: String = "sheet", title: String = "Settings",
                           revision: Int = 1, nodes: [[String: Any]]) throws -> XgentDocument {
         let payload: [String: Any] = ["version": 1, "surface": surface, "revision": revision, "mode": mode,
             "title": title, "formFactor": "mobile", "appearance": "light", "dismissAction": "close", "nodes": nodes]

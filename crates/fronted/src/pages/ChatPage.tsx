@@ -6421,6 +6421,7 @@ export function ChatPage(props: ChatPageProps) {
             handleDesktopNewConversation();
           }}
           onNewSideConversation={!nativeMobile ? handleNewRightSideChat : undefined}
+          onCreateSoul={() => onOpenSettings("soul", { createSoul: true })}
           onOpenConversationInSplit={!nativeMobile ? handleOpenConversationInSplit : undefined}
           onOpenSettings={(section) => onOpenSettings(section)}
           onOpenSkillsHub={() => {

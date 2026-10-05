@@ -30,9 +30,13 @@ struct XgentContextUsagePopover: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let cancel = current.children?.first(where: { $0.id == "context-cancel" }) {
-                    Button(cancel.label ?? "", action: close)
+                    Button(action: close) {
+                        Text(cancel.label ?? "")
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
+                            .contentShape(Rectangle())
+                    }
                         .buttonStyle(.borderless)
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
                         .accessibilityIdentifier(cancel.id)
                 }
                 if let confirm = current.children?.first(where: { $0.id == "context-confirm" }) {

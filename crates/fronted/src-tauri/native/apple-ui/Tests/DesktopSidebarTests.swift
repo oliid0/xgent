@@ -29,15 +29,16 @@ final class DesktopSidebarTests: XCTestCase {
                 defer { model.invalidate(); window.close() }
                 try await Task.sleep(nanoseconds: 200_000_000)
                 host.layoutSubtreeIfNeeded()
-                var elements = accessibilityElements(host)
+                let elements = accessibilityElements(host)
                 try attachNativeAccessibilityEvidence(elements.map { ["id": $0.accessibilityIdentifier() ?? "", "label": $0.accessibilityLabel() ?? ""] },
                     name: "sidebar-accessibility-\(Int(width))-\(size)")
                 let newChat = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "new-chat" })
                 let skills = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "skills" })
                 let settings = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "settings" })
                 let mode = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "sidebar-execution-mode" })
+                let soul = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "sidebar-soul-menu" })
                 let bounds = window.convertToScreen(host.convert(host.bounds, to: nil))
-                for element in [newChat, skills, settings, mode] {
+                for element in [newChat, skills, settings, mode, soul] {
                     let frame = element.accessibilityFrame()
                     XCTAssertGreaterThan(frame.height, 20)
                     XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX - 1)
@@ -54,8 +55,7 @@ final class DesktopSidebarTests: XCTestCase {
                 let search = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "sidebar-search-toggle" })
                 XCTAssertTrue(search.accessibilityPerformPress())
                 try await Task.sleep(nanoseconds: 100_000_000)
-                elements = accessibilityElements(host)
-                XCTAssertTrue(elements.contains { $0.accessibilityIdentifier() == "sidebar-search" })
+                XCTAssertEqual(actions.last?.action, "workspace-search")
                 let strategy = Snapshotting<NSView, NSImage>.image(size: CGSize(width: width, height: 760))
                 let image = await withCheckedContinuation { continuation in
                     strategy.snapshot(host).run { continuation.resume(returning: $0) }
@@ -81,7 +81,7 @@ final class DesktopSidebarTests: XCTestCase {
                     "label": "Work mode", "value": "tools", "action": "work-mode",
                     "options": [["value": "tools", "label": "Xgent"], ["value": "text", "label": "Xchat"]]],
                 ["id": "sidebar-close", "kind": "IconButton", "label": "Close sidebar", "action": "close"],
-                ["id": "sidebar-search", "kind": "TextInput", "label": "Search conversations", "value": "", "action": "search"],
+                ["id": "sidebar-search-toggle", "kind": "IconButton", "label": "Search workspace", "icon": "magnifyingglass", "action": "workspace-search"],
                 ["id": "sidebar-list", "kind": "List", "children": [
                     ["id": "skills", "kind": "NavigationRow", "label": "Skills", "icon": "link", "action": "skills"],
                     ["id": "mcp", "kind": "NavigationRow", "label": "MCP", "action": "mcp"],
@@ -92,6 +92,10 @@ final class DesktopSidebarTests: XCTestCase {
                 ]],
                 ["id": "sidebar-footer", "kind": "HStack", "children": [
                     ["id": "new-chat", "kind": "Button", "label": "New conversation", "icon": "square.and.pencil", "action": "new-chat"],
+                    ["id": "sidebar-soul-menu", "kind": "Menu", "variant": "ghost", "icon": "sparkles",
+                     "label": "An assistant preset with a long descriptive name", "children": [
+                        ["id": "sidebar-soul:selected", "kind": "Button", "label": "Selected preset", "selected": true, "action": "select-soul"],
+                     ]],
                     ["id": "settings", "kind": "IconButton", "label": "Settings", "icon": "gearshape", "action": "settings"],
                 ]],
             ]]]]

@@ -18,6 +18,9 @@ struct XgentDesktopSheetSizing: ViewModifier {
         if document.nodes.contains(where: { $0.kind == .settingsLayout }) {
             let size = Self.settingsSize(in: availableSize)
             content.frame(width: size.width, height: size.height).presentationSizing(.fitted)
+        } else if document.nodes.contains(where: { $0.variant == "workspace-search-palette" }) {
+            let size = Self.settingsSize(in: availableSize)
+            content.frame(width: min(640, size.width), height: min(560, size.height)).presentationSizing(.fitted)
         } else {
             content
         }

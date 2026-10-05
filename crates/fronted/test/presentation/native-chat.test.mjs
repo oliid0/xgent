@@ -83,6 +83,8 @@ function harness(overrides = {}, options = {}) {
     },
     "../i18n": { useLocale: () => ({ t: (key) => key }) },
     "../lib/runtimePlatform": { isNativeMobileRuntime: () => mobile },
+    "../lib/soul": { useSoul: () => options.soul ?? { loading: false, saving: false, activeId: "default",
+      presets: [{ id: "default", metadata: { name: "XGent" } }], select: async () => {} } },
     "./NativeSurface": { NativeSurface: "NativeSurface" },
     "./nativeTheme": { createNativePresentationTheme: () => ({ marker: "theme" }) },
   } });
@@ -119,11 +121,14 @@ function harness(overrides = {}, options = {}) {
   };
   let request = 0;
   let lastSurfaces = [];
+  let searchProps;
   const render = () => {
     cursor = 0;
     const element = NativeChatPage(props);
     mounted = true;
-    const surfaces = element.props.children.filter(Boolean);
+    const children = element.props.children.filter(Boolean);
+    searchProps = children.find(child => child.props?.conversations)?.props;
+    const surfaces = children.filter(child => child.props?.document);
     lastSurfaces = surfaces;
     registry.register("chat", surfaces[0].props.handlers);
     for (const surface of surfaces.slice(1)) {
@@ -137,6 +142,7 @@ function harness(overrides = {}, options = {}) {
   return {
     props, render, loader,
     documents: () => lastSurfaces.map((surface) => surface.props.document),
+    search: () => searchProps,
     dispatch: (action, value = null, surface = "chat") =>
       registry.dispatch({ action, value, surface, requestId: String(++request) }),
     unmount: () => { for (const cleanup of cleanups) cleanup?.(); registry.remove("chat"); },
@@ -455,7 +461,10 @@ test("native iPhone opens More as a sheet menu and keeps compact sidebar routes"
   assert.equal((await h.dispatch("sidebar-search-toggle", null, "sidebar")).ok, true);
   h.render();
   sidebar = h.documents().find((item) => item.mode === "sidebar");
-  assert.ok(sidebar.nodes[0].children.some((node) => node.id === "sidebar-search"));
+  assert.equal(sidebar.nodes[0].children.some((node) => node.id === "sidebar-search"), false);
+  assert.equal(h.search().open, true);
+  assert.equal(h.search().workdir, "/project");
+  h.search().onOpenChange(false);
   assert.ok(
     sidebar.nodes[0].children
       .find((node) => node.id === "sidebar-list")
@@ -674,6 +683,63 @@ test("native context details retain overflow percentages while limiting the ring
     for (const usedTokens of [0, -1, NaN, Infinity]) {
       assert.equal(createNativeChatContextUsage({ conversationId: "chat", usedTokens, contextWindow: 100_000 }, key => key).node, null);
     }
+  } finally { h.unmount(); }
+});
+
+test("native sidebar retains the shared Soul presets, selected state, creation and desktop tool shortcuts", async () => {
+  for (const mobile of [false, true]) {
+    const selected = [], created = [], terminals = [];
+    const soul = { activeId: "default", saving: false, loading: false,
+      presets: [{ id: "default", metadata: { name: "XGent" } }, { id: "writer", metadata: { name: "Writer" } }],
+      async select(id) { selected.push(id); soul.activeId = id; } };
+    const h = harness({ onCreateSoul: () => created.push(true), onOpenTerminal: () => terminals.push(true) }, { mobile, soul });
+    try {
+      await h.dispatch("sidebar"); h.render();
+      const menu = () => {
+        const document = h.documents().find(document => document.mode === "sidebar");
+        const footer = document.nodes[0].children.find(node => node.id === "sidebar-footer");
+        return mobile ? footer.children.find(node => node.id === "settings").children[0]
+          : footer.children.find(node => node.id === "sidebar-soul-menu");
+      };
+      let picker = menu();
+      assert.equal(picker.children[0].children[0].selected, true);
+      const writer = picker.children[0].children.find(node => node.id === "sidebar-soul:writer");
+      assert.equal((await h.dispatch(writer.action, null, "sidebar")).ok, true);
+      h.render(); picker = menu();
+      assert.deepEqual(selected, ["writer"]);
+      assert.equal(picker.children[0].children.find(node => node.id === writer.id).selected, true);
+      if (!mobile) {
+        assert.equal(picker.label, "Writer");
+        assert.equal((await h.dispatch("sidebar-soul-terminal", null, "sidebar")).ok, true);
+        assert.deepEqual(terminals, [true]);
+      } else assert.equal(picker.children.some(node => node.id === "sidebar-soul-terminal"), false);
+      soul.presets = soul.presets.filter(preset => preset.id !== "writer"); h.render();
+      assert.equal((await h.dispatch(writer.action, null, "sidebar")).ok, false);
+      assert.equal((await h.dispatch("sidebar-soul-create", null, "sidebar")).ok, true);
+      assert.deepEqual(created, [true]);
+    } finally { h.unmount(); }
+  }
+});
+
+test("native Soul quick switching reserves the shared mutation and rejects pending or retired selectors", async () => {
+  const h = harness();
+  try {
+    const { createNativeSidebarSoulMenu } = h.loader.loadModule("src/presentation/nativeSidebarSoulMenu.ts");
+    let finish;
+    const calls = [];
+    const soul = { loading: false, saving: false, activeId: "default",
+      presets: [{ id: "default", metadata: { name: "Default" } }],
+      select(id) { calls.push(id); return new Promise(resolve => { finish = resolve; }); } };
+    const request = { busy: false, mounted: true };
+    const menu = createNativeSidebarSoulMenu({ mobile: true, readSoul: () => soul, request }, key => key);
+    const select = menu.handlers.get("sidebar-soul:default");
+    const pending = select.run(null);
+    await assert.rejects(() => select.run(null));
+    assert.deepEqual(calls, ["default"]);
+    finish(); await pending;
+    request.mounted = false;
+    await assert.rejects(() => select.run(null));
+    assert.deepEqual(calls, ["default"]);
   } finally { h.unmount(); }
 });
 

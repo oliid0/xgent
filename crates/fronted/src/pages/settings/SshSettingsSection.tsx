@@ -38,6 +38,7 @@ import {
   Trash2,
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
+import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import {
   removeSshHostFromProjectAssociations,
   type SshAuthType,
@@ -53,6 +54,8 @@ import {
 } from "../../lib/ssh/scan";
 import { presentationControls } from "../../presentation/controls";
 import { NativeSurface } from "../../presentation/NativeSurface";
+import { decodeNativeFiles } from "../../presentation/nativeFiles";
+import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import { SecretTextInput } from "./SecretTextInput";
@@ -100,6 +103,7 @@ function SshPasswordInput(props: {
 }
 
 function SshHostModal(props: {
+  settings: SettingsSectionProps["settings"];
   initialData?: SshHostConfig;
   existingHosts: SshHostConfig[];
   onImport?: (hosts: SshImportCandidate[]) => void;
@@ -122,6 +126,15 @@ function SshHostModal(props: {
     initialData?.privateKeyPassphrase ?? "",
   );
   const [selectedKeyFile, setSelectedKeyFile] = useState<File | null>(null);
+  const keyImport = useRef({ mounted: true, revision: 0 });
+  const [keyImportAction] = useState(() => `key-import:${createUuid()}`);
+  useEffect(() => {
+    keyImport.current.mounted = true;
+    return () => {
+      keyImport.current.mounted = false;
+      keyImport.current.revision++;
+    };
+  }, []);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importResult, setImportResult] = useState<SshScanResult | null>(null);
@@ -138,12 +151,13 @@ function SshHostModal(props: {
   const isPrivateKeyAuth = authType === "privateKey";
   const isKeyboardInteractiveAuth = authType === "keyboardInteractive";
   const importCandidates = importResult?.candidates ?? [];
+  const canImport = !!onImport;
   const selectedImportCandidates = importCandidates.filter((candidate) =>
     selectedImportIds.has(candidate.id),
   );
 
   useEffect(() => {
-    if (!importOpen || !onImport) return;
+    if (!importOpen || !canImport) return;
     let cancelled = false;
     setImportResult(null);
     setImportError("");
@@ -162,7 +176,7 @@ function SshHostModal(props: {
     return () => {
       cancelled = true;
     };
-  }, [existingHosts, importOpen, onImport]);
+  }, [existingHosts, importOpen, canImport]);
 
   function toggleImportCandidate(id: string) {
     setSelectedImportIds((current) => {
@@ -173,17 +187,21 @@ function SshHostModal(props: {
     });
   }
 
-  function handleFileSelected(file: File | null) {
+  async function handleFileSelected(file: File | null) {
+    const revision = ++keyImport.current.revision;
     setSelectedKeyFile(file);
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const content = typeof reader.result === "string" ? reader.result : "";
+    try {
+      const content = await file.text();
+      if (!keyImport.current.mounted || keyImport.current.revision !== revision) return;
       setPrivateKey(content.trim());
       setPrivateKeyPath(file.name);
       setAuthType("privateKey");
-    };
-    reader.readAsText(file);
+      setImportError("");
+    } catch (error) {
+      if (keyImport.current.mounted && keyImport.current.revision === revision)
+        setImportError(String(error));
+    }
   }
 
   function handleSave() {
@@ -241,7 +259,104 @@ function SshHostModal(props: {
   if (isApplePresentationRuntime()) {
     const c = presentationControls();
     c.handlers.set("close", { enabled: true, accepts: (value) => value === null, run: onClose });
+    c.handlers.set(keyImportAction, {
+      enabled: !browser && isPrivateKeyAuth,
+      accepts: (value) => typeof value === "string",
+      run: async (value) => {
+        const files = decodeNativeFiles(value as string);
+        if (files.length !== 1) throw new Error(t("settings.sshRequired"));
+        await handleFileSelected(files[0]);
+      },
+    });
     const nodes: PresentationNode[] = [
+      {
+        id: "back",
+        kind: "Button",
+        label: t("settings.native.back"),
+        icon: "chevron.left",
+        action: "close",
+      },
+      ...(!isEditing && onImport
+        ? [
+            c.group("ssh-import", t("settings.sshImport"), [
+              c.toggle("ssh-import-open", t("settings.sshImport"), importOpen, setImportOpen),
+              ...(importOpen
+                ? [
+                    {
+                      id: "ssh-import-description",
+                      kind: "Text" as const,
+                      text: t("settings.sshImportDesc"),
+                      secondary: true,
+                    },
+                    ...(!importResult && !importError
+                      ? [
+                          {
+                            id: "ssh-import-scanning",
+                            kind: "ProgressBar" as const,
+                            label: t("settings.sshImportScanning"),
+                          },
+                        ]
+                      : []),
+                    ...(importResult
+                      ? [
+                          {
+                            id: "ssh-import-directory",
+                            kind: "Text" as const,
+                            text: importResult.sshDirPath,
+                            secondary: true,
+                          },
+                          {
+                            id: "ssh-import-count",
+                            kind: "Text" as const,
+                            text: t("settings.sshImportFound")
+                              .replace("{count}", String(importCandidates.length))
+                              .replace("{keys}", String(importResult.keyFiles.length)),
+                          },
+                          ...importCandidates.map((candidate) => ({
+                            ...c.toggle(
+                              `ssh-import-candidate:${candidate.id}`,
+                              candidate.name,
+                              selectedImportIds.has(candidate.id),
+                              () => toggleImportCandidate(candidate.id),
+                              !candidate.duplicate,
+                            ),
+                            text: `${candidate.username ? `${candidate.username}@` : ""}${candidate.host}:${candidate.port} · ${authLabel(candidate, t)} · ${candidate.source}${candidate.duplicate ? ` · ${t("settings.sshImportDuplicate")}` : ""}`,
+                          })),
+                          ...(!importCandidates.length
+                            ? [
+                                {
+                                  id: "ssh-import-empty",
+                                  kind: "EmptyState" as const,
+                                  label: t("settings.sshImportEmpty"),
+                                  text: t("settings.sshImportEmptyHint"),
+                                  icon: "key",
+                                },
+                              ]
+                            : []),
+                          {
+                            id: "ssh-import-selected",
+                            kind: "Text" as const,
+                            text: t("settings.sshImportSelected").replace(
+                              "{count}",
+                              String(selectedImportCandidates.length),
+                            ),
+                          },
+                          c.action(
+                            "ssh-import-confirm",
+                            t("settings.sshImport"),
+                            () => {
+                              onImport(selectedImportCandidates);
+                              onClose();
+                            },
+                            selectedImportCandidates.length > 0,
+                          ),
+                        ]
+                      : []),
+                  ]
+                : []),
+            ]),
+          ]
+        : []),
       c.group("connection", t("settings.sshAdd"), [
         c.input("name", t("settings.sshName"), name, setName),
         c.input("host", t("settings.sshHost"), host, setHost),
@@ -256,13 +371,38 @@ function SshHostModal(props: {
             { value: "privateKey", label: t("settings.sshAuthPrivateKey") },
             { value: "keyboardInteractive", label: t("settings.sshAuthKeyboardInteractive") },
           ],
-          (value) => setAuthType(value as SshAuthType),
+          (value) => {
+            keyImport.current.revision++;
+            setAuthType(value as SshAuthType);
+          },
         ),
         ...(isPasswordAuth
-          ? [c.input("password", t("settings.sshPassword"), password, setPassword, true)]
+          ? [
+              c.input("password", t("settings.sshPassword"), password, setPassword, true),
+              ...(initialData?.passwordConfigured && !password.trim()
+                ? [
+                    {
+                      id: "password-configured",
+                      kind: "Text" as const,
+                      text: t("settings.sshPasswordConfigured"),
+                      secondary: true,
+                    },
+                  ]
+                : []),
+            ]
           : []),
         ...(isPrivateKeyAuth
           ? [
+              {
+                id: "key-import",
+                kind: "FilePicker" as const,
+                label: t("settings.sshPrivateKeyImport"),
+                text: selectedKeyFile?.name,
+                action: keyImportAction,
+                disabled: browser,
+                variant: "ssh-private-key",
+                options: [{ value: "files", label: t("settings.sshPrivateKeyImport") }],
+              },
               {
                 ...c.input("private-key", t("settings.sshPrivateKey"), privateKey, setPrivateKey),
                 kind: "TextArea" as const,
@@ -280,35 +420,91 @@ function SshHostModal(props: {
                 setPrivateKeyPassphrase,
                 true,
               ),
+              ...(initialData?.privateKeyConfigured && !privateKey.trim()
+                ? [
+                    {
+                      id: "private-key-configured",
+                      kind: "Text" as const,
+                      text: t("settings.sshPrivateKeyConfigured"),
+                      secondary: true,
+                    },
+                  ]
+                : []),
+              ...(initialData?.privateKeyPassphraseConfigured && !privateKeyPassphrase.trim()
+                ? [
+                    {
+                      id: "passphrase-configured",
+                      kind: "Text" as const,
+                      text: t("settings.sshPrivateKeyPassphraseConfigured"),
+                      secondary: true,
+                    },
+                  ]
+                : []),
+            ]
+          : []),
+        ...(isKeyboardInteractiveAuth
+          ? [
+              {
+                id: "interactive-auth-hint",
+                kind: "Banner" as const,
+                label: t("settings.sshAuthKeyboardInteractive"),
+                text: t("settings.sshAuthKeyboardInteractiveHint"),
+              },
             ]
           : []),
       ]),
-      c.group("proxy", t("settings.sshProxyOptionalHint"), [
-        c.select(
-          "proxy-type",
-          t("settings.sshProxyType"),
-          proxyType,
-          [
-            { value: "socks5", label: "SOCKS5" },
-            { value: "http", label: "HTTP CONNECT" },
-          ],
-          (value) => setProxyType(value as SshProxyType),
-        ),
-        c.input("proxy-url", t("settings.sshProxyUrl"), proxyUrl, setProxyUrl),
-        c.optionalNumber(
-          "proxy-port",
-          t("settings.sshProxyPort"),
-          proxyPort,
-          1,
-          65535,
-          1,
-          setProxyPort,
-          true,
-          true,
-        ),
-        c.input("proxy-user", t("settings.sshUsername"), proxyUsername, setProxyUsername),
-        c.input("proxy-password", t("settings.sshPassword"), proxyPassword, setProxyPassword, true),
-      ]),
+      c.toggle("ssh-advanced", t("settings.sshAdvancedSettings"), advancedOpen, setAdvancedOpen),
+      ...(advancedOpen
+        ? [
+            c.group("proxy", t("settings.sshProxyOptionalHint"), [
+              c.select(
+                "proxy-type",
+                t("settings.sshProxyType"),
+                proxyType,
+                [
+                  { value: "socks5", label: "SOCKS5" },
+                  { value: "http", label: "HTTP CONNECT" },
+                ],
+                (value) => setProxyType(value as SshProxyType),
+              ),
+              c.input("proxy-url", t("settings.sshProxyUrl"), proxyUrl, setProxyUrl),
+              c.optionalNumber(
+                "proxy-port",
+                t("settings.sshProxyPort"),
+                proxyPort,
+                1,
+                65535,
+                1,
+                setProxyPort,
+                true,
+                true,
+              ),
+              c.input(
+                "proxy-user",
+                t("settings.sshProxyUsername"),
+                proxyUsername,
+                setProxyUsername,
+              ),
+              c.input(
+                "proxy-password",
+                t("settings.sshProxyPassword"),
+                proxyPassword,
+                setProxyPassword,
+                true,
+              ),
+              ...(initialData?.proxy.passwordConfigured && !proxyPassword.trim()
+                ? [
+                    {
+                      id: "proxy-password-configured",
+                      kind: "Text" as const,
+                      text: t("settings.sshProxyPasswordConfigured"),
+                      secondary: true,
+                    },
+                  ]
+                : []),
+            ]),
+          ]
+        : []),
       {
         ...c.action(
           "save",
@@ -326,7 +522,13 @@ function SshHostModal(props: {
         document={{
           mode: "sheet",
           title: t(isEditing ? "settings.sshEdit" : "settings.sshAdd"),
-          appearance: "system",
+          appearance: props.settings.theme,
+          formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
+          theme: createNativePresentationTheme(
+            props.settings,
+            isNativeMobileRuntime(),
+            "workspaceTools",
+          ),
           nodes,
           dismissAction: "close",
         }}
@@ -480,6 +682,7 @@ function SshHostModal(props: {
                     value === "privateKey" ||
                     value === "keyboardInteractive"
                   ) {
+                    keyImport.current.revision++;
                     setAuthType(value);
                   }
                 }}
@@ -728,6 +931,10 @@ export function SshSettingsSection(
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingHost, setEditingHost] = useState<SshHostConfig | null>(null);
   const [knownHostResettingId, setKnownHostResettingId] = useState<string | null>(null);
+  const [resetHostId, setResetHostId] = useState<string | null>(null);
+  const resetRequest = useRef({ busy: false, mounted: true });
+  const latestSettings = useRef(settings);
+  latestSettings.current = settings;
   const [knownHostResetStatus, setKnownHostResetStatus] = useState<SshKnownHostResetStatus | null>(
     null,
   );
@@ -735,7 +942,9 @@ export function SshSettingsSection(
   const hosts = settings.ssh.hosts;
 
   useEffect(() => {
+    resetRequest.current.mounted = true;
     return () => {
+      resetRequest.current.mounted = false;
       if (knownHostResetTimerRef.current !== null) {
         window.clearTimeout(knownHostResetTimerRef.current);
       }
@@ -743,6 +952,7 @@ export function SshSettingsSection(
   }, []);
 
   function showKnownHostResetStatus(status: SshKnownHostResetStatus) {
+    if (!resetRequest.current.mounted) return;
     if (knownHostResetTimerRef.current !== null) {
       window.clearTimeout(knownHostResetTimerRef.current);
     }
@@ -847,6 +1057,15 @@ export function SshSettingsSection(
   }
 
   async function handleResetKnownHost(host: SshHostConfig) {
+    const current = latestSettings.current.ssh.hosts.find((item) => item.id === host.id);
+    if (
+      !resetRequest.current.mounted ||
+      resetRequest.current.busy ||
+      !current ||
+      current.host !== host.host ||
+      current.port !== host.port
+    )
+      return;
     const targetHost = host.host.trim();
     if (!targetHost || host.port <= 0) {
       showKnownHostResetStatus({
@@ -860,12 +1079,15 @@ export function SshSettingsSection(
       return;
     }
 
+    resetRequest.current.busy = true;
     setKnownHostResettingId(host.id);
     try {
       const response = await invoke<SshKnownHostResetResponse>("settings_reset_ssh_known_host", {
         host: targetHost,
         port: host.port,
       });
+      const latest = latestSettings.current.ssh.hosts.find((item) => item.id === host.id);
+      if (!latest || latest.host !== host.host || latest.port !== host.port) return;
       showKnownHostResetStatus({
         hostId: host.id,
         kind: response.deleted > 0 ? "success" : "info",
@@ -875,6 +1097,8 @@ export function SshSettingsSection(
             : t("settings.sshKnownHostResetEmpty"),
       });
     } catch (error) {
+      const latest = latestSettings.current.ssh.hosts.find((item) => item.id === host.id);
+      if (!latest || latest.host !== host.host || latest.port !== host.port) return;
       const message = error instanceof Error ? error.message : String(error);
       showKnownHostResetStatus({
         hostId: host.id,
@@ -882,7 +1106,9 @@ export function SshSettingsSection(
         message: t("settings.sshKnownHostResetFailed").replace("{error}", message),
       });
     } finally {
-      setKnownHostResettingId((current) => (current === host.id ? null : current));
+      resetRequest.current.busy = false;
+      if (resetRequest.current.mounted)
+        setKnownHostResettingId((current) => (current === host.id ? null : current));
     }
   }
 
@@ -906,6 +1132,7 @@ export function SshSettingsSection(
   if (modalOpen) {
     return (
       <SshHostModal
+        settings={settings}
         nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
         initialData={editingHost ?? undefined}
         existingHosts={hosts}
@@ -924,29 +1151,100 @@ export function SshSettingsSection(
       run: () => props.onBack?.(),
     });
     const nodes: PresentationNode[] = [
+      ...(isNativeMobileRuntime()
+        ? [
+            {
+              id: "back",
+              kind: "Button" as const,
+              label: t("settings.native.back"),
+              icon: "chevron.left",
+              action: "close",
+            },
+          ]
+        : []),
       c.action("add", t("settings.sshAdd"), openAdd),
-      ...hosts.map((host) =>
-        c.group(host.id, host.name, [
+      ...hosts.map((host) => ({
+        ...c.group(host.id, host.name, [
           {
-            ...c.action(`${host.id}:edit`, `${host.username}@${host.host}:${host.port}`, () => {
-              setEditingHost(host);
-              setModalOpen(true);
-            }),
+            ...c.action(
+              `${host.id}:edit`,
+              `${host.username ? `${host.username}@` : ""}${host.host}:${host.port}`,
+              () => {
+                setEditingHost(host);
+                setModalOpen(true);
+              },
+            ),
             kind: "NavigationRow",
             icon: "server.rack",
+            accessibilityLabel: t("settings.sshEdit"),
+          },
+          { id: `${host.id}:auth`, kind: "Badge", label: authLabel(host, t) },
+          ...(knownHostResetStatus?.hostId === host.id
+            ? [
+                {
+                  id: `${host.id}:known-host-status`,
+                  kind: "StatusDot" as const,
+                  label: knownHostResetStatus.message,
+                  status:
+                    knownHostResetStatus.kind === "error"
+                      ? ("error" as const)
+                      : knownHostResetStatus.kind === "success"
+                        ? ("completed" as const)
+                        : ("pending" as const),
+                },
+              ]
+            : []),
+          {
+            ...c.action(
+              `${host.id}:reset-known-host`,
+              t("settings.sshKnownHostResetTitle"),
+              () => setResetHostId(host.id),
+              !knownHostResettingId,
+            ),
+            kind: "IconButton",
+            icon: "shield.lefthalf.filled",
           },
           {
             ...c.action(`${host.id}:delete`, t("settings.delete"), () => setDeleteId(host.id)),
             destructive: true,
           },
         ]),
-      ),
+        kind: "VStack" as const,
+        variant: "ssh-host-row",
+        icon: "server.rack",
+      })),
       ...(hosts.length
         ? []
-        : [{ id: "empty", kind: "Text" as const, text: t("settings.sshEmpty") }]),
+        : [
+            {
+              id: "empty",
+              kind: "EmptyState" as const,
+              label: t("settings.sshNoHosts"),
+              text: t("settings.sshNoHostsHint"),
+              icon: "key",
+            },
+          ]),
     ];
-    if (knownHostResetStatus)
+    if (knownHostResetStatus && !knownHostResetStatus.hostId)
       nodes.push({ id: "error", kind: "Text", text: knownHostResetStatus.message });
+    const resetHost = hosts.find((host) => host.id === resetHostId);
+    const resetConfirmation = presentationControls(
+      JSON.stringify(["ssh-known-host", resetHost?.id, resetHost?.host, resetHost?.port]),
+    );
+    const resetCancel = resetConfirmation.action("cancel", t("settings.cancel"), () =>
+      setResetHostId(null),
+    );
+    const resetConfirm = resetConfirmation.action(
+      "confirm",
+      t("settings.sshKnownHostResetConfirm"),
+      async () => {
+        if (!resetRequest.current.mounted || resetRequest.current.busy)
+          throw new Error(t("settings.saving"));
+        if (resetHost) await handleResetKnownHost(resetHost);
+        if (resetRequest.current.mounted) setResetHostId(null);
+      },
+      !!resetHost && !knownHostResettingId,
+    );
     const confirmation = presentationControls();
     const cancel = confirmation.action("cancel", t("settings.cancel"), () => setDeleteId(null));
     const remove = confirmation.action("delete", t("settings.delete"), () => {
@@ -961,6 +1259,12 @@ export function SshSettingsSection(
             mode: "sheet",
             title: t("settings.sshTitle"),
             appearance: settings.theme,
+            formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
+            theme: createNativePresentationTheme(
+              settings,
+              isNativeMobileRuntime(),
+              "workspaceTools",
+            ),
             nodes,
             dismissAction: "close",
           }}
@@ -969,6 +1273,33 @@ export function SshSettingsSection(
             showKnownHostResetStatus({ hostId: "", kind: "error", message: String(error) })
           }
         />
+        {resetHost ? (
+          <NativeSurface
+            document={{
+              mode: "alert",
+              title: t("settings.sshKnownHostResetTitle"),
+              appearance: settings.theme,
+              nodes: [
+                {
+                  id: "known-host-reset-description",
+                  kind: "Text",
+                  text: t("settings.sshKnownHostResetDesc"),
+                },
+                resetCancel,
+                resetConfirm,
+              ],
+              dismissAction: resetCancel.action,
+            }}
+            handlers={resetConfirmation.handlers}
+            onError={(error) =>
+              showKnownHostResetStatus({
+                hostId: resetHost.id,
+                kind: "error",
+                message: String(error),
+              })
+            }
+          />
+        ) : null}
         {deleteId ? (
           <NativeSurface
             document={{

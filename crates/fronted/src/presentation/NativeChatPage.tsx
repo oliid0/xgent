@@ -48,14 +48,17 @@ import type {
 import { workspaceProjectPathKey } from "../lib/settings";
 import { sortSidebarConversations } from "../lib/sidebar/reconcile";
 import type { SidebarStore } from "../lib/sidebar/store";
+import { useSoul } from "../lib/soul";
 import { type DesktopSttCapture, startDesktopSttCapture } from "../lib/stt/desktopAudioCapture";
 import type { TaskListState } from "../lib/tools/builtinTypes";
 import type { PendingToolApprovalSummary, ToolApprovalDecision } from "../lib/tools/toolApproval";
 import { sortWorkspaceProjectsByActivity } from "../lib/workspaceProjects";
 import type { ChatQueueTurnPreview } from "../pages/chat/components/ChatComposerBar";
+import type { SectionId } from "../pages/settings/types";
 import { createNativeComposerStore } from "./composerStore";
 import { presentationControls } from "./controls";
 import { NativeSurface } from "./NativeSurface";
+import { NativeWorkspaceSearchPalette } from "./NativeWorkspaceSearchPalette";
 import { useNativeAskUserQuestions } from "./nativeAskUserQuestions";
 import { createNativeChatContextUsage } from "./nativeChatContextUsage";
 import { toolEvidenceNodes } from "./nativeChatEvidence";
@@ -74,6 +77,7 @@ import {
 import { decodeNativeFiles } from "./nativeFiles";
 import { nativeReadOnlyCodeNodes } from "./nativeReadOnlyCode";
 import { attachReadOnlySyntax, readOnlySyntaxPalette } from "./nativeReadOnlySyntax";
+import { createNativeSidebarSoulMenu } from "./nativeSidebarSoulMenu";
 import { createNativeTaskProgress } from "./nativeTaskProgress";
 import { createNativePresentationTheme } from "./nativeTheme";
 import {
@@ -147,11 +151,10 @@ export type NativeChatPageProps = NativeWorkspaceActionsProps & {
   onConversationCwdChanged: (id: string, cwd: string) => void;
   onSelectProject: (project: WorkspaceProject) => void;
   onNewConversation: () => void;
+  onCreateSoul?: () => void;
   onNewSideConversation?: () => void;
   onOpenConversationInSplit?: (id: string) => void;
-  onOpenSettings: (
-    section?: "skills" | "cron" | "ssh" | "mcp" | "mobileExecution" | "providers",
-  ) => void;
+  onOpenSettings: (section?: SectionId) => void;
   onOpenSkillsHub: () => void;
   onOpenMcpHub: () => void;
   sidebarOpenRequestId?: number;
@@ -176,6 +179,16 @@ export type NativeChatPageProps = NativeWorkspaceActionsProps & {
 export function NativeChatPage(props: NativeChatPageProps) {
   const { t } = useLocale();
   const compact = isNativeMobileRuntime();
+  const soul = useSoul();
+  const soulRef = useRef(soul);
+  soulRef.current = soul;
+  const [soulRequest] = useState(() => ({ busy: false, mounted: true }));
+  useEffect(() => {
+    soulRequest.mounted = true;
+    return () => {
+      soulRequest.mounted = false;
+    };
+  }, [soulRequest]);
   const [composer] = useState(createNativeComposerStore);
   const [mentionSearch] = useState(createNativeMentionSearch);
   useSyncExternalStore(composer.subscribe, composer.getSnapshot, composer.getSnapshot);
@@ -249,8 +262,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [trajectoryOpen, setTrajectoryOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [sidebarSearchVisible, setSidebarSearchVisible] = useState(false);
+  const [workspaceSearchOpen, setWorkspaceSearchOpen] = useState(false);
   const [archivedGroupOpen, setArchivedGroupOpen] = useState(false);
   const [expandedProjectIds, setExpandedProjectIds] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -282,6 +294,10 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const recentChats = sortSidebarConversations(
     Array.from(sidebar.byId.values()).filter((item) => !item.cwd?.trim()),
   ).slice(0, sidebar.recentHistory.limit);
+  const searchableConversations = useMemo(
+    () => sortSidebarConversations(Array.from(sidebar.byId.values())),
+    [sidebar.byId],
+  );
   const [voiceAvailable, setVoiceAvailable] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [voicePartial, setVoicePartial] = useState("");
@@ -1188,7 +1204,6 @@ export function NativeChatPage(props: NativeChatPageProps) {
       if (!groupByPath.has(key)) groupByPath.set(key, group.id);
     }
   }
-  const projectQuery = query.toLocaleLowerCase();
   const projectNodes: PresentationNode[] = [
     ...(props.workspaceProjectGroups ?? []).flatMap((group): PresentationNode[] => {
       const members = sidebarProjects.filter(
@@ -1196,11 +1211,6 @@ export function NativeChatPage(props: NativeChatPageProps) {
           groupByPath.get(workspaceProjectPathKey(project.path)) === group.id &&
           !props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)),
       );
-      const groupMatches = group.name.toLocaleLowerCase().includes(projectQuery);
-      const visibleMembers = groupMatches
-        ? members
-        : members.filter((project) => project.name.toLocaleLowerCase().includes(projectQuery));
-      if (projectQuery && !groupMatches && visibleMembers.length === 0) return [];
       return [
         {
           ...sidebarButton(`group:${group.id}`, group.name, () =>
@@ -1210,9 +1220,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
           variant: "sidebar-workspace-row",
           children: [workspaceActions.groupMenu(group)],
         },
-        ...(!group.collapsed
-          ? visibleMembers.flatMap((project) => projectSidebarRows(project, 18))
-          : []),
+        ...(!group.collapsed ? members.flatMap((project) => projectSidebarRows(project, 18)) : []),
       ];
     }),
     ...sidebarProjects
@@ -1220,7 +1228,6 @@ export function NativeChatPage(props: NativeChatPageProps) {
         (project) => !props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)),
       )
       .filter((project) => !groupByPath.has(workspaceProjectPathKey(project.path)))
-      .filter((project) => project.name.toLocaleLowerCase().includes(projectQuery))
       .flatMap((project) => projectSidebarRows(project)),
     ...(props.projects.some((project) =>
       props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)),
@@ -1249,18 +1256,12 @@ export function NativeChatPage(props: NativeChatPageProps) {
                 .filter((project) =>
                   props.archivedProjectPathKeys?.has(workspaceProjectPathKey(project.path)),
                 )
-                .filter((project) => project.name.toLocaleLowerCase().includes(projectQuery))
                 .flatMap((project) => projectSidebarRows(project))
             : []),
         ]
       : []),
   ];
   for (const [id, handler] of workspaceActions.handlers) sidebarHandlers.set(id, handler);
-  sidebarHandlers.set("search", {
-    enabled: true,
-    accepts: (value) => typeof value === "string",
-    run: (value) => setQuery(value as string),
-  });
   sidebarHandlers.set("sidebar-execution-mode", {
     enabled: true,
     accepts: (value) => value === "text" || value === "tools",
@@ -1269,7 +1270,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
   sidebarHandlers.set("sidebar-search-toggle", {
     enabled: true,
     accepts: (value) => value === null,
-    run: () => setSidebarSearchVisible(!sidebarSearchVisible),
+    run: () => setWorkspaceSearchOpen(true),
   });
   sidebarHandlers.set("close", {
     enabled: true,
@@ -1305,6 +1306,60 @@ export function NativeChatPage(props: NativeChatPageProps) {
     setTrajectoryOpen(true);
   };
   const activityControls = presentationControls();
+  const soulMenu = createNativeSidebarSoulMenu(
+    {
+      mobile: compact,
+      readSoul: () => soulRef.current,
+      request: soulRequest,
+      onCreate: props.onCreateSoul
+        ? () => {
+            finishSidebarAction();
+            props.onCreateSoul?.();
+          }
+        : undefined,
+      tools: [
+        {
+          id: "sidebar-soul-terminal",
+          label: t("sidebar.terminal"),
+          icon: "terminal",
+          run: props.onOpenTerminal,
+        },
+        {
+          id: "sidebar-soul-git",
+          label: t("sidebar.gitReview"),
+          icon: "arrow.triangle.branch",
+          run: props.onOpenGitReview,
+        },
+        {
+          id: "sidebar-soul-ssh",
+          label: t("sidebar.sshConnection"),
+          icon: "key",
+          run: props.onOpenRemote,
+        },
+        {
+          id: "sidebar-soul-background",
+          label: t("sidebar.backgroundTasks"),
+          icon: "cpu",
+          run: props.onOpenBackgroundTasks,
+        },
+        {
+          id: "sidebar-soul-trajectory",
+          label: t("chat.trajectory.open"),
+          icon: "waveform.path",
+          run: openTrajectory,
+          enabled: props.trajectoryAvailable,
+        },
+        {
+          id: "sidebar-soul-settings",
+          label: t("tooltip.settings"),
+          icon: "gearshape",
+          run: () => props.onOpenSettings(),
+        },
+      ],
+    },
+    t,
+  );
+  for (const [id, handler] of soulMenu.handlers) sidebarHandlers.set(id, handler);
   for (const [id, handler] of questions.handlers) activityControls.handlers.set(id, handler);
   activityControls.handlers.set("close", {
     enabled: true,
@@ -1472,36 +1527,13 @@ export function NativeChatPage(props: NativeChatPageProps) {
                     ],
                     action: "sidebar-execution-mode",
                   },
-                  ...(compact
-                    ? [
-                        {
-                          id: "sidebar-search-toggle",
-                          kind: "IconButton" as const,
-                          label: t("chat.history.search"),
-                          icon: "magnifyingglass",
-                          action: "sidebar-search-toggle",
-                        },
-                        ...(sidebarSearchVisible
-                          ? [
-                              {
-                                id: "sidebar-search",
-                                kind: "TextInput" as const,
-                                label: t("chat.history.searchPlaceholder"),
-                                value: query,
-                                action: "search",
-                              },
-                            ]
-                          : []),
-                      ]
-                    : [
-                        {
-                          id: "sidebar-search",
-                          kind: "TextInput" as const,
-                          label: t("chat.history.searchPlaceholder"),
-                          value: query,
-                          action: "search",
-                        },
-                      ]),
+                  {
+                    id: "sidebar-search-toggle",
+                    kind: "IconButton",
+                    label: t("search.title"),
+                    icon: "magnifyingglass",
+                    action: "sidebar-search-toggle",
+                  },
                   {
                     id: "sidebar-list",
                     kind: "List",
@@ -1577,29 +1609,23 @@ export function NativeChatPage(props: NativeChatPageProps) {
                       },
                       ...projectNodes,
                       { id: "recents-label", kind: "Heading", text: t("chat.recentConversation") },
-                      ...recentChats
-                        .filter((conversation) =>
-                          conversation.title
-                            .toLocaleLowerCase()
-                            .includes(query.toLocaleLowerCase()),
-                        )
-                        .map((conversation) =>
-                          conversationSidebarRow(
-                            {
-                              ...sidebarButton(
-                                `conversation:${conversation.id}`,
-                                conversation.title,
-                                () => {
-                                  props.onSelectConversation(conversation.id);
-                                  finishSidebarAction();
-                                },
-                              ),
-                              variant: compact ? "sidebar-conversation" : undefined,
-                              selected: props.conversationId === conversation.id,
-                            },
-                            conversation.id,
-                          ),
+                      ...recentChats.map((conversation) =>
+                        conversationSidebarRow(
+                          {
+                            ...sidebarButton(
+                              `conversation:${conversation.id}`,
+                              conversation.title,
+                              () => {
+                                props.onSelectConversation(conversation.id);
+                                finishSidebarAction();
+                              },
+                            ),
+                            variant: compact ? "sidebar-conversation" : undefined,
+                            selected: props.conversationId === conversation.id,
+                          },
+                          conversation.id,
                         ),
+                      ),
                       ...(sidebar.recentHistory.hasMore
                         ? [
                             sidebarButton("more", t("presentation.loadMore"), () =>
@@ -1642,6 +1668,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                         accessibilityLabel: compact ? t("chat.newConversation") : undefined,
                       },
                       { id: "sidebar-footer-space", kind: "Spacer" },
+                      ...(!compact ? [soulMenu.node] : []),
                       {
                         ...sidebarButton("settings", t("tooltip.settings"), () => {
                           finishSidebarAction();
@@ -1649,6 +1676,9 @@ export function NativeChatPage(props: NativeChatPageProps) {
                         }),
                         kind: "IconButton",
                         icon: "gearshape",
+                        ...(compact
+                          ? { variant: "sidebar-settings", children: [soulMenu.node] }
+                          : {}),
                       },
                     ],
                   },
@@ -1781,6 +1811,35 @@ export function NativeChatPage(props: NativeChatPageProps) {
           }}
           handlers={workspaceActions.dialog.handlers}
           onError={setFailure}
+        />
+      ) : null}
+      {workspaceSearchOpen ? (
+        <NativeWorkspaceSearchPalette
+          open
+          settings={props.settings}
+          workdir={props.uploadWorkdir}
+          conversations={searchableConversations}
+          onOpenChange={setWorkspaceSearchOpen}
+          onSelectConversation={(id) => {
+            finishSidebarAction();
+            props.onSelectConversation(id);
+          }}
+          onOpenFile={(path) => {
+            finishSidebarAction();
+            props.onOpenWorkspaceFile(path);
+          }}
+          onOpenSettings={(section) => {
+            finishSidebarAction();
+            props.onOpenSettings(section);
+          }}
+          onNewConversation={() => {
+            finishSidebarAction();
+            props.onNewConversation();
+          }}
+          onCreateProject={() => {
+            finishSidebarAction();
+            props.onCreateProject();
+          }}
         />
       ) : null}
       {!compact && trajectoryOpen ? (

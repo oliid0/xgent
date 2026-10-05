@@ -103,6 +103,7 @@ struct XgentAttachmentPicker: View {
     }
 
     private var configurationPicker: Bool { node.variant == "mcp-config" }
+    private var singleFilePicker: Bool { configurationPicker || node.variant == "ssh-private-key" }
     private var allowedFileTypes: [UTType] {
         configurationPicker ? [.json, .plainText, UTType(filenameExtension: "toml", conformingTo: .plainText) ?? .plainText] : [.item]
     }
@@ -137,8 +138,8 @@ struct XgentAttachmentPicker: View {
             }
         } label: {
             if importing { ProgressView().frame(width: controlSize, height: controlSize) }
-            else if configurationPicker {
-                Label(node.label ?? "Import configuration", systemImage: "doc.badge.plus")
+            else if singleFilePicker {
+                Label(node.label ?? "Import file", systemImage: configurationPicker ? "doc.badge.plus" : "key")
                     .modifier(XgentControlTypography(node: node))
                     .padding(.horizontal, 12).padding(.vertical, 8)
                     .frame(minHeight: 44)
@@ -154,11 +155,11 @@ struct XgentAttachmentPicker: View {
         .menuStyle(.borderlessButton).disabled(importing || node.disabled == true)
         .accessibilityLabel(node.label ?? "Attach files")
         .fileImporter(isPresented: $pickingFiles, allowedContentTypes: allowedFileTypes,
-                      allowsMultipleSelection: !configurationPicker,
+                      allowsMultipleSelection: !singleFilePicker,
                       onCompletion: { result in
             guard let owner = fileOwner else { return }
             fileOwner = nil
-            let maximumFiles = owner.node.variant == "mcp-config" ? 1 : 9
+            let maximumFiles = ["mcp-config", "ssh-private-key"].contains(owner.node.variant ?? "") ? 1 : 9
             startImport(owner) {
                 let urls = try result.get()
                 return try await XgentAttachmentPayload.prepare {

@@ -6,7 +6,9 @@ extension XgentNodeView {
     @ViewBuilder var desktopContent: some View {
         switch node.kind {
         case .vStack:
-            if node.variant == "workspace-editor-tabs" {
+            if node.variant == "workspace-search-palette" {
+                XgentWorkspaceSearchPalette(node: node, document: document, model: model)
+            } else if node.variant == "workspace-editor-tabs" {
                 XgentWorkspaceEditorTabs(node: node, document: document, model: model)
             } else if node.variant == "workspace-editor-close-all" {
                 XgentWorkspaceCloseAll(node: node, document: document, model: model).id(node.id)
@@ -87,6 +89,8 @@ extension XgentNodeView {
                 XgentBackupConnectionFields(node: node, document: document, model: model)
             } else if node.variant == "backup-transfer-actions" {
                 XgentBackupTransferActions(node: node, document: document, model: model)
+            } else if node.variant == "ssh-host-row" {
+                XgentSSHHostRow(node: node, document: document, model: model)
             } else if node.variant == "automation-row" {
                 XgentAutomationRow(node: node, document: document, model: model)
             } else if node.variant == "hook-lifecycle" {

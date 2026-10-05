@@ -561,7 +561,8 @@ struct XgentSheetView: View {
         document.formFactor == .mobile && visibleNodes.contains { $0.kind == .settingsGroup }
     }
     private var usesFullHeightContainer: Bool {
-        visibleNodes.contains { $0.kind == .settingsLayout } ||
+        visibleNodes.contains { $0.variant == "workspace-search-palette" } ||
+            visibleNodes.contains { $0.kind == .settingsLayout } ||
             visibleNodes.contains { $0.kind == .terminalLayout } ||
             (visibleNodes.count == 1 && visibleNodes.first?.kind == .list)
     }

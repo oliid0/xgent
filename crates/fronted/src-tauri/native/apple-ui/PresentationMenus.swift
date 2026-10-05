@@ -17,11 +17,12 @@ struct XgentNativeMenu: View {
                 HStack(spacing: 8) {
                     if let icon = node.icon { XgentControlIcon(name: icon) }
                     Text(node.label ?? "").fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(node.id == "sidebar-soul-menu" ? 1 : nil)
                 }
             }
         }
         .menuStyle(.button)
-        .menuIndicator(.hidden)
+        .menuIndicator(node.id == "sidebar-soul-menu" ? .visible : .hidden)
         .buttonStyle(XgentActionButtonStyle(node: node, iconOnly: iconOnly))
         .disabled(node.disabled == true)
         .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")

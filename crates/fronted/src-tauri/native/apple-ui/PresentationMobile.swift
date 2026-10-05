@@ -448,17 +448,7 @@ private struct XgentIOSSidebarFooter: View {
                 .accessibilityIdentifier(newChat.id)
             }
             if let settings {
-                Button { model.send(settings, in: document) } label: {
-                    Image(systemName: settings.icon ?? "gearshape")
-                        .accessibilityHidden(true)
-                        .font(.system(size: 18, weight: .medium))
-                        .frame(width: 44, height: 44)
-                        .background(Color(xgentHex: palette.surface), in: Circle())
-                        .overlay(Circle().stroke(Color(xgentHex: palette.border), lineWidth: 1))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(settings.label ?? "")
-                .accessibilityIdentifier(settings.id)
+                XgentSidebarSettingsButton(node: settings, document: document, model: model)
             }
         }
         .padding(.horizontal, 8)
@@ -530,6 +520,9 @@ struct XgentIOSSheetPresentation: View {
     private var isSettingsIndex: Bool {
         back == nil && contentNodes.contains { $0.kind == .settingsGroup && $0.id == "mobile-theme" }
     }
+    private var isSettingsSession: Bool {
+        document.surface == "settings" || document.surface.hasPrefix("settings:")
+    }
     private var detents: Set<PresentationDetent> {
         list == nil ? [.large] : [.fraction(0.62), .large]
     }
@@ -552,7 +545,7 @@ struct XgentIOSSheetPresentation: View {
     }
 
     @ViewBuilder private var trailingNavigation: some View {
-        if document.dismissAction != nil && (document.surface != "settings" || back == nil) {
+        if document.dismissAction != nil && (!isSettingsSession || back == nil) {
             Button { model.dismiss(document) } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 17, weight: .semibold))
@@ -611,7 +604,7 @@ struct XgentIOSSheetPresentation: View {
     var body: some View {
         VStack(spacing: 0) {
             if !isSettingsIndex {
-                if document.surface != "settings" {
+                if !isSettingsSession {
                     Capsule()
                         .fill(Color.secondary.opacity(0.32))
                         .frame(width: 40, height: 4)
@@ -630,7 +623,7 @@ struct XgentIOSSheetPresentation: View {
             if grouped {
                 XgentIOSSettingsForm(nodes: contentNodes, document: document, model: model,
                     showsRootClose: isSettingsIndex)
-            } else if contentNodes.contains(where: { $0.kind == .terminalLayout }) {
+            } else if contentNodes.contains(where: { $0.kind == .terminalLayout || $0.variant == "workspace-search-palette" }) {
                 XgentIOSNodes(nodes: contentNodes, document: document, model: model)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {

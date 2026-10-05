@@ -10,13 +10,12 @@ struct XgentDesktopSidebar: View {
     @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .title2) private var titleSize: CGFloat = 24
     @ScaledMetric(relativeTo: .subheadline) private var sectionScale = 1.0
-    @State private var searchShown = false
 
     private var layout: XgentNode? { document.nodes.first { $0.id == "sidebar-layout" } }
     private var children: [XgentNode] { layout?.children ?? [] }
     private var list: [XgentNode] { children.first { $0.id == "sidebar-list" }?.children ?? [] }
     private var footer: [XgentNode] { children.first { $0.id == "sidebar-footer" }?.children ?? [] }
-    private var search: XgentNode? { children.first { $0.id == "sidebar-search" } }
+    private var search: XgentNode? { children.first { $0.id == "sidebar-search-toggle" } }
     private var mode: XgentNode? { children.first { $0.id == "sidebar-execution-mode" } }
     private var close: XgentNode? { children.first { $0.id == "sidebar-close" } }
     private var createProject: XgentNode? { list.first { $0.id == "create-project" } }
@@ -67,10 +66,11 @@ struct XgentDesktopSidebar: View {
                 }
                 Spacer(minLength: 8)
                 if let search {
-                    Button { searchShown.toggle() } label: {
+                    Button { model.send(search, in: document) } label: {
                         Image(systemName: "magnifyingglass").frame(width: 32, height: 32)
                     }
                     .buttonStyle(.plain)
+                    .disabled(search.disabled == true || model.isBusy(search, in: document))
                     .accessibilityIdentifier("sidebar-search-toggle")
                     .accessibilityLabel(search.accessibilityLabel ?? search.label ?? "")
                 }
@@ -83,9 +83,6 @@ struct XgentDesktopSidebar: View {
                     .accessibilityIdentifier(close.id)
                     .accessibilityLabel(close.accessibilityLabel ?? close.label ?? "")
                 }
-            }
-            if let search, searchShown || !model.value(search, in: document).text.isEmpty {
-                XgentTextInput(node: search, document: document, model: model)
             }
         }
         .padding(16)
@@ -153,18 +150,18 @@ struct XgentDesktopSidebar: View {
     }
 
     private var footerControls: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 12) {
-                ForEach(footer.filter { $0.id != "new-chat" && $0.kind != .spacer }) { item in
+        HStack(spacing: 8) {
+            ForEach(footer.filter { $0.id != "new-chat" && $0.kind != .spacer }) { item in
+                if item.id == "sidebar-soul-menu" {
                     XgentNodeView(node: item, document: document, model: model, parentAxis: .horizontal)
-                }
-            }
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(footer.filter { $0.id != "new-chat" && $0.kind != .spacer }) { item in
-                    XgentNodeView(node: item, document: document, model: model, parentAxis: .vertical)
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                } else {
+                    XgentNodeView(node: item, document: document, model: model, parentAxis: .horizontal)
+                        .fixedSize()
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 #endif

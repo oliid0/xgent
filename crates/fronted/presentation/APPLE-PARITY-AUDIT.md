@@ -602,3 +602,33 @@ were inspected through GitHub/Swift MCP and official documentation.
   slices, repeated read-only output, checksum failure and unsafe archives. The
   actual device archive, startup dependency inspector and nine Shell probes
   still must pass remotely; these changes do not establish installed parity.
+# Source audit follow-up: sidebar search, Soul and SSH
+
+The Astryx implementations in `ChatHistorySidebar.tsx`, `WorkspaceSearchPalette.tsx`,
+`OtherSettingsSection.tsx` and `SshSettingsSection.tsx` exposed additional differences:
+
+- Sidebar search previously only filtered loaded titles. Native search now calls the
+  same extracted search source as Astryx: persisted message history, workspace glob,
+  settings and quick actions. Search retirement and workspace changes reject old
+  result actions. A native bounded results viewport supports long paths, Dynamic Type,
+  arrow/Return/Escape navigation and marked-text composition guards.
+- Desktop Soul selection and mobile settings-button long press now use the actual
+  shared Soul presets, selected state and creation route. The mobile picker uses a
+  native material sheet. Real device long-press behavior still needs installed-app
+  confirmation; layout fixtures and controller tests alone do not prove it.
+- Native SSH now includes authentication/status metadata, confirmed known-host reset,
+  scan import with duplicate constraints, single-key-file import, configured-secret
+  hints, keyboard-interactive guidance and folded proxy settings. Operations use the
+  same existing handlers/backend as Astryx. Host rows have a handwritten native card.
+- Production settings surfaces have UUID suffixes. The iOS navigation now recognizes
+  `settings:<UUID>` as a settings session, retaining one Back control on detail pages.
+  Drawer tests now use that actual surface identity.
+- CI 307 passed seven jobs but failed the iOS context-popover accessibility assertion:
+  Cancel exposed a 20.67-point region. Its 44-point frame is now inside the button
+  label. No full release was dispatched against that failing commit.
+
+Remaining source differences include the native Other page's extra list-entry layer,
+the missing sidebar application-update entry, and composer hardware Return/Shift-Return/
+Control-Return behavior. These items are not counted as aligned. Native SDK checks and
+installed-app smoke evidence for this follow-up are pending; all-platform parity and
+90% visual similarity have not been demonstrated.
