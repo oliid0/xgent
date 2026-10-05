@@ -29,6 +29,7 @@ final class MobileSettingsDrawerTests: XCTestCase {
                 node("sidebar-footer", "HStack", ["children": [
                     node("new-chat", "Button", ["label": "New chat", "action": "new"]),
                     node("settings", "IconButton", ["label": "Settings", "icon": "gearshape", "action": "settings"]),
+                    node("sidebar-update", "IconButton", ["label": "Update to version 1.2.3", "variant": "sidebar-update", "icon": "arrow.down", "action": "update"]),
                 ]]),
             ]]),
         ]))
@@ -38,7 +39,8 @@ final class MobileSettingsDrawerTests: XCTestCase {
         let elements = hierarchy.flattenToElements()
         let settings = try XCTUnwrap(elements.first { $0.identifier == "settings" && $0.traits.contains(.button) })
         let newChat = try XCTUnwrap(elements.first { $0.identifier == "new-chat" && $0.traits.contains(.button) })
-        for action in [settings, newChat] {
+        let update = try XCTUnwrap(elements.first { $0.identifier == "sidebar-update" && $0.traits.contains(.button) })
+        for action in [settings, newChat, update] {
             let bounds = action.shape.bezierPath.bounds
             XCTAssertGreaterThanOrEqual(bounds.height, 44)
             XCTAssertGreaterThanOrEqual(bounds.minX, -1)
@@ -47,6 +49,8 @@ final class MobileSettingsDrawerTests: XCTestCase {
             XCTAssertLessThanOrEqual(bounds.maxY, 845)
         }
         XCTAssertFalse(settings.shape.bezierPath.bounds.intersects(newChat.shape.bezierPath.bounds))
+        XCTAssertFalse(update.shape.bezierPath.bounds.intersects(newChat.shape.bezierPath.bounds))
+        XCTAssertFalse(update.shape.bezierPath.bounds.intersects(settings.shape.bezierPath.bounds))
         try attachNativeAccessibilityEvidence(hierarchy, name: "sidebar-footer-long-history-320-accessible")
         try attachCompositedNativeScreenshot(of: window, name: "sidebar-footer-long-history-320-accessible")
     }

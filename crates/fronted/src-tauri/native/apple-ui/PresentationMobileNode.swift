@@ -527,7 +527,9 @@ struct XgentIOSNode: View {
         case .settingsLayout:
             VStack(alignment: .leading, spacing: CGFloat(theme.spacing.lg)) { children }
         case .iconButton:
-            if node.variant == "sidebar-settings" {
+            if node.variant == "sidebar-update" {
+                XgentSidebarUpdateButton(node: node, document: document, model: model)
+            } else if node.variant == "sidebar-settings" {
                 XgentSidebarSettingsButton(node: node, document: document, model: model)
             } else { iconButton }
         case .spacer:

@@ -172,7 +172,9 @@ extension XgentNodeView {
                 #endif
             }
         case .iconButton:
-            XgentIconButton(node: node, document: document, model: model)
+            if node.variant == "sidebar-update" {
+                XgentSidebarUpdateButton(node: node, document: document, model: model)
+            } else { XgentIconButton(node: node, document: document, model: model) }
         case .textInput:
             XgentTextInput(node: node, document: document, model: model)
         case .shortcutRecorder:

@@ -647,3 +647,11 @@ Swift narrow-width and large-text rendering checks are pending remote CI.
 
 CI 308 exposed a file-private search helper call at compile time. Search now
 reads public child data directly; no access-control relaxation was needed.
+
+The conditional update button from `ChatHistorySidebar.tsx` and
+`AppUpdateButton.tsx` is now included in both native sidebar footers. It invokes
+the same install/restart controller (including its running-task guard), shows
+version and failure/retry labels, and reserves duplicate requests before render.
+The shared `AboutSection.tsx` itself contains only the name and current version;
+that native page was already aligned. New controller checks pass; footer geometry
+and actual macOS button dispatch remain subject to the new remote SDK run.

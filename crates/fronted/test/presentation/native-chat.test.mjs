@@ -721,6 +721,28 @@ test("native sidebar retains the shared Soul presets, selected state, creation a
   }
 });
 
+test("native desktop and mobile sidebars expose the actual conditional update controller", async () => {
+  for (const mobile of [false, true]) {
+    let installed = 0, restarted = 0;
+    const appUpdate = { showUpdateButton: false, installed: false, installing: false, restarting: false,
+      status: "available", result: { version: "1.2.3" },
+      installAndRestart: async () => { installed++; }, restart: async () => { restarted++; } };
+    const h = harness({ appUpdate }, { mobile });
+    try {
+      await h.dispatch("sidebar"); h.render();
+      const button = () => h.documents().find(document => document.mode === "sidebar").nodes[0]
+        .children.find(node => node.id === "sidebar-footer").children.find(node => node.id === "sidebar-update");
+      assert.equal(button(), undefined);
+      appUpdate.showUpdateButton = true; h.render();
+      const first = button(); assert.equal(first.variant, "sidebar-update");
+      assert.equal((await h.dispatch(first.action, null, "sidebar")).ok, true); assert.equal(installed, 1);
+      appUpdate.installed = true; appUpdate.status = "installed"; h.render();
+      assert.equal((await h.dispatch(first.action, null, "sidebar")).ok, false);
+      assert.equal((await h.dispatch(button().action, null, "sidebar")).ok, true); assert.equal(restarted, 1);
+    } finally { h.unmount(); }
+  }
+});
+
 test("native Soul quick switching reserves the shared mutation and rejects pending or retired selectors", async () => {
   const h = harness();
   try {

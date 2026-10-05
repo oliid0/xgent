@@ -450,6 +450,9 @@ private struct XgentIOSSidebarFooter: View {
             if let settings {
                 XgentSidebarSettingsButton(node: settings, document: document, model: model)
             }
+            if let update = node.children?.first(where: { $0.id == "sidebar-update" }) {
+                XgentSidebarUpdateButton(node: update, document: document, model: model)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)

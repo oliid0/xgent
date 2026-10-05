@@ -37,8 +37,9 @@ final class DesktopSidebarTests: XCTestCase {
                 let settings = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "settings" })
                 let mode = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "sidebar-execution-mode" })
                 let soul = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "sidebar-soul-menu" })
+                let update = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "sidebar-update" })
                 let bounds = window.convertToScreen(host.convert(host.bounds, to: nil))
-                for element in [newChat, skills, settings, mode, soul] {
+                for element in [newChat, skills, settings, mode, soul, update] {
                     let frame = element.accessibilityFrame()
                     XCTAssertGreaterThan(frame.height, 20)
                     XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX - 1)
@@ -56,6 +57,11 @@ final class DesktopSidebarTests: XCTestCase {
                 XCTAssertTrue(search.accessibilityPerformPress())
                 try await Task.sleep(nanoseconds: 100_000_000)
                 XCTAssertEqual(actions.last?.action, "workspace-search")
+                XCTAssertFalse(update.accessibilityFrame().intersects(settings.accessibilityFrame()))
+                XCTAssertFalse(update.accessibilityFrame().intersects(soul.accessibilityFrame()))
+                XCTAssertTrue(update.accessibilityPerformPress())
+                try await Task.sleep(nanoseconds: 100_000_000)
+                XCTAssertEqual(actions.last?.action, "update")
                 let strategy = Snapshotting<NSView, NSImage>.image(size: CGSize(width: width, height: 760))
                 let image = await withCheckedContinuation { continuation in
                     strategy.snapshot(host).run { continuation.resume(returning: $0) }
@@ -97,6 +103,7 @@ final class DesktopSidebarTests: XCTestCase {
                         ["id": "sidebar-soul:selected", "kind": "Button", "label": "Selected preset", "selected": true, "action": "select-soul"],
                      ]],
                     ["id": "settings", "kind": "IconButton", "label": "Settings", "icon": "gearshape", "action": "settings"],
+                    ["id": "sidebar-update", "kind": "IconButton", "variant": "sidebar-update", "label": "Update to version 1.2.3", "icon": "arrow.down", "action": "update"],
                 ]],
             ]]]]
         let document = try JSONDecoder().decode(XgentDocument.self,

@@ -14,6 +14,7 @@ import type {
   MentionComposerSkill,
 } from "../components/chat/MentionComposer";
 import { useLocale } from "../i18n";
+import type { AppUpdateController } from "../lib/appUpdates";
 import { collectActivityItems } from "../lib/chat/activityTimeline";
 import type { RenderTimelineItem } from "../lib/chat/conversation/conversationState";
 import type { LiveTranscriptStore } from "../lib/chat/conversation/liveTranscriptStore";
@@ -78,6 +79,7 @@ import { decodeNativeFiles } from "./nativeFiles";
 import { nativeReadOnlyCodeNodes } from "./nativeReadOnlyCode";
 import { attachReadOnlySyntax, readOnlySyntaxPalette } from "./nativeReadOnlySyntax";
 import { createNativeSidebarSoulMenu } from "./nativeSidebarSoulMenu";
+import { createNativeSidebarUpdate } from "./nativeSidebarUpdate";
 import { createNativeTaskProgress } from "./nativeTaskProgress";
 import { createNativePresentationTheme } from "./nativeTheme";
 import {
@@ -103,6 +105,7 @@ function activityIcon(toolName: string) {
 }
 
 export type NativeChatPageProps = NativeWorkspaceActionsProps & {
+  appUpdate?: AppUpdateController;
   editorSessions?: NativeWorkspaceEditorSessions;
   conversationId: string;
   uploadWorkdir: string;
@@ -182,6 +185,10 @@ export function NativeChatPage(props: NativeChatPageProps) {
   const soul = useSoul();
   const soulRef = useRef(soul);
   soulRef.current = soul;
+  const appUpdateRef = useRef(props.appUpdate);
+  appUpdateRef.current = props.appUpdate;
+  const [updateRequest] = useState(() => ({ busy: false, mounted: true }));
+  const [, setUpdateBusy] = useState(false);
   const [soulRequest] = useState(() => ({ busy: false, mounted: true }));
   useEffect(() => {
     soulRequest.mounted = true;
@@ -189,6 +196,12 @@ export function NativeChatPage(props: NativeChatPageProps) {
       soulRequest.mounted = false;
     };
   }, [soulRequest]);
+  useEffect(() => {
+    updateRequest.mounted = true;
+    return () => {
+      updateRequest.mounted = false;
+    };
+  }, [updateRequest]);
   const [composer] = useState(createNativeComposerStore);
   const [mentionSearch] = useState(createNativeMentionSearch);
   useSyncExternalStore(composer.subscribe, composer.getSnapshot, composer.getSnapshot);
@@ -1360,6 +1373,11 @@ export function NativeChatPage(props: NativeChatPageProps) {
     t,
   );
   for (const [id, handler] of soulMenu.handlers) sidebarHandlers.set(id, handler);
+  const sidebarUpdate = createNativeSidebarUpdate(
+    { readController: () => appUpdateRef.current, request: updateRequest, setBusy: setUpdateBusy },
+    t,
+  );
+  for (const [id, handler] of sidebarUpdate.handlers) sidebarHandlers.set(id, handler);
   for (const [id, handler] of questions.handlers) activityControls.handlers.set(id, handler);
   activityControls.handlers.set("close", {
     enabled: true,
@@ -1680,6 +1698,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                           ? { variant: "sidebar-settings", children: [soulMenu.node] }
                           : {}),
                       },
+                      ...(sidebarUpdate.node ? [sidebarUpdate.node] : []),
                     ],
                   },
                 ],

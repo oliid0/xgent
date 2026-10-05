@@ -6342,6 +6342,7 @@ export function ChatPage(props: ChatPageProps) {
       <>
         <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
         <NativeChatPage
+          appUpdate={appUpdate}
           onCommandSafetyModeChange={(commandSafetyMode) =>
             setSettings((previous) => updateSystem(previous, { commandSafetyMode }))
           }
