@@ -703,3 +703,33 @@ conversation/workspace scope, allowing the native model to discard old optimisti
 edits on target changes. Controller tests reject late and returned-old-scope edits;
 a bridge test requires a restored next-conversation draft to survive old input
 and its acknowledgement. Installed screenshots/persistence are still required.
+
+# Mobile voice entry and native typography (2026-10-05)
+
+CI 314 at `0a9166de75467954f6247b9a1b71f73482780ac5` passed all eight jobs.
+Hosted macOS passed 189 tests and hosted iOS passed 196 tests, including the
+previous keyboard-menu setup check and disabled drawer Back control. Full
+Release 131 was dispatched only after that exact SHA passed; six platform
+packages and installed application smoke tests are still in progress.
+
+Source review of `SettingsPage.tsx`, `ChatComposerBar.tsx` and `NativeChatPage.tsx`
+found Android's voice setting excluded by `desktopOnly`, although mobile
+recording requires `stt.enabled` and the default is false. Android now has a
+mobile voice page with the real enable setting, native recognition status,
+permission entry, refresh/error feedback and a parent-aware Back route matching
+iOS. The desktop STT provider form remains desktop-specific. The mobile enable
+control preserves provider credentials; mobile descriptions no longer claim
+that system recognition requires desktop cloud credentials.
+
+Android voice and device permission pages share native-service observation with
+operation ownership, queued resume refresh, synchronous duplicate-request
+guards, supported permission aliases and aborting retired authorization requests.
+Controller tests cover denied permission, retry, resumed OS grants and retired
+status/request results. These checks do not prove recording on physical devices.
+
+Native composer, workspace search input/results and desktop Soul controls now
+honor their surface's font family/application scale, with Dynamic Type scaling
+applied once. A new hosted test checks the fonts and sizes of actual native
+composer/search fields; existing narrow/large-text accessibility bounds remain.
+Swift compilation and installed font/layout evidence require the next exact-SHA
+CI/release. Prompt history and atomic mention keyboard editing remain open.

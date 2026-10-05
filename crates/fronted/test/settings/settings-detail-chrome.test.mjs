@@ -6,17 +6,18 @@ import { createReactHookHarness } from "../helpers/react-hook-harness.mjs";
 function harness() {
   const hooks = createReactHookHarness();
   const settings = createTsModuleLoader().loadModule("src/lib/settings/index.ts").getDefaultSettings();
+  let nativeBack;
   const mocks = {
     react: hooks.react,
     "../i18n": { useLocale: () => ({ t: key => key }) },
     "../lib/responsive/compactViewport": { useCompactViewport: () => true },
-    "../lib/useMobileBackNavigation": { useMobileBackNavigation: () => ({ current: null }) },
+    "../lib/useMobileBackNavigation": { useMobileBackNavigation: (_enabled, callback) => { nativeBack = callback; } },
     "./settings/SettingsModalShell": { SettingsDetailLayerProvider: "SettingsDetailLayerProvider" },
     "./settings/shared": { SettingsRow: "SettingsRow", SettingsRowGroup: "SettingsRowGroup" },
     "./settings/SettingsDetailHeader": { SettingsDetailHeader: "SettingsDetailHeader" },
   };
   for (const name of ["AboutSection", "AccessSection", "BackupSyncSection", "ComputerUseSection",
-    "GlobalShortcutsSection", "MobileAssistantSection", "MobileExecutionSection", "OtherSettingsSection",
+    "GlobalShortcutsSection", "MobileAssistantSection", "MobileExecutionSection", "MobileVoiceSettingsSection", "OtherSettingsSection",
     "ProjectRootsSection", "ProviderSettingsSection", "SoulSection", "SttSettingsSection",
     "SystemSettingsForm", "ToolPermissionsSection"]) mocks[`./settings/${name}`] = { [name]: name };
   mocks["./settings/memory/MemoryPanel"] = { MemoryPanel: "MemoryPanel" };
@@ -36,7 +37,7 @@ function harness() {
       const result = walk(type, node.props[key]); if (result) return result;
     }
   }
-  return { props, render, find: type => walk(type, render()) };
+  return { props, render, find: type => walk(type, render()), back: () => nativeBack() };
 }
 
 test("compact settings hide successful saves and preserve actual error feedback on index and detail", () => {
@@ -55,6 +56,25 @@ test("compact settings hide successful saves and preserve actual error feedback 
   assert.equal(header.props.endContent, undefined);
   assert.equal(header.props.startContent.props.size, "lg");
   header.props.startContent.props.onClick();
+  assert.equal(h.find("SettingsDetailHeader"), undefined);
+  assert.ok(h.find("SettingsRowGroup"));
+});
+
+test("Android voice is a reachable native-service page and permission Back restores its parent", () => {
+  const h = harness();
+  h.props.initialSection = "voice";
+  assert.equal(h.find("SettingsDetailHeader").props.title, "settings.navVoice");
+  assert.equal(h.find("SttSettingsSection"), undefined, "mobile does not expose desktop cloud credentials");
+  h.find("MobileVoiceSettingsSection").props.onOpenPermissions();
+  assert.ok(h.find("MobileAssistantSection"));
+  const back = h.find("SettingsDetailHeader").props.startContent;
+  assert.equal(back.props.label, "settings.navVoice");
+  back.props.onClick();
+  assert.ok(h.find("MobileVoiceSettingsSection"));
+  h.find("MobileVoiceSettingsSection").props.onOpenPermissions();
+  h.render(); h.back();
+  assert.ok(h.find("MobileVoiceSettingsSection"), "Android hardware Back follows the same parent route");
+  h.render(); h.back();
   assert.equal(h.find("SettingsDetailHeader"), undefined);
   assert.ok(h.find("SettingsRowGroup"));
 });

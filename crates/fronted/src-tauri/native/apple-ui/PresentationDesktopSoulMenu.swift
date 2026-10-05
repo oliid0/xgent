@@ -11,6 +11,8 @@ struct XgentDesktopSoulMenu: View {
     @State private var contentHeight: CGFloat = 240
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @ScaledMetric(relativeTo: .body) private var bodyScale = 1.0
+    @ScaledMetric(relativeTo: .caption) private var captionScale = 1.0
 
     private var current: XgentNode {
         model.documents.first { $0.surface == document.surface }?.node(id: node.id) ?? node
@@ -25,7 +27,7 @@ struct XgentDesktopSoulMenu: View {
                 Image(systemName: "chevron.down").font(.caption2).foregroundStyle(.secondary)
                     .accessibilityHidden(true)
             }
-            .font(.body.weight(.medium))
+            .font(XgentFonts.body(theme.fontFamily, size: CGFloat(theme.typography.body * theme.fontScale) * bodyScale, weight: .medium))
             .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
             .contentShape(Rectangle())
         }
@@ -40,7 +42,9 @@ struct XgentDesktopSoulMenu: View {
                         if item.kind == .divider { Divider().padding(.vertical, 6) }
                         else if item.kind == .settingsGroup || item.kind == .section {
                             if let label = item.label {
-                                Text(label).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                Text(label)
+                                    .font(XgentFonts.body(theme.fontFamily, size: CGFloat(theme.typography.supporting * theme.fontScale) * captionScale, weight: .semibold))
+                                    .foregroundStyle(.secondary)
                                     .fixedSize(horizontal: false, vertical: true)
                                     .padding(.horizontal, 12).padding(.top, 8)
                                     .accessibilityAddTraits(.isHeader)
@@ -55,6 +59,7 @@ struct XgentDesktopSoulMenu: View {
             }
             .frame(width: 300)
             .frame(height: min(420, max(44, contentHeight)))
+            .font(XgentFonts.body(theme.fontFamily, size: CGFloat(theme.typography.body * theme.fontScale) * bodyScale))
             .accessibilityElement(children: .contain)
         }
     }

@@ -7,7 +7,7 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Activity,
   Camera,
@@ -21,16 +21,7 @@ import {
   WifiOff,
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
-import {
-  checkMobileAssistantPermissions,
-  type MobileAssistantPermission,
-  type MobileAssistantStatus,
-  type MobilePermissionStates,
-  mobileAssistantStatus,
-  normalizeMobileAssistantPermissions,
-  openMobileSystemSettings,
-  requestMobileAssistantPermission,
-} from "../../lib/mobileAssistant";
+import type { MobileAssistantPermission, MobilePermissionStates } from "../../lib/mobileAssistant";
 import { type ToolPolicy, updateSystem } from "../../lib/settings";
 import {
   PERSONAL_CAPABILITIES,
@@ -38,6 +29,7 @@ import {
   personalPolicyKey,
 } from "../../lib/tools/mobileAssistantPolicy";
 import type { SettingsSectionProps } from "./types";
+import { useMobileAssistantAccess } from "./useMobileAssistantAccess";
 
 type PermissionDescriptor = {
   id: MobileAssistantPermission;
@@ -121,64 +113,15 @@ function PermissionStateBadge({
 
 export function MobileAssistantSection({ settings, setSettings }: SettingsSectionProps) {
   const { t } = useLocale();
-  const [status, setStatus] = useState<MobileAssistantStatus>();
-  const [permissions, setPermissions] = useState<MobilePermissionStates>({});
-  const [busy, setBusy] = useState<MobileAssistantPermission | "refresh" | "">("");
-  const [error, setError] = useState("");
-
-  const refresh = useCallback(async () => {
-    setBusy((current) => current || "refresh");
-    setError("");
-    try {
-      const nextStatus = await mobileAssistantStatus();
-      setStatus(nextStatus);
-      // Native status queries can fail independently of capability discovery.
-      const nextPermissions = await checkMobileAssistantPermissions();
-      setPermissions(normalizeMobileAssistantPermissions(nextStatus, nextPermissions));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusy((current) => (current === "refresh" ? "" : current));
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-    const resume = () => {
-      if (document.visibilityState === "visible") void refresh();
-    };
-    window.addEventListener("focus", resume);
-    document.addEventListener("visibilitychange", resume);
-    return () => {
-      window.removeEventListener("focus", resume);
-      document.removeEventListener("visibilitychange", resume);
-    };
-  }, [refresh]);
+  const { status, permissions, busy, error, refresh, request } = useMobileAssistantAccess(
+    t("settings.mobileAssistant.unavailable"),
+  );
 
   const permissionRows = useMemo(
     () =>
       PERMISSIONS.filter((permission) => status?.permissionAliases?.[permission.id] !== undefined),
     [status],
   );
-
-  async function request(permission: MobileAssistantPermission) {
-    setBusy(permission);
-    setError("");
-    try {
-      if (!status) throw new Error(t("settings.mobileAssistant.unavailable"));
-      if (permissions[permission] === "denied" || permissions[permission] === "requested") {
-        await openMobileSystemSettings();
-        return;
-      }
-      const alias = status.permissionAliases[permission] ?? permission;
-      const next = await requestMobileAssistantPermission(alias);
-      setPermissions(normalizeMobileAssistantPermissions(status, next));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusy("");
-    }
-  }
 
   return (
     <VStack gap={5}>

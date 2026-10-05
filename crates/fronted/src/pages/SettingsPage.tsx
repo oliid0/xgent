@@ -48,6 +48,7 @@ import { ComputerUseSection } from "./settings/ComputerUseSection";
 import { GlobalShortcutsSection } from "./settings/GlobalShortcutsSection";
 import { MobileAssistantSection } from "./settings/MobileAssistantSection";
 import { MobileExecutionSection } from "./settings/MobileExecutionSection";
+import { MobileVoiceSettingsSection } from "./settings/MobileVoiceSettingsSection";
 import { MemoryPanel } from "./settings/memory/MemoryPanel";
 import { OtherSettingsSection } from "./settings/OtherSettingsSection";
 import { ProjectRootsSection } from "./settings/ProjectRootsSection";
@@ -179,7 +180,6 @@ const NAV_ITEMS: NavDefinition[] = [
     id: "voice",
     icon: Mic,
     descriptionKey: "settings.stt.desc",
-    desktopOnly: true,
   },
   {
     id: "soul",
@@ -247,6 +247,13 @@ export function SettingsPage(props: SettingsPageProps) {
     () => compactSettings && initialSection !== "system",
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [detailParent, setDetailParent] = useState<SectionId | null>(null);
+  const returnFromMobileDetail = () => {
+    if (detailParent) {
+      setSection(detailParent);
+      setDetailParent(null);
+    } else setMobileDetailOpen(false);
+  };
   const [detailLayerDepth, setDetailLayerDepth] = useState(0);
   const handleDetailLayerChange = useCallback((delta: 1 | -1) => {
     setDetailLayerDepth((current) => Math.max(0, current + delta));
@@ -288,7 +295,11 @@ export function SettingsPage(props: SettingsPageProps) {
       ).map((item) => ({
         ...item,
         label: sectionLabels[item.id],
-        description: t(item.descriptionKey),
+        description: t(
+          nativeMobile && item.id === "voice"
+            ? "settings.mobileAssistant.microphoneDescription"
+            : item.descriptionKey,
+        ),
       })),
     [hiddenSectionSet, nativeMobile, sectionLabels, t],
   );
@@ -335,6 +346,7 @@ export function SettingsPage(props: SettingsPageProps) {
 
   useEffect(() => {
     setSection(normalizeSettingsSection(initialSection));
+    setDetailParent(null);
     setMobileDetailOpen(compactSettings && normalizeSettingsSection(initialSection) !== "system");
   }, [compactSettings, initialSection]);
 
@@ -423,7 +435,19 @@ export function SettingsPage(props: SettingsPageProps) {
       case "projectRoots":
         return <ProjectRootsSection settings={settings} setSettings={setSettings} />;
       case "voice":
-        return <SttSettingsSection settings={settings} setSettings={setSettings} />;
+        return nativeMobile ? (
+          <MobileVoiceSettingsSection
+            settings={settings}
+            setSettings={setSettings}
+            onOpenPermissions={() => {
+              setDetailParent("voice");
+              setSection("mobileAssistant");
+              setMobileDetailOpen(true);
+            }}
+          />
+        ) : (
+          <SttSettingsSection settings={settings} setSettings={setSettings} />
+        );
       case "usage":
         return null;
       case "about":
@@ -443,7 +467,7 @@ export function SettingsPage(props: SettingsPageProps) {
   useMobileBackNavigation(
     compactSettings,
     () => {
-      if (mobileDetailOpen) setMobileDetailOpen(false);
+      if (mobileDetailOpen) returnFromMobileDetail();
       else onBack();
     },
     10,
@@ -473,12 +497,20 @@ export function SettingsPage(props: SettingsPageProps) {
                     startContent={
                       <IconButton
                         className="settings-navigation-control"
-                        label={t("settings.mobile.backToSettings")}
-                        tooltip={t("settings.mobile.backToSettings")}
+                        label={
+                          detailParent
+                            ? sectionLabels[detailParent]
+                            : t("settings.mobile.backToSettings")
+                        }
+                        tooltip={
+                          detailParent
+                            ? sectionLabels[detailParent]
+                            : t("settings.mobile.backToSettings")
+                        }
                         icon={<Icon icon={ChevronLeft} size="md" color="inherit" />}
                         variant="ghost"
                         size="lg"
-                        onClick={() => setMobileDetailOpen(false)}
+                        onClick={returnFromMobileDetail}
                       />
                     }
                   />
@@ -596,6 +628,7 @@ export function SettingsPage(props: SettingsPageProps) {
                             startContent={<Icon icon={item.icon} size="md" color="inherit" />}
                             endContent={<Icon icon={ChevronRight} size="sm" color="tertiary" />}
                             onClick={() => {
+                              setDetailParent(null);
                               setSection(item.id);
                               setMobileDetailOpen(true);
                             }}

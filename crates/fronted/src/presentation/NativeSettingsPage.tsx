@@ -1645,7 +1645,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
                 normalizeSettings({ ...previous, stt: { ...previous.stt, enabled } }),
               ),
             ),
-            text: t("settings.stt.desc"),
+            text: t("settings.mobileAssistant.microphoneDescription"),
           },
           {
             id: "voice-device-status",

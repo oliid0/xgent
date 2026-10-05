@@ -12,6 +12,8 @@ struct XgentWorkspaceSearchPalette: View {
     @FocusState private var queryFocused: Bool
     @State private var selectedID: String?
     @StateObject private var fieldState = XgentWorkspaceSearchFieldState()
+    @ScaledMetric(relativeTo: .body) private var bodyScale = 1.0
+    @ScaledMetric(relativeTo: .subheadline) private var supportingScale = 1.0
 
     private var query: XgentNode? { node.children?.first { $0.id == "workspace-search-query" } }
     private var groups: [XgentNode] {
@@ -19,6 +21,22 @@ struct XgentWorkspaceSearchPalette: View {
     }
     private var results: [XgentNode] { groups.flatMap { $0.children ?? [] } }
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
+    private var bodyFont: Font {
+        #if os(iOS)
+        let size = 17.0
+        #else
+        let size = theme.typography.body
+        #endif
+        return XgentFonts.body(theme.fontFamily, size: CGFloat(size * theme.fontScale) * bodyScale)
+    }
+    private var supportingFont: Font {
+        #if os(iOS)
+        let size = 15.0
+        #else
+        let size = theme.typography.supporting
+        #endif
+        return XgentFonts.body(theme.fontFamily, size: CGFloat(size * theme.fontScale) * supportingScale)
+    }
     private var queryCurrent: Bool {
         guard let query else { return false }
         return model.value(query, in: document).text == query.value?.text
@@ -39,7 +57,7 @@ struct XgentWorkspaceSearchPalette: View {
                             model.send(query, in: document, value: .string(next), editing: true)
                         }))
                         .textFieldStyle(.plain)
-                        .font(.body)
+                        .font(bodyFont)
                         .focused($queryFocused)
                         #if os(iOS)
                         .introspect(.textField, on: .iOS(.v26)) { field in
@@ -83,7 +101,7 @@ struct XgentWorkspaceSearchPalette: View {
                     LazyVStack(alignment: .leading, spacing: 12) {
                         ForEach(groups) { group in
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(group.label ?? "").font(.subheadline.weight(.semibold))
+                                Text(group.label ?? "").font(supportingFont.weight(.semibold))
                                     .foregroundStyle(.secondary)
                                     .fixedSize(horizontal: false, vertical: true)
                                     .padding(.horizontal, 12)
@@ -117,10 +135,10 @@ struct XgentWorkspaceSearchPalette: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: result.icon ?? "magnifyingglass").frame(width: 20).padding(.top, 3).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(result.label ?? "").font(.body)
+                    Text(result.label ?? "").font(bodyFont)
                         .fixedSize(horizontal: false, vertical: true)
                     if let description = result.text, !description.isEmpty {
-                        Text(description).font(.subheadline).foregroundStyle(.secondary)
+                        Text(description).font(supportingFont).foregroundStyle(.secondary)
                             .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)

@@ -24,7 +24,7 @@ struct XgentComposerInput: View {
         TextField(node.label ?? "", text: value, selection: $selection, axis: .vertical)
             .modifier(XgentComposerFocusModifier(node: node, document: document, model: model))
             .lineLimit(1...6).textFieldStyle(.plain)
-            .font(.body).padding(.vertical, 8)
+            .modifier(XgentControlTypography(node: node)).padding(.vertical, 8)
             .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
             .onChange(of: selection) { _, next in
                 fieldState.recordComposition()

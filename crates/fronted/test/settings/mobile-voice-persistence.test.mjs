@@ -41,3 +41,36 @@ test("mobile voice toggle survives settings reload without a desktop STT command
     else globalThis.localStorage = previousStorage;
   }
 });
+
+test("Android voice control changes the real persisted setting while preserving desktop credentials", () => {
+  const mocks = {
+    "../../i18n": { useLocale: () => ({ t: key => key }) },
+    "./shared": { SettingsRow: "SettingsRow", SettingsRowGroup: "SettingsRowGroup" },
+    "./useMobileAssistantAccess": { useMobileAssistantAccess: () => ({
+      status: { voiceInputAvailable: true }, permissions: { microphone: "granted" }, busy: "", error: "", refresh() {},
+    }) },
+  };
+  for (const [module, names] of Object.entries({
+    Banner: ["Banner"], IconButton: ["IconButton"], Layout: ["VStack"], List: ["ListItem"],
+    StatusDot: ["StatusDot"], Switch: ["Switch"], Text: ["Text"],
+  })) mocks[`@astryxdesign/core/${module}`] = Object.fromEntries(names.map(name => [name, name]));
+  const loader = createTsModuleLoader({ mocks });
+  const { MobileVoiceSettingsSection } = loader.loadModule("src/pages/settings/MobileVoiceSettingsSection.tsx");
+  let settings = loader.loadModule("src/lib/settings/index.ts").getDefaultSettings();
+  settings.stt.providers.aliyun_dashscope.apiKey = "desktop-secret";
+  let opened = false;
+  const tree = MobileVoiceSettingsSection({ settings, setSettings: update => { settings = update(settings); },
+    onOpenPermissions: () => { opened = true; },
+  });
+  const visit = value => Array.isArray(value) ? value.flatMap(visit) : value?.props
+    ? [value, ...visit(value.props.children)] : [];
+  const nodes = visit(tree);
+  const toggle = nodes.find(node => node.type === "Switch");
+  assert.equal(toggle.props.value, false); toggle.props.onChange(true);
+  assert.equal(settings.stt.enabled, true);
+  assert.equal(settings.stt.providers.aliyun_dashscope.apiKey, "desktop-secret");
+  const permission = nodes.find(node => node.type === "ListItem");
+  assert.equal(permission.props.description, "settings.mobileAssistant.granted");
+  permission.props.onClick(); assert.equal(opened, true);
+  assert.ok(!nodes.some(node => node.type === "TextInput"), "mobile OS speech does not request desktop provider credentials");
+});
