@@ -511,7 +511,9 @@ struct XgentIOSSheetPresentation: View {
     private var visibleNodes: [XgentNode] {
         document.nodes.filter { $0.id != "back" && $0.id != "save-status" }
     }
-    private var grouped: Bool { visibleNodes.contains { $0.kind == .settingsGroup } }
+    private var grouped: Bool {
+        visibleNodes.contains { $0.kind == .settingsGroup || $0.variant == "other-settings-area" }
+    }
     private var list: XgentNode? {
         visibleNodes.count == 1 && visibleNodes.first?.kind == .list ? visibleNodes.first : nil
     }

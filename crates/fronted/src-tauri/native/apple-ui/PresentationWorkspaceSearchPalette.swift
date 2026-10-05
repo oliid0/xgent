@@ -13,8 +13,10 @@ struct XgentWorkspaceSearchPalette: View {
     @State private var selectedID: String?
     @StateObject private var fieldState = XgentWorkspaceSearchFieldState()
 
-    private var query: XgentNode? { node.child(id: "workspace-search-query") }
-    private var groups: [XgentNode] { node.child(id: "workspace-search-results")?.children ?? [] }
+    private var query: XgentNode? { node.children?.first { $0.id == "workspace-search-query" } }
+    private var groups: [XgentNode] {
+        node.children?.first { $0.id == "workspace-search-results" }?.children ?? []
+    }
     private var results: [XgentNode] { groups.flatMap { $0.children ?? [] } }
     private var palette: XgentPalette { theme.palette(for: colorScheme) }
     private var queryCurrent: Bool {

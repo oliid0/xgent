@@ -26,6 +26,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
     "../i18n": locale,
     "../../i18n": locale,
     "./NativeSurface": { NativeSurface: "NativeSurface" },
+    "./NativeOtherSettings": { NativeOtherSettings: "NativeOtherSettings" },
     "./nativeTheme": { createNativePresentationTheme: () => ({ marker: "theme" }) },
     "../pages/settings/providerUtils": {
       ...providerUtils,
@@ -274,16 +275,12 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(settings.system.toolPolicies["personal:clipboard"], "deny");
   await dispatch("back");
   await dispatch("nav:other");
-  for (const [section, component] of [["ssh", "SshSettingsSection"], ["cron", "CronSection"], ["hooks", "HooksSection"]]) {
-    assert.equal((await dispatch(`nav:${section}`)).ok, true);
-    assert.equal(rendered.type, component);
-    assert.notEqual(rendered.props.openCreateImmediately, true, "enter the management list, not an unsolicited creation form");
-    rendered.props.onBack();
-    render();
-    assert.equal(document.mode, "sheet");
-    assert.ok(document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === `nav:${section}`), "return to the invoking settings category");
-  }
-  await dispatch("back");
+  assert.equal(rendered.type, "NativeOtherSettings");
+  assert.equal(rendered.props.mobile, true);
+  assert.equal(rendered.props.nativeSettingsSurfaceId, settingsSurface);
+  // The three actual lists and their editors are exercised together in
+  // native-other-settings.test.mjs; this route has no extra launcher layer.
+  rendered.props.onBack(); render();
   assert.ok(!document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === "nav:skills" || node.id === "nav:mcp"));
   mobile = false;
   states.length = 0;

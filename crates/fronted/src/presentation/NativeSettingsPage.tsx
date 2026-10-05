@@ -62,6 +62,7 @@ import { SshSettingsSection } from "../pages/settings/SshSettingsSection";
 import type { SectionId, SettingsPageProps } from "../pages/settings/types";
 import { useCodexOAuthAccounts } from "../pages/settings/useCodexOAuthAccounts";
 import { presentationControls } from "./controls";
+import { NativeOtherSettings } from "./NativeOtherSettings";
 import {
   NativeSurface,
   removeNativeSurfaceSession,
@@ -603,6 +604,17 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         nativeSettingsSurfaceId={sessionSurface}
         appearance={settings.theme}
         theme={createNativePresentationTheme(settings, nativeMobile)}
+      />
+    );
+  if (page === "other")
+    return (
+      <NativeOtherSettings
+        settings={settings}
+        setSettings={setSettings}
+        nativeSettingsSurfaceId={sessionSurface}
+        mobile={nativeMobile}
+        onBack={returnToSettings}
+        onClose={props.onBack}
       />
     );
   if (page === "ssh")
@@ -1779,14 +1791,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           status: voiceTest.ok ? "completed" : "error",
         });
     }
-  } else if (page === "other") {
-    nodes.push(
-      c.group("other-tools", titles.other, [
-        { ...navigate("hooks", "bolt"), text: t("settings.mobile.hooksDescription") },
-        { ...navigate("cron", "calendar.badge.clock"), text: t("settings.mobile.cronDescription") },
-        { ...navigate("ssh", "server.rack"), text: t("settings.mobile.sshDescription") },
-      ]),
-    );
   } else if (page === "access") {
     nodes.push(...access.nodes);
     for (const [id, handler] of access.handlers) c.handlers.set(id, handler);

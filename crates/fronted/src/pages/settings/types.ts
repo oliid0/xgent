@@ -1,6 +1,7 @@
 import type { AppUpdateController } from "../../lib/appUpdates";
 import type { AppSettings } from "../../lib/settings";
 import type { SettingsSaveState } from "../../lib/settings/storage";
+import type { NativeSettingsContentSink } from "../../presentation/nativeOtherContent";
 
 export type SetSettingsFn = (updater: (prev: AppSettings) => AppSettings) => void;
 
@@ -51,4 +52,5 @@ export type SettingsSectionProps = {
   setSettings: SetSettingsFn;
   reloadSettings?: () => Promise<void>;
   nativeSettingsSurfaceId?: string;
+  nativeOtherSink?: NativeSettingsContentSink;
 };

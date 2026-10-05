@@ -53,8 +53,10 @@ import {
   scanSshImportCandidates,
 } from "../../lib/ssh/scan";
 import { presentationControls } from "../../presentation/controls";
+import { NativeSettingsContent } from "../../presentation/NativeSettingsContent";
 import { NativeSurface } from "../../presentation/NativeSurface";
 import { decodeNativeFiles } from "../../presentation/nativeFiles";
+import type { NativeSettingsContentSink } from "../../presentation/nativeOtherContent";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
@@ -110,6 +112,7 @@ function SshHostModal(props: {
   onSave: (data: SshHostDraft) => void;
   onClose: () => void;
   nativeSettingsSurfaceId?: string;
+  nativeOtherSink?: NativeSettingsContentSink;
 }) {
   const browser = isBrowserRuntime();
   const { initialData, existingHosts, onImport, onSave, onClose } = props;
@@ -257,6 +260,7 @@ function SshHostModal(props: {
   }
 
   if (isApplePresentationRuntime()) {
+    const RootSurface = props.nativeOtherSink ? NativeSettingsContent : NativeSurface;
     const c = presentationControls();
     c.handlers.set("close", { enabled: true, accepts: (value) => value === null, run: onClose });
     c.handlers.set(keyImportAction, {
@@ -517,7 +521,9 @@ function SshHostModal(props: {
     ];
     if (importError) nodes.push({ id: "error", kind: "Text", text: importError });
     return (
-      <NativeSurface
+      <RootSurface
+        sink={props.nativeOtherSink}
+        detail
         sessionSurface={props.nativeSettingsSurfaceId}
         document={{
           mode: "sheet",
@@ -1134,6 +1140,7 @@ export function SshSettingsSection(
       <SshHostModal
         settings={settings}
         nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
+        nativeOtherSink={props.nativeOtherSink}
         initialData={editingHost ?? undefined}
         existingHosts={hosts}
         onImport={editingHost ? undefined : handleImport}
@@ -1144,6 +1151,7 @@ export function SshSettingsSection(
   }
 
   if (isApplePresentationRuntime()) {
+    const RootSurface = props.nativeOtherSink ? NativeSettingsContent : NativeSurface;
     const c = presentationControls();
     c.handlers.set("close", {
       enabled: true,
@@ -1253,7 +1261,8 @@ export function SshSettingsSection(
     });
     return (
       <>
-        <NativeSurface
+        <RootSurface
+          sink={props.nativeOtherSink}
           sessionSurface={props.nativeSettingsSurfaceId}
           document={{
             mode: "sheet",

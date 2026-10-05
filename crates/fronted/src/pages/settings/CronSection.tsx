@@ -31,6 +31,7 @@ import { buildModelOptions } from "../../lib/chat/page/chatPageHelpers";
 import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import { workspaceProjectPathKey } from "../../lib/settings";
 import { presentationControls } from "../../presentation/controls";
+import { NativeSettingsContent } from "../../presentation/NativeSettingsContent";
 import { NativeSurface } from "../../presentation/NativeSurface";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
@@ -140,6 +141,7 @@ export function CronSection(
       <CronTaskViewModal
         settings={settings}
         nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
+        nativeOtherSink={props.nativeOtherSink}
         taskId={detail.taskId}
         nativePresentationMode={props.nativePresentationMode}
         onClose={() => setDetail({ open: false })}
@@ -152,6 +154,7 @@ export function CronSection(
       <CronTaskModal
         settings={settings}
         nativeSettingsSurfaceId={props.nativeSettingsSurfaceId}
+        nativeOtherSink={props.nativeOtherSink}
         mode={detail.mode}
         nativePresentationMode={props.nativePresentationMode}
         initialData={detail.task}
@@ -170,6 +173,7 @@ export function CronSection(
   }
 
   if (isApplePresentationRuntime()) {
+    const RootSurface = props.nativeOtherSink ? NativeSettingsContent : NativeSurface;
     const c = presentationControls();
     c.handlers.set("close", {
       enabled: true,
@@ -260,7 +264,8 @@ export function CronSection(
     });
     return (
       <>
-        <NativeSurface
+        <RootSurface
+          sink={props.nativeOtherSink}
           sessionSurface={props.nativeSettingsSurfaceId}
           document={{
             mode: props.nativePresentationMode ?? "sheet",

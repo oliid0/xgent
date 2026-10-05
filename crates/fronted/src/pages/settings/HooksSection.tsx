@@ -31,6 +31,7 @@ import {
 } from "../../lib/automation";
 import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import { presentationControls } from "../../presentation/controls";
+import { NativeSettingsContent } from "../../presentation/NativeSettingsContent";
 import { NativeSurface } from "../../presentation/NativeSurface";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
@@ -165,6 +166,7 @@ export function HooksSection(
         settings={_props.settings}
         nativeSettingsSurfaceId={_props.nativeSettingsSurfaceId}
         nativePresentationMode={_props.nativePresentationMode}
+        nativeOtherSink={_props.nativeOtherSink}
         event={editingHook?.event}
         initialData={editingHook ?? undefined}
         onSave={handleSave}
@@ -174,6 +176,7 @@ export function HooksSection(
   }
 
   if (isApplePresentationRuntime()) {
+    const RootSurface = _props.nativeOtherSink ? NativeSettingsContent : NativeSurface;
     const c = presentationControls();
     c.handlers.set("close", {
       enabled: true,
@@ -290,7 +293,8 @@ export function HooksSection(
     });
     return (
       <>
-        <NativeSurface
+        <RootSurface
+          sink={_props.nativeOtherSink}
           sessionSurface={_props.nativeSettingsSurfaceId}
           document={{
             mode: _props.nativePresentationMode ?? "sheet",

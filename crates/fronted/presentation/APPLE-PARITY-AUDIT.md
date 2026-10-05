@@ -627,8 +627,23 @@ The Astryx implementations in `ChatHistorySidebar.tsx`, `WorkspaceSearchPalette.
   Cancel exposed a 20.67-point region. Its 44-point frame is now inside the button
   label. No full release was dispatched against that failing commit.
 
-Remaining source differences include the native Other page's extra list-entry layer,
+At this checkpoint, source differences included the native Other page's extra list-entry layer,
 the missing sidebar application-update entry, and composer hardware Return/Shift-Return/
 Control-Return behavior. These items are not counted as aligned. Native SDK checks and
 installed-app smoke evidence for this follow-up are pending; all-platform parity and
 90% visual similarity have not been demonstrated.
+# Inline Other settings follow-up (2026-10-05)
+
+The shared `OtherSettingsSection.tsx` renders Hooks, Cron and SSH lists inline,
+and replaces all three areas when an editor opens. Native settings now mounts
+the same three controllers together, publishes their primary content through
+one retained settings session, and leaves confirmation alerts separate.
+Detail node identities remain intact; area actions are scoped to their content
+owner so hidden and retired editors cannot receive old actions. iOS renders
+each area with its own inset and avoids wrapping its cards in another card.
+Actual controller tests cover all three lists, hook mutation, editor entry and
+return, hidden action rejection and confirmation ownership on both form factors.
+Swift narrow-width and large-text rendering checks are pending remote CI.
+
+CI 308 exposed a file-private search helper call at compile time. Search now
+reads public child data directly; no access-control relaxation was needed.

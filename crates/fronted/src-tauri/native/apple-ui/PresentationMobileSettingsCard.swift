@@ -28,7 +28,13 @@ struct XgentIOSSettingsCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        if section.controlRows.count == 1,
+           let area = section.controlRows.first, area.variant == "other-settings-area" {
+            // Each area contains its own cards and explanations. Adding another
+            // card here would double the inset and squeeze the actual controls.
+            XgentIOSNode(node: area, document: document, model: model, parentAxis: .vertical)
+        } else {
+          VStack(alignment: .leading, spacing: 10) {
             if let field, !section.labels.contains(field.label ?? "") {
                 Text(field.label ?? "")
                     .font(XgentFonts.body(theme.fontFamily, size: labelSize * CGFloat(theme.fontScale), weight: .semibold))
@@ -50,6 +56,7 @@ struct XgentIOSSettingsCard: View {
             }
             .background(section.hasControls ? Color(xgentHex: theme.palette(for: colorScheme).card) : .clear,
                 in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+          }
         }
     }
 }

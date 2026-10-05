@@ -40,8 +40,10 @@ import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import type { AppSettings } from "../../lib/settings";
 import { type ExecutionMode, isAgentExecutionMode } from "../../lib/settings";
 import { presentationControls } from "../../presentation/controls";
+import { NativeSettingsContent } from "../../presentation/NativeSettingsContent";
 import { NativeSurface } from "../../presentation/NativeSurface";
 import { nativeHttpRequestEditor } from "../../presentation/nativeHttpRequestEditor";
+import type { NativeSettingsContentSink } from "../../presentation/nativeOtherContent";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
@@ -129,6 +131,7 @@ type CronTaskModalProps = {
   settings?: AppSettings;
   mode: "add" | "edit";
   nativeSettingsSurfaceId?: string;
+  nativeOtherSink?: NativeSettingsContentSink;
   nativePresentationMode?: "root" | "sheet";
   initialData?: CronTask;
   modelOptions: CronPromptModelOption[];
@@ -148,6 +151,7 @@ export function CronTaskModal({
   settings,
   mode,
   nativeSettingsSurfaceId,
+  nativeOtherSink,
   nativePresentationMode,
   initialData,
   modelOptions,
@@ -312,6 +316,7 @@ export function CronTaskModal({
   const modalTitle = mode === "add" ? t("settings.cronModalAdd") : t("settings.cronModalEdit");
 
   if (isApplePresentationRuntime()) {
+    const RootSurface = nativeOtherSink ? NativeSettingsContent : NativeSurface;
     const c = presentationControls();
     c.handlers.set("close", {
       enabled: !isSaving,
@@ -476,7 +481,9 @@ export function CronTaskModal({
       prominent: true,
     });
     return (
-      <NativeSurface
+      <RootSurface
+        sink={nativeOtherSink}
+        detail
         sessionSurface={nativeSettingsSurfaceId}
         document={{
           mode: nativePresentationMode ?? "sheet",

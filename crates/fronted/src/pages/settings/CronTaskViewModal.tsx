@@ -39,8 +39,10 @@ import { useCompactViewport } from "../../lib/responsive/compactViewport";
 import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import type { AppSettings } from "../../lib/settings";
 import { presentationControls } from "../../presentation/controls";
+import { NativeSettingsContent } from "../../presentation/NativeSettingsContent";
 import { NativeSurface } from "../../presentation/NativeSurface";
 import { nativeCronRunNodes } from "../../presentation/nativeCronRunNodes";
+import type { NativeSettingsContentSink } from "../../presentation/nativeOtherContent";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
 import { SettingsDetailHeader } from "./SettingsDetailHeader";
@@ -52,6 +54,7 @@ type CronTaskViewModalProps = {
   settings?: AppSettings;
   taskId: string;
   nativeSettingsSurfaceId?: string;
+  nativeOtherSink?: NativeSettingsContentSink;
   nativePresentationMode?: "root" | "sheet";
   onClose: () => void;
 };
@@ -856,6 +859,7 @@ export function CronTaskViewModal({
   settings,
   taskId,
   nativeSettingsSurfaceId,
+  nativeOtherSink,
   nativePresentationMode,
   onClose,
 }: CronTaskViewModalProps) {
@@ -977,6 +981,7 @@ export function CronTaskViewModal({
   }
 
   if (isApplePresentationRuntime()) {
+    const RootSurface = nativeOtherSink ? NativeSettingsContent : NativeSurface;
     const c = presentationControls();
     c.handlers.set("close", { enabled: true, accepts: (value) => value === null, run: onClose });
     const compact = isNativeMobileRuntime();
@@ -1002,7 +1007,9 @@ export function CronTaskViewModal({
     });
     return (
       <>
-        <NativeSurface
+        <RootSurface
+          sink={nativeOtherSink}
+          detail
           sessionSurface={nativeSettingsSurfaceId}
           document={{
             mode: nativePresentationMode ?? "sheet",

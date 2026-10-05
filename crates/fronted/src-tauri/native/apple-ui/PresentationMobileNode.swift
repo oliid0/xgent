@@ -287,7 +287,9 @@ struct XgentIOSNode: View {
     @ViewBuilder private var rendered: some View {
         switch node.kind {
         case .vStack:
-            if node.variant == "workspace-search-palette" {
+            if node.variant == "other-settings-area" {
+                XgentOtherSettingsArea(node: node, document: document, model: model)
+            } else if node.variant == "workspace-search-palette" {
                 XgentWorkspaceSearchPalette(node: node, document: document, model: model)
             } else if node.variant == "workspace-editor-tabs" {
                 XgentWorkspaceEditorTabs(node: node, document: document, model: model)

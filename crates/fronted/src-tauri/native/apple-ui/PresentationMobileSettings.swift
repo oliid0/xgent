@@ -34,7 +34,10 @@ struct XgentSettingsFormSection: Identifiable {
             rows.removeAll()
         }
         for node in nodes {
-            if node.kind == .settingsGroup {
+            if node.variant == "other-settings-area" {
+                flush()
+                result.append(Self(id: node.id, labels: [], rows: [node]))
+            } else if node.kind == .settingsGroup {
                 flush()
                 let title = node.label.map { $0.isEmpty ? [] : [$0] } ?? []
                 result.append(contentsOf: sections(node.children ?? [], labels: labels + title))

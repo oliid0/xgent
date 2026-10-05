@@ -29,8 +29,10 @@ import {
 import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import type { AppSettings } from "../../lib/settings";
 import { presentationControls } from "../../presentation/controls";
+import { NativeSettingsContent } from "../../presentation/NativeSettingsContent";
 import { NativeSurface } from "../../presentation/NativeSurface";
 import { nativeHttpRequestEditor } from "../../presentation/nativeHttpRequestEditor";
+import type { NativeSettingsContentSink } from "../../presentation/nativeOtherContent";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
@@ -50,6 +52,7 @@ const DEFAULT_HOOK_TIMEOUT_SECONDS = 60;
 type HookModalProps = {
   settings?: AppSettings;
   nativeSettingsSurfaceId?: string;
+  nativeOtherSink?: NativeSettingsContentSink;
   nativePresentationMode?: "root" | "sheet";
   event?: HookEvent;
   initialData?: HookDef;
@@ -64,6 +67,7 @@ export function HookModal({
   onClose,
   settings,
   nativeSettingsSurfaceId,
+  nativeOtherSink,
   nativePresentationMode,
 }: HookModalProps) {
   const { t } = useLocale();
@@ -144,6 +148,7 @@ export function HookModal({
   }
 
   if (isApplePresentationRuntime()) {
+    const RootSurface = nativeOtherSink ? NativeSettingsContent : NativeSurface;
     const c = presentationControls();
     const editable = !isSaving;
     const nodes: PresentationNode[] = [
@@ -287,7 +292,9 @@ export function HookModal({
       run: onClose,
     });
     return (
-      <NativeSurface
+      <RootSurface
+        sink={nativeOtherSink}
+        detail
         sessionSurface={nativeSettingsSurfaceId}
         document={{
           mode: nativePresentationMode ?? "sheet",
