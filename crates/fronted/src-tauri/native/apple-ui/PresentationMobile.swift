@@ -466,37 +466,6 @@ private struct XgentIOSSidebarFooter: View {
     }
 }
 
-struct XgentIOSContextUsage: View {
-    let node: XgentNode
-
-    private var ratio: Double {
-        min(1, max(0, (node.current ?? 0) / max(node.total ?? 1, 1)))
-    }
-
-    private var color: Color {
-        if ratio >= 0.8 { return .red }
-        if ratio >= 0.5 { return .orange }
-        return .green
-    }
-
-    var body: some View {
-        ZStack {
-            Circle().stroke(Color.primary.opacity(0.16), lineWidth: 2.5)
-            Circle()
-                .trim(from: 0, to: ratio)
-                .stroke(color, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Text("\(Int(((node.current ?? 0) / max(node.total ?? 1, 1) * 100).rounded()))%")
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-        }
-        .frame(width: 34, height: 34)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "Context usage")
-        .accessibilityValue(node.accessibilityValue ?? "")
-    }
-}
-
 private struct XgentIOSPageHeader: View {
     let title: String
     let document: XgentDocument

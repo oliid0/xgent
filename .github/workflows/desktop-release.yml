@@ -880,6 +880,7 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/mobile/prepare-ios-shell-resources.sh
+          python3 scripts/mobile/prepare-ios-runtime-frameworks.py
           bash scripts/mobile/prepare-mobile-legal-notices.sh
           test -s crates/mobile-execution/ios-frameworks/Frameworks/python3_ios.xcframework/Info.plist
           test -s crates/mobile-execution/ios/Sources/Resources/python/lib/python3.9/os.py

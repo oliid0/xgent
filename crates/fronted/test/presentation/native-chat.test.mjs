@@ -623,6 +623,60 @@ test("native iPhone work modes belong to the sidebar title while command safety 
   h.unmount();
 });
 
+test("both native composers confirm manual compaction through the shared callback and reject retired conversations", async () => {
+  for (const mobile of [false, true]) {
+    let compacted = 0;
+    const h = harness({ onManualCompact: () => { compacted++; } }, { mobile });
+    const usage = () => h.render().nodes[0].children.find(node => node.id === "composer")
+      .children.find(node => node.id === "composer-actions").children.find(node => node.id === "context-usage");
+    try {
+      assert.equal(usage().children.some(node => node.id === "context-confirm"), false,
+        "The shared composer offers compaction only from 50% usage");
+      h.props.contextUsageTokensSource.getContextUsageTokens = () => 50_000;
+      let confirm = usage().children.find(node => node.id === "context-confirm");
+      assert.equal(confirm.disabled, false);
+      assert.equal(compacted, 0, "Viewing context details must not compact the conversation");
+      h.props.composerRef.current.setText("Keep this draft");
+      assert.equal((await h.dispatch(confirm.action)).ok, true);
+      assert.equal(compacted, 1);
+      assert.equal(h.props.composerRef.current.getText(), "Keep this draft");
+      h.props.manualCompactionDisabled = true;
+      assert.equal(usage().children.find(node => node.id === "context-confirm").disabled, true);
+      assert.equal((await h.dispatch(confirm.action)).ok, false);
+      assert.equal(compacted, 1, "A running task cannot start concurrent manual compaction");
+      h.props.manualCompactionDisabled = false;
+      h.props.conversationId = "another-conversation";
+      const current = usage();
+      assert.equal(current.value, "another-conversation");
+      assert.equal((await h.dispatch(confirm.action)).ok, false,
+        "A confirmation retained from the old conversation must not compact the new one");
+      confirm = current.children.find(node => node.id === "context-confirm");
+      assert.equal((await h.dispatch(confirm.action)).ok, true);
+      assert.equal(compacted, 2);
+      h.props.contextUsageTokensSource.getContextUsageTokens = () => 49_999;
+      usage();
+      assert.equal((await h.dispatch(confirm.action)).ok, false);
+      h.props.contextWindow = undefined;
+      assert.equal(usage(), undefined, "No unknown-window percentage or compaction action is invented");
+    } finally { h.unmount(); }
+  }
+});
+
+test("native context details retain overflow percentages while limiting the ring and require an actual callback", () => {
+  const h = harness();
+  try {
+    const { createNativeChatContextUsage } = h.loader.loadModule("src/presentation/nativeChatContextUsage.ts");
+    const result = createNativeChatContextUsage({ conversationId: "chat", usedTokens: 180_000, contextWindow: 100_000 }, key => key);
+    assert.match(result.node.text, /180%/);
+    assert.equal(result.node.status, "error");
+    assert.equal(result.node.children.some(node => node.id === "context-confirm"), false);
+    assert.equal(result.handlers.size, 0);
+    for (const usedTokens of [0, -1, NaN, Infinity]) {
+      assert.equal(createNativeChatContextUsage({ conversationId: "chat", usedTokens, contextWindow: 100_000 }, key => key).node, null);
+    }
+  } finally { h.unmount(); }
+});
+
 test("native chat and activity preserve file edit evidence from tool results", async () => {
   const opened = [];
   const h = harness({ onOpenWorkspaceFile: (path) => opened.push(path) }, { mobile: true });

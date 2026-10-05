@@ -40,7 +40,7 @@ struct XgentIOSComposerActions: View {
         HStack(spacing: 6) {
             ForEach(children) { child in
                 if child.id == "context-usage" {
-                    XgentIOSContextUsage(node: child)
+                    XgentContextUsage(node: child, document: document, model: model)
                 } else if child.id == "model" {
                     XgentIOSNode(node: child, document: document, model: model, parentAxis: .horizontal)
                         .frame(maxWidth: .infinity, alignment: .leading)

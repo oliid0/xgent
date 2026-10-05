@@ -212,7 +212,9 @@ extension XgentNodeView {
         case .progress:
             ProgressView(node.label ?? "").modifier(XgentControlTypography(node: node))
         case .progressBar:
-            nativeProgressBar
+            if node.variant == "context-usage" {
+                XgentContextUsage(node: node, document: document, model: model)
+            } else { nativeProgressBar }
         case .badge:
             nativeBadge
         case .banner:

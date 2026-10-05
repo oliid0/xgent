@@ -15,7 +15,6 @@ import type {
 } from "../components/chat/MentionComposer";
 import { useLocale } from "../i18n";
 import { collectActivityItems } from "../lib/chat/activityTimeline";
-import { contextUsageRatio } from "../lib/chat/contextUsage";
 import type { RenderTimelineItem } from "../lib/chat/conversation/conversationState";
 import type { LiveTranscriptStore } from "../lib/chat/conversation/liveTranscriptStore";
 import { executionActivityStore } from "../lib/chat/executionActivityStore";
@@ -58,6 +57,7 @@ import { createNativeComposerStore } from "./composerStore";
 import { presentationControls } from "./controls";
 import { NativeSurface } from "./NativeSurface";
 import { useNativeAskUserQuestions } from "./nativeAskUserQuestions";
+import { createNativeChatContextUsage } from "./nativeChatContextUsage";
 import { toolEvidenceNodes } from "./nativeChatEvidence";
 import { createNativeChatRuntimeControls } from "./nativeChatRuntimeControls";
 import { createNativeChatTranscript } from "./nativeChatTranscript";
@@ -119,6 +119,8 @@ export type NativeChatPageProps = NativeWorkspaceActionsProps & {
     getContextUsageTokens: () => number | undefined;
   };
   contextWindow?: number;
+  onManualCompact?: () => void;
+  manualCompactionDisabled?: boolean;
   inputDisabled: boolean;
   inputPlaceholder: string;
   isSending: boolean;
@@ -557,24 +559,18 @@ export function NativeChatPage(props: NativeChatPageProps) {
       ],
     };
   });
-  const contextWindow =
-    typeof props.contextWindow === "number" && Number.isFinite(props.contextWindow)
-      ? Math.max(0, Math.floor(props.contextWindow))
-      : 0;
-  const usedTokens = Math.max(0, contextUsedTokens ?? 0);
-  const contextRatio = contextUsageRatio(usedTokens, contextWindow);
-  const contextUsageNode: PresentationNode | null =
-    contextWindow > 0 && usedTokens > 0
-      ? {
-          id: "context-usage",
-          kind: "ProgressBar",
-          label: t("chat.contextUsage"),
-          current: usedTokens,
-          total: contextWindow,
-          status: contextRatio >= 0.8 ? "error" : contextRatio >= 0.5 ? "paused" : "completed",
-          accessibilityValue: `${usedTokens.toLocaleString()} / ${contextWindow.toLocaleString()} tokens (${Math.round(contextRatio * 100)}%)`,
-        }
-      : null;
+  const contextUsage = createNativeChatContextUsage(
+    {
+      conversationId: props.conversationId,
+      usedTokens: contextUsedTokens,
+      contextWindow: props.contextWindow,
+      onManualCompact: props.onManualCompact,
+      manualCompactionDisabled: props.manualCompactionDisabled,
+    },
+    t,
+  );
+  const contextUsageNode = contextUsage.node;
+  for (const [id, handler] of contextUsage.handlers) handlers.set(id, handler);
   const runtime = createNativeChatRuntimeControls(
     {
       controls: props.chatRuntimeControls,

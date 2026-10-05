@@ -106,8 +106,29 @@ targets:
         product: XgentMobileShellFrameworks
       # These C interpreters must unload between runs, as in a-Shell's host.
       # An app load command pins their parser state after the first six runs.
-      - package: XgentMobileShellFrameworks
-        product: XgentDashRuntime
+      # A binary-only aggregate SwiftPM product has no single file to copy.
+      # Stage the verified bundles and let Xcode select their SDK/arch slices.
+      - framework: ../../../../mobile-execution/ios-frameworks/Frameworks/dash.xcframework
+        link: false
+        embed: true
+        codeSign: true
+      - framework: ../../../../mobile-execution/ios-frameworks/Frameworks/dashA.xcframework
+        link: false
+        embed: true
+        codeSign: true
+      - framework: ../../../../mobile-execution/ios-frameworks/Frameworks/dashB.xcframework
+        link: false
+        embed: true
+        codeSign: true
+      - framework: ../../../../mobile-execution/ios-frameworks/Frameworks/dashC.xcframework
+        link: false
+        embed: true
+        codeSign: true
+      - framework: ../../../../mobile-execution/ios-frameworks/Frameworks/dashD.xcframework
+        link: false
+        embed: true
+        codeSign: true
+      - framework: ../../../../mobile-execution/ios-frameworks/Frameworks/dashE.xcframework
         link: false
         embed: true
         codeSign: true

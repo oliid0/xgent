@@ -133,9 +133,10 @@ test("dash interpreters remain signed embedded runtime dependencies", () => {
   const linked = host.match(/private let nativeTargetNames = \[([\s\S]*?)\n\]/)?.[1];
   assert.ok(linked);
   assert.doesNotMatch(linked, /"dash[A-E]?"/);
-  assert.match(host, /name: "XgentDashRuntime",\s*targets: dashRuntimeTargets/);
-  assert.match(project, /product: XgentDashRuntime\s+link: false\s+embed: true\s+codeSign: true/);
+  assert.doesNotMatch(host, /name: "XgentDashRuntime"/,
+    "A binary-only aggregate has no single framework product to embed");
   for (const name of ["dash", "dashA", "dashB", "dashC", "dashD", "dashE"]) {
     assert.ok(host.includes(`name: "${name}"`), `${name} remains available as a verified binary`);
+    assert.match(project, new RegExp(`framework: [^\\n]+/${name}\\.xcframework\\s+link: false\\s+embed: true\\s+codeSign: true`));
   }
 });

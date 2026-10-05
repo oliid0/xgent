@@ -6362,6 +6362,8 @@ export function ChatPage(props: ChatPageProps) {
           selectedValue={selectedValue}
           contextUsageTokensSource={contextUsageTokensSource}
           contextWindow={currentModelContextWindow}
+          onManualCompact={handleManualCompaction}
+          manualCompactionDisabled={isSending || compactionStatus.phase === "running"}
           inputDisabled={isComposerInputDisabled}
           inputPlaceholder={composerPlaceholder}
           isSending={isSending}

@@ -37,6 +37,23 @@ a long task involving third-party applications.
 
 ## Chat and task results
 
+The follow-up comparison reads Astryx's actual `ChatComposerBar`, `SettingsPage`,
+`SystemSettingsForm`, provider subpages and `RightSidebar`, rather than treating
+the twelve native navigation destinations as sufficient coverage. It found a
+functional omission in the composer: native context usage was read-only, while
+Astryx's ring opens token details and offers confirmed manual compaction from
+50% usage. Native now passes the existing `handleManualCompaction` and running
+state, renders an Apple popover and scopes the confirmation to its conversation.
+Dispatch tests cover both form factors, the threshold, concurrent-task disabling,
+draft preservation and retired conversations. Native rendering remains subject
+to the next remote Apple SDK checks; this does not establish complete parity.
+Another concrete remaining difference is keyboard submission: Astryx's
+`MentionComposer` handles Enter/send, Shift-Enter/newline and Ctrl/Cmd-Enter/steer,
+whereas `XgentComposerInput` currently only reports native text and selection and
+`NativeChatPage` does not receive `onSteer`. Matching buttons is therefore not
+sufficient evidence of matching composer interaction. This requires a native
+keyboard and IME-safe implementation and actual input verification.
+
 `NativeChatPage` uses the existing composer store, transcript/live store, activity
 store, approval controller and queued-turn handlers. The audit checked model
 selection, execution mode, plan/web-search/thinking controls, context usage,
@@ -564,3 +581,24 @@ were inspected through GitHub/Swift MCP and official documentation.
   after rebinding and requires both typing and undo to reach the returning file.
   Original lifetime, content, selection and action assertions remain unchanged;
   the next remote run must establish whether this fixes the integration failure.
+- CI 306 / `c56fd00`: all eight jobs passed, including all 180 macOS and 190
+  hosted iOS tests. Both the deliberate stale-binding test and retained
+  file-return undo/redo integration passed. Release 130 / `37245078895` was
+  dispatched for this exact SHA. Windows and Linux built successfully; the
+  installed Android reached Settings but its harness still sought the removed
+  Back-to-Chat label. Its real close control is now the required Close label.
+- Release 130 macOS packages built, but Apple Silicon's composer was not AX
+  hittable and its hierarchy logged inconsistent parent/child relationships.
+  The boundary now hides the covered transport for hit testing and exposes
+  unignored native children. Its SDK test additionally requires the window's
+  accessibility hit to identify the actual pointer target. Intel's sample shows
+  application-wide AX queries waiting in the system Apple menu's IconServices;
+  packaged queries and hierarchy captures now stay within the actual window.
+  Composer hittability remains mandatory and real click/typing is added.
+- Release 130 iOS archive failed while copying the nonexistent aggregate
+  `XgentDashRuntime` product. The host now consumes six individually staged,
+  checksum-verified XCFramework files with embed/sign enabled and linking
+  disabled. Xcode selects the platform slice. Staging regressions cover both
+  slices, repeated read-only output, checksum failure and unsafe archives. The
+  actual device archive, startup dependency inspector and nine Shell probes
+  still must pass remotely; these changes do not establish installed parity.

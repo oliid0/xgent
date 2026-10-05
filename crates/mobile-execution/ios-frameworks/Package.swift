@@ -74,11 +74,6 @@ private let nativeTargetNames = [
     "harfbuzz", "libpng",
 ]
 
-// ios_system dlopens and closes each interpreter. Linking these into the app
-// keeps their process-global parser state alive when the six-slot pool wraps.
-// Consume this product with link: false and embed: true in the Xcode host.
-private let dashRuntimeTargets = ["dash", "dashA", "dashB", "dashC", "dashD", "dashE"]
-
 // Tauri compiles the Swift plugin into libapp.a, but binary dependencies of
 // that static archive do not become dependencies of the generated Xcode app.
 // The iOS project therefore consumes this binary-only product directly.
@@ -91,10 +86,6 @@ let package = Package(
         .library(
             name: "XgentMobileShellFrameworks",
             targets: nativeTargetNames + pythonFrameworks.map(\.target)
-        ),
-        .library(
-            name: "XgentDashRuntime",
-            targets: dashRuntimeTargets
         ),
     ],
     targets: [

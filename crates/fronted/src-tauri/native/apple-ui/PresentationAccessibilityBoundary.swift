@@ -22,9 +22,12 @@ final class XgentPresentationAccessibilityBoundary {
             return
         }
         if nativeRoot {
+            transport.setAccessibilityHidden(true)
             // Keep every native sibling (including the hosting controller)
             // while excluding the transport before WebKit's remote AX query.
-            container.setAccessibilityChildren(container.subviews.filter { $0 !== transport })
+            let nativeChildren = NSAccessibility.unignoredChildren(from:
+                container.subviews.filter { $0 !== transport })
+            container.setAccessibilityChildren(nativeChildren)
             ownsChildren = true
         } else {
             reset()
@@ -35,6 +38,7 @@ final class XgentPresentationAccessibilityBoundary {
         guard ownsChildren else { return }
         // Tauri's content container otherwise uses AppKit's computed children.
         container?.setAccessibilityChildren(nil)
+        transport?.setAccessibilityHidden(false)
         ownsChildren = false
     }
 }

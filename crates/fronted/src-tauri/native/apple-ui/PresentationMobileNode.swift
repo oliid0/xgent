@@ -460,7 +460,9 @@ struct XgentIOSNode: View {
         case .progress:
             ProgressView(node.label ?? "")
         case .progressBar:
-            progressBar
+            if node.variant == "context-usage" {
+                XgentContextUsage(node: node, document: document, model: model)
+            } else { progressBar }
         case .badge:
             Text(node.label ?? node.text ?? "")
                 .font(XgentFonts.body(theme.fontFamily, size: CGFloat(theme.typography.caption * theme.fontScale * captionScale), weight: .medium))

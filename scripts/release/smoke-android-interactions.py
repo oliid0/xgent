@@ -109,7 +109,7 @@ def capture(name):
 tap({"打开边栏", "Open Sidebar"})
 tap({"设置", "Settings"})
 capture("settings")
-tap({"返回对话", "Back to Chat"})
+tap({"关闭", "Close"})
 tap({"工作工具", "Workspace tools"})
 tap({"Shell 管理", "Shell management"})
 tap({"刷新状态", "Refresh status"}, scroll=True)
@@ -171,7 +171,7 @@ else:
     capture("package-install-output-missing")
     raise AssertionError("The package installer did not expose APK output during or after installation")
 tap({"返回设置", "Back to Settings"}, timeout=300)
-tap({"返回对话", "Back to Chat"})
+tap({"关闭", "Close"})
 tap({"工作工具", "Workspace tools"})
 tap({"打开终端", "Open terminal"})
 

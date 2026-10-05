@@ -46,9 +46,9 @@ final class PresentationTransportTests: XCTestCase {
         container.layoutSubtreeIfNeeded()
         try await Task.sleep(for: .milliseconds(250))
         let native = try XCTUnwrap(container.subviews.first { $0 !== transport })
-        let children = try XCTUnwrap(container.accessibilityChildren()).compactMap { $0 as? NSView }
-        XCTAssertTrue(children.contains { $0 === native })
-        XCTAssertFalse(children.contains { $0 === transport }, "The covered execution host must not own accessibility")
+        let children = try XCTUnwrap(container.accessibilityChildren())
+        XCTAssertFalse(children.contains { ($0 as? NSView) === transport }, "The covered execution host must not own accessibility")
+        XCTAssertTrue(transport.isAccessibilityHidden())
         XCTAssertTrue(transport.window === window)
         XCTAssertFalse(transport.isHidden, "The shared execution host must continue running")
 
@@ -64,6 +64,9 @@ final class PresentationTransportTests: XCTestCase {
             ["id": $0.accessibilityIdentifier() ?? "", "label": $0.accessibilityText() ?? ""]
         }, name: "actual-transport-host")
         let action = try XCTUnwrap(nativeElements.first { $0.accessibilityIdentifier() == "native-action" })
+        let exposed = children.flatMap { nativeMacAccessibilityTree($0) }
+        XCTAssertTrue(exposed.contains { $0.accessibilityIdentifier() == "draft" })
+        XCTAssertTrue(exposed.contains { $0.accessibilityIdentifier() == "native-action" })
         let frame = action.accessibilityFrame()
         XCTAssertGreaterThan(frame.width, 0)
         let windowPoint = window.convertPoint(fromScreen: NSPoint(x: frame.midX, y: frame.midY))
@@ -71,6 +74,10 @@ final class PresentationTransportTests: XCTestCase {
         let hit = try XCTUnwrap(container.hitTest(point))
         XCTAssertTrue(hit === native || hit.isDescendant(of: native), "Pointer input must reach the native presentation")
         XCTAssertFalse(hit === transport || hit.isDescendant(of: transport))
+        let screenPoint = NSPoint(x: frame.midX, y: frame.midY)
+        let accessibilityHit = try XCTUnwrap(window.accessibilityHitTest(screenPoint) as? NSObject)
+        XCTAssertEqual(NativeMacAccessibilityElement(object: accessibilityHit).accessibilityIdentifier(), "native-action",
+                       "Accessibility hit testing must reach the same native control as pointer input")
         let value = try await transport.evaluateJavaScript("6 * 7")
         XCTAssertEqual((value as? NSNumber)?.intValue, 42, "Native accessibility must preserve shared JS execution")
         XCTAssertTrue(action.accessibilityPerformPress())
