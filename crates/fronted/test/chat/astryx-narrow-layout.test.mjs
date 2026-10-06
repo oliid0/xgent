@@ -371,7 +371,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
         // button's own target (including clear/status/step controls).
         const target = touchTarget(control);
         if (smallTouchTarget(target)) failures.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,panel:section.dataset.panel,smallEditorControl:label,box:{width:target.width,height:target.height,top:target.top,bottom:target.bottom},computed:{height:getComputedStyle(control).height,minHeight:getComputedStyle(control).minHeight,transform:getComputedStyle(control).transform}});
-        if (!control.closest('.astryx-tab-strip') && (box.left < bounds.left - 1 || box.right > bounds.right + 1)) failures.push({width:section.dataset.width,scale:section.dataset.scale,panel:section.dataset.panel,editorControlOverflow:label});
+        if (!control.closest('.astryx-tab-strip') && (box.left < bounds.left - 1 || box.right > bounds.right + 1)) failures.push({locale:section.dataset.locale,provider:section.dataset.provider,width:section.dataset.width,scale:section.dataset.scale,panel:section.dataset.panel,editorControlOverflow:label,type:control.type,role:control.getAttribute('role'),box:{left:box.left,right:box.right},bounds:{left:bounds.left,right:bounds.right}});
       }
       for (const text of panel.querySelectorAll('.astryx-text')) {
         const box = text.getBoundingClientRect();

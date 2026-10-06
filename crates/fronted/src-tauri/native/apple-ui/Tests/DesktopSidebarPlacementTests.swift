@@ -80,7 +80,8 @@ final class DesktopSidebarPlacementTests: XCTestCase {
             }
             model.windowChromeInstalled = true
             let host = NSHostingView(rootView: XgentRootLayout(model: model)
-                .environment(\.accessibilityEnabled, true).environment(\.accessibilityReduceMotion, true))
+                .environment(\.accessibilityEnabled, true)
+                .transaction { $0.animation = nil; $0.disablesAnimations = true })
             let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 1440, height: 844),
                 styleMask: [.borderless], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
@@ -167,7 +168,7 @@ final class DesktopSidebarPlacementTests: XCTestCase {
             model.update(try sidebar(revision: 1))
             model.windowChromeInstalled = true
             let host = NSHostingView(rootView: XgentRootLayout(model: model)
-                .environment(\.accessibilityReduceMotion, true))
+                .transaction { $0.animation = nil; $0.disablesAnimations = true })
             let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: 844),
                 styleMask: [.borderless], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)

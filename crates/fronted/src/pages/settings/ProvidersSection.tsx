@@ -1912,14 +1912,15 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                   </Section>
 
                   {providerType === "claude_code" || providerType === "codex" ? (
-                    <AstryxStack
-                      direction="vertical"
+                    <Section
+                      padding={4}
+                      width="100%"
                       className={cn(
-                        "mt-3 rounded-xl border bg-card px-4 py-3 transition-colors",
+                        "mt-3 rounded-xl border bg-card transition-colors",
                         promptCachingEnabled && "border-primary/35 bg-primary/[0.04]",
                       )}
                     >
-                      <AstryxStack direction="horizontal" className="flex items-center gap-3">
+                      <HStack gap={3} vAlign="center">
                         <AstryxStack
                           as="span"
                           direction="horizontal"
@@ -1930,7 +1931,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                         >
                           <Zap className="h-4 w-4" />
                         </AstryxStack>
-                        <AstryxStack direction="vertical" className="min-w-0 flex-1">
+                        <StackItem size="fill">
                           <AstryxStack direction="vertical" className="text-sm font-medium">
                             {t("settings.promptCaching")}
                           </AstryxStack>
@@ -1942,13 +1943,13 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                               ? t("settings.promptCachingDescClaude")
                               : t("settings.promptCachingDescCodex")}
                           </AstryxStack>
-                        </AstryxStack>
+                        </StackItem>
                         <DialogSwitch
                           checked={promptCachingEnabled}
                           onCheckedChange={setPromptCachingEnabled}
                           ariaLabel={t("settings.promptCaching")}
                         />
-                      </AstryxStack>
+                      </HStack>
                       {providerType === "claude_code" && promptCachingEnabled ? (
                         <AstryxStack
                           direction="horizontal"
@@ -2000,7 +2001,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                           }}
                         />
                       ) : null}
-                    </AstryxStack>
+                    </Section>
                   ) : null}
 
                   <AstryxStack
