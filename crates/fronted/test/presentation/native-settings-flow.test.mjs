@@ -51,6 +51,10 @@ test("native settings mirrors compact navigation and persists shared system, pro
     "./SettingsModalShell": { SettingsModalShell: "SettingsModalShell" },
     "../pages/settings/useCodexOAuthAccounts": { useCodexOAuthAccounts: () => ({ status: { accounts: [] }, loaded: true, locked: false }) },
   } });
+  const editorModule = loader.loadModule("src/presentation/nativeProviderEditor.ts");
+  const useEditor = editorModule.useNativeProviderEditor;
+  let providerEditor;
+  editorModule.useNativeProviderEditor = (...args) => { providerEditor = useEditor(...args); return providerEditor; };
   const { NativeSettingsPage } = loader.loadModule("src/presentation/NativeSettingsPage.tsx");
   const { getDefaultSettings } = loader.loadModule("src/lib/settings/index.ts");
   const { createPresentationActionRegistry } = loader.loadModule("src/presentation/actionRegistry.ts");
@@ -137,7 +141,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
   await dispatch("back");
   assert.ok(!document.nodes.find((node) => node.id === "mobile-theme").children.some((node) => node.id === "accent-light"));
   await dispatch("nav:system");
-  assert.ok(document.nodes.some((node) => node.id === "save-status"));
+  assert.ok(!document.nodes.some((node) => node.id === "save-status"));
   assert.equal((await dispatch("language", "zh-CN")).ok, true);
   assert.equal((await dispatch("mode", "text")).ok, true);
   assert.equal(settings.locale, "zh-CN");
@@ -154,20 +158,28 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(settings.customSettings.appearance.showThinking, false);
   await dispatch("back");
   await dispatch("nav:providers");
+  const categoryToolbar = document.nodes.find(node => node.id === "provider-category-toolbar");
+  assert.equal(categoryToolbar.variant, "provider-category-toolbar");
+  assert.deepEqual(categoryToolbar.children.map(node => node.id), ["provider-vendor", "provider-runtime-settings"]);
+  assert.equal(categoryToolbar.children[0].variant, "provider-vendor-tabs");
+  assert.equal(categoryToolbar.children[1].kind, "IconButton");
+  assert.equal(categoryToolbar.children[1].size, "large");
+  assert.ok(categoryToolbar.children[1].icon);
   await dispatch("provider-vendor", "codex");
   const count = settings.customProviders.length;
   assert.equal((await dispatch("add-provider")).ok, true);
-  assert.equal(settings.customProviders.length, count + 1);
+  assert.equal(settings.customProviders.length, count, "Add keeps the new provider unsaved");
+  assert.equal(providerEditor.settings.customProviders.length, count + 1);
   await dispatch("provider-name", "Local relay");
   const endpoint = "https://example.test/v1/chat/completions";
   await dispatch("provider-url", endpoint);
-  assert.equal(settings.customProviders.at(-1).baseUrl, "https://example.test/v1");
-  assert.equal(settings.customProviders.at(-1).requestFormat, "openai-completions");
+  assert.equal(providerEditor.settings.customProviders.at(-1).baseUrl, "https://example.test/v1");
+  assert.equal(providerEditor.settings.customProviders.at(-1).requestFormat, "openai-completions");
   await dispatch("full-url", true);
-  assert.equal(settings.customProviders.at(-1).baseUrl, endpoint,
+  assert.equal(providerEditor.settings.customProviders.at(-1).baseUrl, endpoint,
     "enabling exact URL after entering it must preserve its endpoint suffix");
   await dispatch("full-url", false);
-  assert.equal(settings.customProviders.at(-1).baseUrl, "https://example.test/v1");
+  assert.equal(providerEditor.settings.customProviders.at(-1).baseUrl, "https://example.test/v1");
   const urlField = document.nodes.flatMap((node) => node.children ?? []).find((node) => node.id === "provider-url");
   assert.equal(urlField.value, endpoint, "editing retains the entered endpoint across normalization");
   await dispatch("provider-url", "https://example.test/v1");
@@ -191,28 +203,33 @@ test("native settings mirrors compact navigation and persists shared system, pro
   const staleAuthEdit = await registry.dispatch({ surface: "settings", action: retiredApiKeyAction,
     value: "retired-api-key-mode", requestId: String(++request) });
   assert.equal(staleAuthEdit.ok, false, "changing auth mode retires its previous credential action");
-  assert.equal(settings.customProviders.at(-1).apiKey, "test-catalogue-key");
+  assert.equal(providerEditor.settings.customProviders.at(-1).apiKey, "test-catalogue-key");
   await dispatch("provider-key", "manual-access-token");
   const accountEdit = await dispatch("provider-oauth-account-id", " account-routing-id ");
   assert.equal(accountEdit.acceptedValue, "account-routing-id");
-  assert.equal(settings.customProviders.at(-1).authMode, "oauth-token");
-  assert.deepEqual(settings.customProviders.at(-1).customHeaders, [{ key: "chatgpt-account-id", value: "account-routing-id" }]);
+  assert.equal(providerEditor.settings.customProviders.at(-1).authMode, "oauth-token");
+  assert.deepEqual(providerEditor.settings.customProviders.at(-1).customHeaders, [{ key: "chatgpt-account-id", value: "account-routing-id" }]);
   await dispatch("fetch-models");
   assert.equal(discoveryOptions.authMode, "oauth-token");
   assert.equal(discoveryOptions.customHeaders[0].value, "account-routing-id");
   await dispatch("provider-auth", "api-key");
-  assert.equal(settings.customProviders.at(-1).customHeaders.length, 0);
-  assert.ok(!settings.customProviders.at(-1).activeModels.includes("fetched-model"), "catalogue refresh preserves enabled models like the desktop editor");
-  await dispatch(`model:${settings.customProviders.at(-1).id}:fetched-model`, true);
+  assert.equal(providerEditor.settings.customProviders.at(-1).customHeaders.length, 0);
+  assert.ok(!providerEditor.settings.customProviders.at(-1).activeModels.includes("fetched-model"), "catalogue refresh preserves enabled models like the desktop editor");
+  await dispatch(`model:${providerEditor.settings.customProviders.at(-1).id}:fetched-model`, true);
+  const newProviderId = providerEditor.provider.id;
+  await dispatch("provider-editor-save");
+  assert.equal(settings.customProviders.length, count + 1);
+  assert.equal(settings.customProviders.at(-1).name, "Local relay");
+  await dispatch(`provider:${newProviderId}`);
   // Choosing a model is a separate action from refreshing its catalogue.
   settings = { ...settings, selectedModel: {
-    customProviderId: settings.customProviders.at(-1).id, model: "fetched-model",
+    customProviderId: providerEditor.settings.customProviders.at(-1).id, model: "fetched-model",
   } };
   assert.deepEqual(settings.selectedModel, {
-    customProviderId: settings.customProviders.at(-1).id,
+    customProviderId: providerEditor.settings.customProviders.at(-1).id,
     model: "fetched-model",
   });
-  const fetchingProviderId = settings.customProviders.at(-1).id;
+  const fetchingProviderId = providerEditor.settings.customProviders.at(-1).id;
   const retiredCredentialAction = actionFor("provider-key");
   let releaseDiscovery;
   discoveryPause = new Promise(resolve => { releaseDiscovery = resolve; });
@@ -239,7 +256,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
   await dispatch(`provider:${fetchingProviderId}`);
   await dispatch("model-id", "example-model");
   assert.equal((await dispatch("add-model")).ok, true);
-  const provider = settings.customProviders.at(-1);
+  const provider = providerEditor.settings.customProviders.at(-1);
   assert.equal(provider.name, "Local relay");
   assert.equal(provider.baseUrl, "https://example.test/v1");
   assert.ok(provider.activeModels.includes("example-model"));
@@ -265,7 +282,8 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(rendered.props.nativeSettingsSurfaceId, settingsSurface);
   rendered.props.onBack(); render();
   assert.ok(rendered.props.handlers.has(actionFor("provider-request-settings")));
-  await dispatch("back");
+  await dispatch("provider-editor-save");
+  assert.ok(settings.customProviders.at(-1).activeModels.includes("example-model"));
   await dispatch("back");
   await dispatch("nav:mobileAssistant");
   assert.ok(!document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === "policy:Bash"));

@@ -8,6 +8,7 @@ import {
   resolveModelLimits,
   resolveModelLimitsAcrossProviders,
 } from "../models/modelCatalog";
+import { normalizeModelInput, supportsModelInputOverride } from "../models/modelInput";
 import { clampThinkingLevelToList, type ThinkingLevel } from "../models/modelThinking";
 import {
   ANTHROPIC_LONG_CONTEXT_WINDOW,
@@ -280,6 +281,8 @@ export type ProviderModelConfig = {
 
   cost?: ProviderModelCost;
   promptCacheHintMode?: PromptCacheHintMode;
+  /** A user override for relay model aliases; absence retains automatic detection. */
+  inputModalities?: ("text" | "image")[];
 };
 
 export type PromptCacheHintMode = "auto" | "openai-key" | "openrouter-session" | "none";
@@ -464,6 +467,8 @@ export type CustomProvider = {
   oauthAccountId?: string;
   customHeaders?: { key: string; value: string }[];
   models: ProviderModelConfig[];
+  /** Explicit user ordering; absent retains automatic vendor/active sorting. */
+  modelOrder?: string[];
   activeModels: string[];
   requestFormat?: CodexRequestFormat;
   reasoning: ReasoningLevel;
@@ -1627,6 +1632,9 @@ export function normalizeProviderModelConfig(
   }
 
   const cost = normalizeProviderModelCost(obj.cost);
+  const inputModalities = supportsModelInputOverride(providerId)
+    ? normalizeModelInput(obj.inputModalities)
+    : undefined;
   const promptCacheHintMode =
     providerId === "codex" &&
     (obj.promptCacheHintMode === "auto" ||
@@ -1643,6 +1651,7 @@ export function normalizeProviderModelConfig(
     limitsSource,
     ...(cost !== undefined ? { cost } : {}),
     ...(promptCacheHintMode ? { promptCacheHintMode } : {}),
+    ...(inputModalities ? { inputModalities } : {}),
   };
 }
 
@@ -1680,7 +1689,7 @@ export function findProviderModelConfig(
       limitsSource: defaults.source,
     };
   }
-  if (provider.type !== "claude_code") return matched;
+  if (provider.type !== "claude_code" || matched.limitsSource === "user") return matched;
   return {
     ...matched,
     contextWindow: resolveAnthropicContextWindow(
@@ -1762,6 +1771,9 @@ export function normalizeCustomProvider(input: unknown): CustomProvider {
         : undefined,
     customHeaders: normalizeCustomHeaders(obj.customHeaders),
     models,
+    modelOrder: Array.isArray(obj.modelOrder)
+      ? normalizeModels(normalizeStringArray(obj.modelOrder)).filter((id) => validModelIds.has(id))
+      : undefined,
     activeModels: normalizeModels(normalizeStringArray(obj.activeModels)).filter((modelId) =>
       validModelIds.has(modelId),
     ),

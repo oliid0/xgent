@@ -65,6 +65,8 @@ final class PackagedSettingsTests: XCTestCase {
                 for editor in editors {
                     let row = app.buttons[editor.action].firstMatch
                     reveal(row, in: app)
+                    XCTAssertEqual(app.buttons.matching(identifier: editor.action).count, 1,
+                                   "The actual action must have one accessibility identity")
                     tap(row, in: app)
                     let field = app.descendants(matching: .any)[editor.field].firstMatch
                     reveal(field, in: app); assertOnscreen(field, in: app)
@@ -96,6 +98,7 @@ final class PackagedSettingsTests: XCTestCase {
         tap(app.buttons["nav:voice"].firstMatch, in: app)
         let toggle = app.switches["voice-enabled"].firstMatch
         reveal(toggle, in: app)
+        XCTAssertEqual(app.switches.matching(identifier: "voice-enabled").count, 1)
         let original = try XCTUnwrap(toggle.value as? String)
         XCTAssertTrue(["0", "1"].contains(original))
         let changed = original == "1" ? "0" : "1"

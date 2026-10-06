@@ -133,6 +133,17 @@ export function validatePresentationDocument(
         throw new Error(`Invalid native composer selection action: ${node.id}`);
       }
       if (
+        node.editAction !== undefined &&
+        (node.kind !== "ComposerInput" ||
+          !node.action ||
+          !node.editAction ||
+          node.editAction === node.action ||
+          node.editAction === node.selectionAction ||
+          !handlers.has(node.editAction))
+      ) {
+        throw new Error(`Invalid native composer edit action: ${node.id}`);
+      }
+      if (
         node.focusRequest !== undefined &&
         (node.kind !== "ComposerInput" ||
           !Number.isSafeInteger(node.focusRequest) ||

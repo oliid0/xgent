@@ -57,11 +57,15 @@ test("native iOS execution does not search the simulator host for shell commands
   const environment = plugin.slice(plugin.indexOf("private func configureCommandEnvironment"), plugin.indexOf("private func isCancelled"));
   assert.doesNotMatch(environment, /applicationBin\).*:\/usr\/bin|applicationBin\).*:\/bin/);
   assert.match(environment, /documentsBin\):\\\(applicationBin\)"/);
-  assert.match(plugin, /installationVerificationVersion = "ios-a-shell-v6"/);
+  assert.match(plugin, /installationVerificationVersion = "ios-a-shell-v7"/);
   assert.match(plugin, /Missing native a-Shell command marker/);
   const prepare = read("../../../../scripts/mobile/prepare-ios-shell-resources.sh");
   assert.match(prepare, /prepare-ios-command-markers\.py/);
+  assert.match(prepare, /prepare-ios-package-script\.py" "\$OUTPUT_ROOT\/bin\/pkg"/);
   assert.match(prepare, /\$OUTPUT_ROOT\/commandDictionary\.plist.*\$OUTPUT_ROOT\/extraCommandsDictionary\.plist/);
+  assert.match(environment, /setenv\("ENV", "", 1\)/);
+  assert.match(plugin, /pkg list >\/dev\/null && printf/,
+    "The installed environment must still pass the actual package registry probe");
 });
 
 test("native iOS command cancellation cannot send process-fatal signals to its embedded interpreter", () => {

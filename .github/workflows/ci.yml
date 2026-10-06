@@ -227,6 +227,7 @@ jobs:
         if: ${{ !cancelled() && matrix.platform == 'macos' }}
         run: |
           set -o pipefail
+          python3 ../../../../../scripts/release/prepare-macos-gui-smoke.py
           xcodebuild -resolvePackageDependencies -scheme XgentNativeUI \
             -clonedSourcePackagesDirPath "$RUNNER_TEMP/native-xcode-packages" \
             2>&1 | tee "$RUNNER_TEMP/native-macos-resolve.log"

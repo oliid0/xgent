@@ -9,29 +9,33 @@ struct XgentWorkspaceEditorTabs: View {
     private var selected: String? { tabs.first { $0.selected == true }?.id }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal) {
-                HStack(spacing: 4) {
-                    ForEach(tabs) { tab in
-                        XgentWorkspaceEditorTab(node: tab, document: document, model: model).id(tab.id)
+        Group {
+            if !model.windowChromeInstalled {
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 4) {
+                            ForEach(tabs) { tab in
+                                XgentWorkspaceEditorTab(node: tab, document: document, model: model).id(tab.id)
+                            }
+                        }.padding(.horizontal, 8).padding(.vertical, 6)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                                if height.isFinite, height > 0, abs(contentHeight - height) > 0.5 { contentHeight = height }
+                            }
                     }
-                }.padding(.horizontal, 8).padding(.vertical, 6)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-                        if height.isFinite, height > 0, abs(contentHeight - height) > 0.5 { contentHeight = height }
-                    }
+                    .scrollIndicators(.hidden)
+                    .focusable()
+                    .onAppear { if let selected { proxy.scrollTo(selected) } }
+                    .onChange(of: selected) { _, id in if let id { proxy.scrollTo(id) } }
+                    .modifier(XgentTabKeyNavigation(ids: tabs.map(\.id), current: selected,
+                        select: select, close: close))
+                }
+                .frame(minWidth: 0, maxWidth: .infinity)
+                .frame(height: contentHeight)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(node.label ?? "")
             }
-            .scrollIndicators(.hidden)
-            .focusable()
-            .onAppear { if let selected { proxy.scrollTo(selected) } }
-            .onChange(of: selected) { _, id in if let id { proxy.scrollTo(id) } }
-            .modifier(XgentTabKeyNavigation(ids: tabs.map(\.id), current: selected,
-                select: select, close: close))
         }
-        .frame(minWidth: 0, maxWidth: .infinity)
-        .frame(height: contentHeight)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(node.label ?? "")
     }
 
     private func select(_ id: String) -> Bool {

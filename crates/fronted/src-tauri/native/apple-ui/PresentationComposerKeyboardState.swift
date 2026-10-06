@@ -39,16 +39,51 @@ import AppKit
     #if os(iOS)
     weak var field: UITextView?
     var composing: Bool { field?.markedTextRange != nil }
-    var selection: NSRange? { field?.selectedRange }
-    func insertLineBreak() { field?.insertText("\n") }
+    var selection: NSRange? {
+        guard let field else { return nil }
+        return XgentComposerRichText(field.attributedText ?? NSAttributedString(string: "")).plainRange(field.selectedRange)
+    }
+    func insertLineBreak() {
+        let native = field as? XgentComposerNativeTextView
+        native?.insertingLineBreak = true
+        defer { native?.insertingLineBreak = false }
+        field?.insertText("\n")
+    }
     #else
-    weak var field: NSTextField?
-    var composing: Bool { (field?.currentEditor() as? NSTextInputClient)?.hasMarkedText() == true }
-    var selection: NSRange? { (field?.currentEditor() as? NSTextView)?.selectedRange() }
-    func insertLineBreak() { (field?.currentEditor() as? NSTextView)?.insertNewlineIgnoringFieldEditor(nil) }
+    weak var field: NSTextView?
+    var composing: Bool { field?.hasMarkedText() == true }
+    var selection: NSRange? {
+        guard let field else { return nil }
+        return XgentComposerRichText(field.attributedString()).plainRange(field.selectedRange())
+    }
+    func insertLineBreak() { field?.insertNewlineIgnoringFieldEditor(nil) }
     #endif
 
     private var previouslyComposing = false
+    func historyBoundary(previous: Bool) -> Bool {
+        guard let field else { return false }
+        #if os(iOS)
+        let text = field.text ?? "", caret = field.selectedRange
+        #else
+        let text = field.string, caret = field.selectedRange()
+        #endif
+        guard caret.length == 0, let range = Range(caret, in: text) else { return false }
+        return previous ? !text[..<range.lowerBound].contains("\n") : !text[range.upperBound...].contains("\n")
+    }
+    func hasReference(for key: String, caret: NSRange) -> Bool {
+        guard caret.length == 0, let field else { return false }
+        #if os(iOS)
+        let text = field.attributedText ?? NSAttributedString(string: "")
+        #else
+        let text = field.attributedString()
+        #endif
+        let backward = key == "left" || key == "backspace"
+        return XgentComposerRichText(text).spans.contains { span in
+            span.reference != nil && (backward
+                ? caret.location > span.plain.location && caret.location <= NSMaxRange(span.plain)
+                : caret.location >= span.plain.location && caret.location < NSMaxRange(span.plain))
+        }
+    }
     private var compositionEndedAt: TimeInterval = -.infinity
     func recordComposition() {
         let current = composing

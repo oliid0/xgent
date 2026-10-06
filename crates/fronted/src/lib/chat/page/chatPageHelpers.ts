@@ -1,6 +1,7 @@
 import type { Context } from "@earendil-works/pi-ai";
 import type { Locale } from "../../../i18n/config";
 import { type ModelOption, toModelValue } from "../../providers/llm";
+import { createModelOrderSnapshot } from "../../providers/modelVendor";
 import type { AppSettings } from "../../settings";
 import { createUuid } from "../../shared/id";
 import type { ChatHistorySummary } from "../history/chatHistory";
@@ -51,7 +52,13 @@ export function buildModelOptions(
 ): ModelOption[] {
   const options: ModelOption[] = [];
   for (const provider of settings.customProviders) {
-    for (const model of provider.activeModels) {
+    const active = new Set(provider.activeModels);
+    const ordered = provider.modelOrder
+      ? createModelOrderSnapshot(provider.models, provider.modelOrder, active).filter((id) =>
+          active.has(id),
+        )
+      : provider.activeModels;
+    for (const model of ordered) {
       options.push({
         providerType: provider.type,
         providerId: provider.id,

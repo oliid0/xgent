@@ -6,8 +6,9 @@ import type { SettingsSectionProps } from "../pages/settings/types";
 import { NativeSurface } from "./NativeSurface";
 import { createNativeDesktopAppearance } from "./nativeDesktopAppearance";
 import { useNativeFontSettings } from "./nativeFontSettings";
+import { withNativeSettingsIcons } from "./nativeSettingsIcons";
 import { createNativePresentationTheme } from "./nativeTheme";
-import type { PresentationHandler } from "./types";
+import type { PresentationHandler, PresentationNode } from "./types";
 
 /** Uses the same persisted settings updater as the Android and desktop forms. */
 export function NativeMobileSystemSettings({
@@ -55,69 +56,67 @@ export function NativeMobileSystemSettings({
         formFactor: "mobile",
         theme: createNativePresentationTheme(settings, true),
         dismissAction: "close",
-        nodes: [
-          {
-            id: "back",
-            kind: "IconButton",
-            label: t("settings.mobile.backToSettings"),
-            icon: "chevron.left",
-            action: "close",
-          },
-          ...(saveState
-            ? [
+        nodes: (
+          [
+            {
+              id: "back",
+              kind: "IconButton",
+              label: t("settings.mobile.backToSettings"),
+              icon: "chevron.left",
+              action: "close",
+            },
+            ...(saveState?.status === "error"
+              ? [
+                  {
+                    id: "save-status",
+                    kind: "Text" as const,
+                    text: `${t("settings.saveError")}: ${saveState.message}`,
+                  },
+                ]
+              : []),
+            {
+              id: "system-settings",
+              kind: "SettingsGroup",
+              children: [
                 {
-                  id: "save-status",
-                  kind: "Text" as const,
-                  secondary: saveState.status !== "error",
-                  text:
-                    saveState.status === "error"
-                      ? `${t("settings.saveError")}: ${saveState.message}`
-                      : t(saveState.status === "saving" ? "settings.saving" : "settings.saved"),
-                },
-              ]
-            : []),
-          {
-            id: "system-settings",
-            kind: "SettingsGroup",
-            children: [
-              {
-                id: "execution-mode",
-                kind: "Selector",
-                label: t("settings.executionMode"),
-                text: t(
-                  settings.system.executionMode === "text"
-                    ? "settings.chatModeDesc"
-                    : "settings.agentModeDesc",
-                ),
-                value: settings.system.executionMode === "text" ? "text" : "tools",
-                action: "execution-mode",
-                options: [
-                  { value: "text", label: t("settings.chatMode") },
-                  { value: "tools", label: t("settings.agentMode") },
-                ],
-              },
-              {
-                id: "locale",
-                kind: "Selector",
-                label: t("settings.language"),
-                value: settings.locale,
-                action: "locale",
-                options: SUPPORTED_LOCALES.map((locale) => ({
-                  value: locale,
-                  label: t(
-                    locale === "system"
-                      ? "settings.auto"
-                      : locale === "zh-CN"
-                        ? "settings.chinese"
-                        : "settings.english",
+                  id: "execution-mode",
+                  kind: "Selector",
+                  label: t("settings.executionMode"),
+                  text: t(
+                    settings.system.executionMode === "text"
+                      ? "settings.chatModeDesc"
+                      : "settings.agentModeDesc",
                   ),
-                })),
-              },
-            ],
-          },
-          ...appearance.nodes,
-          ...fonts.nodes,
-        ],
+                  value: settings.system.executionMode === "text" ? "text" : "tools",
+                  action: "execution-mode",
+                  options: [
+                    { value: "text", label: t("settings.chatMode") },
+                    { value: "tools", label: t("settings.agentMode") },
+                  ],
+                },
+                {
+                  id: "locale",
+                  kind: "Selector",
+                  label: t("settings.language"),
+                  value: settings.locale,
+                  action: "locale",
+                  options: SUPPORTED_LOCALES.map((locale) => ({
+                    value: locale,
+                    label: t(
+                      locale === "system"
+                        ? "settings.auto"
+                        : locale === "zh-CN"
+                          ? "settings.chinese"
+                          : "settings.english",
+                    ),
+                  })),
+                },
+              ],
+            },
+            ...appearance.nodes,
+            ...fonts.nodes,
+          ] satisfies PresentationNode[]
+        ).map(withNativeSettingsIcons),
       }}
       handlers={handlers}
       onError={setFailure}

@@ -4,6 +4,7 @@ import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import type { AppSettings } from "../../lib/settings";
 import { presentationControls } from "../../presentation/controls";
 import { NativeSurface } from "../../presentation/NativeSurface";
+import { withNativeSettingsIcons } from "../../presentation/nativeSettingsIcons";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
 import { backupLastSyncText } from "./backupManifestText";
@@ -302,7 +303,7 @@ export function NativeBackupSyncSection(props: {
         formFactor: mobile ? "mobile" : "desktop",
         theme: createNativePresentationTheme(props.settings, mobile),
         dismissAction: "backup-back",
-        nodes: presentedNodes,
+        nodes: mobile ? presentedNodes.map(withNativeSettingsIcons) : presentedNodes,
       }}
       handlers={c.handlers}
       onError={setFailure}

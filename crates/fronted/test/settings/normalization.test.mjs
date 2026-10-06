@@ -6,6 +6,16 @@ const loader = createTsModuleLoader();
 const settings = loader.loadModule("src/lib/settings/index.ts");
 const soul = loader.loadModule("src/lib/soul/model.ts");
 
+test("custom model order removes duplicates and deleted entries and persists through settings reload", () => {
+  const provider = settings.normalizeCustomProvider({ id: "ordered", type: "codex", name: "Ordered",
+    models: ["alpha", "beta", "new"], activeModels: ["alpha", "beta"],
+    modelOrder: [" beta ", "missing", "alpha", "beta", 42] });
+  assert.deepEqual(provider.modelOrder, ["beta", "alpha"]);
+  const reloaded = settings.normalizeSettings(JSON.parse(JSON.stringify({ customProviders: [provider] })));
+  assert.deepEqual(reloaded.customProviders[0].modelOrder, ["beta", "alpha"]);
+  assert.equal(settings.normalizeCustomProvider({ ...provider, modelOrder: undefined }).modelOrder, undefined);
+});
+
 test("the bundled default Soul contributes no system prompt", () => {
   const document = soul.parseSoulDocument(
     soul.serializeSoulDocument({ metadata: soul.DEFAULT_SOUL_METADATA, body: "" }),

@@ -6,7 +6,8 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 const walk = value => {
   if (!value || typeof value !== "object") return [];
   if (Array.isArray(value)) return value.flatMap(walk);
-  return [value, ...walk(value.props?.children), ...walk(value.props?.endContent)];
+  if (typeof value.type === "function" && value.type.name === "CompactAccessSettingsForm") return walk(value.type(value.props));
+  return [value, ...walk(value.props?.children), ...walk(value.props?.label), ...walk(value.props?.description), ...walk(value.props?.endContent)];
 };
 
 test("Astryx and native access switches preserve consecutive capability changes from the same rendered page", () => {

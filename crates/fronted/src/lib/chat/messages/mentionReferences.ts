@@ -128,7 +128,7 @@ function codeMentionLineToken(reference: Pick<CodeMentionReference, "startLine" 
     : `${reference.startLine}-${reference.endLine}`;
 }
 
-function codeMentionTokenLabel(reference: CodeMentionReference) {
+export function codeMentionTokenLabel(reference: CodeMentionReference) {
   return `${codeMentionDisplayName(reference)}:${codeMentionLineToken(reference)}`;
 }
 

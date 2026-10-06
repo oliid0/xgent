@@ -16,7 +16,7 @@ struct XgentSidebarConversationRow: View {
 
     private var title: some View {
         Text(node.label ?? "")
-            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
+            .lineLimit(node.variant == "sidebar-workspace-row" ? nil : (dynamicTypeSize.isAccessibilitySize ? 3 : 2))
             .fixedSize(horizontal: false, vertical: true)
     }
 

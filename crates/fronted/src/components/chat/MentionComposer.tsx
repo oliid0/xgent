@@ -23,6 +23,7 @@ import {
   useState,
 } from "react";
 import { useLocale } from "../../i18n";
+import { isLargePasteText, makeLargePaste } from "../../lib/chat/largePaste";
 import {
   type CodeMentionReference,
   codeMentionDisplayName,
@@ -38,7 +39,6 @@ import {
   formatFileMentionToken,
   formatMarkdownReferenceDestination,
 } from "../../lib/chat/messages/mentionReferences";
-import { createUuid } from "../../lib/shared/id";
 import { cn } from "../../lib/shared/utils";
 import { readClipboardText, writeClipboardText } from "../../lib/system/clipboardText";
 import { invokeFs } from "../../lib/tools/fsBackend";
@@ -243,9 +243,6 @@ const CODE_MENTION_PATH_ATTR = "data-code-mention-path";
 const CODE_MENTION_START_ATTR = "data-code-mention-start";
 const CODE_MENTION_END_ATTR = "data-code-mention-end";
 const LARGE_PASTE_TAG_ATTR = "data-large-paste-id";
-const LARGE_PASTE_CHAR_THRESHOLD = 8_000;
-const LARGE_PASTE_LINE_THRESHOLD = 200;
-const LARGE_PASTE_PREVIEW_CHARS = 160;
 const CARET_ANCHOR_TEXT = "\u200B";
 const IME_ENTER_SUPPRESS_WINDOW_MS = 300;
 const IME_COMPOSITION_END_ENTER_TAIL_MS = 80;
@@ -593,20 +590,6 @@ function deleteComposerSelection(
 
 function normalizeMentionQuery(query: string) {
   return removeCaretAnchors(query).trim().replace(/\\/g, "/").toLowerCase();
-}
-
-function normalizeLargePastePreview(text: string) {
-  return text.trim().replace(/\s+/g, " ").slice(0, LARGE_PASTE_PREVIEW_CHARS);
-}
-
-function countLargePasteLines(text: string) {
-  if (!text) return 0;
-  return text.split(/\r\n|\r|\n/).length;
-}
-
-function isLargePasteText(text: string) {
-  if (text.length >= LARGE_PASTE_CHAR_THRESHOLD) return true;
-  return countLargePasteLines(text) >= LARGE_PASTE_LINE_THRESHOLD;
 }
 
 function clipboardFileExtension(mimeType: string) {
@@ -2473,14 +2456,7 @@ export const MentionComposer = memo(
     const createLargePaste = useCallback((text: string): MentionComposerLargePaste => {
       const index = largePasteCounterRef.current + 1;
       largePasteCounterRef.current = index;
-      return {
-        id: `large-paste-${Date.now()}-${createUuid()}`,
-        label: `Pasted text ${index}`,
-        text,
-        charCount: text.length,
-        lineCount: countLargePasteLines(text),
-        preview: normalizeLargePastePreview(text),
-      };
+      return makeLargePaste(text, index);
     }, []);
 
     const insertLargePaste = useCallback(

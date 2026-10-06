@@ -1,6 +1,7 @@
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Selector } from "@astryxdesign/core/Selector";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
@@ -88,6 +89,24 @@ export function SettingsValueSelector(props: ComponentProps<typeof Selector>) {
         </Text>
       )}
     />
+  );
+}
+
+/** StatusDot supplies the accessible indicator; the text makes its state visible. */
+export function SettingsStatus(props: ComponentProps<typeof StatusDot>) {
+  return (
+    <HStack gap={2} vAlign="center" style={{ minWidth: 0 }}>
+      <StatusDot {...props} />
+      <Text
+        type="body"
+        color="secondary"
+        wordBreak="break-word"
+        className="settings-status-label"
+        style={{ minWidth: 0 }}
+      >
+        {props.label}
+      </Text>
+    </HStack>
   );
 }
 

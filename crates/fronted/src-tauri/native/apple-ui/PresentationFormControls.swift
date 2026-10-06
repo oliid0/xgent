@@ -61,6 +61,8 @@ struct XgentTextInput: View {
                 #if os(iOS)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+                .keyboardType(node.variant == "integer-input" ? .numberPad :
+                    node.variant == "decimal-input" ? .decimalPad : .default)
                 #endif
     }
 
@@ -238,30 +240,52 @@ struct XgentSwitch: View {
     @Environment(\.xgentPresentationTheme) private var theme
     @ScaledMetric(relativeTo: .subheadline) private var supportingScale = 1.0
 
-    var body: some View {
-        Toggle(isOn: Binding(
+    private var value: Binding<Bool> {
+        Binding(
             get: { model.value(node, in: document).boolean },
             set: { model.send(node, in: document, value: .bool($0), editing: true) }
-        )) {
-            HStack(spacing: 10) {
-                if let icon = node.icon {
-                    Image(systemName: icon).frame(width: 24).accessibilityHidden(true)
+        )
+    }
+
+    private var label: some View {
+        HStack(spacing: 10) {
+            if let icon = node.icon {
+                Image(systemName: icon).frame(width: 24).accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(node.label ?? "").fixedSize(horizontal: false, vertical: true)
+                if let text = node.text, !text.isEmpty {
+                    Text(text)
+                        .font(XgentFonts.body(theme.fontFamily,
+                            size: CGFloat(theme.typography.supporting * theme.fontScale) * supportingScale))
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(node.label ?? "").fixedSize(horizontal: false, vertical: true)
-                    if let text = node.text, !text.isEmpty {
-                        Text(text)
-                            .font(XgentFonts.body(theme.fontFamily,
-                                size: CGFloat(theme.typography.supporting * theme.fontScale) * supportingScale))
-                            .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                Spacer(minLength: 12)
             }
         }
-        .toggleStyle(.switch)
+    }
+
+    var body: some View {
         #if os(iOS)
-        .tint(Color(uiColor: .systemGreen))
+        HStack(spacing: 12) {
+            label
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+                .onTapGesture { value.wrappedValue.toggle() }
+                .accessibilityHidden(true)
+            Toggle(node.accessibilityLabel ?? node.label ?? "", isOn: value)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(Color(uiColor: .systemGreen))
+                .frame(minHeight: 44)
+                .accessibilityIdentifier(node.id)
+                .accessibilityHint(node.accessibilityHint ?? node.text ?? "")
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .accessibilityElement(children: .contain)
+        #else
+        Toggle(isOn: value) { label }
+        .toggleStyle(.switch)
+        .accessibilityIdentifier(node.id)
         #endif
         .modifier(XgentControlTypography(node: node))
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)

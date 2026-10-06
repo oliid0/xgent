@@ -37,6 +37,7 @@ import {
 } from "../../../lib/settings";
 import { presentationControls } from "../../../presentation/controls";
 import { NativeSurface } from "../../../presentation/NativeSurface";
+import { withNativeSettingsIcons } from "../../../presentation/nativeSettingsIcons";
 import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
 import type { PresentationNode } from "../../../presentation/types";
 import { isApplePresentationRuntime } from "../../../runtime/applePresentation";
@@ -572,7 +573,7 @@ export function MemorySettingsDrawer(props: {
           appearance: settings.theme,
           formFactor: isNativeMobileRuntime() ? "mobile" : "desktop",
           theme: createNativePresentationTheme(settings, isNativeMobileRuntime()),
-          nodes,
+          nodes: isNativeMobileRuntime() ? nodes.map(withNativeSettingsIcons) : nodes,
           dismissAction: "back",
         }}
         handlers={c.handlers}

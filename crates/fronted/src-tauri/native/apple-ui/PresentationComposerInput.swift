@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftUIIntrospect
 
 // Native selection reports drive the same @file and /skill menus as the web
 // composer. They are separate from text edits so an ACK cannot erase a draft.
@@ -7,54 +6,75 @@ struct XgentComposerInput: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
-    @State private var selection: TextSelection?
-    @State private var appliedRequest = 0
     @StateObject private var fieldState = XgentComposerFieldState()
 
-    private var value: Binding<String> {
-        Binding(get: { model.value(node, in: document).text },
-            set: { next in
-                fieldState.recordComposition()
-                guard next != model.value(node, in: document).text else { return }
-                model.send(node, in: document, value: .string(next), editing: true)
-            })
+    private var value: String { model.value(node, in: document).text }
+
+    @Environment(\.xgentPresentationTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
+    @ScaledMetric(relativeTo: .body) private var scale = 1.0
+
+    private var fontSize: CGFloat {
+        let small = node.size == "small" || (node.size == nil && node.variant == "compact")
+        #if os(iOS)
+        let size = small ? 15.0 : 17.0
+        #else
+        let size = small ? theme.typography.supporting : theme.typography.body
+        #endif
+        return CGFloat(size * theme.fontScale) * scale
     }
 
     var body: some View {
-        TextField(node.label ?? "", text: value, selection: $selection, axis: .vertical)
-            .modifier(XgentComposerFocusModifier(node: node, document: document, model: model))
-            .lineLimit(1...6).textFieldStyle(.plain)
-            .modifier(XgentControlTypography(node: node)).padding(.vertical, 8)
-            .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
-            .onChange(of: selection) { _, next in
-                fieldState.recordComposition()
-                guard let next, case .selection(let range) = next.indices else { return }
-                let text = value.wrappedValue
-                guard range.lowerBound >= text.startIndex, range.upperBound <= text.endIndex else { return }
-                model.reportComposerSelection(NSRange(range, in: text), text: text, node: node, in: document)
+        ZStack(alignment: .topLeading) {
+            if value.isEmpty {
+                Text(node.label ?? "")
+                    .font(XgentFonts.body(theme.fontFamily, size: fontSize))
+                    .foregroundStyle(Color(xgentHex: theme.palette(for: colorScheme).secondaryText))
+                    .padding(.vertical, 8).allowsHitTesting(false).accessibilityHidden(true)
             }
-            .onChange(of: node.focusRequest, initial: true) { applySelectionRequest() }
-            .onKeyPress(keys: [.return, .tab, .upArrow, .downArrow, .escape], phases: [.down, .repeat]) { key in
-                handleKey(key)
-            }
-            #if os(iOS)
-            .introspect(.textField(axis: .vertical), on: .iOS(.v26)) { view in
-                fieldState.field = view
-                view.keyboardDismissMode = .interactive
-                view.showsVerticalScrollIndicator = false
-            }
-            #else
-            .introspect(.textField(axis: .vertical), on: .macOS(.v15, .v26)) { fieldState.field = $0 }
-            #endif
+            XgentComposerNativeField(configuration: XgentComposerFieldConfiguration(
+                readText: { value }, canonicalText: node.value?.text ?? "",
+                references: node.children?.first { $0.id == "draft-inline-references" }?.text ?? "[]",
+                readReferences: { model.composerReferences(node, in: document) },
+                pasteRules: node.children?.first { $0.id == "draft-paste-rules" }?.text ?? "",
+                selectionRequest: node.text, focusRequest: node.focusRequest,
+                lease: "\(document.surface):\(node.action ?? ""):\(node.selectionAction ?? ""):\(node.editAction ?? "")",
+                label: node.accessibilityLabel ?? node.label ?? "", identifier: node.id,
+                disabled: node.disabled == true, fontFamily: theme.fontFamily, fontSize: fontSize,
+                palette: theme.palette(for: colorScheme), fieldState: fieldState,
+                consumeFocus: { model.consumeFocusRequest(node, in: document) },
+                edit: { model.sendComposerEdit(text: $0, references: $1, pastes: $2, node: node, in: document) },
+                select: { model.reportComposerSelection($0, text: $1, node: node, in: document) },
+                key: handleKey))
+        }
     }
-
-    private func handleKey(_ key: KeyPress) -> KeyPress.Result {
+    private func handleKey(_ key: XgentComposerKey) -> KeyPress.Result {
         guard node.disabled != true, !fieldState.composing else { return .ignored }
         if key.key == .return && fieldState.suppressReturn { return .ignored }
         guard let latest = model.documents.first(where: { $0.surface == document.surface }),
               let input = latest.node(id: node.id), input.action == node.action,
-              input.selectionAction == node.selectionAction, input.disabled != true else { return .ignored }
+              input.selectionAction == node.selectionAction, input.editAction == node.editAction,
+              input.disabled != true else { return .ignored }
         let text = model.value(input, in: latest).text
+        let atomicKey: String? = key.key == .leftArrow ? "left" : key.key == .rightArrow ? "right"
+            : key.key == .delete || key.key == KeyEquivalent("\u{7f}") ? "backspace"
+            : key.key == .deleteForward ? "delete" : nil
+        if let atomicKey, key.modifiers.intersection([.shift, .option, .control, .command]).isEmpty,
+           let caret = fieldState.selection,
+           !fieldState.hasReference(for: atomicKey, caret: caret),
+           let action = input.children?.first(where: { $0.id == "draft-keyboard-atomic-\(atomicKey)" }),
+           action.disabled != true,
+           XgentComposerTokens.range(for: atomicKey, caret: caret, text: text,
+                                     encoded: action.value?.text ?? "") != nil {
+            // A preceding edit must be delivered before these ranges can own
+            // another key. Ordinary text/selection/modifier keys stay native.
+            guard text == input.value?.text, !model.isBusy(action, in: latest) else { return .handled }
+            guard let data = try? JSONSerialization.data(withJSONObject: [
+                "text": text, "location": caret.location, "length": caret.length
+            ]), let payload = String(data: data, encoding: .utf8) else { return .ignored }
+            model.send(action, in: latest, value: .string(payload))
+            return .handled
+        }
         let menu = latest.node(id: "composer-suggestions")
         let menuScope = menu?.value?.text.data(using: .utf8)
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [Any] }
@@ -81,6 +101,23 @@ struct XgentComposerInput: View {
             // its stale suggestion or the whole message by accident.
             return .handled
         }
+        if menu == nil, key.key == .upArrow || key.key == .downArrow {
+            guard key.modifiers.intersection([.shift, .option, .control, .command]).isEmpty,
+                  let caret = currentCaret, caret.length == 0 else { return .ignored }
+            let previous = key.key == .upArrow
+            let boundary = fieldState.historyBoundary(previous: previous)
+            guard boundary, let history = input.children?.first(where: {
+                $0.id == "draft-keyboard-history-\(previous ? "prev" : "next")"
+            }), history.disabled != true else { return .ignored }
+            // Wait for pending text delivery rather than recalling from an old
+            // draft or moving the caret while its history request is in flight.
+            guard text == input.value?.text, !model.isBusy(history, in: latest) else { return .handled }
+            guard let data = try? JSONSerialization.data(withJSONObject: [
+                "text": text, "location": caret.location, "length": caret.length
+            ]), let payload = String(data: data, encoding: .utf8) else { return .ignored }
+            model.send(history, in: latest, value: .string(payload))
+            return .handled
+        }
         guard key.key == .return else { return .ignored }
         if key.modifiers.contains(.shift) {
             fieldState.insertLineBreak(); return .handled
@@ -92,21 +129,4 @@ struct XgentComposerInput: View {
         return .handled
     }
 
-    private func applySelectionRequest() {
-        guard let encoded = node.text, let data = encoded.data(using: .utf8),
-              let request = try? JSONDecoder().decode(SelectionRequest.self, from: data),
-              request.request > appliedRequest, request.request == node.focusRequest,
-              request.location >= 0, request.length >= 0,
-              request.location <= value.wrappedValue.utf16.count,
-              request.length <= value.wrappedValue.utf16.count - request.location,
-              let range = Range(NSRange(location: request.location, length: request.length), in: value.wrappedValue) else { return }
-        appliedRequest = request.request
-        selection = TextSelection(range: range)
-    }
-
-    private struct SelectionRequest: Decodable {
-        let request: Int
-        let location: Int
-        let length: Int
-    }
 }

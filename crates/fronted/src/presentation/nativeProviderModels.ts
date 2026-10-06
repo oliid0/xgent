@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { moveModelOrder } from "../lib/providers/modelVendor";
 import { type CustomProvider, updateCustomProviders } from "../lib/settings";
 import {
   createDraftModelConfig,
@@ -107,7 +108,7 @@ export function useNativeProviderModels(
   const ui = scope.ui;
   const visible = (item: CustomProvider) => {
     const query = scope.ui.query.trim().toLowerCase();
-    return sortModelsBySelection(item.models, new Set(item.activeModels)).filter(
+    return sortModelsBySelection(item.models, new Set(item.activeModels), item.modelOrder).filter(
       (model) => !query || model.id.toLowerCase().includes(query),
     );
   };
@@ -197,6 +198,16 @@ export function useNativeProviderModels(
       () => change({ bulk: !scope.ui.bulk, selection: new Set() }),
       !busy,
     ),
+    ...(provider.modelOrder
+      ? [
+          c.action(
+            "model-order-reset",
+            t("settings.resetModelOrder"),
+            () => update((item) => ({ ...item, modelOrder: undefined })),
+            !busy,
+          ),
+        ]
+      : []),
     ...(ui.bulk
       ? [
           {
@@ -235,7 +246,7 @@ export function useNativeProviderModels(
         ]
       : []),
   ];
-  const rows: PresentationNode[] = visibleModels.map((model) => {
+  const rows: PresentationNode[] = visibleModels.map((model, index) => {
     const id = `${key}:${model.id}`;
     const enabledControl = ui.bulk
       ? {
@@ -288,6 +299,29 @@ export function useNativeProviderModels(
           icon: "ellipsis",
           variant: "compact",
           children: [
+            ...([-1, 1] as const).map((offset) =>
+              c.action(
+                `model-move-${offset < 0 ? "up" : "down"}:${id}`,
+                t(offset < 0 ? "settings.failover.moveUp" : "settings.failover.moveDown"),
+                () => {
+                  if (scope.ui.query.trim() || scope.ui.bulk) return;
+                  update((item) => {
+                    const modelOrder = moveModelOrder(
+                      item.models,
+                      item.modelOrder,
+                      new Set(item.activeModels),
+                      model.id,
+                      offset,
+                    );
+                    return modelOrder ? { ...item, modelOrder } : item;
+                  });
+                },
+                !busy &&
+                  !ui.query.trim() &&
+                  !ui.bulk &&
+                  (offset < 0 ? index > 0 : index + 1 < visibleModels.length),
+              ),
+            ),
             c.action(
               `model-edit:${id}`,
               `${t("settings.modelSettings")} · ${model.id}`,

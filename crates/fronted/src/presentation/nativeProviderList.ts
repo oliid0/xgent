@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { type ProviderUsageResult, queryProviderUsage } from "../lib/providers/usageQuery";
 import { type CustomProvider, type ProviderId, updateCustomProviders } from "../lib/settings";
+import { providerListDetails } from "../pages/settings/providerListDetails";
 import type { SettingsSectionProps } from "../pages/settings/types";
 import { presentationControls } from "./controls";
 import type { PresentationNode } from "./types";
@@ -12,6 +13,13 @@ const vendors: { value: ProviderId; label: string }[] = [
   { value: "xai", label: "Grok" },
   { value: "deepseek", label: "DeepSeek" },
 ];
+const vendorIcons: Record<ProviderId, string> = {
+  claude_code: "sun.max",
+  codex: "cpu",
+  gemini: "sparkles",
+  xai: "bolt",
+  deepseek: "arrow.triangle.branch",
+};
 type Usage = {
   configuration: string;
   loading: boolean;
@@ -46,6 +54,7 @@ export function useNativeProviderList(
     type,
     usage: new Map<string, Usage>(),
     pendingDelete: "",
+    deleteVersion: 0,
     error: "",
   }));
   const [, publish] = useState(0);
@@ -70,6 +79,7 @@ export function useNativeProviderList(
   const revision = scope.revision;
   const current = () => scope.active && scope.revision === revision;
   const page = scope.page;
+  const deleteVersion = scope.deleteVersion;
   const currentList = () => current() && scope.type === type && scope.page === page;
   const c = presentationControls();
   const repaint = () => publish((value) => value + 1);
@@ -197,7 +207,7 @@ export function useNativeProviderList(
   if (!enabled) return { type, nodes: [], handlers: c.handlers };
   const nodes: PresentationNode[] = [
     {
-      ...c.select("provider-vendor", t("settings.native.api"), type, vendors, (value) => {
+      ...c.select("provider-vendor", t("settings.navProviders"), type, vendors, (value) => {
         if (current()) {
           scope.type = value as ProviderId;
           scope.page++;
@@ -205,7 +215,14 @@ export function useNativeProviderList(
           setType(value as ProviderId);
         }
       }),
-      kind: "SegmentedControl",
+      variant: "provider-vendor-tabs",
+      children: vendors.map(({ value, label }) => ({
+        id: `provider-vendor-state:${value}`,
+        kind: "Text",
+        value,
+        label,
+        icon: vendorIcons[value],
+      })),
     },
     ...(filtered.length
       ? [
@@ -217,28 +234,9 @@ export function useNativeProviderList(
             disabled: false,
             label: t("settings.reorderProvider"),
             children: filtered.map((provider, index): PresentationNode => {
-              const usage = scope.usage.get(provider.id),
-                result = usage?.result,
-                plan = result?.data[0];
-              const summary = result?.error
-                ? result.error
-                : plan
-                  ? [
-                      plan.planName || plan.extra,
-                      typeof plan.remaining === "number"
-                        ? t("settings.usage.remaining") +
-                          ": " +
-                          plan.remaining.toLocaleString() +
-                          (plan.unit ? " " + plan.unit : "")
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")
-                  : (provider.baseUrl || t("settings.noBaseUrl")) +
-                    " · " +
-                    provider.activeModels.length +
-                    " " +
-                    t("settings.activeModels");
+              const usage = scope.usage.get(provider.id);
+              const result = usage?.result;
+              const details = providerListDetails(provider, result, t);
               return {
                 id: "provider-list-row:" + provider.id,
                 kind: "VStack",
@@ -248,19 +246,18 @@ export function useNativeProviderList(
                   {
                     ...action("provider:" + provider.id, provider.name, () => onEdit(provider.id)),
                     kind: "NavigationRow",
-                    icon: "cpu",
-                    text: summary,
+                    icon: vendorIcons[provider.type],
+                    text: details.connection,
                   },
                   {
                     id: "provider-list-actions:" + provider.id,
                     kind: "Menu",
                     variant: "compact",
-                    label: provider.name,
-                    icon: "ellipsis",
+                    label: `${t("settings.reorderProvider")}: ${provider.name}`,
+                    icon: "line.3.horizontal",
+                    size: "large",
+                    disabled: filtered.length < 2,
                     children: [
-                      action("provider-edit:" + provider.id, t("settings.edit"), () =>
-                        onEdit(provider.id),
-                      ),
                       action(
                         "provider-up:" + provider.id,
                         t("settings.failover.moveUp"),
@@ -273,29 +270,54 @@ export function useNativeProviderList(
                         () => move(provider.id, 1),
                         index + 1 < filtered.length,
                       ),
-                      ...(provider.usageQuery?.enabled
-                        ? [
-                            action(
-                              "provider-usage-refresh:" + provider.id,
-                              t("settings.usage.refresh"),
-                              () => loadUsage(provider.id, true),
-                              !usage?.loading,
-                            ),
-                          ]
-                        : []),
-                      {
-                        ...action(
-                          "provider-list-delete:" + provider.id,
-                          t("settings.delete"),
-                          () => {
-                            scope.pendingDelete = provider.id;
-                            repaint();
-                          },
-                        ),
-                        destructive: true,
-                      },
                     ],
                   },
+                  ...(provider.usageQuery?.enabled
+                    ? [
+                        {
+                          ...action(
+                            "provider-usage-refresh:" + provider.id,
+                            t("settings.usage.refresh"),
+                            () => loadUsage(provider.id, true),
+                            !usage?.loading,
+                          ),
+                          kind: "IconButton" as const,
+                          variant: "ghost",
+                          icon: "arrow.clockwise",
+                          size: "large" as const,
+                        },
+                      ]
+                    : []),
+                  {
+                    ...action("provider-edit:" + provider.id, t("settings.edit"), () =>
+                      onEdit(provider.id),
+                    ),
+                    kind: "IconButton",
+                    variant: "ghost",
+                    icon: "pencil",
+                    size: "large",
+                  },
+                  {
+                    ...action("provider-list-delete:" + provider.id, t("settings.delete"), () => {
+                      scope.deleteVersion++;
+                      scope.pendingDelete = provider.id;
+                      repaint();
+                    }),
+                    kind: "IconButton",
+                    variant: "ghost",
+                    icon: "trash",
+                    size: "large",
+                  },
+                  ...(details.usage
+                    ? [
+                        {
+                          id: "provider-list-usage:" + provider.id,
+                          kind: "Text" as const,
+                          text: details.usage,
+                          secondary: true,
+                        },
+                      ]
+                    : []),
                   ...(usage?.loading
                     ? [
                         {
@@ -351,6 +373,7 @@ export function useNativeProviderList(
             children: [
               {
                 ...action("provider-list-delete-confirm", t("settings.delete"), () => {
+                  if (scope.deleteVersion !== deleteVersion || !scope.pendingDelete) return;
                   const id = scope.pendingDelete;
                   try {
                     props.setSettings((previous) =>
@@ -360,6 +383,7 @@ export function useNativeProviderList(
                       ),
                     );
                     scope.pendingDelete = "";
+                    scope.deleteVersion++;
                     scope.error = "";
                     repaint();
                   } catch (cause) {
@@ -369,7 +393,9 @@ export function useNativeProviderList(
                 destructive: true,
               },
               action("provider-list-delete-cancel", t("settings.cancel"), () => {
+                if (scope.deleteVersion !== deleteVersion) return;
                 scope.pendingDelete = "";
+                scope.deleteVersion++;
                 repaint();
               }),
             ],

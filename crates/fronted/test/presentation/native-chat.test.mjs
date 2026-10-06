@@ -23,6 +23,88 @@ function assistantWork(transcript, id) {
   return work.children;
 }
 
+test("native window navigation uses visited conversations, real titles and rejects repeated or retired callbacks", async () => {
+  const known = sidebarSnapshot([
+    { id: "conversation", title: "  Original chat  " },
+    { id: "second", title: "Second chat" },
+    { id: "third", title: "Third chat" },
+    { id: "branch", title: "Branch chat" },
+  ]);
+  const calls = [];
+  const h = harness({ sidebarStore: { subscribe: () => () => {}, getSnapshot: () => known } });
+  h.props.onSelectConversation = id => { calls.push(id); h.props.conversationId = id; };
+  const control = (document, id) => document.nodes[0].children.find(node => node.id === "toolbar").children.find(node => node.id === id);
+  try {
+    const initial = h.render();
+    assert.equal(initial.title, "Original chat");
+    assert.equal(initial.nodes.find(node => node.kind === "ChatLayout").value, "conversation");
+    assert.equal(control(initial, "window-back").disabled, true);
+    assert.equal(control(initial, "window-forward").disabled, true);
+    h.props.conversationId = "second";
+    const second = h.render();
+    assert.equal(second.title, "Second chat");
+    assert.equal(second.nodes.find(node => node.kind === "ChatLayout").value, "second");
+    const oldBack = control(second, "window-back").action;
+    await h.dispatch(oldBack);
+    await h.dispatch(oldBack);
+    assert.deepEqual(calls, ["conversation"], "Rapid clicks before repaint cannot repeat the shared selection");
+    const returned = h.render();
+    assert.equal(returned.title, "Original chat");
+    assert.equal(control(returned, "window-forward").disabled, false);
+    assert.equal((await h.dispatch(oldBack)).ok, false);
+    await h.dispatch(control(returned, "window-forward").action);
+    h.render();
+    h.props.conversationId = "third";
+    const third = h.render();
+    await h.dispatch(control(third, "window-back").action);
+    h.render();
+    h.props.conversationId = "branch";
+    const branch = h.render();
+    assert.equal(control(branch, "window-forward").disabled, true, "A new selection replaces the forward branch");
+    await h.dispatch(control(branch, "window-back").action);
+    const branchedBack = h.render();
+    await h.dispatch(control(branchedBack, "window-forward").action);
+    assert.equal(h.render().title, "Branch chat");
+  } finally { h.unmount(); }
+});
+
+test("native window navigation skips deleted conversations at dispatch and remains retryable after a selection failure", async () => {
+  const known = sidebarSnapshot(["conversation", "second", "third"].map(id => ({ id, title: id })));
+  const h = harness({ sidebarStore: { subscribe: () => () => {}, getSnapshot: () => known } });
+  const calls = [];
+  let fail = true;
+  h.props.onSelectConversation = id => {
+    calls.push(id);
+    if (fail) throw Error("selection failed");
+    h.props.conversationId = id;
+  };
+  const back = document => document.nodes[0].children.find(node => node.id === "toolbar").children.find(node => node.id === "window-back");
+  try {
+    h.props.conversationId = "second"; h.render();
+    h.props.conversationId = "third";
+    const rendered = h.render();
+    known.byId.delete("second");
+    const failure = await h.dispatch(back(rendered).action);
+    assert.equal(failure.ok, false);
+    assert.deepEqual(calls, ["conversation"]);
+    fail = false;
+    await h.dispatch(back(h.render()).action);
+    assert.deepEqual(calls, ["conversation", "conversation"]);
+    assert.equal(h.render().title, "conversation");
+    known.byId.clear();
+    assert.equal(back(h.render()).disabled, true);
+  } finally { h.unmount(); }
+});
+
+test("mobile native chat retains its compact toolbar without desktop window history controls", () => {
+  const h = harness({}, { mobile: true });
+  try {
+    const controls = h.render().nodes[0].children.find(node => node.id === "toolbar").children;
+    assert.equal(controls.some(node => node.id.startsWith("window-")), false);
+    assert.ok(controls.some(node => node.id === "sidebar"));
+  } finally { h.unmount(); }
+});
+
 test("native chat carries authoritative editor sessions without adding a visible control or another surface", () => {
   const snapshot = { scope: "editor-workspace", open: [JSON.stringify(["a", 1]), JSON.stringify(["b", 2])], revision: 4 };
   const h = harness({ editorSessions: snapshot });
@@ -175,6 +257,96 @@ test("native edits reach the shared composer used by send and conversation draft
   assert.equal((await h.dispatch("send")).ok, false);
 });
 
+test("desktop and mobile inline reference edits share exact metadata, plain text ACKs and conversation ownership", async () => {
+  for (const mobile of [false, true]) {
+    const h = harness({}, { mobile });
+    try {
+      const handle = h.props.composerRef.current;
+      handle.insertSkillMention({ name: "review", path: "/a/review" });
+      handle.insertSkillMention({ name: "review", path: "/b/review" });
+      const input = () => h.render().nodes[0].children.find(node => node.id === "composer").children.find(node => node.id === "draft");
+      const initial = input();
+      assert.notEqual(initial.editAction, initial.action);
+      assert.notEqual(initial.editAction, initial.selectionAction);
+      const references = JSON.parse(initial.children.find(node => node.id === "draft-inline-references").text);
+      const payload = JSON.stringify({ text: " /review ", references: [{ ...references[1], location: 1 }] });
+      const reply = await h.dispatch(initial.editAction, payload);
+      assert.equal(reply.ok, true);
+      assert.equal(reply.acceptedValue, " /review ");
+      assert.deepEqual(handle.getDraft().skillMentions.map(skill => skill.path), ["/b/review"]);
+      const current = input();
+      assert.equal(current.value, " /review ");
+      assert.equal(JSON.parse(current.children.find(node => node.id === "draft-inline-references").text)[0].id, references[1].id);
+      const rejected = await h.dispatch(current.editAction, JSON.stringify({ text: "/review", references: [{ id: "foreign", location: 0, length: 7 }] }));
+      assert.equal(rejected.ok, false);
+      assert.equal(handle.getText(), " /review ");
+      h.props.conversationId = "other";
+      input();
+      assert.equal((await h.dispatch(current.editAction, payload)).ok, false);
+      h.props.inputDisabled = true;
+      const disabled = input();
+      assert.equal((await h.dispatch(disabled.editAction, payload)).ok, false);
+    } finally { h.unmount(); }
+  }
+});
+
+test("desktop and mobile clipboard declarations become the shared pasted-text draft and reject stale owners", async () => {
+  for (const mobile of [false, true]) {
+    const h = harness({}, { mobile });
+    try {
+      const input = () => h.render().nodes[0].children.find(node => node.id === "composer").children.find(node => node.id === "draft");
+      const initial = input();
+      const rules = JSON.parse(initial.children.find(node => node.id === "draft-paste-rules").text);
+      assert.equal(rules.minimumCharacters, 8000);
+      assert.equal(rules.minimumLines, 200);
+      const text = "line\n".repeat(200), id = `${rules.scope}:paste-${crypto.randomUUID()}`;
+      const payload = JSON.stringify({ text, references: [{ id, location: 0, length: text.length }], pastes: [{ id }] });
+      const reply = await h.dispatch(initial.editAction, payload);
+      assert.equal(reply.ok, true);
+      assert.equal(reply.acceptedValue, text);
+      const draft = h.props.composerRef.current.getDraft();
+      assert.equal(draft.largePastes[0].label, "Pasted text 1");
+      assert.equal(draft.largePastes[0].text, text);
+      assert.equal(draft.textWithoutLargePastes, "");
+      const canonical = input();
+      assert.equal(JSON.parse(canonical.children.find(node => node.id === "draft-inline-references").text)[0].id, id);
+      h.props.conversationId = "replacement"; input();
+      assert.equal((await h.dispatch(canonical.editAction, payload)).ok, false);
+    } finally { h.unmount(); }
+  }
+});
+
+test("native reference keys use current UTF16 ranges and reject stale text, selections, locked and retired composers", async () => {
+  for (const mobile of [false, true]) {
+    const h = harness({}, { mobile });
+    try {
+      h.props.composerRef.current.setText("😀 ");
+      h.props.composerRef.current.insertSkillMention({ name: "review", baseDir: "/skills/review", skillFile: "/skills/review/SKILL.md" });
+      const input = () => h.render().nodes[0].children.find(n => n.id === "composer").children.find(n => n.id === "draft");
+      const control = key => input().children.find(n => n.id === `draft-keyboard-atomic-${key}`);
+      const text = h.props.composerRef.current.getText();
+      const payload = (location, length = 0, value = text) => JSON.stringify({ text: value, location, length });
+      assert.deepEqual(JSON.parse(control("left").value), [{ location: 3, length: 7 }]);
+      assert.equal((await h.dispatch(control("right").action, payload(3))).ok, true);
+      assert.equal(JSON.parse(input().text).location, 10);
+      assert.equal((await h.dispatch(control("left").action, payload(10))).ok, true);
+      assert.equal(JSON.parse(input().text).location, 3);
+      assert.equal((await h.dispatch(control("delete").action, payload(3, 1))).ok, false);
+      assert.equal((await h.dispatch(control("delete").action, payload(3, 0, "old draft"))).ok, false);
+      const previous = control("delete").action;
+      h.props.inputDisabled = true; h.render();
+      assert.equal((await h.dispatch(previous, payload(3))).ok, false);
+      h.props.inputDisabled = false; h.render();
+      assert.equal((await h.dispatch(control("delete").action, payload(3))).ok, true);
+      assert.equal(h.props.composerRef.current.getText(), "😀  ");
+      assert.deepEqual(h.props.composerRef.current.getDraft().skillMentions, []);
+      assert.equal(control("left").disabled, true);
+      h.props.conversationId = "another"; h.render();
+      assert.equal((await h.dispatch(previous, payload(3))).ok, false);
+    } finally { h.unmount(); }
+  }
+});
+
 test("native hardware submit uses the current native draft and shared steer callback, preserving rich references and rejecting retired sessions", async () => {
   for (const mobile of [false, true]) {
     const sent = [], steered = [];
@@ -203,6 +375,42 @@ test("native hardware submit uses the current native draft and shared steer call
       h.props.composerRef.current.clear();
       assert.equal((await h.dispatch(keyboard("submit").action, "  ")).ok, true);
       assert.equal(sent.length, 1, "An empty native draft cannot send a message");
+    } finally { h.unmount(); }
+  }
+});
+
+test("native history actions share sent prompts, restore rich drafts and reject stale caret and conversation owners", async () => {
+  for (const mobile of [false, true]) {
+    const h = harness({
+      historyItems: [{ kind: "user", key: "prompt", text: "latest prompt", timestamp: 1, attachments: [] }],
+      loadHistoryPrompts: () => ["older prompt", "latest prompt"],
+    }, { mobile });
+    const history = direction => h.render().nodes[0].children.find(n => n.id === "composer")
+      .children.find(n => n.id === "draft").children.find(n => n.id === `draft-keyboard-history-${direction}`);
+    const payload = (location = h.props.composerRef.current.getText().length) => JSON.stringify({
+      text: h.props.composerRef.current.getText(), location, length: 0,
+    });
+    try {
+      h.props.composerRef.current.setText("Unsaved draft ");
+      h.props.composerRef.current.insertSkillMention({ name: "review", path: "/review" });
+      const stash = h.props.composerRef.current.getDraft();
+      assert.equal(history("next").disabled, true);
+      const previous = history("prev").action;
+      const oldCaret = payload();
+      assert.equal((await h.dispatch(previous, oldCaret)).ok, true);
+      assert.equal(h.props.composerRef.current.getText(), "latest prompt");
+      assert.equal((await h.dispatch(previous, oldCaret)).ok, false, "A duplicate caret cannot erase a recalled draft");
+      assert.equal(history("next").disabled, false);
+      assert.equal((await h.dispatch(history("next").action, payload())).ok, true);
+      assert.deepEqual(h.props.composerRef.current.getDraft(), stash);
+      const livePrevious = history("prev").action;
+      const currentCaret = payload();
+      h.props.conversationId = "new owner"; h.render();
+      assert.equal((await h.dispatch(livePrevious, currentCaret)).ok, false);
+      assert.deepEqual(h.props.composerRef.current.getDraft(), stash);
+      assert.equal(history("next").disabled, true);
+      h.props.inputDisabled = true;
+      assert.equal(history("prev").disabled, true);
     } finally { h.unmount(); }
   }
 });

@@ -36,7 +36,6 @@ import {
   Download,
   Eye,
   EyeOff,
-  GeminiIcon,
   Globe,
   GripVertical,
   List,
@@ -46,10 +45,10 @@ import {
   RefreshCw,
   Search,
   Settings,
+  Sparkles,
   Trash2,
   Wallet,
   Waypoints,
-  X,
   Zap,
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
@@ -58,11 +57,19 @@ import {
   LOCAL_ACCESS_SECRET_SENTINEL,
 } from "../../lib/localAccessSecrets";
 import {
+  MODEL_INPUT_OPTIONS,
+  type ModelInputMode,
+  modelInputMode,
+  supportsModelInputOverride,
+  withModelInputMode,
+} from "../../lib/models/modelInput";
+import {
   getCustomHeaderKeyPresets,
   isReservedCustomHeaderKey,
   isValidCustomHeaderKey,
   isValidCustomHeaderValue,
 } from "../../lib/providers/customHeaders";
+import { moveModelOrder } from "../../lib/providers/modelVendor";
 import {
   type ProviderUsageResult,
   testProviderUsage,
@@ -76,6 +83,7 @@ import {
   normalizeUsageQueryConfig,
   PROVIDER_RETRY_DEFAULT_MAX_RETRIES,
   PROVIDER_RETRY_MAX_RETRIES_LIMITS,
+  type PromptCacheHintMode,
   type ProviderAuthMode,
   type ProviderId,
   type ProviderModelConfig,
@@ -95,6 +103,8 @@ import {
 import { CodexOAuthAccounts } from "./CodexOAuthAccounts";
 import { ModelFailoverSection } from "./ModelFailoverSection";
 import { ModelPicker } from "./modelPicker";
+import { ProviderSettingsRow } from "./ProviderSettingsRow";
+import { PROVIDER_CACHE_HINT_OPTIONS } from "./providerCacheSettings";
 import {
   buildCcsImportedProviders,
   type CcsProviderImportItem,
@@ -108,10 +118,12 @@ import {
   syncCcsImportModels,
   syncCherryImportModels,
 } from "./providerImports";
+import { providerListDetails } from "./providerListDetails";
 import {
   createModelEditDraft,
   editedProviderModel,
   type ModelEditDraft,
+  mergeModelEdit,
   parseCostRate,
   parsePositiveInteger,
 } from "./providerModelSettings";
@@ -164,11 +176,14 @@ function getProviderLabel(type: ProviderId) {
 }
 
 function ProviderBrandIcon({ type }: { type: ProviderId }) {
-  if (type === "claude_code") return <Icon icon={ClaudeIcon} size="sm" color="inherit" />;
-  if (type === "gemini") return <Icon icon={GeminiIcon} size="sm" color="inherit" />;
-  if (type === "xai") return <Icon icon={Zap} size="sm" color="inherit" />;
-  if (type === "deepseek") return <Icon icon={Waypoints} size="sm" color="inherit" />;
-  return <Icon icon={OpenaiChatgptIcon} size="sm" color="inherit" />;
+  const icon = {
+    claude_code: ClaudeIcon,
+    codex: OpenaiChatgptIcon,
+    gemini: Sparkles,
+    xai: Zap,
+    deepseek: Waypoints,
+  }[type];
+  return <Icon className="settings-provider-brand" icon={icon} size="sm" color="inherit" />;
 }
 
 const REDACTED_API_KEY_DISPLAY = "API Key";
@@ -267,12 +282,34 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   const [customHeaders, setCustomHeaders] = useState(() =>
     (initialData?.customHeaders ?? []).map((header) => ({ ...header })),
   );
-  const [models, setModels] = useState<ProviderModelConfig[]>(() =>
+  const [models, publishModels] = useState<ProviderModelConfig[]>(() =>
     normalizeFetchedModels(initialData?.models ?? [], providerType),
   );
-  const [activeModels, setActiveModels] = useState<Set<string>>(
+  const acceptedModels = useRef(models);
+  acceptedModels.current = models;
+  function setModels(
+    next: ProviderModelConfig[] | ((previous: ProviderModelConfig[]) => ProviderModelConfig[]),
+  ) {
+    acceptedModels.current = typeof next === "function" ? next(acceptedModels.current) : next;
+    modelOrderScope.current.models = acceptedModels.current;
+    publishModels(acceptedModels.current);
+  }
+  const [activeModels, publishActiveModels] = useState<Set<string>>(
     new Set(initialData?.activeModels ?? []),
   );
+  const [modelOrder, setModelOrder] = useState<string[] | undefined>(initialData?.modelOrder);
+  const modelOrderScope = useRef({
+    models,
+    activeModels,
+    order: modelOrder,
+    query: "",
+    bulk: false,
+  });
+  function setActiveModels(next: Set<string> | ((previous: Set<string>) => Set<string>)) {
+    modelOrderScope.current.activeModels =
+      typeof next === "function" ? next(modelOrderScope.current.activeModels) : next;
+    publishActiveModels(modelOrderScope.current.activeModels);
+  }
   const [requestFormat, setRequestFormat] = useState<CodexRequestFormat>(
     initialData?.requestFormat ?? "openai-responses",
   );
@@ -284,6 +321,11 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   const [promptCacheRetention, setPromptCacheRetention] = useState<"short" | "long">(
     initialData?.promptCacheRetention === "long" ? "long" : "short",
   );
+  const [promptCacheHintMode, setPromptCacheHintMode] = useState<PromptCacheHintMode>(
+    initialData?.promptCacheHintMode ?? "auto",
+  );
+  const acceptedCacheHint = useRef(promptCacheHintMode);
+  acceptedCacheHint.current = promptCacheHintMode;
   const [fetchingModels, setFetchingModels] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [addingModel, setAddingModel] = useState(false);
@@ -291,7 +333,15 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   const [modelSearch, setModelSearch] = useState("");
   const [modelBulkMode, setModelBulkMode] = useState(false);
   const [modelBulkSelection, setModelBulkSelection] = useState<Set<string>>(new Set());
-  const [editingModel, setEditingModel] = useState<ModelEditDraft | null>(null);
+  const [editingModel, publishEditingModel] = useState<ModelEditDraft | null>(null);
+  const acceptedModelEdit = useRef(editingModel);
+  acceptedModelEdit.current = editingModel;
+  function setEditingModel(
+    next: ModelEditDraft | null | ((previous: ModelEditDraft | null) => ModelEditDraft | null),
+  ) {
+    acceptedModelEdit.current = typeof next === "function" ? next(acceptedModelEdit.current) : next;
+    publishEditingModel(acceptedModelEdit.current);
+  }
   const [activePanel, setActivePanel] = useState<ProviderDialogPanel>("general");
   const [headerValidationSubmitted, setHeaderValidationSubmitted] = useState(false);
   const [visibleHeaderValues, setVisibleHeaderValues] = useState<Set<number>>(new Set());
@@ -315,8 +365,36 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
     error: string | null;
   }>({ loading: false, result: null, error: null });
 
+  const acceptedUsageQuery = useRef(usageQuery);
+  const usageRequest = useRef({ active: false, session: 0, request: 0, pending: false });
+  const usageSession = usageRequest.current.session;
+  const invalidateUsageTest = useCallback(() => {
+    usageRequest.current.request++;
+    usageRequest.current.pending = false;
+    setUsageTest({ loading: false, result: null, error: null });
+  }, []);
+  const retireUsageTests = useCallback(() => {
+    usageRequest.current.active = false;
+    usageRequest.current.session++;
+    usageRequest.current.request++;
+    usageRequest.current.pending = false;
+  }, []);
+
+  useEffect(() => {
+    usageRequest.current.active = true;
+    invalidateUsageTest();
+    return retireUsageTests;
+  }, [invalidateUsageTest, retireUsageTests]);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevFetchKey = useRef("");
+  const modelRequest = useRef({
+    active: false,
+    configuration: "",
+    editVersion: 0,
+    request: 0,
+    pending: false,
+  });
   const headerKeyRefs = useRef<Array<HTMLInputElement | null>>([]);
   const headerValueRefs = useRef<Array<HTMLInputElement | null>>([]);
   const apiKeyIsRedactedDisplay = initialUsesRedactedApiKey && apiKey === REDACTED_API_KEY_DISPLAY;
@@ -330,9 +408,81 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
     authMode === "oauth-managed" ? managedOAuthAccountId.trim() : apiKeyForRequest;
   const canFetchModels =
     (baseUrl.trim().length > 0 || modelsUrl.trim().length > 0) && modelFetchCredential.length > 0;
+  const modelFetchKey = JSON.stringify([
+    providerType,
+    initialData?.id,
+    buildProviderModelsFetchKey(
+      baseUrl.trim(),
+      apiKeyForRequest,
+      useSystemProxy,
+      supportsOAuth ? authMode : "api-key",
+      customHeaders,
+      authMode === "oauth-managed" ? managedOAuthAccountId : undefined,
+      isFullUrl,
+      modelsUrl,
+    ),
+  ]);
+  const modelEditVersion = modelRequest.current.editVersion;
+
+  const clearModelDebounce = useCallback(() => {
+    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
+    debounceRef.current = null;
+  }, []);
+
+  const retireModelRequests = useCallback(() => {
+    modelRequest.current.active = false;
+    modelRequest.current.request++;
+    modelRequest.current.pending = false;
+    prevFetchKey.current = "";
+    clearModelDebounce();
+  }, [clearModelDebounce]);
+
+  const invalidateModelRequest = useCallback(() => {
+    invalidateUsageTest();
+    modelRequest.current.editVersion++;
+    modelRequest.current.request++;
+    modelRequest.current.pending = false;
+    prevFetchKey.current = "";
+    clearModelDebounce();
+    setFetchingModels(false);
+    setFetchError(null);
+  }, [clearModelDebounce, invalidateUsageTest]);
+
+  useEffect(() => {
+    modelRequest.current.active = true;
+    setFetchingModels(false);
+    return retireModelRequests;
+  }, [retireModelRequests]);
+
+  useEffect(() => {
+    modelRequest.current.configuration = modelFetchKey;
+    modelRequest.current.request++;
+    modelRequest.current.pending = false;
+    prevFetchKey.current = "";
+    clearModelDebounce();
+    setFetchingModels(false);
+    setFetchError(null);
+  }, [clearModelDebounce, modelFetchKey]);
 
   const doFetch = useCallback(
     async (url: string, key: string) => {
+      const scope = modelRequest.current;
+      if (
+        !scope.active ||
+        scope.configuration !== modelFetchKey ||
+        scope.editVersion !== modelEditVersion ||
+        scope.pending
+      )
+        return;
+      scope.pending = true;
+      const request = ++scope.request;
+      const ownsRequest = () =>
+        scope.active &&
+        scope.configuration === modelFetchKey &&
+        scope.editVersion === modelEditVersion &&
+        scope.request === request;
+      clearModelDebounce();
+      prevFetchKey.current = modelFetchKey;
       setFetchingModels(true);
       setFetchError(null);
       try {
@@ -345,19 +495,27 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
           isFullUrl,
           modelsUrl,
         });
-        setModels((prev) => mergeFetchedModels(list, prev));
+        if (ownsRequest()) {
+          setModels((prev) => (ownsRequest() ? mergeFetchedModels(list, prev) : prev));
+        }
       } catch (err) {
-        setFetchError(err instanceof Error ? err.message : String(err));
+        if (ownsRequest()) setFetchError(err instanceof Error ? err.message : String(err));
       } finally {
-        setFetchingModels(false);
+        if (ownsRequest()) {
+          scope.pending = false;
+          setFetchingModels(false);
+        }
       }
     },
     [
       authMode,
+      clearModelDebounce,
       customHeaders,
       isFullUrl,
       initialData?.id,
       managedOAuthAccountId,
+      modelEditVersion,
+      modelFetchKey,
       modelsUrl,
       providerType,
       supportsOAuth,
@@ -369,55 +527,64 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
     const trimUrl = baseUrl.trim();
     const trimKey = apiKeyForRequest;
     const trimCredential = modelFetchCredential;
-    const key = buildProviderModelsFetchKey(
-      trimUrl,
-      trimKey,
-      useSystemProxy,
-      supportsOAuth ? authMode : "api-key",
-      customHeaders,
-      authMode === "oauth-managed" ? managedOAuthAccountId : undefined,
-      isFullUrl,
-      modelsUrl,
-    );
     if ((!trimUrl && !modelsUrl.trim()) || !trimCredential) return;
-    if (key === prevFetchKey.current) return;
+    if (modelFetchKey === prevFetchKey.current || !modelRequest.current.active) return;
 
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    clearModelDebounce();
     debounceRef.current = setTimeout(() => {
-      prevFetchKey.current = key;
+      debounceRef.current = null;
       void doFetch(trimUrl, trimKey);
     }, 900);
 
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return clearModelDebounce;
   }, [
     apiKeyForRequest,
     authMode,
     baseUrl,
+    clearModelDebounce,
     customHeaders,
     doFetch,
     managedOAuthAccountId,
     isFullUrl,
     modelFetchCredential,
+    modelFetchKey,
     modelsUrl,
     supportsOAuth,
     useSystemProxy,
   ]);
 
   function handleRefresh() {
+    if (
+      !modelRequest.current.active ||
+      modelRequest.current.configuration !== modelFetchKey ||
+      modelRequest.current.editVersion !== modelEditVersion
+    )
+      return;
     const trimUrl = baseUrl.trim();
     const trimKey = apiKeyForRequest;
     if ((!trimUrl && !modelsUrl.trim()) || !modelFetchCredential) {
       setFetchError(t("settings.noBaseUrlApiKey"));
       return;
     }
-    prevFetchKey.current = "";
     void doFetch(trimUrl, trimKey);
   }
 
+  function closeEditor() {
+    if (!usageRequest.current.active || usageRequest.current.session !== usageSession) return;
+    retireModelRequests();
+    retireUsageTests();
+    onClose();
+  }
+
   function patchUsageQuery(patch: Partial<UsageQueryConfig>) {
-    setUsageQuery((previous) => normalizeUsageQueryConfig({ ...previous, ...patch }));
+    acceptUsageQuery(normalizeUsageQueryConfig({ ...acceptedUsageQuery.current, ...patch }));
+  }
+
+  function acceptUsageQuery(next: UsageQueryConfig) {
+    if (!usageRequest.current.active || usageRequest.current.session !== usageSession) return;
+    acceptedUsageQuery.current = next;
+    invalidateUsageTest();
+    setUsageQuery(next);
   }
 
   function serializeRetryPolicy(): ProviderRetryPolicy | undefined {
@@ -433,17 +600,35 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   }
 
   async function runUsageQueryTest() {
-    if (!initialData?.id) return;
+    const scope = usageRequest.current;
+    if (!initialData?.id || !scope.active || scope.session !== usageSession || scope.pending)
+      return;
+    scope.pending = true;
+    const request = ++scope.request;
+    const ownsRequest = () =>
+      scope.active && scope.session === usageSession && scope.request === request;
     setUsageTest({ loading: true, result: null, error: null });
     try {
-      const result = await testProviderUsage(initialData.id, usageQuery);
-      setUsageTest({ loading: false, result, error: result?.error ?? null });
+      const result = await testProviderUsage(initialData.id, acceptedUsageQuery.current);
+      if (ownsRequest()) {
+        setUsageTest((previous) =>
+          ownsRequest() ? { loading: false, result, error: result?.error ?? null } : previous,
+        );
+      }
     } catch (error) {
-      setUsageTest({
-        loading: false,
-        result: null,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      if (ownsRequest()) {
+        setUsageTest((previous) =>
+          ownsRequest()
+            ? {
+                loading: false,
+                result: null,
+                error: error instanceof Error ? error.message : String(error),
+              }
+            : previous,
+        );
+      }
+    } finally {
+      if (ownsRequest()) scope.pending = false;
     }
   }
 
@@ -478,9 +663,17 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   }
 
   function openModelSettings(modelId: string) {
-    const target = models.find((item) => item.id === modelId);
+    if (!usageRequest.current.active || usageRequest.current.session !== usageSession) return;
+    if (acceptedModelEdit.current?.model.id === modelId) {
+      setEditingModel(null);
+      return;
+    }
+    const nextModels = modelsWithEditingDraft();
+    if (!nextModels) return;
+    const target = nextModels.find((item) => item.id === modelId);
     if (!target) return;
-    setEditingModel((prev) => (prev?.model.id === target.id ? null : createModelEditDraft(target)));
+    setModels(nextModels);
+    setEditingModel(createModelEditDraft(target));
   }
 
   const editingModelContextWindow = editingModel
@@ -491,13 +684,26 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
     : null;
   const canSaveEditingModel = editedProviderModel(editingModel) !== null;
 
+  function modelsWithEditingDraft(): ProviderModelConfig[] | null {
+    const draft = acceptedModelEdit.current;
+    if (!draft) return acceptedModels.current;
+    const nextModel = editedProviderModel(draft);
+    if (!nextModel) return null;
+    return acceptedModels.current.map((item) =>
+      item.id === nextModel.id ? mergeModelEdit(item, nextModel, draft.model) : item,
+    );
+  }
+
   function saveInlineModelSettings() {
-    const nextModel = editedProviderModel(editingModel);
-    if (!nextModel) return;
-    setModels((prev) => prev.map((item) => (item.id === nextModel.id ? nextModel : item)));
+    if (!usageRequest.current.active || usageRequest.current.session !== usageSession) return;
+    const nextModels = modelsWithEditingDraft();
+    if (!nextModels) return;
+    setModels(nextModels);
     setEditingModel(null);
   }
   function updateCustomHeader(index: number, field: "key" | "value", value: string) {
+    if (customHeaders[index]?.[field] === value) return;
+    invalidateModelRequest();
     setCustomHeaders((prev) =>
       prev.map((header, headerIndex) =>
         headerIndex === index ? { ...header, [field]: value } : header,
@@ -515,6 +721,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   }
 
   function addCustomHeader(key = "", focusField: "key" | "value" = "key") {
+    invalidateModelRequest();
     const nextIndex = customHeaders.length;
     setCustomHeaders((prev) => [...prev, { key, value: "" }]);
     setHeaderValidationSubmitted(false);
@@ -522,6 +729,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   }
 
   function removeCustomHeader(index: number) {
+    invalidateModelRequest();
     setCustomHeaders((prev) => prev.filter((_, headerIndex) => headerIndex !== index));
     setVisibleHeaderValues((prev) => {
       const next = new Set<number>();
@@ -538,6 +746,8 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
     customHeaders.find((header) => header.key.toLowerCase() === "chatgpt-account-id")?.value ?? "";
 
   function setManualOAuthAccountId(value: string) {
+    if (value === manualOAuthAccountId) return;
+    invalidateModelRequest();
     setCustomHeaders((current) => {
       const index = current.findIndex(
         (header) => header.key.toLowerCase() === "chatgpt-account-id",
@@ -576,8 +786,14 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   }
 
   function handleSave() {
+    if (!usageRequest.current.active || usageRequest.current.session !== usageSession) return;
     setSaveAttempted(true);
     if (!name.trim()) {
+      setActivePanel("general");
+      return;
+    }
+    const nextModels = modelsWithEditingDraft();
+    if (!nextModels) {
       setActivePanel("general");
       return;
     }
@@ -626,8 +842,9 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
         providerType === "codex" && authMode !== "oauth-token"
           ? customHeaders.filter((header) => header.key.toLowerCase() !== "chatgpt-account-id")
           : customHeaders,
-      models,
-      activeModels: Array.from(activeModels),
+      models: nextModels,
+      modelOrder: modelOrderScope.current.order,
+      activeModels: Array.from(modelOrderScope.current.activeModels),
       requestFormat:
         providerType === "xai"
           ? "openai-responses"
@@ -646,20 +863,41 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
         providerType === "claude_code" && promptCachingEnabled && promptCacheRetention === "long"
           ? "long"
           : undefined,
+      promptCacheHintMode:
+        providerType === "codex" ? acceptedCacheHint.current : initialData?.promptCacheHintMode,
       nativeWebSearchEnabled: initialData?.nativeWebSearchEnabled ?? true,
       useSystemProxy,
       retryPolicy: serializeRetryPolicy(),
-      usageQuery,
+      usageQuery: acceptedUsageQuery.current,
     });
+    retireModelRequests();
+    retireUsageTests();
   }
 
   const isEditing = Boolean(initialData);
   const typeLabel = getProviderLabel(providerType);
   const orderedModels = useMemo(
-    () => sortModelsBySelection(models, activeModels),
-    [models, activeModels],
+    () => sortModelsBySelection(models, activeModels, modelOrder),
+    [models, activeModels, modelOrder],
   );
   const modelSearchQuery = modelSearch.trim().toLowerCase();
+  modelOrderScope.current = {
+    models,
+    activeModels,
+    order: modelOrder,
+    query: modelSearchQuery,
+    bulk: modelBulkMode,
+  };
+  function moveModel(id: string, offset: -1 | 1) {
+    if (!usageRequest.current.active || usageRequest.current.session !== usageSession) return;
+    const latest = modelOrderScope.current;
+    if (latest.query || latest.bulk) return;
+    const next = moveModelOrder(latest.models, latest.order, latest.activeModels, id, offset);
+    if (next) {
+      latest.order = next;
+      setModelOrder(next);
+    }
+  }
   const visibleModels = useMemo(
     () =>
       modelSearchQuery
@@ -734,7 +972,13 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
           ? t("settings.invalidCustomHeaderValue")
           : null;
   return (
-    <VStack height="100%" minHeight={0} gap={0}>
+    <VStack
+      className="settings-provider-editor"
+      data-compact={isCompact}
+      height="100%"
+      minHeight={0}
+      gap={0}
+    >
       <SettingsDetailHeader
         title={isEditing ? t("settings.editProvider") : t("settings.addProvider")}
         subtitle={`${typeLabel} ${t("settings.compatible")}`}
@@ -743,55 +987,58 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
             label={t("settings.providerDialogNavigation")}
             tooltip={t("settings.providerDialogNavigation")}
             variant="ghost"
-            icon={<Icon icon={ChevronLeft} size="md" color="inherit" />}
+            icon={<Icon icon={ChevronLeft} size={isCompact ? "lg" : "md"} color="inherit" />}
             size="lg"
-            onClick={onClose}
+            onClick={closeEditor}
           />
         }
         endContent={<ProviderBrandIcon type={providerType} />}
       />
 
-      <StackItem size="fill">
+      <StackItem size="fill" className="settings-provider-editor-fill">
         <Stack
+          className="settings-provider-editor-body"
           direction={isCompact ? "vertical" : "horizontal"}
           height="100%"
           minHeight={0}
           gap={0}
         >
           {isCompact ? (
-            <AstryxStack direction="vertical" className="shrink-0 border-b bg-muted/30 px-3 pt-2">
-              <TabList
-                value={activePanel}
-                onChange={(value) => setActivePanel(value as ProviderDialogPanel)}
-                role="tablist"
-                layout="fill"
-                size="sm"
-              >
-                <Tab
-                  value="general"
-                  label={t("settings.providerDialogGeneral")}
-                  panelId="provider-settings-panel"
-                  icon={<Icon icon={Settings} size="sm" color="inherit" />}
-                />
-                <Tab
-                  value="request"
-                  label={t("settings.providerDialogRequest")}
-                  panelId="provider-settings-panel"
-                  icon={<Icon icon={Globe} size="sm" color="inherit" />}
-                  endContent={
-                    customHeaders.length > 0 ? (
-                      <Badge label={customHeaders.length} variant="neutral" />
-                    ) : undefined
-                  }
-                />
-                <Tab
-                  value="usage"
-                  label={t("settings.navUsage")}
-                  panelId="provider-settings-panel"
-                  icon={<Icon icon={Wallet} size="sm" color="inherit" />}
-                />
-              </TabList>
-            </AstryxStack>
+            <StackItem>
+              <AstryxStack direction="vertical" paddingInline={3} paddingBlockStart={2}>
+                <TabList
+                  value={activePanel}
+                  onChange={(value) => setActivePanel(value as ProviderDialogPanel)}
+                  role="tablist"
+                  layout="fill"
+                  size="lg"
+                >
+                  <Tab
+                    value="general"
+                    label={t("settings.providerDialogGeneral")}
+                    panelId="provider-settings-panel"
+                    icon={<Icon icon={Settings} size={isCompact ? "lg" : "sm"} color="inherit" />}
+                  />
+                  <Tab
+                    value="request"
+                    label={t("settings.providerDialogRequest")}
+                    panelId="provider-settings-panel"
+                    icon={<Icon icon={Globe} size={isCompact ? "lg" : "sm"} color="inherit" />}
+                    endContent={
+                      customHeaders.length > 0 ? (
+                        <Badge label={customHeaders.length} variant="neutral" />
+                      ) : undefined
+                    }
+                  />
+                  <Tab
+                    value="usage"
+                    label={t("settings.navUsage")}
+                    panelId="provider-settings-panel"
+                    icon={<Icon icon={Wallet} size={isCompact ? "lg" : "sm"} color="inherit" />}
+                  />
+                </TabList>
+              </AstryxStack>
+            </StackItem>
           ) : (
             <AstryxStack
               as="nav"
@@ -802,13 +1049,17 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
               <AstryxList density="compact">
                 <ListItem
                   label={t("settings.providerDialogGeneral")}
-                  startContent={<Icon icon={Settings} size="sm" color="secondary" />}
+                  startContent={
+                    <Icon icon={Settings} size={isCompact ? "lg" : "sm"} color="secondary" />
+                  }
                   isSelected={activePanel === "general"}
                   onClick={() => setActivePanel("general")}
                 />
                 <ListItem
                   label={t("settings.providerDialogRequest")}
-                  startContent={<Icon icon={Globe} size="sm" color="secondary" />}
+                  startContent={
+                    <Icon icon={Globe} size={isCompact ? "lg" : "sm"} color="secondary" />
+                  }
                   endContent={
                     customHeaders.length > 0 ? (
                       <Badge label={customHeaders.length} variant="neutral" />
@@ -819,7 +1070,9 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                 />
                 <ListItem
                   label={t("settings.navUsage")}
-                  startContent={<Icon icon={Wallet} size="sm" color="secondary" />}
+                  startContent={
+                    <Icon icon={Wallet} size={isCompact ? "lg" : "sm"} color="secondary" />
+                  }
                   isSelected={activePanel === "usage"}
                   onClick={() => setActivePanel("usage")}
                 />
@@ -827,1266 +1080,1438 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
             </AstryxStack>
           )}
 
-          <AstryxStack
+          <StackItem
             id="provider-settings-panel"
             role="tabpanel"
-            direction="vertical"
-            className="min-w-0 flex-1 overflow-y-auto px-6 py-5 max-[720px]:px-3.5 max-[720px]:pb-[calc(0.875rem+env(safe-area-inset-bottom))] max-[720px]:pt-3.5"
+            size="fill"
+            isScrollable
             onScroll={() => setHeaderSuggest(null)}
           >
-            {activePanel === "general" ? (
-              <AstryxStack
-                direction="vertical"
-                as="section"
-                key="general"
-                className="provider-panel-enter"
-              >
-                <AstryxStack direction="vertical" className="text-sm font-semibold">
-                  {t("settings.basicInformation")}
-                </AstryxStack>
+            <VStack padding={isCompact ? 4 : 6} width="100%">
+              {activePanel === "general" ? (
+                <AstryxStack
+                  direction="vertical"
+                  as="section"
+                  key="general"
+                  gap={4}
+                  className="provider-panel-enter"
+                >
+                  <AstryxStack direction="vertical" className="text-sm font-semibold">
+                    {t("settings.basicInformation")}
+                  </AstryxStack>
 
-                <VStack gap={1.5}>
-                  <TextInput
-                    label={t("settings.providerName")}
-                    value={name}
-                    onChange={(value) => {
-                      setName(value);
-                      if (value.trim()) setSaveAttempted(false);
-                    }}
-                    isRequired
-                    hasAutoFocus={!initialData}
-                    status={
-                      saveAttempted && !name.trim()
-                        ? { type: "error", message: t("settings.providerNameRequired") }
-                        : undefined
-                    }
-                    width="100%"
-                  />
-                </VStack>
+                  <VStack gap={1.5}>
+                    <TextInput
+                      size={isCompact ? "lg" : "md"}
+                      label={t("settings.providerName")}
+                      value={name}
+                      onChange={(value) => {
+                        setName(value);
+                        if (value.trim()) setSaveAttempted(false);
+                      }}
+                      isRequired
+                      hasAutoFocus={!initialData}
+                      status={
+                        saveAttempted && !name.trim()
+                          ? { type: "error", message: t("settings.providerNameRequired") }
+                          : undefined
+                      }
+                      width="100%"
+                    />
+                  </VStack>
 
-                {supportsOAuth ? (
-                  <AstryxStack direction="vertical" className="mt-4 space-y-2">
-                    <Label as="label" type="label" weight="medium">
-                      {t("settings.providerAuthMethod")}
-                    </Label>
-                    <AstryxGrid
-                      className={cn(
-                        "grid rounded-xl bg-muted/65 p-1",
-                        providerType === "codex" ? "grid-cols-3" : "grid-cols-2",
-                      )}
-                    >
-                      {(providerType === "codex"
-                        ? (["api-key", "oauth-managed", "oauth-token"] as const)
-                        : (["api-key", "oauth-token"] as const)
-                      ).map((mode) => (
-                        <ToggleButton
-                          key={mode}
-                          label={
-                            mode === "api-key"
+                  {supportsOAuth ? (
+                    <AstryxStack direction="vertical" gap={2}>
+                      <Label as="label" type="label" weight="medium">
+                        {t("settings.providerAuthMethod")}
+                      </Label>
+                      <AstryxGrid
+                        data-options={providerType === "codex" ? 3 : 2}
+                        columns={providerType === "codex" ? 3 : 2}
+                        gap={1}
+                      >
+                        {(providerType === "codex"
+                          ? (["api-key", "oauth-managed", "oauth-token"] as const)
+                          : (["api-key", "oauth-token"] as const)
+                        ).map((mode) => (
+                          <ToggleButton
+                            key={mode}
+                            label={
+                              mode === "api-key"
+                                ? t("settings.providerAuthApiKey")
+                                : mode === "oauth-managed"
+                                  ? t("settings.providerAuthOAuth")
+                                  : t("settings.providerAuthToken")
+                            }
+                            isPressed={authMode === mode}
+                            onPressedChange={() => {
+                              if (mode === authMode) return;
+                              invalidateModelRequest();
+                              setAuthMode(mode);
+                            }}
+                            size={isCompact ? "lg" : "sm"}
+                          >
+                            {mode === "api-key"
                               ? t("settings.providerAuthApiKey")
                               : mode === "oauth-managed"
                                 ? t("settings.providerAuthOAuth")
-                                : t("settings.providerAuthToken")
-                          }
-                          isPressed={authMode === mode}
-                          onPressedChange={() => setAuthMode(mode)}
-                          size="sm"
+                                : t("settings.providerAuthToken")}
+                          </ToggleButton>
+                        ))}
+                      </AstryxGrid>
+                      {authMode === "oauth-managed" ? (
+                        <AstryxText
+                          as="p"
+                          type="inherit"
+                          display="block"
+                          className="text-xs leading-5 text-muted-foreground"
                         >
-                          {mode === "api-key"
-                            ? t("settings.providerAuthApiKey")
-                            : mode === "oauth-managed"
-                              ? t("settings.providerAuthOAuth")
-                              : t("settings.providerAuthToken")}
-                        </ToggleButton>
-                      ))}
-                    </AstryxGrid>
-                    {authMode === "oauth-managed" ? (
-                      <AstryxText
-                        as="p"
-                        type="inherit"
-                        display="block"
-                        className="text-xs leading-5 text-muted-foreground"
-                      >
-                        {t("settings.providerOAuthManagedHintCodex")}
-                      </AstryxText>
-                    ) : authMode === "oauth-token" ? (
-                      <AstryxText
-                        as="p"
-                        type="inherit"
-                        display="block"
-                        className="text-xs leading-5 text-muted-foreground"
-                      >
-                        {providerType === "claude_code"
-                          ? t("settings.providerOAuthHintAnthropic")
-                          : t("settings.providerOAuthHintCodex")}
-                      </AstryxText>
-                    ) : null}
-                  </AstryxStack>
-                ) : null}
-
-                <AstryxGrid
-                  className={cn(
-                    "mt-4 grid gap-3 max-[720px]:grid-cols-1",
-                    authMode === "oauth-managed" ? "grid-cols-1" : "grid-cols-2",
-                  )}
-                >
-                  <AstryxStack direction="vertical" className="space-y-1.5">
-                    <Label as="label" type="label" weight="medium">
-                      Base URL
-                    </Label>
-                    <Input
-                      label="modal-baseurl"
-                      isLabelHidden
-                      id="modal-baseurl"
-                      value={baseUrl}
-                      onChange={(nextValue) => setBaseUrl(nextValue)}
-                    />
-                  </AstryxStack>
-
-                  {authMode !== "oauth-managed" ? (
-                    <SecretTextInput
-                      label={
-                        authMode === "oauth-token" ? t("settings.providerOAuthToken") : "API Key"
-                      }
-                      value={apiKey}
-                      onChange={setApiKey}
-                      onFocus={(event) => {
-                        if (apiKeyIsRedactedDisplay && event.target instanceof HTMLInputElement) {
-                          event.target.select();
-                        }
-                      }}
-                    />
+                          {t("settings.providerOAuthManagedHintCodex")}
+                        </AstryxText>
+                      ) : authMode === "oauth-token" ? (
+                        <AstryxText
+                          as="p"
+                          type="inherit"
+                          display="block"
+                          className="text-xs leading-5 text-muted-foreground"
+                        >
+                          {providerType === "claude_code"
+                            ? t("settings.providerOAuthHintAnthropic")
+                            : t("settings.providerOAuthHintCodex")}
+                        </AstryxText>
+                      ) : null}
+                    </AstryxStack>
                   ) : null}
-                </AstryxGrid>
 
-                {providerType !== "gemini" ? (
-                  <VStack gap={1} paddingBlockStart={3}>
-                    <TextInput
-                      label={t("settings.providerModelsUrl")}
-                      description={t("settings.providerModelsUrlHint")}
-                      id="modal-models-url"
-                      value={modelsUrl}
-                      width="100%"
-                      onChange={setModelsUrl}
-                      placeholder="https://example.com/v1/models"
-                    />
-                  </VStack>
-                ) : null}
-
-                {providerType === "codex" && authMode === "oauth-managed" ? (
-                  <AstryxStack direction="vertical" className="mt-4 space-y-1.5">
-                    <Label as="label" type="label" weight="medium">
-                      {t("settings.providerOAuthAccounts")}
-                    </Label>
-                    <CodexOAuthAccounts
-                      value={managedOAuthAccountId}
-                      onChange={setManagedOAuthAccountId}
-                      browserRuntime={isBrowser}
-                    />
-                  </AstryxStack>
-                ) : null}
-
-                {providerType === "codex" && authMode === "oauth-token" ? (
-                  <AstryxStack direction="vertical" className="mt-4 space-y-1.5">
-                    <Label as="label" type="label" weight="medium">
-                      {t("settings.providerOAuthAccountId")}
-                    </Label>
-                    <Input
-                      label={t("settings.providerOAuthAccountIdPlaceholder")}
-                      isLabelHidden
-                      id="modal-oauth-account-id"
-                      value={manualOAuthAccountId}
-                      onChange={(nextValue) => setManualOAuthAccountId(nextValue)}
-                      placeholder={t("settings.providerOAuthAccountIdPlaceholder")}
-                    />
-                    <AstryxText
-                      as="p"
-                      type="inherit"
-                      display="block"
-                      className="text-xs leading-5 text-muted-foreground"
-                    >
-                      {t("settings.providerOAuthAccountIdHint")}
-                    </AstryxText>
-                  </AstryxStack>
-                ) : null}
-
-                {providerType === "codex" ? (
-                  <AstryxStack direction="vertical" className="mt-4 space-y-1.5">
-                    <Label as="label" type="label" weight="medium">
-                      {t("settings.requestFormat")}
-                    </Label>
-                    <Selector
-                      label={t("settings.requestFormat")}
-                      isLabelHidden
-                      value={requestFormat}
-                      width="100%"
-                      options={Object.entries(CODEX_REQUEST_FORMAT_LABELS).map(
-                        ([value, label]) => ({
-                          value,
-                          label,
-                        }),
-                      )}
-                      onChange={(value) => setRequestFormat(value as CodexRequestFormat)}
-                    />
-                  </AstryxStack>
-                ) : null}
-
-                <AstryxStack direction="vertical" className="mt-6 text-sm font-semibold">
-                  {t("settings.models")}
-                </AstryxStack>
-                <AstryxStack
-                  direction="vertical"
-                  className="mt-3 overflow-hidden rounded-xl border"
-                >
-                  <AstryxStack
-                    direction="vertical"
-                    className="flex gap-2 border-b bg-muted/30 p-2.5"
+                  <AstryxGrid
+                    className="settings-provider-credentials"
+                    columns={authMode === "oauth-managed" ? 1 : { minWidth: 280, max: 2 }}
+                    gap={3}
+                    width="100%"
                   >
-                    <AstryxStack direction="vertical" className="relative min-w-0 w-full">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <AstryxStack direction="vertical" gap={2}>
+                      <Label as="label" type="label" weight="medium">
+                        Base URL
+                      </Label>
+                      <Input
+                        size={isCompact ? "lg" : "md"}
+                        width="100%"
+                        label="modal-baseurl"
+                        isLabelHidden
+                        id="modal-baseurl"
+                        value={baseUrl}
+                        onChange={(nextValue) => {
+                          if (nextValue === baseUrl) return;
+                          invalidateModelRequest();
+                          setBaseUrl(nextValue);
+                        }}
+                      />
+                    </AstryxStack>
+
+                    {authMode !== "oauth-managed" ? (
+                      <SecretTextInput
+                        label={
+                          authMode === "oauth-token" ? t("settings.providerOAuthToken") : "API Key"
+                        }
+                        compact={isCompact}
+                        value={apiKey}
+                        onChange={(nextValue) => {
+                          if (nextValue === apiKey) return;
+                          invalidateModelRequest();
+                          setApiKey(nextValue);
+                        }}
+                        onFocus={(event) => {
+                          if (apiKeyIsRedactedDisplay && event.target instanceof HTMLInputElement) {
+                            event.target.select();
+                          }
+                        }}
+                      />
+                    ) : null}
+                  </AstryxGrid>
+
+                  {providerType !== "gemini" ? (
+                    <VStack gap={1} paddingBlockStart={3}>
+                      <TextInput
+                        size={isCompact ? "lg" : "md"}
+                        label={t("settings.providerModelsUrl")}
+                        description={t("settings.providerModelsUrlHint")}
+                        id="modal-models-url"
+                        value={modelsUrl}
+                        width="100%"
+                        onChange={(nextValue) => {
+                          if (nextValue === modelsUrl) return;
+                          invalidateModelRequest();
+                          setModelsUrl(nextValue);
+                        }}
+                        placeholder="https://example.com/v1/models"
+                      />
+                    </VStack>
+                  ) : null}
+
+                  {providerType === "codex" && authMode === "oauth-managed" ? (
+                    <AstryxStack direction="vertical" gap={2}>
+                      <Label as="label" type="label" weight="medium">
+                        {t("settings.providerOAuthAccounts")}
+                      </Label>
+                      <CodexOAuthAccounts
+                        value={managedOAuthAccountId}
+                        onChange={(nextValue) => {
+                          if (nextValue === managedOAuthAccountId) return;
+                          invalidateModelRequest();
+                          setManagedOAuthAccountId(nextValue);
+                        }}
+                        browserRuntime={isBrowser}
+                      />
+                    </AstryxStack>
+                  ) : null}
+
+                  {providerType === "codex" && authMode === "oauth-token" ? (
+                    <AstryxStack direction="vertical" gap={2}>
+                      <Label as="label" type="label" weight="medium">
+                        {t("settings.providerOAuthAccountId")}
+                      </Label>
+                      <Input
+                        size={isCompact ? "lg" : "md"}
+                        width="100%"
+                        label={t("settings.providerOAuthAccountIdPlaceholder")}
+                        isLabelHidden
+                        id="modal-oauth-account-id"
+                        value={manualOAuthAccountId}
+                        onChange={(nextValue) => setManualOAuthAccountId(nextValue)}
+                        placeholder={t("settings.providerOAuthAccountIdPlaceholder")}
+                      />
+                      <AstryxText
+                        as="p"
+                        type="inherit"
+                        display="block"
+                        className="text-xs leading-5 text-muted-foreground"
+                      >
+                        {t("settings.providerOAuthAccountIdHint")}
+                      </AstryxText>
+                    </AstryxStack>
+                  ) : null}
+
+                  {providerType === "codex" ? (
+                    <AstryxStack direction="vertical" gap={2}>
+                      <Label as="label" type="label" weight="medium">
+                        {t("settings.requestFormat")}
+                      </Label>
+                      <Selector
+                        size={isCompact ? "lg" : "md"}
+                        label={t("settings.requestFormat")}
+                        isLabelHidden
+                        value={requestFormat}
+                        width="100%"
+                        options={Object.entries(CODEX_REQUEST_FORMAT_LABELS).map(
+                          ([value, label]) => ({
+                            value,
+                            label,
+                          }),
+                        )}
+                        onChange={(value) => setRequestFormat(value as CodexRequestFormat)}
+                      />
+                    </AstryxStack>
+                  ) : null}
+
+                  <AstryxStack direction="vertical" className="mt-6 text-sm font-semibold">
+                    {t("settings.models")}
+                  </AstryxStack>
+                  <AstryxStack direction="vertical" gap={3}>
+                    <AstryxStack direction="vertical" gap={2}>
                       <Input
                         label={t("settings.searchModels")}
                         isLabelHidden
                         {...({ autoComplete: "off", spellCheck: false } as const)}
                         type="text"
                         value={modelSearch}
-                        className="h-9 pl-9 pr-9 text-sm"
+                        startIcon={Search}
+                        hasClear
+                        size={isCompact ? "lg" : "md"}
+                        width="100%"
                         placeholder={t("settings.searchModels")}
                         aria-label={t("settings.searchModels")}
-                        onChange={(nextValue) => setModelSearch(nextValue)}
+                        onChange={(nextValue) => {
+                          modelOrderScope.current.query = nextValue.trim().toLowerCase();
+                          setModelSearch(nextValue);
+                        }}
                         onKeyDown={(event) => {
-                          if (event.key === "Escape") setModelSearch("");
+                          if (event.key === "Escape") {
+                            modelOrderScope.current.query = "";
+                            setModelSearch("");
+                          }
                         }}
                       />
-                      {modelSearch ? (
-                        <AstryxButton
-                          variant="ghost"
-                          label={t("settings.clearModelSearch")}
-                          type="button"
-                          className="absolute right-0 top-0 flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                          onClick={() => setModelSearch("")}
-                          tooltip={t("settings.clearModelSearch")}
-                          aria-label={t("settings.clearModelSearch")}
+                      <AstryxStack direction="horizontal" gap={2} wrap="wrap">
+                        {modelOrder ? (
+                          <Button
+                            label={t("settings.resetModelOrder")}
+                            variant="ghost"
+                            size={isCompact ? "lg" : "sm"}
+                            onClick={() => {
+                              if (
+                                !usageRequest.current.active ||
+                                usageRequest.current.session !== usageSession
+                              )
+                                return;
+                              modelOrderScope.current.order = undefined;
+                              setModelOrder(undefined);
+                            }}
+                          />
+                        ) : null}
+                        <ToggleButton
+                          label={t("settings.skillsBulkSelect")}
+                          size={isCompact ? "lg" : "sm"}
+                          isPressed={modelBulkMode}
+                          onPressedChange={(pressed) => {
+                            modelOrderScope.current.bulk = pressed;
+                            setModelBulkMode(pressed);
+                            if (!pressed) setModelBulkSelection(new Set());
+                          }}
                         >
-                          <X className="h-3.5 w-3.5" />
-                        </AstryxButton>
-                      ) : null}
+                          {modelBulkMode
+                            ? t("settings.skillsBulkDone")
+                            : t("settings.skillsBulkSelect")}
+                        </ToggleButton>
+                        <Button
+                          label={
+                            fetchingModels ? t("settings.fetching") : t("settings.refreshModels")
+                          }
+                          type="button"
+                          variant="secondary"
+                          size={isCompact ? "lg" : "sm"}
+                          onClick={handleRefresh}
+                          isLoading={fetchingModels}
+                          isDisabled={fetchingModels || !canFetchModels}
+                        />
+                        <Button
+                          label={t("settings.manualAddModel")}
+                          type="button"
+                          variant="secondary"
+                          size={isCompact ? "lg" : "sm"}
+                          onClick={() => setAddingModel(true)}
+                        />
+                      </AstryxStack>
                     </AstryxStack>
-                    <AstryxStack direction="horizontal" className="flex flex-wrap gap-2">
-                      <ToggleButton
-                        label={t("settings.skillsBulkSelect")}
-                        size="sm"
-                        isPressed={modelBulkMode}
-                        onPressedChange={(pressed) => {
-                          setModelBulkMode(pressed);
-                          if (!pressed) setModelBulkSelection(new Set());
-                        }}
-                      >
-                        {modelBulkMode
-                          ? t("settings.skillsBulkDone")
-                          : t("settings.skillsBulkSelect")}
-                      </ToggleButton>
-                      <Button
-                        label={
-                          fetchingModels ? t("settings.fetching") : t("settings.refreshModels")
-                        }
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="h-9 max-[720px]:h-10 max-[720px]:flex-1"
-                        onClick={handleRefresh}
-                        isLoading={fetchingModels}
-                        isDisabled={fetchingModels || !canFetchModels}
-                      />
-                      <Button
-                        label={t("settings.manualAddModel")}
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="h-9 max-[720px]:h-10 max-[720px]:flex-1"
-                        onClick={() => setAddingModel(true)}
-                      />
-                    </AstryxStack>
-                  </AstryxStack>
 
-                  {modelBulkMode ? (
-                    <HStack gap={2} vAlign="center" wrap="wrap" padding={2}>
-                      <CheckboxInput
-                        label={t("settings.skillsBulkSelectAll")}
-                        value={
-                          modelBulkSelection.size === 0
-                            ? false
-                            : visibleModels.every((model) => modelBulkSelection.has(model.id))
-                              ? true
-                              : "indeterminate"
-                        }
-                        size="sm"
-                        onChange={(checked) =>
-                          setModelBulkSelection(
-                            checked ? new Set(visibleModels.map((model) => model.id)) : new Set(),
-                          )
-                        }
-                      />
-                      <StackItem size="fill">
-                        <Text type="supporting" color="secondary">
-                          {t("settings.skillsBulkSelectedCount").replace(
-                            "{count}",
-                            String(modelBulkSelection.size),
-                          )}
-                        </Text>
-                      </StackItem>
-                      <Button
-                        label={`${t("settings.skillsBulkEnable")} (${selectedModelsToEnable.length})`}
-                        variant="ghost"
-                        size="sm"
-                        isDisabled={selectedModelsToEnable.length === 0}
-                        onClick={() => setModelBulkState(true)}
-                      />
-                      <Button
-                        label={`${t("settings.skillsBulkDisable")} (${selectedModelsToDisable.length})`}
-                        variant="ghost"
-                        size="sm"
-                        isDisabled={selectedModelsToDisable.length === 0}
-                        onClick={() => setModelBulkState(false)}
-                      />
-                    </HStack>
-                  ) : null}
+                    {modelBulkMode ? (
+                      <HStack gap={2} vAlign="center" wrap="wrap" padding={2}>
+                        <CheckboxInput
+                          label={t("settings.skillsBulkSelectAll")}
+                          value={
+                            modelBulkSelection.size === 0
+                              ? false
+                              : visibleModels.every((model) => modelBulkSelection.has(model.id))
+                                ? true
+                                : "indeterminate"
+                          }
+                          size={isCompact ? "md" : "sm"}
+                          onChange={(checked) =>
+                            setModelBulkSelection(
+                              checked ? new Set(visibleModels.map((model) => model.id)) : new Set(),
+                            )
+                          }
+                        />
+                        <StackItem size="fill">
+                          <Text type="supporting" color="secondary">
+                            {t("settings.skillsBulkSelectedCount").replace(
+                              "{count}",
+                              String(modelBulkSelection.size),
+                            )}
+                          </Text>
+                        </StackItem>
+                        <Button
+                          label={`${t("settings.skillsBulkEnable")} (${selectedModelsToEnable.length})`}
+                          variant="ghost"
+                          size={isCompact ? "lg" : "sm"}
+                          isDisabled={selectedModelsToEnable.length === 0}
+                          onClick={() => setModelBulkState(true)}
+                        />
+                        <Button
+                          label={`${t("settings.skillsBulkDisable")} (${selectedModelsToDisable.length})`}
+                          variant="ghost"
+                          size={isCompact ? "lg" : "sm"}
+                          isDisabled={selectedModelsToDisable.length === 0}
+                          onClick={() => setModelBulkState(false)}
+                        />
+                      </HStack>
+                    ) : null}
 
-                  {fetchError ? (
-                    <AstryxStack
-                      direction="vertical"
-                      className="border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-                    >
-                      {fetchError}
-                    </AstryxStack>
-                  ) : null}
-
-                  {addingModel ? (
-                    <AstryxStack
-                      direction="horizontal"
-                      className="flex gap-2 border-b bg-muted/20 p-2.5 max-[720px]:flex-wrap"
-                    >
-                      <Input
-                        label={t("settings.modelName")}
-                        isLabelHidden
-                        hasAutoFocus
-                        value={newModelName}
-                        className="h-9 text-sm max-[720px]:h-10 max-[720px]:basis-full"
-                        placeholder={t("settings.modelName")}
-                        onChange={(nextValue) => setNewModelName(nextValue)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") handleAddModel();
-                          if (event.key === "Escape") setAddingModel(false);
-                        }}
-                      />
-                      <Button
-                        variant="primary"
-                        label={t("settings.add")}
-                        size="sm"
-                        className="h-9"
-                        onClick={handleAddModel}
-                      >
-                        {t("settings.add")}
-                      </Button>
-                      <Button
-                        label={t("settings.cancel")}
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-9"
-                        onClick={() => setAddingModel(false)}
-                      >
-                        {t("settings.cancel")}
-                      </Button>
-                    </AstryxStack>
-                  ) : null}
-
-                  <AstryxStack direction="vertical" className="divide-y">
-                    {visibleModels.length === 0 ? (
+                    {fetchError ? (
                       <AstryxStack
                         direction="vertical"
-                        className="px-3 py-8 text-center text-xs text-muted-foreground"
+                        className="border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
                       >
-                        {models.length > 0 && modelSearchQuery
-                          ? t("settings.noMatchingModels")
-                          : baseUrl.trim() && modelFetchCredential
-                            ? t("settings.fetchFailed")
-                            : t("settings.fetchHint")}
+                        {fetchError}
                       </AstryxStack>
-                    ) : (
-                      visibleModels.map((model) => {
-                        const isEditingModel = editingModel?.model.id === model.id;
-                        return (
-                          <AstryxStack
-                            direction="vertical"
-                            key={model.id}
-                            className="group hover:bg-accent/30"
-                          >
+                    ) : null}
+
+                    {addingModel ? (
+                      <AstryxStack
+                        direction="horizontal"
+                        className="flex gap-2 border-b bg-muted/20 p-2.5 max-[720px]:flex-wrap"
+                      >
+                        <Input
+                          size={isCompact ? "lg" : "md"}
+                          width="100%"
+                          label={t("settings.modelName")}
+                          isLabelHidden
+                          hasAutoFocus
+                          value={newModelName}
+                          placeholder={t("settings.modelName")}
+                          onChange={(nextValue) => setNewModelName(nextValue)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") handleAddModel();
+                            if (event.key === "Escape") setAddingModel(false);
+                          }}
+                        />
+                        <Button
+                          variant="primary"
+                          label={t("settings.add")}
+                          size={isCompact ? "lg" : "sm"}
+                          onClick={handleAddModel}
+                        >
+                          {t("settings.add")}
+                        </Button>
+                        <Button
+                          label={t("settings.cancel")}
+                          type="button"
+                          variant="ghost"
+                          size={isCompact ? "lg" : "sm"}
+                          onClick={() => setAddingModel(false)}
+                        >
+                          {t("settings.cancel")}
+                        </Button>
+                      </AstryxStack>
+                    ) : null}
+
+                    <AstryxStack direction="vertical" className="divide-y">
+                      {visibleModels.length === 0 ? (
+                        <AstryxStack
+                          direction="vertical"
+                          className="px-3 py-8 text-center text-xs text-muted-foreground"
+                        >
+                          {models.length > 0 && modelSearchQuery
+                            ? t("settings.noMatchingModels")
+                            : baseUrl.trim() && modelFetchCredential
+                              ? t("settings.fetchFailed")
+                              : t("settings.fetchHint")}
+                        </AstryxStack>
+                      ) : (
+                        visibleModels.map((model, index) => {
+                          const isEditingModel = editingModel?.model.id === model.id;
+                          return (
                             <AstryxStack
-                              direction="horizontal"
-                              className="flex items-center gap-2 px-3 py-2 max-[720px]:flex-wrap"
+                              direction="vertical"
+                              key={model.id}
+                              className="group hover:bg-accent/30"
                             >
-                              {modelBulkMode ? (
-                                <CheckboxInput
-                                  label={model.id}
-                                  isLabelHidden
-                                  value={modelBulkSelection.has(model.id)}
-                                  size="sm"
-                                  onChange={() => toggleModelBulkSelection(model.id)}
-                                />
-                              ) : (
-                                <DialogSwitch
-                                  checked={activeModels.has(model.id)}
-                                  onCheckedChange={() => toggleModel(model.id)}
-                                  ariaLabel={model.id}
-                                />
-                              )}
                               <AstryxStack
-                                direction="vertical"
-                                className="min-w-0 flex-1 max-[720px]:basis-[calc(100%-3rem)]"
+                                direction={isCompact ? "vertical" : "horizontal"}
+                                className="settings-provider-model-row"
+                                gap={2}
+                                padding={3}
+                                width="100%"
+                                vAlign="center"
                               >
-                                <AstryxStack
-                                  direction="horizontal"
-                                  className="flex min-w-0 items-center gap-2"
-                                >
-                                  <AstryxText
-                                    as="span"
-                                    type="inherit"
-                                    className="truncate text-sm font-medium"
-                                  >
-                                    {model.id}
-                                  </AstryxText>
-                                </AstryxStack>
-                              </AstryxStack>
-                              <AstryxStack
-                                direction="vertical"
-                                className="shrink-0 text-[11px] tabular-nums text-muted-foreground max-[720px]:order-3 max-[720px]:ml-12 max-[720px]:basis-full"
-                              >
-                                {formatTokenCount(model.contextWindow)} ctx ·{" "}
-                                {formatTokenCount(model.maxOutputToken)} out
-                              </AstryxStack>
-                              <Button
-                                label={t("settings.modelSettings")}
-                                type="button"
-                                variant="ghost"
-                                size="md"
-                                className={cn(
-                                  "h-10 w-10 shrink-0 text-muted-foreground hover:text-foreground",
-                                  isEditingModel && "bg-primary/10 text-primary",
-                                )}
-                                onClick={() => openModelSettings(model.id)}
-                                tooltip={t("settings.modelSettings")}
-                                aria-label={t("settings.modelSettings")}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                label={t("settings.delete")}
-                                type="button"
-                                variant="ghost"
-                                size="md"
-                                className="h-10 w-10 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => removeModel(model.id)}
-                                tooltip={t("settings.delete")}
-                                aria-label={t("settings.delete")}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AstryxStack>
-
-                            {isEditingModel && editingModel ? (
-                              <AstryxStack
-                                direction="vertical"
-                                className="mx-3 mb-3 rounded-lg border bg-muted/20 p-3"
-                              >
-                                <AstryxGrid className="grid grid-cols-2 gap-3 max-[720px]:grid-cols-1">
-                                  <AstryxStack direction="vertical" className="space-y-1.5">
-                                    <Label as="label" type="label" weight="medium">
-                                      {t("settings.contextWindow")}
-                                    </Label>
-                                    <Input
-                                      label={t("settings.contextWindow")}
-                                      isLabelHidden
-                                      {...({ inputMode: "numeric" } as const)}
-                                      type="text"
-                                      aria-invalid={
-                                        editingModelContextWindow === null ? true : undefined
-                                      }
-                                      className={cn(
-                                        editingModelContextWindow === null &&
-                                          "ring-1 ring-inset ring-destructive focus-visible:ring-destructive",
-                                      )}
-                                      value={editingModel.contextWindow}
-                                      onChange={(nextValue) => {
-                                        const value = nextValue;
-                                        setEditingModel((prev) =>
-                                          prev ? { ...prev, contextWindow: value } : prev,
-                                        );
-                                      }}
-                                    />
-                                  </AstryxStack>
-                                  <AstryxStack direction="vertical" className="space-y-1.5">
-                                    <Label as="label" type="label" weight="medium">
-                                      {t("settings.maxOutputToken")}
-                                    </Label>
-                                    <Input
-                                      label={t("settings.maxOutputToken")}
-                                      isLabelHidden
-                                      {...({ inputMode: "numeric" } as const)}
-                                      type="text"
-                                      aria-invalid={
-                                        editingModelMaxOutputToken === null ? true : undefined
-                                      }
-                                      className={cn(
-                                        editingModelMaxOutputToken === null &&
-                                          "ring-1 ring-inset ring-destructive focus-visible:ring-destructive",
-                                      )}
-                                      value={editingModel.maxOutputToken}
-                                      onChange={(nextValue) => {
-                                        const value = nextValue;
-                                        setEditingModel((prev) =>
-                                          prev ? { ...prev, maxOutputToken: value } : prev,
-                                        );
-                                      }}
-                                    />
-                                  </AstryxStack>
-                                </AstryxGrid>
-
-                                <AstryxStack
-                                  direction="vertical"
-                                  className="mt-3 text-xs font-medium text-muted-foreground"
-                                >
-                                  {t("settings.modelCost")}
-                                </AstryxStack>
-                                <AstryxStack
-                                  direction="vertical"
-                                  className="mt-1 text-[11px] text-muted-foreground/80"
-                                >
-                                  {t("settings.modelCostHint")}
-                                </AstryxStack>
-                                <AstryxGrid className="mt-2 grid grid-cols-2 gap-3 max-[720px]:grid-cols-1">
-                                  {(
-                                    [
-                                      ["costInput", "settings.modelCostInput"],
-                                      ["costOutput", "settings.modelCostOutput"],
-                                      ["costCacheRead", "settings.modelCostCacheRead"],
-                                      ["costCacheWrite", "settings.modelCostCacheWrite"],
-                                    ] as const
-                                  ).map(([field, labelKey]) => (
-                                    <AstryxStack
-                                      direction="vertical"
-                                      key={field}
-                                      className="space-y-1.5"
-                                    >
-                                      <Label as="label" type="label" weight="medium">
-                                        {t(labelKey)}
-                                      </Label>
-                                      <Input
-                                        label="0"
+                                <StackItem size="fill">
+                                  <HStack gap={2} vAlign="start" width="100%">
+                                    {modelBulkMode ? (
+                                      <CheckboxInput
+                                        label={model.id}
                                         isLabelHidden
-                                        {...({ inputMode: "decimal" } as const)}
+                                        value={modelBulkSelection.has(model.id)}
+                                        size={isCompact ? "md" : "sm"}
+                                        onChange={() => toggleModelBulkSelection(model.id)}
+                                      />
+                                    ) : (
+                                      <DialogSwitch
+                                        checked={activeModels.has(model.id)}
+                                        onCheckedChange={() => toggleModel(model.id)}
+                                        ariaLabel={model.id}
+                                      />
+                                    )}
+                                    <StackItem size="fill">
+                                      <VStack className="settings-provider-model-name" gap={1}>
+                                        <AstryxText
+                                          as="span"
+                                          type="body"
+                                          weight="medium"
+                                          textWrap="wrap"
+                                          className="settings-provider-model-label"
+                                        >
+                                          {model.id}
+                                        </AstryxText>
+                                        <Text
+                                          className="settings-provider-model-limits"
+                                          type="supporting"
+                                          hasTabularNumbers
+                                        >
+                                          {formatTokenCount(model.contextWindow)} ctx ·{" "}
+                                          {formatTokenCount(model.maxOutputToken)} out
+                                        </Text>
+                                      </VStack>
+                                    </StackItem>
+                                  </HStack>
+                                </StackItem>
+                                <HStack gap={1} wrap="wrap" hAlign="end">
+                                  <DropdownMenu
+                                    button={{
+                                      label: `${t("settings.reorderModel")}: ${model.id}`,
+                                      variant: "ghost",
+                                      size: isCompact ? "lg" : "md",
+                                      icon: <Icon icon={GripVertical} size="sm" color="inherit" />,
+                                      isIconOnly: true,
+                                      isDisabled: !!modelSearchQuery || modelBulkMode,
+                                    }}
+                                    alignment="end"
+                                    items={[
+                                      {
+                                        id: "up",
+                                        label: t("settings.failover.moveUp"),
+                                        isDisabled: index === 0,
+                                        onClick: () => moveModel(model.id, -1),
+                                      },
+                                      {
+                                        id: "down",
+                                        label: t("settings.failover.moveDown"),
+                                        isDisabled: index + 1 === visibleModels.length,
+                                        onClick: () => moveModel(model.id, 1),
+                                      },
+                                    ]}
+                                  />
+                                  <Button
+                                    label={t("settings.modelSettings")}
+                                    type="button"
+                                    variant="ghost"
+                                    size={isCompact ? "lg" : "md"}
+                                    isIconOnly
+                                    icon={
+                                      <Icon
+                                        icon={Pencil}
+                                        size="sm"
+                                        color={isEditingModel ? "accent" : "inherit"}
+                                      />
+                                    }
+                                    onClick={() => openModelSettings(model.id)}
+                                    tooltip={t("settings.modelSettings")}
+                                    aria-label={t("settings.modelSettings")}
+                                  />
+                                  <Button
+                                    label={t("settings.delete")}
+                                    type="button"
+                                    variant="ghost"
+                                    size={isCompact ? "lg" : "md"}
+                                    isIconOnly
+                                    icon={<Icon icon={Trash2} size="sm" color="inherit" />}
+                                    onClick={() => removeModel(model.id)}
+                                    tooltip={t("settings.delete")}
+                                    aria-label={t("settings.delete")}
+                                  />
+                                </HStack>
+                              </AstryxStack>
+
+                              {isEditingModel && editingModel ? (
+                                <AstryxStack direction="vertical" gap={3} padding={3} width="100%">
+                                  {supportsModelInputOverride(providerType) ? (
+                                    <Selector
+                                      size={isCompact ? "lg" : "md"}
+                                      label={t("settings.modelInput")}
+                                      width="100%"
+                                      value={modelInputMode(editingModel.model)}
+                                      options={MODEL_INPUT_OPTIONS.map((option) => ({
+                                        value: option.value,
+                                        label: t(option.labelKey),
+                                      }))}
+                                      onChange={(value) =>
+                                        setEditingModel((previous) =>
+                                          previous
+                                            ? {
+                                                ...previous,
+                                                model: withModelInputMode(
+                                                  previous.model,
+                                                  value as ModelInputMode,
+                                                ),
+                                              }
+                                            : previous,
+                                        )
+                                      }
+                                    />
+                                  ) : null}
+                                  {providerType === "codex" ? (
+                                    <Selector
+                                      size={isCompact ? "lg" : "md"}
+                                      label={t("settings.promptCacheHintModelOverride")}
+                                      width="100%"
+                                      value={editingModel.model.promptCacheHintMode ?? "inherit"}
+                                      options={[
+                                        {
+                                          value: "inherit",
+                                          label: t("settings.promptCacheHintMode.inherit"),
+                                        },
+                                        ...PROVIDER_CACHE_HINT_OPTIONS.map((option) => ({
+                                          value: option.value,
+                                          label: t(option.labelKey),
+                                        })),
+                                      ]}
+                                      onChange={(value) =>
+                                        setEditingModel((previous) =>
+                                          previous
+                                            ? {
+                                                ...previous,
+                                                model: {
+                                                  ...previous.model,
+                                                  promptCacheHintMode:
+                                                    value === "inherit"
+                                                      ? undefined
+                                                      : (value as PromptCacheHintMode),
+                                                },
+                                              }
+                                            : previous,
+                                        )
+                                      }
+                                    />
+                                  ) : null}
+                                  <AstryxGrid
+                                    columns={{ minWidth: 240, max: 2 }}
+                                    gap={3}
+                                    width="100%"
+                                  >
+                                    <AstryxStack direction="vertical" gap={2}>
+                                      <Input
+                                        size={isCompact ? "lg" : "md"}
+                                        width="100%"
+                                        label={t("settings.contextWindow")}
+                                        {...({ inputMode: "numeric" } as const)}
                                         type="text"
-                                        placeholder="0"
                                         aria-invalid={
-                                          parseCostRate(editingModel[field]) === null
-                                            ? true
+                                          editingModelContextWindow === null ? true : undefined
+                                        }
+                                        status={
+                                          editingModelContextWindow === null
+                                            ? { type: "error" }
                                             : undefined
                                         }
-                                        className={cn(
-                                          parseCostRate(editingModel[field]) === null &&
-                                            "ring-1 ring-inset ring-destructive focus-visible:ring-destructive",
-                                        )}
-                                        value={editingModel[field]}
+                                        value={editingModel.contextWindow}
                                         onChange={(nextValue) => {
                                           const value = nextValue;
                                           setEditingModel((prev) =>
-                                            prev ? { ...prev, [field]: value } : prev,
+                                            prev ? { ...prev, contextWindow: value } : prev,
                                           );
                                         }}
                                       />
                                     </AstryxStack>
-                                  ))}
-                                </AstryxGrid>
+                                    <AstryxStack direction="vertical" gap={2}>
+                                      <Input
+                                        size={isCompact ? "lg" : "md"}
+                                        width="100%"
+                                        label={t("settings.maxOutputToken")}
+                                        {...({ inputMode: "numeric" } as const)}
+                                        type="text"
+                                        aria-invalid={
+                                          editingModelMaxOutputToken === null ? true : undefined
+                                        }
+                                        status={
+                                          editingModelMaxOutputToken === null
+                                            ? { type: "error" }
+                                            : undefined
+                                        }
+                                        value={editingModel.maxOutputToken}
+                                        onChange={(nextValue) => {
+                                          const value = nextValue;
+                                          setEditingModel((prev) =>
+                                            prev ? { ...prev, maxOutputToken: value } : prev,
+                                          );
+                                        }}
+                                      />
+                                    </AstryxStack>
+                                  </AstryxGrid>
 
-                                {!canSaveEditingModel ? (
+                                  <Text type="body" weight="medium" wordBreak="break-word">
+                                    {t("settings.modelCost")}
+                                  </Text>
+                                  <Text type="supporting" color="secondary" wordBreak="break-word">
+                                    {t("settings.modelCostHint")}
+                                  </Text>
+                                  <AstryxGrid
+                                    columns={{ minWidth: 240, max: 2 }}
+                                    gap={3}
+                                    width="100%"
+                                  >
+                                    {(
+                                      [
+                                        ["costInput", "settings.modelCostInput"],
+                                        ["costOutput", "settings.modelCostOutput"],
+                                        ["costCacheRead", "settings.modelCostCacheRead"],
+                                        ["costCacheWrite", "settings.modelCostCacheWrite"],
+                                      ] as const
+                                    ).map(([field, labelKey]) => (
+                                      <AstryxStack direction="vertical" key={field} gap={2}>
+                                        <Input
+                                          size={isCompact ? "lg" : "md"}
+                                          width="100%"
+                                          label={t(labelKey)}
+                                          {...({ inputMode: "decimal" } as const)}
+                                          type="text"
+                                          placeholder="0"
+                                          aria-invalid={
+                                            parseCostRate(editingModel[field]) === null
+                                              ? true
+                                              : undefined
+                                          }
+                                          status={
+                                            parseCostRate(editingModel[field]) === null
+                                              ? { type: "error" }
+                                              : undefined
+                                          }
+                                          value={editingModel[field]}
+                                          onChange={(nextValue) => {
+                                            const value = nextValue;
+                                            setEditingModel((prev) =>
+                                              prev ? { ...prev, [field]: value } : prev,
+                                            );
+                                          }}
+                                        />
+                                      </AstryxStack>
+                                    ))}
+                                  </AstryxGrid>
+
+                                  {!canSaveEditingModel ? (
+                                    <Banner
+                                      status="error"
+                                      title={t("settings.modelParametersInvalid")}
+                                      collapsible={false}
+                                    />
+                                  ) : null}
+
                                   <AstryxStack
-                                    direction="vertical"
-                                    className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                                    direction="horizontal"
+                                    gap={2}
+                                    hAlign="end"
+                                    wrap="wrap"
                                   >
-                                    {t("settings.positiveIntegerRequired")}
+                                    <Button
+                                      label={t("settings.cancel")}
+                                      type="button"
+                                      variant="secondary"
+                                      size={isCompact ? "lg" : "sm"}
+                                      onClick={() => setEditingModel(null)}
+                                    >
+                                      {t("settings.cancel")}
+                                    </Button>
+                                    <Button
+                                      variant="primary"
+                                      label={t("settings.save")}
+                                      type="button"
+                                      size={isCompact ? "lg" : "sm"}
+                                      isDisabled={!canSaveEditingModel}
+                                      onClick={saveInlineModelSettings}
+                                    >
+                                      {t("settings.save")}
+                                    </Button>
                                   </AstryxStack>
-                                ) : null}
-
-                                <AstryxStack
-                                  direction="horizontal"
-                                  className="mt-3 flex justify-end gap-2"
-                                >
-                                  <Button
-                                    label={t("settings.cancel")}
-                                    type="button"
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => setEditingModel(null)}
-                                  >
-                                    {t("settings.cancel")}
-                                  </Button>
-                                  <Button
-                                    variant="primary"
-                                    label={t("settings.save")}
-                                    type="button"
-                                    size="sm"
-                                    isDisabled={!canSaveEditingModel}
-                                    onClick={saveInlineModelSettings}
-                                  >
-                                    {t("settings.save")}
-                                  </Button>
                                 </AstryxStack>
-                              </AstryxStack>
-                            ) : null}
-                          </AstryxStack>
-                        );
-                      })
-                    )}
+                              ) : null}
+                            </AstryxStack>
+                          );
+                        })
+                      )}
+                    </AstryxStack>
                   </AstryxStack>
                 </AstryxStack>
-              </AstryxStack>
-            ) : activePanel === "request" ? (
-              <AstryxStack
-                direction="vertical"
-                as="section"
-                key="request"
-                className="provider-panel-enter"
-              >
-                <AstryxStack direction="vertical" className="text-sm font-semibold">
-                  {t("settings.providerDialogRequest")}
-                </AstryxStack>
-
+              ) : activePanel === "request" ? (
                 <AstryxStack
-                  direction="horizontal"
-                  className={cn(
-                    "mt-3 flex items-center gap-3 rounded-xl border bg-card px-4 py-3 transition-colors",
-                    useSystemProxy && "border-primary/35 bg-primary/[0.04]",
-                  )}
+                  direction="vertical"
+                  as="section"
+                  key="request"
+                  gap={4}
+                  className="provider-panel-enter"
                 >
+                  <AstryxStack direction="vertical" className="text-sm font-semibold">
+                    {t("settings.providerDialogRequest")}
+                  </AstryxStack>
+
                   <AstryxStack
-                    as="span"
                     direction="horizontal"
                     className={cn(
-                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors",
-                      useSystemProxy && "bg-primary/15 text-primary",
+                      "mt-3 flex items-center gap-3 rounded-xl border bg-card px-4 py-3 transition-colors",
+                      useSystemProxy && "border-primary/35 bg-primary/[0.04]",
                     )}
                   >
-                    <Waypoints className="h-4 w-4" />
-                  </AstryxStack>
-                  <AstryxStack direction="vertical" className="min-w-0 flex-1 text-sm font-medium">
-                    {t("settings.providerUseSystemProxy")}
-                  </AstryxStack>
-                  <DialogSwitch
-                    checked={useSystemProxy}
-                    onCheckedChange={setUseSystemProxy}
-                    ariaLabel={t("settings.providerUseSystemProxy")}
-                  />
-                </AstryxStack>
-
-                <Section padding={4} width="100%" dividers={["top", "bottom"]}>
-                  <VStack gap={3}>
-                    <VStack gap={0.5}>
-                      <Heading level={4}>{t("settings.providerStreamRetry")}</Heading>
-                      <Text type="supporting" color="secondary">
-                        {t("settings.providerStreamRetryDesc")}
-                      </Text>
-                    </VStack>
-                    <Selector
-                      label={t("settings.providerStreamRetry")}
-                      isLabelHidden
-                      value={streamRetryMode}
-                      width="100%"
-                      options={[
-                        {
-                          value: "default",
-                          label: t("settings.providerStreamRetryDefault"),
-                        },
-                        { value: "off", label: t("settings.providerStreamRetryOff") },
-                        {
-                          value: "custom",
-                          label: t("settings.providerStreamRetryCustom"),
-                        },
-                      ]}
-                      onChange={(value) =>
-                        setStreamRetryMode(value as "default" | "off" | "custom")
-                      }
+                    <AstryxStack
+                      as="span"
+                      direction="horizontal"
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors",
+                        useSystemProxy && "bg-primary/15 text-primary",
+                      )}
+                    >
+                      <Waypoints className="h-4 w-4" />
+                    </AstryxStack>
+                    <AstryxStack
+                      direction="vertical"
+                      className="min-w-0 flex-1 text-sm font-medium"
+                    >
+                      {t("settings.providerUseSystemProxy")}
+                    </AstryxStack>
+                    <DialogSwitch
+                      checked={useSystemProxy}
+                      onCheckedChange={(nextValue) => {
+                        if (nextValue === useSystemProxy) return;
+                        invalidateModelRequest();
+                        setUseSystemProxy(nextValue);
+                      }}
+                      ariaLabel={t("settings.providerUseSystemProxy")}
                     />
-                    {streamRetryMode === "custom" ? (
-                      <NumberInput
-                        label={t("settings.providerStreamRetryMaxRetries")}
-                        description={t("settings.providerStreamRetryMaxRetriesDesc")}
-                        min={PROVIDER_RETRY_MAX_RETRIES_LIMITS.min}
-                        max={PROVIDER_RETRY_MAX_RETRIES_LIMITS.max}
-                        value={streamRetryCount}
-                        isWheelEnabled={false}
+                  </AstryxStack>
+
+                  <Section padding={4} width="100%" dividers={["top", "bottom"]}>
+                    <VStack gap={3}>
+                      <VStack gap={0.5}>
+                        <Heading level={4}>{t("settings.providerStreamRetry")}</Heading>
+                        <Text type="supporting" color="secondary">
+                          {t("settings.providerStreamRetryDesc")}
+                        </Text>
+                      </VStack>
+                      <Selector
+                        size={isCompact ? "lg" : "md"}
+                        label={t("settings.providerStreamRetry")}
+                        isLabelHidden
+                        value={streamRetryMode}
                         width="100%"
+                        options={[
+                          {
+                            value: "default",
+                            label: t("settings.providerStreamRetryDefault"),
+                          },
+                          { value: "off", label: t("settings.providerStreamRetryOff") },
+                          {
+                            value: "custom",
+                            label: t("settings.providerStreamRetryCustom"),
+                          },
+                        ]}
                         onChange={(value) =>
-                          setStreamRetryCount(value ?? PROVIDER_RETRY_DEFAULT_MAX_RETRIES)
+                          setStreamRetryMode(value as "default" | "off" | "custom")
                         }
                       />
-                    ) : null}
-                  </VStack>
-                </Section>
+                      {streamRetryMode === "custom" ? (
+                        <NumberInput
+                          size={isCompact ? "lg" : "md"}
+                          label={t("settings.providerStreamRetryMaxRetries")}
+                          description={t("settings.providerStreamRetryMaxRetriesDesc")}
+                          min={PROVIDER_RETRY_MAX_RETRIES_LIMITS.min}
+                          max={PROVIDER_RETRY_MAX_RETRIES_LIMITS.max}
+                          value={streamRetryCount}
+                          isWheelEnabled={false}
+                          width="100%"
+                          onChange={(value) =>
+                            setStreamRetryCount(value ?? PROVIDER_RETRY_DEFAULT_MAX_RETRIES)
+                          }
+                        />
+                      ) : null}
+                    </VStack>
+                  </Section>
 
-                {providerType === "claude_code" || providerType === "codex" ? (
-                  <AstryxStack
-                    direction="vertical"
-                    className={cn(
-                      "mt-3 rounded-xl border bg-card px-4 py-3 transition-colors",
-                      promptCachingEnabled && "border-primary/35 bg-primary/[0.04]",
-                    )}
-                  >
-                    <AstryxStack direction="horizontal" className="flex items-center gap-3">
-                      <AstryxStack
-                        as="span"
-                        direction="horizontal"
-                        className={cn(
-                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors",
-                          promptCachingEnabled && "bg-primary/15 text-primary",
-                        )}
-                      >
-                        <Zap className="h-4 w-4" />
-                      </AstryxStack>
-                      <AstryxStack direction="vertical" className="min-w-0 flex-1">
-                        <AstryxStack direction="vertical" className="text-sm font-medium">
-                          {t("settings.promptCaching")}
+                  {providerType === "claude_code" || providerType === "codex" ? (
+                    <AstryxStack
+                      direction="vertical"
+                      className={cn(
+                        "mt-3 rounded-xl border bg-card px-4 py-3 transition-colors",
+                        promptCachingEnabled && "border-primary/35 bg-primary/[0.04]",
+                      )}
+                    >
+                      <AstryxStack direction="horizontal" className="flex items-center gap-3">
+                        <AstryxStack
+                          as="span"
+                          direction="horizontal"
+                          className={cn(
+                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors",
+                            promptCachingEnabled && "bg-primary/15 text-primary",
+                          )}
+                        >
+                          <Zap className="h-4 w-4" />
                         </AstryxStack>
-                        <AstryxStack direction="vertical" className="text-xs text-muted-foreground">
-                          {providerType === "claude_code"
-                            ? t("settings.promptCachingDescClaude")
-                            : t("settings.promptCachingDescCodex")}
+                        <AstryxStack direction="vertical" className="min-w-0 flex-1">
+                          <AstryxStack direction="vertical" className="text-sm font-medium">
+                            {t("settings.promptCaching")}
+                          </AstryxStack>
+                          <AstryxStack
+                            direction="vertical"
+                            className="text-xs text-muted-foreground"
+                          >
+                            {providerType === "claude_code"
+                              ? t("settings.promptCachingDescClaude")
+                              : t("settings.promptCachingDescCodex")}
+                          </AstryxStack>
                         </AstryxStack>
+                        <DialogSwitch
+                          checked={promptCachingEnabled}
+                          onCheckedChange={setPromptCachingEnabled}
+                          ariaLabel={t("settings.promptCaching")}
+                        />
                       </AstryxStack>
-                      <DialogSwitch
-                        checked={promptCachingEnabled}
-                        onCheckedChange={setPromptCachingEnabled}
-                        ariaLabel={t("settings.promptCaching")}
-                      />
+                      {providerType === "claude_code" && promptCachingEnabled ? (
+                        <AstryxStack
+                          direction="horizontal"
+                          className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3"
+                        >
+                          <AstryxText
+                            as="span"
+                            type="inherit"
+                            className="text-xs text-muted-foreground"
+                          >
+                            {t("settings.promptCacheRetention")}
+                          </AstryxText>
+                          {(
+                            [
+                              ["short", "settings.promptCacheRetentionShort"],
+                              ["long", "settings.promptCacheRetentionLong"],
+                            ] as const
+                          ).map(([value, labelKey]) => (
+                            <ToggleButton
+                              key={value}
+                              label={t(labelKey)}
+                              isPressed={promptCacheRetention === value}
+                              onPressedChange={() => setPromptCacheRetention(value)}
+                              size={isCompact ? "lg" : "sm"}
+                            >
+                              {t(labelKey)}
+                            </ToggleButton>
+                          ))}
+                        </AstryxStack>
+                      ) : null}
+                      {providerType === "codex" && promptCachingEnabled ? (
+                        <Selector
+                          size={isCompact ? "lg" : "md"}
+                          label={t("settings.promptCacheHintMode")}
+                          width="100%"
+                          value={promptCacheHintMode}
+                          options={PROVIDER_CACHE_HINT_OPTIONS.map((option) => ({
+                            value: option.value,
+                            label: t(option.labelKey),
+                          }))}
+                          onChange={(value) => {
+                            if (
+                              !usageRequest.current.active ||
+                              usageRequest.current.session !== usageSession
+                            )
+                              return;
+                            acceptedCacheHint.current = value as PromptCacheHintMode;
+                            setPromptCacheHintMode(value as PromptCacheHintMode);
+                          }}
+                        />
+                      ) : null}
                     </AstryxStack>
-                    {providerType === "claude_code" && promptCachingEnabled ? (
-                      <AstryxStack
-                        direction="horizontal"
-                        className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3"
-                      >
+                  ) : null}
+
+                  <AstryxStack
+                    direction="horizontal"
+                    gap={2}
+                    wrap="wrap"
+                    hAlign="between"
+                    vAlign="center"
+                  >
+                    <AstryxStack direction="horizontal" gap={2} vAlign="center">
+                      <AstryxText as="span" type="inherit" className="text-sm font-semibold">
+                        {t("settings.customHeaders")}
+                      </AstryxText>
+                      {customHeaders.length > 0 ? (
                         <AstryxText
                           as="span"
                           type="inherit"
-                          className="text-xs text-muted-foreground"
+                          className="settings-provider-header-count rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground"
                         >
-                          {t("settings.promptCacheRetention")}
+                          {customHeaders.length}
                         </AstryxText>
-                        {(
-                          [
-                            ["short", "settings.promptCacheRetentionShort"],
-                            ["long", "settings.promptCacheRetentionLong"],
-                          ] as const
-                        ).map(([value, labelKey]) => (
-                          <ToggleButton
-                            key={value}
-                            label={t(labelKey)}
-                            isPressed={promptCacheRetention === value}
-                            onPressedChange={() => setPromptCacheRetention(value)}
-                            size="sm"
-                          >
-                            {t(labelKey)}
-                          </ToggleButton>
-                        ))}
-                      </AstryxStack>
-                    ) : null}
-                  </AstryxStack>
-                ) : null}
-
-                <AstryxStack
-                  direction="horizontal"
-                  className="mt-6 flex items-center justify-between gap-3"
-                >
-                  <AstryxStack direction="horizontal" className="flex min-w-0 items-center gap-2">
-                    <AstryxText as="span" type="inherit" className="text-sm font-semibold">
-                      {t("settings.customHeaders")}
-                    </AstryxText>
-                    {customHeaders.length > 0 ? (
-                      <AstryxText
-                        as="span"
-                        type="inherit"
-                        className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground"
-                      >
-                        {customHeaders.length}
-                      </AstryxText>
-                    ) : null}
-                  </AstryxStack>
-                  <Button
-                    label={t("settings.addCustomHeader")}
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-8 shrink-0 gap-1.5 max-[720px]:h-10"
-                    onClick={() => addCustomHeader()}
-                    isDisabled={isBrowser}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    {t("settings.addCustomHeader")}
-                  </Button>
-                </AstryxStack>
-
-                {customHeaders.length === 0 ? (
-                  <EmptyState
-                    isCompact
-                    icon={<Icon icon={List} size="sm" color="inherit" />}
-                    title={t("settings.noCustomHeaders")}
-                    description={t("settings.noCustomHeadersHint")}
-                    actions={
-                      <AstryxNativeButton
-                        label={t("settings.addCustomHeader")}
-                        variant="secondary"
-                        size="sm"
-                        isDisabled={isBrowser}
-                        onClick={() => addCustomHeader()}
-                      />
-                    }
-                  />
-                ) : (
-                  <AstryxStack direction="vertical" className="mt-3 space-y-2">
-                    <AstryxStack
-                      direction="vertical"
-                      className="-m-0.5 max-h-[196px] space-y-2 overflow-y-auto p-0.5 max-[720px]:max-h-[360px]"
-                      onScroll={() => setHeaderSuggest(null)}
+                      ) : null}
+                    </AstryxStack>
+                    <Button
+                      label={t("settings.addCustomHeader")}
+                      type="button"
+                      variant="secondary"
+                      size={isCompact ? "lg" : "sm"}
+                      onClick={() => addCustomHeader()}
+                      isDisabled={isBrowser}
                     >
-                      {customHeaders.map((header, index) => {
-                        const issue = getCustomHeaderKeyIssue(
-                          header.key,
-                          headerValidationSubmitted,
-                        );
-                        const valueIssue = !isValidCustomHeaderValue(header.value);
-                        const issueTitle =
-                          issue === "reserved"
-                            ? t("settings.customHeaderReservedTitle")
-                            : issue === "invalid"
-                              ? t("settings.invalidCustomHeaderKey")
-                              : undefined;
-                        const valueVisible = visibleHeaderValues.has(index);
-                        const suggestOpen =
-                          headerSuggest?.index === index && headerSuggestItems.length > 0;
+                      <Plus className="h-3.5 w-3.5" />
+                      {t("settings.addCustomHeader")}
+                    </Button>
+                  </AstryxStack>
 
-                        return (
-                          <AstryxStack
-                            direction="horizontal"
-                            key={index}
-                            className={cn(
-                              "provider-panel-enter group relative flex items-stretch overflow-hidden rounded-lg border bg-card transition-all focus-within:border-primary/45 focus-within:ring-2 focus-within:ring-primary/10 hover:border-muted-foreground/30 max-[720px]:flex-wrap",
-                              (issue || valueIssue) &&
-                                "border-destructive/60 focus-within:border-destructive focus-within:ring-destructive/10",
-                            )}
-                          >
-                            <Input
-                              label={t("settings.customHeaderName")}
-                              isLabelHidden
-                              {...({ autoComplete: "off", spellCheck: false } as const)}
-                              type="text"
-                              ref={(element) => {
-                                headerKeyRefs.current[index] = element;
-                              }}
-                              value={header.key}
-                              isDisabled={isBrowser}
-                              className={cn(
-                                "h-10 w-[210px] shrink-0 rounded-none border-0 border-r bg-muted/30 px-3 font-mono text-xs shadow-none focus-visible:ring-0 max-[720px]:w-full max-[720px]:border-b max-[720px]:border-r-0 max-[720px]:bg-muted/40",
-                                issue && "text-destructive",
-                              )}
-                              placeholder={t("settings.customHeaderKeyPlaceholder")}
-                              aria-label={t("settings.customHeaderName")}
-                              aria-invalid={issue ? true : undefined}
-                              role="combobox"
-                              aria-expanded={suggestOpen}
-                              aria-controls={suggestOpen ? "provider-header-suggest" : undefined}
-                              aria-autocomplete="list"
-                              labelTooltip={issueTitle}
-                              onChange={(nextValue) => {
-                                updateCustomHeader(index, "key", nextValue);
-                                openHeaderSuggest(index);
-                              }}
-                              onFocus={() => openHeaderSuggest(index)}
-                              onBlur={() => setHeaderSuggest(null)}
-                              onKeyDown={(event) => {
-                                if (event.key === "ArrowDown") {
-                                  event.preventDefault();
-                                  if (suggestOpen) {
-                                    setHeaderSuggestActive(
-                                      (headerSuggestActiveIndex + 1) % headerSuggestItems.length,
-                                    );
-                                  } else {
-                                    openHeaderSuggest(index);
-                                  }
-                                  return;
-                                }
-                                if (event.key === "ArrowUp" && suggestOpen) {
-                                  event.preventDefault();
-                                  setHeaderSuggestActive(
-                                    (headerSuggestActiveIndex - 1 + headerSuggestItems.length) %
-                                      headerSuggestItems.length,
-                                  );
-                                  return;
-                                }
-                                if (event.key === "Escape" && headerSuggest) {
-                                  event.preventDefault();
-                                  setHeaderSuggest(null);
-                                  return;
-                                }
-                                if (event.key !== "Enter") return;
-                                event.preventDefault();
-                                if (suggestOpen) {
-                                  applyHeaderSuggestion(
-                                    headerSuggestItems[headerSuggestActiveIndex],
-                                  );
-                                  return;
-                                }
-                                focusCustomHeader(index, "value");
-                              }}
-                            />
+                  {customHeaders.length === 0 ? (
+                    <EmptyState
+                      isCompact
+                      icon={<Icon icon={List} size={isCompact ? "lg" : "sm"} color="inherit" />}
+                      title={t("settings.noCustomHeaders")}
+                      description={t("settings.noCustomHeadersHint")}
+                      actions={
+                        <AstryxNativeButton
+                          label={t("settings.addCustomHeader")}
+                          variant="secondary"
+                          size={isCompact ? "lg" : "sm"}
+                          isDisabled={isBrowser}
+                          onClick={() => addCustomHeader()}
+                        />
+                      }
+                    />
+                  ) : (
+                    <AstryxStack direction="vertical" gap={2}>
+                      <AstryxStack
+                        direction="vertical"
+                        className="-m-0.5 max-h-[196px] space-y-2 overflow-y-auto p-0.5 max-[720px]:max-h-[360px]"
+                        onScroll={() => setHeaderSuggest(null)}
+                      >
+                        {customHeaders.map((header, index) => {
+                          const issue = getCustomHeaderKeyIssue(
+                            header.key,
+                            headerValidationSubmitted,
+                          );
+                          const valueIssue = !isValidCustomHeaderValue(header.value);
+                          const issueTitle =
+                            issue === "reserved"
+                              ? t("settings.customHeaderReservedTitle")
+                              : issue === "invalid"
+                                ? t("settings.invalidCustomHeaderKey")
+                                : undefined;
+                          const valueVisible = visibleHeaderValues.has(index);
+                          const suggestOpen =
+                            headerSuggest?.index === index && headerSuggestItems.length > 0;
+
+                          return (
                             <AstryxStack
-                              direction="vertical"
-                              className="relative min-w-0 flex-1 max-[720px]:basis-full"
+                              direction={isCompact ? "vertical" : "horizontal"}
+                              gap={2}
+                              key={index}
+                              className={cn(
+                                "settings-provider-header-row provider-panel-enter group",
+                                (issue || valueIssue) &&
+                                  "border-destructive/60 focus-within:border-destructive focus-within:ring-destructive/10",
+                              )}
                             >
                               <Input
-                                label={t("settings.customHeaderValue")}
+                                size={isCompact ? "lg" : "md"}
+                                width="100%"
+                                label={t("settings.customHeaderName")}
                                 isLabelHidden
                                 {...({ autoComplete: "off", spellCheck: false } as const)}
+                                type="text"
                                 ref={(element) => {
-                                  headerValueRefs.current[index] = element;
+                                  headerKeyRefs.current[index] = element;
                                 }}
-                                type={valueVisible ? "text" : "password"}
-                                value={header.value}
-                                aria-invalid={valueIssue ? true : undefined}
-                                labelTooltip={
-                                  valueIssue ? t("settings.invalidCustomHeaderValue") : undefined
-                                }
+                                value={header.key}
                                 isDisabled={isBrowser}
-                                className="h-10 w-full rounded-none border-0 bg-transparent pl-3 pr-[4.5rem] font-mono text-xs shadow-none focus-visible:ring-0"
-                                placeholder={t("settings.customHeaderValue")}
-                                aria-label={t("settings.customHeaderValue")}
-                                onChange={(nextValue) =>
-                                  updateCustomHeader(index, "value", nextValue)
-                                }
+                                className={cn("font-mono", issue && "text-destructive")}
+                                placeholder={t("settings.customHeaderKeyPlaceholder")}
+                                aria-label={t("settings.customHeaderName")}
+                                aria-invalid={issue ? true : undefined}
+                                role="combobox"
+                                aria-expanded={suggestOpen}
+                                aria-controls={suggestOpen ? "provider-header-suggest" : undefined}
+                                aria-autocomplete="list"
+                                labelTooltip={issueTitle}
+                                onChange={(nextValue) => {
+                                  updateCustomHeader(index, "key", nextValue);
+                                  openHeaderSuggest(index);
+                                }}
+                                onFocus={() => openHeaderSuggest(index)}
+                                onBlur={() => setHeaderSuggest(null)}
                                 onKeyDown={(event) => {
+                                  if (event.key === "ArrowDown") {
+                                    event.preventDefault();
+                                    if (suggestOpen) {
+                                      setHeaderSuggestActive(
+                                        (headerSuggestActiveIndex + 1) % headerSuggestItems.length,
+                                      );
+                                    } else {
+                                      openHeaderSuggest(index);
+                                    }
+                                    return;
+                                  }
+                                  if (event.key === "ArrowUp" && suggestOpen) {
+                                    event.preventDefault();
+                                    setHeaderSuggestActive(
+                                      (headerSuggestActiveIndex - 1 + headerSuggestItems.length) %
+                                        headerSuggestItems.length,
+                                    );
+                                    return;
+                                  }
+                                  if (event.key === "Escape" && headerSuggest) {
+                                    event.preventDefault();
+                                    setHeaderSuggest(null);
+                                    return;
+                                  }
                                   if (event.key !== "Enter") return;
                                   event.preventDefault();
-                                  if (index === customHeaders.length - 1) addCustomHeader();
-                                  else focusCustomHeader(index + 1, "key");
+                                  if (suggestOpen) {
+                                    applyHeaderSuggestion(
+                                      headerSuggestItems[headerSuggestActiveIndex],
+                                    );
+                                    return;
+                                  }
+                                  focusCustomHeader(index, "value");
                                 }}
                               />
                               <AstryxStack
-                                direction="horizontal"
-                                className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 max-[720px]:opacity-100"
+                                direction="vertical"
+                                className="settings-provider-header-value relative min-w-0 flex-1 max-[720px]:basis-full"
                               >
-                                <Button
-                                  label={
-                                    valueVisible
-                                      ? t("settings.hideCustomHeaderValue")
-                                      : t("settings.showCustomHeaderValue")
+                                <Input
+                                  size={isCompact ? "lg" : "md"}
+                                  width="100%"
+                                  label={t("settings.customHeaderValue")}
+                                  isLabelHidden
+                                  {...({ autoComplete: "off", spellCheck: false } as const)}
+                                  ref={(element) => {
+                                    headerValueRefs.current[index] = element;
+                                  }}
+                                  type={valueVisible ? "text" : "password"}
+                                  value={header.value}
+                                  aria-invalid={valueIssue ? true : undefined}
+                                  labelTooltip={
+                                    valueIssue ? t("settings.invalidCustomHeaderValue") : undefined
                                   }
-                                  type="button"
-                                  variant="ghost"
-                                  size="md"
-                                  className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground"
-                                  onClick={() => toggleCustomHeaderValue(index)}
                                   isDisabled={isBrowser}
-                                  tooltip={
-                                    valueVisible
-                                      ? t("settings.hideCustomHeaderValue")
-                                      : t("settings.showCustomHeaderValue")
+                                  className="font-mono"
+                                  placeholder={t("settings.customHeaderValue")}
+                                  aria-label={t("settings.customHeaderValue")}
+                                  onChange={(nextValue) =>
+                                    updateCustomHeader(index, "value", nextValue)
                                   }
-                                  aria-label={
-                                    valueVisible
-                                      ? t("settings.hideCustomHeaderValue")
-                                      : t("settings.showCustomHeaderValue")
-                                  }
-                                >
-                                  {valueVisible ? (
-                                    <EyeOff className="h-3.5 w-3.5" />
-                                  ) : (
-                                    <Eye className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                                <Button
-                                  label={t("settings.removeCustomHeader")}
-                                  type="button"
-                                  variant="ghost"
-                                  size="md"
-                                  className="h-7 w-7 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                  onClick={() => removeCustomHeader(index)}
-                                  isDisabled={isBrowser}
-                                  tooltip={t("settings.removeCustomHeader")}
-                                  aria-label={t("settings.removeCustomHeader")}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
+                                  onKeyDown={(event) => {
+                                    if (event.key !== "Enter") return;
+                                    event.preventDefault();
+                                    if (index === customHeaders.length - 1) addCustomHeader();
+                                    else focusCustomHeader(index + 1, "key");
+                                  }}
+                                />
+                                <AstryxStack direction="horizontal" gap={1} hAlign="end">
+                                  <Button
+                                    label={
+                                      valueVisible
+                                        ? t("settings.hideCustomHeaderValue")
+                                        : t("settings.showCustomHeaderValue")
+                                    }
+                                    type="button"
+                                    variant="ghost"
+                                    size={isCompact ? "lg" : "md"}
+                                    isIconOnly
+                                    icon={
+                                      <Icon
+                                        icon={valueVisible ? EyeOff : Eye}
+                                        size="sm"
+                                        color="inherit"
+                                      />
+                                    }
+                                    onClick={() => toggleCustomHeaderValue(index)}
+                                    isDisabled={isBrowser}
+                                    tooltip={
+                                      valueVisible
+                                        ? t("settings.hideCustomHeaderValue")
+                                        : t("settings.showCustomHeaderValue")
+                                    }
+                                    aria-label={
+                                      valueVisible
+                                        ? t("settings.hideCustomHeaderValue")
+                                        : t("settings.showCustomHeaderValue")
+                                    }
+                                  />
+                                  <Button
+                                    label={t("settings.removeCustomHeader")}
+                                    type="button"
+                                    variant="ghost"
+                                    size={isCompact ? "lg" : "md"}
+                                    isIconOnly
+                                    icon={<Icon icon={Trash2} size="sm" color="inherit" />}
+                                    onClick={() => removeCustomHeader(index)}
+                                    isDisabled={isBrowser}
+                                    tooltip={t("settings.removeCustomHeader")}
+                                    aria-label={t("settings.removeCustomHeader")}
+                                  />
+                                </AstryxStack>
                               </AstryxStack>
                             </AstryxStack>
-                          </AstryxStack>
-                        );
-                      })}
-                    </AstryxStack>
-                  </AstryxStack>
-                )}
-
-                {headerIssueMessage ? (
-                  <AstryxText
-                    as="p"
-                    type="inherit"
-                    display="block"
-                    className="mt-2 text-xs leading-relaxed text-destructive"
-                    role="alert"
-                  >
-                    {headerIssueMessage}
-                  </AstryxText>
-                ) : null}
-
-                {headerSuggest && headerSuggestItems.length > 0 ? (
-                  <Popover
-                    anchorRef={{
-                      current: headerKeyRefs.current[headerSuggest.index] as HTMLElement,
-                    }}
-                    isOpen
-                    onOpenChange={(isOpen) => {
-                      if (!isOpen) setHeaderSuggest(null);
-                    }}
-                    placement="below"
-                    alignment="start"
-                    width="var(--xgent-provider-header-menu-width)"
-                    label={t("settings.customHeaderKeyPlaceholder")}
-                    role="none"
-                    hasAutoFocus={false}
-                    hasCloseButton={false}
-                    content={
-                      <AstryxStack direction="vertical" id="provider-header-suggest" role="listbox">
-                        {headerSuggestItems.map((preset, itemIndex) => (
-                          <AstryxButton
-                            variant="ghost"
-                            label={preset}
-                            key={preset}
-                            type="button"
-                            role="option"
-                            aria-selected={itemIndex === headerSuggestActiveIndex}
-                            className={cn(
-                              "flex w-full items-center rounded-md px-2.5 py-2 text-left font-mono text-xs text-muted-foreground transition-colors",
-                              itemIndex === headerSuggestActiveIndex && "bg-accent text-foreground",
-                            )}
-                            onMouseDown={(event) => event.preventDefault()}
-                            onMouseEnter={() => setHeaderSuggestActive(itemIndex)}
-                            onClick={() => applyHeaderSuggestion(preset)}
-                          >
-                            {preset}
-                          </AstryxButton>
-                        ))}
+                          );
+                        })}
                       </AstryxStack>
+                    </AstryxStack>
+                  )}
+
+                  {headerIssueMessage ? (
+                    <AstryxText
+                      as="p"
+                      type="inherit"
+                      display="block"
+                      className="mt-2 text-xs leading-relaxed text-destructive"
+                      role="alert"
+                    >
+                      {headerIssueMessage}
+                    </AstryxText>
+                  ) : null}
+
+                  {headerSuggest && headerSuggestItems.length > 0 ? (
+                    <Popover
+                      anchorRef={{
+                        current: headerKeyRefs.current[headerSuggest.index] as HTMLElement,
+                      }}
+                      isOpen
+                      onOpenChange={(isOpen) => {
+                        if (!isOpen) setHeaderSuggest(null);
+                      }}
+                      placement="below"
+                      alignment="start"
+                      width="var(--xgent-provider-header-menu-width)"
+                      label={t("settings.customHeaderKeyPlaceholder")}
+                      role="none"
+                      hasAutoFocus={false}
+                      hasCloseButton={false}
+                      content={
+                        <AstryxStack
+                          direction="vertical"
+                          id="provider-header-suggest"
+                          role="listbox"
+                        >
+                          {headerSuggestItems.map((preset, itemIndex) => (
+                            <AstryxButton
+                              variant="ghost"
+                              label={preset}
+                              key={preset}
+                              type="button"
+                              role="option"
+                              aria-selected={itemIndex === headerSuggestActiveIndex}
+                              className={cn(
+                                "flex w-full items-center rounded-md px-2.5 py-2 text-left font-mono text-xs text-muted-foreground transition-colors",
+                                itemIndex === headerSuggestActiveIndex &&
+                                  "bg-accent text-foreground",
+                              )}
+                              onMouseDown={(event) => event.preventDefault()}
+                              onMouseEnter={() => setHeaderSuggestActive(itemIndex)}
+                              onClick={() => applyHeaderSuggestion(preset)}
+                            >
+                              {preset}
+                            </AstryxButton>
+                          ))}
+                        </AstryxStack>
+                      }
+                    />
+                  ) : null}
+                </AstryxStack>
+              ) : (
+                <VStack as="section" key="usage" className="provider-panel-enter" gap={4}>
+                  <HStack gap={3} vAlign="center">
+                    <Wallet aria-hidden="true" />
+                    <StackItem size="fill">
+                      <VStack gap={0.5}>
+                        <AstryxText
+                          as="p"
+                          type="inherit"
+                          display="block"
+                          className="text-sm font-semibold"
+                        >
+                          {t("settings.usage.title")}
+                        </AstryxText>
+                        <AstryxText
+                          as="p"
+                          type="inherit"
+                          display="block"
+                          className="text-xs text-muted-foreground"
+                        >
+                          {t("settings.usage.desc")}
+                        </AstryxText>
+                      </VStack>
+                    </StackItem>
+                    <Switch
+                      label={t("settings.usage.title")}
+                      isLabelHidden
+                      size={isCompact ? "md" : "sm"}
+                      value={usageQuery.enabled}
+                      onChange={(enabled) => patchUsageQuery({ enabled })}
+                    />
+                  </HStack>
+
+                  <Selector
+                    size={isCompact ? "lg" : "md"}
+                    label={t("settings.usage.mode")}
+                    value={usageQuery.mode}
+                    onChange={(mode) =>
+                      acceptUsageQuery(
+                        switchUsageQueryMode(acceptedUsageQuery.current, mode as UsageQueryMode),
+                      )
                     }
+                    options={USAGE_QUERY_MODES.map((mode) => ({
+                      value: mode,
+                      label: t(`settings.usage.mode.${mode}`),
+                    }))}
+                    width="100%"
                   />
-                ) : null}
-              </AstryxStack>
-            ) : (
-              <VStack as="section" key="usage" className="provider-panel-enter" gap={4}>
-                <HStack gap={3} vAlign="center">
-                  <Wallet aria-hidden="true" />
-                  <StackItem size="fill">
-                    <VStack gap={0.5}>
-                      <AstryxText
-                        as="p"
-                        type="inherit"
-                        display="block"
-                        className="text-sm font-semibold"
-                      >
-                        {t("settings.usage.title")}
-                      </AstryxText>
+                  <NumberInput
+                    size={isCompact ? "lg" : "md"}
+                    label={t("settings.usage.timeout")}
+                    min={2}
+                    max={30}
+                    value={usageQuery.timeoutSecs ?? 10}
+                    isWheelEnabled={false}
+                    width="100%"
+                    onChange={(value) => patchUsageQuery({ timeoutSecs: value ?? 10 })}
+                  />
+                  <TextInput
+                    size={isCompact ? "lg" : "md"}
+                    label={t("settings.usage.baseUrl")}
+                    value={usageQuery.baseUrl}
+                    placeholder={baseUrl}
+                    width="100%"
+                    onChange={(usageBaseUrl) => patchUsageQuery({ baseUrl: usageBaseUrl })}
+                  />
+                  <SecretTextInput
+                    label="API Key"
+                    compact={isCompact}
+                    value={usageQuery.apiKey}
+                    placeholder={
+                      usageQuery.apiKeyConfigured
+                        ? t("settings.usage.secretSaved")
+                        : t("settings.usage.providerCredential")
+                    }
+                    onChange={(usageApiKey) => patchUsageQuery({ apiKey: usageApiKey })}
+                  />
+
+                  {usageQuery.mode === "newapi" ? (
+                    <VStack gap={3}>
+                      <SecretTextInput
+                        label="Access Token"
+                        compact={isCompact}
+                        value={usageQuery.accessToken}
+                        onChange={(accessToken) => patchUsageQuery({ accessToken })}
+                      />
+                      <TextInput
+                        size={isCompact ? "lg" : "md"}
+                        label="User ID"
+                        value={usageQuery.userId}
+                        width="100%"
+                        onChange={(userId) => patchUsageQuery({ userId })}
+                      />
+                    </VStack>
+                  ) : null}
+
+                  {usageQuery.mode === "coding-plan" ? (
+                    <VStack gap={3}>
+                      <TextInput
+                        size={isCompact ? "lg" : "md"}
+                        label="Plan Provider"
+                        value={usageQuery.codingPlanProvider}
+                        placeholder="auto / zhipu_team / zenmux"
+                        width="100%"
+                        onChange={(codingPlanProvider) => patchUsageQuery({ codingPlanProvider })}
+                      />
+                      <TextInput
+                        size={isCompact ? "lg" : "md"}
+                        label="Organization ID"
+                        value={usageQuery.teamOrganizationId}
+                        width="100%"
+                        onChange={(teamOrganizationId) => patchUsageQuery({ teamOrganizationId })}
+                      />
+                      <TextInput
+                        size={isCompact ? "lg" : "md"}
+                        label="Project ID"
+                        value={usageQuery.teamProjectId}
+                        width="100%"
+                        onChange={(teamProjectId) => patchUsageQuery({ teamProjectId })}
+                      />
+                      <TextInput
+                        size={isCompact ? "lg" : "md"}
+                        label="Access Key ID"
+                        value={usageQuery.accessKeyId}
+                        width="100%"
+                        onChange={(accessKeyId) => patchUsageQuery({ accessKeyId })}
+                      />
+                      <SecretTextInput
+                        label="Secret Access Key"
+                        compact={isCompact}
+                        value={usageQuery.secretAccessKey}
+                        onChange={(secretAccessKey) => patchUsageQuery({ secretAccessKey })}
+                      />
+                    </VStack>
+                  ) : null}
+
+                  {usageQuery.mode === "general" ||
+                  usageQuery.mode === "newapi" ||
+                  usageQuery.mode === "custom" ? (
+                    <TextArea
+                      label={t("settings.usage.script")}
+                      value={usageQuery.script}
+                      rows={8}
+                      width="100%"
+                      hasSpellCheck={false}
+                      placeholder={
+                        usageQuery.mode === "custom"
+                          ? t("settings.usage.scriptRequired")
+                          : t("settings.usage.scriptPreset")
+                      }
+                      onChange={(script) => patchUsageQuery({ script })}
+                    />
+                  ) : null}
+
+                  <HStack gap={2} wrap="wrap">
+                    <AstryxNativeButton
+                      label={t("settings.usage.test")}
+                      variant="secondary"
+                      size={isCompact ? "lg" : "md"}
+                      isLoading={usageTest.loading}
+                      isDisabled={!initialData?.id || usageTest.loading}
+                      onClick={() => void runUsageQueryTest()}
+                    />
+                    {!initialData?.id ? (
                       <AstryxText
                         as="p"
                         type="inherit"
                         display="block"
                         className="text-xs text-muted-foreground"
                       >
-                        {t("settings.usage.desc")}
+                        {t("settings.usage.saveBeforeTest")}
                       </AstryxText>
-                    </VStack>
-                  </StackItem>
-                  <Switch
-                    label={t("settings.usage.title")}
-                    isLabelHidden
-                    size="sm"
-                    value={usageQuery.enabled}
-                    onChange={(enabled) => patchUsageQuery({ enabled })}
-                  />
-                </HStack>
-
-                <Selector
-                  label={t("settings.usage.mode")}
-                  value={usageQuery.mode}
-                  onChange={(mode) =>
-                    setUsageQuery((previous) =>
-                      switchUsageQueryMode(previous, mode as UsageQueryMode),
-                    )
-                  }
-                  options={USAGE_QUERY_MODES.map((mode) => ({
-                    value: mode,
-                    label: t(`settings.usage.mode.${mode}`),
-                  }))}
-                  width="100%"
-                />
-                <NumberInput
-                  label={t("settings.usage.timeout")}
-                  min={2}
-                  max={30}
-                  value={usageQuery.timeoutSecs ?? 10}
-                  isWheelEnabled={false}
-                  width="100%"
-                  onChange={(value) => patchUsageQuery({ timeoutSecs: value ?? 10 })}
-                />
-                <TextInput
-                  label={t("settings.usage.baseUrl")}
-                  value={usageQuery.baseUrl}
-                  placeholder={baseUrl}
-                  width="100%"
-                  onChange={(usageBaseUrl) => patchUsageQuery({ baseUrl: usageBaseUrl })}
-                />
-                <SecretTextInput
-                  label="API Key"
-                  value={usageQuery.apiKey}
-                  placeholder={
-                    usageQuery.apiKeyConfigured
-                      ? t("settings.usage.secretSaved")
-                      : t("settings.usage.providerCredential")
-                  }
-                  onChange={(usageApiKey) => patchUsageQuery({ apiKey: usageApiKey })}
-                />
-
-                {usageQuery.mode === "newapi" ? (
-                  <VStack gap={3}>
-                    <SecretTextInput
-                      label="Access Token"
-                      value={usageQuery.accessToken}
-                      onChange={(accessToken) => patchUsageQuery({ accessToken })}
+                    ) : null}
+                  </HStack>
+                  {usageTest.error ? (
+                    <Banner status="error" title={usageTest.error} collapsible={false} />
+                  ) : usageTest.result ? (
+                    <Banner
+                      status="success"
+                      title={t("settings.usage.testSuccess").replace(
+                        "{count}",
+                        String(usageTest.result.data.length),
+                      )}
+                      collapsible={false}
                     />
-                    <TextInput
-                      label="User ID"
-                      value={usageQuery.userId}
-                      width="100%"
-                      onChange={(userId) => patchUsageQuery({ userId })}
-                    />
-                  </VStack>
-                ) : null}
-
-                {usageQuery.mode === "coding-plan" ? (
-                  <VStack gap={3}>
-                    <TextInput
-                      label="Plan Provider"
-                      value={usageQuery.codingPlanProvider}
-                      placeholder="auto / zhipu_team / zenmux"
-                      width="100%"
-                      onChange={(codingPlanProvider) => patchUsageQuery({ codingPlanProvider })}
-                    />
-                    <TextInput
-                      label="Organization ID"
-                      value={usageQuery.teamOrganizationId}
-                      width="100%"
-                      onChange={(teamOrganizationId) => patchUsageQuery({ teamOrganizationId })}
-                    />
-                    <TextInput
-                      label="Project ID"
-                      value={usageQuery.teamProjectId}
-                      width="100%"
-                      onChange={(teamProjectId) => patchUsageQuery({ teamProjectId })}
-                    />
-                    <TextInput
-                      label="Access Key ID"
-                      value={usageQuery.accessKeyId}
-                      width="100%"
-                      onChange={(accessKeyId) => patchUsageQuery({ accessKeyId })}
-                    />
-                    <SecretTextInput
-                      label="Secret Access Key"
-                      value={usageQuery.secretAccessKey}
-                      onChange={(secretAccessKey) => patchUsageQuery({ secretAccessKey })}
-                    />
-                  </VStack>
-                ) : null}
-
-                {usageQuery.mode === "general" ||
-                usageQuery.mode === "newapi" ||
-                usageQuery.mode === "custom" ? (
-                  <TextArea
-                    label={t("settings.usage.script")}
-                    value={usageQuery.script}
-                    rows={8}
-                    width="100%"
-                    hasSpellCheck={false}
-                    placeholder={
-                      usageQuery.mode === "custom"
-                        ? t("settings.usage.scriptRequired")
-                        : t("settings.usage.scriptPreset")
-                    }
-                    onChange={(script) => patchUsageQuery({ script })}
-                  />
-                ) : null}
-
-                <HStack gap={2} wrap="wrap">
-                  <AstryxNativeButton
-                    label={t("settings.usage.test")}
-                    variant="secondary"
-                    isLoading={usageTest.loading}
-                    isDisabled={!initialData?.id || usageTest.loading}
-                    onClick={() => void runUsageQueryTest()}
-                  />
-                  {!initialData?.id ? (
-                    <AstryxText
-                      as="p"
-                      type="inherit"
-                      display="block"
-                      className="text-xs text-muted-foreground"
-                    >
-                      {t("settings.usage.saveBeforeTest")}
-                    </AstryxText>
                   ) : null}
-                </HStack>
-                {usageTest.error ? (
-                  <Banner status="error" title={usageTest.error} collapsible={false} />
-                ) : usageTest.result ? (
-                  <Banner
-                    status="success"
-                    title={t("settings.usage.testSuccess").replace(
-                      "{count}",
-                      String(usageTest.result.data.length),
-                    )}
-                    collapsible={false}
-                  />
-                ) : null}
-              </VStack>
-            )}
-          </AstryxStack>
+                </VStack>
+              )}
+            </VStack>
+          </StackItem>
         </Stack>
       </StackItem>
 
-      <Toolbar
-        label={t("settings.providerDialogNavigation")}
-        size="md"
-        dividers={["top"]}
-        endContent={
-          <HStack gap={2} width={isCompact ? "100%" : undefined}>
+      <Section
+        className="settings-provider-editor-footer"
+        variant="transparent"
+        padding={3}
+        dividers={isCompact ? [] : ["top"]}
+      >
+        <HStack hAlign="end" width="100%">
+          <AstryxGrid columns={2} gap={2} width="100%" maxWidth={isCompact ? undefined : 280}>
             <AstryxNativeButton
               label={t("settings.cancel")}
               variant="secondary"
-              onClick={onClose}
+              size={isCompact ? "lg" : "md"}
+              onClick={closeEditor}
               width={isCompact ? "100%" : undefined}
             />
             <AstryxNativeButton
               label={t("settings.save")}
               variant="primary"
+              size={isCompact ? "lg" : "md"}
               onClick={handleSave}
               width={isCompact ? "100%" : undefined}
             />
-          </HStack>
-        }
-      />
+          </AstryxGrid>
+        </HStack>
+      </Section>
     </VStack>
   );
 }
@@ -2582,6 +3007,8 @@ function ProviderList(props: {
   const [syncMenuOpen, setSyncMenuOpen] = useState(false);
   const [draggingProviderId, setDraggingProviderId] = useState("");
   const [previewProviderOrder, setPreviewProviderOrder] = useState<string[] | null>(null);
+  const draggingPointerRef = useRef<number | null>(null);
+  const previousProviderTypeRef = useRef(type);
   const providerListRef = useRef<HTMLUListElement | HTMLOListElement | null>(null);
   const providerOrderRef = useRef<CustomProvider[]>([]);
   const baseOrderRef = useRef<CustomProvider[]>([]);
@@ -2605,11 +3032,18 @@ function ProviderList(props: {
   // pane is slid away and marked inert — close it as the pane deactivates.
   useEffect(() => {
     if (!isActive) setSyncMenuOpen(false);
-  }, [isActive]);
+    if (!isActive || previousProviderTypeRef.current !== type) {
+      draggingPointerRef.current = null;
+      setDraggingProviderId("");
+      setPreviewProviderOrder(null);
+    }
+    previousProviderTypeRef.current = type;
+  }, [isActive, type]);
 
   useEffect(() => {
     if (!draggingProviderId) return;
     const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== draggingPointerRef.current) return;
       const rows = Array.from(
         providerListRef.current?.querySelectorAll<HTMLElement>("[data-provider-reorder-id]") ?? [],
       );
@@ -2631,18 +3065,23 @@ function ProviderList(props: {
       providerOrderRef.current = next;
       setPreviewProviderOrder(nextIds);
     };
-    const finish = () => {
+    const finish = (event: PointerEvent) => {
+      if (event.pointerId !== draggingPointerRef.current) return;
       const nextIds = providerOrderRef.current.map((provider) => provider.id);
       const previousIds = baseOrderRef.current.map((provider) => provider.id);
+      draggingPointerRef.current = null;
       setDraggingProviderId("");
       setPreviewProviderOrder(null);
-      if (!nextIds.every((id, index) => id === previousIds[index])) {
+      if (
+        event.type !== "pointercancel" &&
+        !nextIds.every((id, index) => id === previousIds[index])
+      ) {
         onReorder(type, nextIds);
       }
     };
     window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", finish, { once: true });
-    window.addEventListener("pointercancel", finish, { once: true });
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", finish);
@@ -2713,11 +3152,17 @@ function ProviderList(props: {
             ? t("settings.noProviders")
             : `${filtered.length} ${t("settings.navProviders")}`}
         </AstryxStack>
-        <HStack gap={2} vAlign="center" wrap="wrap" style={{ minWidth: 0, maxWidth: "100%" }}>
+        <HStack
+          className="settings-provider-list-actions"
+          gap={2}
+          vAlign="center"
+          wrap="wrap"
+          style={{ minWidth: 0, maxWidth: "100%" }}
+        >
           <AstryxNativeButton
             label={t("settings.addProvider")}
             variant="primary"
-            size="sm"
+            size="lg"
             onClick={onAdd}
           />
           {thirdPartyImportEnabled ? (
@@ -2725,7 +3170,8 @@ function ProviderList(props: {
               button={{
                 label: t("settings.thirdPartySync"),
                 variant: "secondary",
-                size: "sm",
+                size: "lg",
+                width: "100%",
                 isLoading: thirdPartyImporting,
                 isDisabled: thirdPartyImporting,
               }}
@@ -2774,52 +3220,59 @@ function ProviderList(props: {
               <AstryxNativeButton
                 label={t("settings.addProvider")}
                 variant="primary"
-                size="sm"
+                size="lg"
                 onClick={onAdd}
               />
             }
           />
         ) : (
-          <AstryxList ref={providerListRef} density="compact" hasDividers>
+          <AstryxList
+            className="settings-provider-list"
+            ref={providerListRef}
+            density="compact"
+            hasDividers
+          >
             {filtered.map((provider) => {
               const usageState = props.usage.getState(provider.id);
-              const usagePlan = usageState.result?.data[0];
-              const usageSummary = usageState.result?.error
-                ? usageState.result.error
-                : usagePlan
-                  ? [
-                      usagePlan.planName || usagePlan.extra,
-                      typeof usagePlan.remaining === "number"
-                        ? `${t("settings.usage.remaining")}: ${usagePlan.remaining.toLocaleString()}${usagePlan.unit ? ` ${usagePlan.unit}` : ""}`
-                        : undefined,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")
-                  : undefined;
+              const details = providerListDetails(provider, usageState.result, t);
               return (
-                <ListItem
+                <ProviderSettingsRow
                   key={provider.id}
-                  data-provider-reorder-id={provider.id}
-                  label={provider.name}
+                  id={provider.id}
+                  name={provider.name}
+                  icon={<ProviderBrandIcon type={type} />}
                   isSelected={draggingProviderId === provider.id}
                   description={
-                    usageSummary ||
-                    `${provider.baseUrl || t("settings.noBaseUrl")} · ${provider.activeModels.length} ${t("settings.activeModels")}`
+                    <>
+                      <span>{details.connection}</span>
+                      {details.usage ? <span>{details.usage}</span> : null}
+                      {provider.useSystemProxy ? (
+                        <HStack as="span" gap={1} vAlign="center" wrap="wrap">
+                          <Icon icon={Waypoints} size="sm" color="secondary" />
+                          {t("settings.providerUseSystemProxy")}
+                        </HStack>
+                      ) : null}
+                    </>
                   }
-                  startContent={
-                    <HStack gap={1} vAlign="center">
+                  actions={
+                    <>
                       <IconButton
                         label={`${t("settings.reorderProvider")}: ${provider.name}`}
                         variant="ghost"
-                        size="sm"
+                        size="lg"
                         isDisabled={filtered.length < 2}
                         style={{ touchAction: "none" }}
                         icon={<Icon icon={GripVertical} size="sm" color="inherit" />}
                         onClick={(event) => event.stopPropagation()}
                         onPointerDown={(event) => {
                           event.stopPropagation();
-                          if (event.button === 0 && filtered.length > 1) {
+                          if (
+                            event.button === 0 &&
+                            filtered.length > 1 &&
+                            draggingPointerRef.current === null
+                          ) {
                             event.currentTarget.setPointerCapture(event.pointerId);
+                            draggingPointerRef.current = event.pointerId;
                             setPreviewProviderOrder(filtered.map((item) => item.id));
                             setDraggingProviderId(provider.id);
                           }
@@ -2831,17 +3284,12 @@ function ProviderList(props: {
                           }
                         }}
                       />
-                      <ProviderBrandIcon type={type} />
-                    </HStack>
-                  }
-                  endContent={
-                    <HStack gap={1} vAlign="center">
                       {provider.usageQuery?.enabled ? (
                         <IconButton
                           label={t("settings.usage.refresh")}
                           tooltip={t("settings.usage.refresh")}
                           variant="ghost"
-                          size="sm"
+                          size="lg"
                           icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
                           isLoading={usageState.loading}
                           isDisabled={usageState.loading}
@@ -2851,19 +3299,11 @@ function ProviderList(props: {
                           }}
                         />
                       ) : null}
-                      {provider.useSystemProxy ? (
-                        <Icon
-                          icon={Waypoints}
-                          size="sm"
-                          color="secondary"
-                          label={t("settings.providerUseSystemProxy")}
-                        />
-                      ) : null}
                       <IconButton
                         label={t("settings.edit")}
                         tooltip={t("settings.edit")}
                         variant="ghost"
-                        size="sm"
+                        size="lg"
                         icon={<Icon icon={Pencil} size="sm" color="inherit" />}
                         onClick={(event) => {
                           event.stopPropagation();
@@ -2879,7 +3319,7 @@ function ProviderList(props: {
                             label={t("settings.delete")}
                             tooltip={t("settings.delete")}
                             variant="ghost"
-                            size="sm"
+                            size="lg"
                             icon={<Icon icon={Trash2} size="sm" color="inherit" />}
                             onClick={(event) => {
                               event.stopPropagation();
@@ -2888,9 +3328,9 @@ function ProviderList(props: {
                           />
                         )}
                       </ConfirmDeletePopover>
-                    </HStack>
+                    </>
                   }
-                  onClick={() => onEdit(provider)}
+                  onEdit={() => onEdit(provider)}
                 />
               );
             })}
@@ -2907,6 +3347,9 @@ export function ProvidersSection(
   const { settings, setSettings } = props;
   const thirdPartyImportEnabled = props.thirdPartyImportEnabled !== false;
   const { t } = useLocale();
+  const isCompact = useMediaQuery(
+    "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
+  );
 
   const [activeTab, setActiveTab] = useState<ProviderId>("claude_code");
   const [view, setView] = useState<ProviderSettingsView>("list");
@@ -3254,6 +3697,7 @@ export function ProvidersSection(
           ariaLabel={editingProvider ? t("settings.editProvider") : t("settings.addProvider")}
         >
           <ProviderEditor
+            key={editingProvider ? `existing:${editingProvider.id}` : `new:${activeTab}`}
             providerType={activeTab}
             initialData={editingProvider ?? undefined}
             onSave={handleSave}
@@ -3277,13 +3721,13 @@ export function ProvidersSection(
           <Toolbar
             className="settings-provider-tabs-toolbar"
             label={t("settings.navProviders")}
-            size="sm"
-            dividers={["bottom"]}
+            size={isCompact ? "lg" : "sm"}
+            dividers={isCompact ? [] : ["bottom"]}
             startContent={
               <TabList
                 value={activeTab}
                 onChange={(value) => setActiveTab(value as ProviderId)}
-                size="sm"
+                size={isCompact ? "lg" : "sm"}
                 overflow="scroll"
                 role="tablist"
               >
@@ -3303,7 +3747,7 @@ export function ProvidersSection(
                 label={t("settings.openCustomSettings")}
                 tooltip={t("settings.openCustomSettings")}
                 variant="ghost"
-                size="sm"
+                size={isCompact ? "lg" : "sm"}
                 icon={<Icon icon={Settings} size="sm" color="inherit" />}
                 onClick={() => setView("advanced")}
               />

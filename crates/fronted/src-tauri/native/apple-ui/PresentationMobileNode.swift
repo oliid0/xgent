@@ -249,13 +249,16 @@ struct XgentIOSNode: View {
 
     @ViewBuilder private var identified: some View {
         switch node.kind {
-        case .textInput, .colorInput:
+        case .textInput, .colorInput, .toggle, .button, .iconButton:
+            // Controls identify their actual interactive element. Repeating
+            // an identifier on this layout wrapper creates a second AX
+            // button/switch with different hit bounds on iOS.
             rendered
         case .navigationRow where node.variant == "sidebar-conversation-row" || node.variant == "sidebar-workspace-row":
             rendered
         case .collapsible where node.variant == "memory-project":
             rendered.accessibilityElement(children: .contain)
-        case .selector where node.variant == "workspace-file-sheets":
+        case .selector where node.variant == "workspace-file-sheets" || node.variant == "provider-vendor-tabs":
             rendered.accessibilityElement(children: .contain)
         case .numberInput where node.variant == "document-annotation-page":
             rendered.accessibilityElement(children: .contain)
@@ -390,7 +393,9 @@ struct XgentIOSNode: View {
                 VStack(alignment: .leading, spacing: node.spacing.map { CGFloat($0) }) { children }
             }
         case .hStack:
-            if node.variant == "sidebar-section-heading" {
+            if node.variant == "provider-category-toolbar" {
+                XgentProviderCategoryToolbar(node: node, document: document, model: model)
+            } else if node.variant == "sidebar-section-heading" {
                 XgentSidebarSectionHeading(node: node, document: document, model: model)
             } else if node.variant == "workspace-file-metadata" {
                 XgentWorkspaceFileMetadata(node: node, document: document, model: model)
@@ -450,7 +455,9 @@ struct XgentIOSNode: View {
         case .toggle:
             XgentSwitch(node: node, document: document, model: model)
         case .selector:
-            if node.variant == "workspace-file-sheets" {
+            if node.variant == "provider-vendor-tabs" {
+                XgentProviderCategoryTabs(node: node, document: document, model: model)
+            } else if node.variant == "workspace-file-sheets" {
                 XgentSpreadsheetSheets(node: node, document: document, model: model)
             } else if node.variant == "terminal-session-tabs" {
                 XgentTerminalSessionTabs(node: node, document: document, model: model)

@@ -58,7 +58,6 @@ export function MobilePanelHeader(props: {
     <Toolbar
       label={props.title}
       size="lg"
-      dividers={["bottom"]}
       className="mobile-panel-header shrink-0"
       startContent={
         <HStack gap={1} vAlign="center">

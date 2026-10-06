@@ -74,7 +74,7 @@ struct XgentDesktopSidebar: View {
                     .accessibilityIdentifier("sidebar-search-toggle")
                     .accessibilityLabel(search.accessibilityLabel ?? search.label ?? "")
                 }
-                if let close {
+                if !model.windowChromeInstalled, let close {
                     Button { model.send(close, in: document) } label: {
                         Image(systemName: close.icon ?? "sidebar.leading").frame(width: 32, height: 32)
                     }

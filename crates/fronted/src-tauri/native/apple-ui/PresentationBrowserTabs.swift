@@ -17,29 +17,33 @@ struct XgentBrowserTabs: View {
     private var selected: String? { tabs.first { $0.selected == true }?.id }
 
     var body: some View {
-        HStack(spacing: 6) {
-            if let add = node.children?.first { content(add) }
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal) {
-                    HStack(spacing: 4) {
-                        ForEach(tabs) { tab in
-                            XgentBrowserTabButton(node: tab, document: document, model: model).id(tab.id)
+        Group {
+            if !model.windowChromeInstalled {
+                HStack(spacing: 6) {
+                    if let add = node.children?.first { content(add) }
+                    ScrollViewReader { proxy in
+                        ScrollView(.horizontal) {
+                            HStack(spacing: 4) {
+                                ForEach(tabs) { tab in
+                                    XgentBrowserTabButton(node: tab, document: document, model: model).id(tab.id)
+                                }
+                            }
                         }
+                        .scrollIndicators(.hidden)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .focusable()
+                        .onAppear { if let selected { proxy.scrollTo(selected) } }
+                        .onChange(of: selected) { _, id in if let id { proxy.scrollTo(id) } }
+                        .onKeyPress(.leftArrow) { select(-1) }
+                        .onKeyPress(.rightArrow) { select(1) }
                     }
+                    ForEach((node.children ?? []).dropFirst().filter { $0.variant != "browser-tab-items" }) { content($0) }
                 }
-                .scrollIndicators(.hidden)
-                .fixedSize(horizontal: false, vertical: true)
-                .focusable()
-                .onAppear { if let selected { proxy.scrollTo(selected) } }
-                .onChange(of: selected) { _, id in if let id { proxy.scrollTo(id) } }
-                .onKeyPress(.leftArrow) { select(-1) }
-                .onKeyPress(.rightArrow) { select(1) }
+                .padding(.horizontal, 8).padding(.vertical, 6)
+                .frame(maxWidth: .infinity)
+                .accessibilityElement(children: .contain)
             }
-            ForEach((node.children ?? []).dropFirst().filter { $0.variant != "browser-tab-items" }) { content($0) }
         }
-        .padding(.horizontal, 8).padding(.vertical, 6)
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .contain)
     }
 
     private func select(_ direction: Int) -> KeyPress.Result {

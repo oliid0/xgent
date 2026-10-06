@@ -14,11 +14,15 @@ struct XgentBrowserHeader: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            if let heading = node.children?.first { content(heading).frame(maxWidth: .infinity, alignment: .leading) }
-            ForEach(Array((node.children ?? []).dropFirst())) { content($0) }
+        Group {
+            if !model.windowChromeInstalled {
+                HStack(alignment: .center, spacing: 12) {
+                    if let heading = node.children?.first { content(heading).frame(maxWidth: .infinity, alignment: .leading) }
+                    ForEach(Array((node.children ?? []).dropFirst())) { content($0) }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

@@ -245,9 +245,11 @@ jobs:
           python3 scripts/release/prepare-apple-ui-resources.py verify-macos "$app_path/Contents/Resources"
 
       - name: Smoke launch actual macOS app and capture settings
+        timeout-minutes: 30
         if: github.event_name == 'push' || inputs.publish == true || inputs.smoke == true
         run: |
           set -euo pipefail
+          python3 scripts/release/prepare-macos-gui-smoke.py
           if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
           app_path="$(find "$GITHUB_WORKSPACE/target/${{ matrix.target }}/release/bundle/macos" -maxdepth 1 -name '*.app' -print -quit)"
           test -n "$app_path"
@@ -1117,6 +1119,7 @@ jobs:
           test -s "$simulator_build/Build/Products/release-iphonesimulator/Xgent.app/Info.plist"
 
       - name: Smoke launch iOS simulator app
+        timeout-minutes: 45
         if: github.event_name == 'push' || inputs.publish == true || inputs.smoke == true
         shell: bash
         run: |

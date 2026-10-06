@@ -54,8 +54,9 @@ final class ComposerFontRenderingTests: XCTestCase {
             defer { model.invalidate(); window.close() }
             host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(180))
             func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
-            let fields = descendants(host).compactMap { $0 as? NSTextField }
-            let composer = try XCTUnwrap(fields.first { $0.stringValue == "Font sample" })
+            let views = descendants(host)
+            let fields = views.compactMap { $0 as? NSTextField }
+            let composer = try XCTUnwrap(views.compactMap { $0 as? NSTextView }.first { $0.string == "Font sample" })
             let query = try XCTUnwrap(fields.first { $0.stringValue == "Search sample" })
             let fonts = [try XCTUnwrap(composer.font), try XCTUnwrap(query.font)]
             let expectedSize = base.typography.body * scale

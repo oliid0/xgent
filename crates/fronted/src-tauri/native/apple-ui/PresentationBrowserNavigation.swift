@@ -15,7 +15,11 @@ struct XgentBrowserNavigation: View {
         #endif
     }
 
-    private var fields: [XgentNode] { node.children ?? [] }
+    private var fields: [XgentNode] {
+        (node.children ?? []).filter {
+            !model.windowChromeInstalled || ($0.id != "browser-back" && $0.id != "browser-forward")
+        }
+    }
     private var entry: XgentNode? { fields.first { $0.variant == "browser-address-entry" } }
     private var vertical: some View {
         VStack(alignment: .leading, spacing: 6) {

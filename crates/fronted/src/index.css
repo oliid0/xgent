@@ -3425,7 +3425,11 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
     max-width: 16rem;
     min-width: 0;
   }
-  .settings-page-compact [data-settings-section] .astryx-grid:not(.compact-backup-actions):not(.compact-policy-actions):not(.compact-memory-actions) {
+  .settings-page-compact
+    [data-settings-section]
+    .astryx-grid:not(.compact-backup-actions):not(.compact-policy-actions):not(
+      .compact-memory-actions
+    ):not(.compact-access-actions) {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -3707,12 +3711,17 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   min-width: 0;
   text-align: end;
 }
-.settings-page-compact :is(.settings-navigation-row, .settings-control-row) > span:first-child:has(> .astryx-icon) {
+.settings-page-compact
+  :is(.settings-navigation-row, .settings-control-row)
+  > span:first-child:has(> .astryx-icon) {
   width: 24px;
   flex-shrink: 0;
   justify-content: center;
 }
-.settings-page-compact :is(.settings-navigation-row, .settings-control-row) > span:first-child > .astryx-icon {
+.settings-page-compact
+  :is(.settings-navigation-row, .settings-control-row)
+  > span:first-child
+  > .astryx-icon {
   width: 22px;
   height: 22px;
   color: inherit;
@@ -3729,7 +3738,9 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   border-block-end: 1px solid var(--color-border);
   pointer-events: none;
 }
-.settings-page-compact .settings-row-group .astryx-list-item:has(> span:first-child > .astryx-icon)::after {
+.settings-page-compact
+  .settings-row-group
+  .astryx-list-item:has(> span:first-child > .astryx-icon)::after {
   inset-inline-start: 48px;
 }
 
@@ -3754,7 +3765,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 
 /* A gray page, one rounded surface per group, and inset row separators match
    the compact native forms without adding a second card around every field. */
-.settings-page-compact :is(.astryx-section, .astryx-card, .astryx-list) {
+.settings-page-compact :is(.astryx-section, .astryx-card) {
   border-radius: var(--radius-container);
   border: 0;
   box-shadow: none;
@@ -4355,7 +4366,9 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   .astryx-section {
     padding: var(--spacing-3);
   }
-  .astryx-grid:not(.compact-backup-actions):not(.compact-policy-actions):not(.compact-memory-actions) {
+  .astryx-grid:not(.compact-backup-actions):not(.compact-policy-actions):not(
+    .compact-memory-actions
+  ):not(.compact-access-actions) {
     grid-template-columns: minmax(0, 1fr);
   }
   .settings-tool-permissions-category-header {
@@ -4367,12 +4380,15 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   }
   /* Astryx 0.6.0 Item places endContent in its final direct span. Move
      controls below the label instead of shrinking the label to zero. */
-  .settings-control-row:not([data-control-layout="value"]):not(:has([role="switch"])) > span:last-child {
+  .settings-control-row:not([data-control-layout="value"]):not(:has([role="switch"]))
+  > span:last-child {
     flex: 0 0 100%;
     width: 100%;
     justify-content: flex-start;
   }
-  .settings-control-row:not([data-control-layout="value"]):not(:has([role="switch"])) > span:last-child > * {
+  .settings-control-row:not([data-control-layout="value"]):not(:has([role="switch"]))
+    > span:last-child
+    > * {
     width: 100%;
     min-width: 0;
     max-width: 100%;
@@ -4398,6 +4414,31 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 .settings-provider-tabs-toolbar .astryx-tab-list {
   width: 100%;
   min-width: 0;
+}
+/* Astryx ListItem keeps its action slot beside its label. This local
+   container rule moves that slot below the label in narrow provider lists. */
+.settings-provider-list {
+  container-name: provider-list;
+  container-type: inline-size;
+}
+.settings-provider-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  min-width: 0;
+}
+@container provider-list (max-width: 32rem) {
+  .settings-provider-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-provider-row > :last-child {
+    min-width: 0;
+    width: 100%;
+  }
+}
+.settings-provider-brand[fill]:not([fill="none"]),
+.settings-provider-brand [fill]:not([fill="none"]) {
+  fill: currentColor;
 }
 .settings-page-compact .settings-detail-header {
   padding: 12px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
@@ -4440,6 +4481,8 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   width: 44px;
   height: 44px;
   min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: var(--astryx-theme-xgent-glass-surface, var(--color-background-card));
   border: 1px solid var(--astryx-theme-xgent-glass-border, var(--color-border));

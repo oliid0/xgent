@@ -43,6 +43,31 @@ function harness(fetch) {
     unmount: () => hooks.unmount(), replay: () => hooks.replayEffects() };
 }
 
+test("native model ordering survives normalization, refresh and rapid moves and reaches the shared picker", async () => {
+  const h = harness();
+  const rows = () => h.nodes().filter(node => node.variant === "provider-model-row").map(node => node.id.split(":").at(-1));
+  const published = h.render();
+  h.action("model-move-up:one:alpha", null, published);
+  h.action("model-move-up:one:alpha", null, published);
+  assert.deepEqual(rows(), ["alpha", "beta", "gamma"]);
+  assert.deepEqual(h.provider().modelOrder, ["alpha", "beta", "gamma"]);
+  h.action("model:one:alpha", true);
+  const { buildModelOptions } = createTsModuleLoader().loadModule("src/lib/chat/page/chatPageHelpers.ts");
+  assert.deepEqual(buildModelOptions(h.settings(), { floatSelectedFirst: false }).map(option => option.model), ["alpha", "beta"]);
+  await h.action("fetch-models");
+  assert.deepEqual(rows(), ["alpha", "beta", "gamma", "new-model"]);
+  h.action("model-delete:one:gamma");
+  assert.deepEqual(h.provider().modelOrder, ["alpha", "beta"]);
+  const prior = h.render();
+  h.action("model-search", "alpha", prior);
+  prior.handlers.get("model-move-down:one:alpha").run(null);
+  assert.deepEqual(h.provider().modelOrder, ["alpha", "beta"], "Accepted filtering disables an older move callback immediately");
+  h.action("model-search-clear"); h.action("model-order-reset");
+  assert.equal(h.provider().modelOrder, undefined);
+  assert.deepEqual(rows(), ["beta", "alpha", "new-model"]);
+  h.unmount();
+});
+
 test("native provider models share ordering, filtered bulk selection, enable states and token limits", () => {
   const h = harness();
   assert.deepEqual(h.nodes().filter(node => node.variant === "provider-model-row").map(node => node.id),

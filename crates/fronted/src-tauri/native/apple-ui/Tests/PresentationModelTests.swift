@@ -10,6 +10,65 @@ private final class ActionRecorder {
 
 final class PresentationModelTests: XCTestCase {
     @MainActor
+    func testMetadataOnlyReferenceEditsWaitForTheirCanonicalReferenceAcknowledgement() throws {
+        let reference = XgentComposerReference(id: "skill", location: 0, length: 7, label: "/review", icon: "sparkles")
+        func fixture(_ revision: Int, references: [XgentComposerReference]) throws -> XgentDocument {
+            let encoded = String(decoding: try JSONEncoder().encode(references), as: UTF8.self)
+            let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: [
+                "version": 1, "surface": "reference-test", "revision": revision, "mode": "root", "title": "Chat", "appearance": "system",
+                "nodes": [["id": "draft", "kind": "ComposerInput", "action": "plain", "editAction": "references", "value": "/review",
+                    "children": [["id": "draft-inline-references", "kind": "Text", "text": encoded]]]],
+            ]))
+            try document.validate(); return document
+        }
+        let initial = try fixture(1, references: [reference]), node = initial.nodes[0]
+        let model = XgentPresentationModel(), recorder = ActionRecorder()
+        model.actionSink = recorder.record; model.update(initial)
+        // Replacing the displayed card with literal /review does not change text.
+        model.sendComposerEdit(text: "/review", references: [], node: node, in: initial)
+        let request = try XCTUnwrap(recorder.actions.last)
+        model.complete(XgentActionResult(surface: initial.surface, requestId: request.requestId,
+            ok: true, error: nil, acceptedValue: .string("/review")))
+        XCTAssertEqual(model.composerReferences(node, in: initial), [])
+        XCTAssertFalse(model.edits.isEmpty, "Equal text alone must not acknowledge different reference metadata")
+        let stale = try fixture(2, references: [reference]); model.update(stale)
+        XCTAssertEqual(model.composerReferences(stale.nodes[0], in: stale), [])
+        let canonical = try fixture(3, references: []); model.update(canonical)
+        XCTAssertNil(model.composerReferences(canonical.nodes[0], in: canonical))
+        XCTAssertTrue(model.edits.isEmpty)
+    }
+
+    @MainActor
+    func testComposerReferencePayloadKeepsPlainOptimisticTextAndRetiresItsOldOwner() throws {
+        func fixture(_ revision: Int, action: String) throws -> XgentDocument {
+            let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: [
+                "version": 1, "surface": "reference-test", "revision": revision, "mode": "root", "title": "Chat", "appearance": "system",
+                "nodes": [["id": "draft", "kind": "ComposerInput", "action": "plain", "editAction": action, "value": "Shared"]],
+            ]))
+            try document.validate(); return document
+        }
+        let model = XgentPresentationModel(), recorder = ActionRecorder()
+        model.actionSink = recorder.record
+        let initial = try fixture(1, action: "references-a"), node = initial.nodes[0]
+        model.update(initial)
+        let reference = XgentComposerReference(id: "skill", location: 0, length: 7, label: "/review", icon: "sparkles")
+        model.sendComposerEdit(text: "/review", references: [reference], node: node, in: initial)
+        XCTAssertEqual(recorder.actions.last?.action, "references-a")
+        XCTAssertEqual(model.value(node, in: initial).text, "/review")
+        let payload = try XCTUnwrap(recorder.actions.last)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(payload.value.text.utf8)) as? [String: Any])
+        XCTAssertEqual(object["text"] as? String, "/review")
+        XCTAssertEqual((object["references"] as? [[String: Any]])?.first?["id"] as? String, "skill")
+        let current = try fixture(2, action: "references-b"); model.update(current)
+        XCTAssertTrue(model.edits.isEmpty)
+        model.complete(XgentActionResult(surface: initial.surface, requestId: payload.requestId,
+            ok: true, error: nil, acceptedValue: .string("/review")))
+        XCTAssertEqual(model.value(current.nodes[0], in: current).text, "Shared")
+        model.sendComposerEdit(text: "Late edit", references: [], node: node, in: initial)
+        XCTAssertEqual(recorder.actions.count, 1)
+    }
+
+    @MainActor
     func testReusedProviderFieldDropsItsDraftAndRejectsThePreviousAcknowledgement() throws {
         let model = XgentPresentationModel(), recorder = ActionRecorder()
         model.actionSink = recorder.record

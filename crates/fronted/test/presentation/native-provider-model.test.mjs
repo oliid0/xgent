@@ -35,6 +35,58 @@ function harness(options = {}) {
     unmount: () => hooks.unmount(), get settings() { return settings; }, get backs() { return backs; } };
 }
 
+test("native model capability uses the accepted choice before Save and automatic mode clears the override", async () => {
+  for (const [mode, expected] of [["text", ["text"]], ["text-image", ["text", "image"]], ["auto", undefined]]) {
+    const h = harness(); h.render();
+    assert.equal((await h.send("inputMode", mode)).ok, true);
+    assert.equal((await h.send("save")).ok, true);
+    assert.deepEqual(h.settings.customProviders[0].models[0].inputModalities, expected);
+    h.unmount();
+  }
+});
+
+test("native model settings keep untouched provider limits current and only mark edited limits as user overrides", async () => {
+  for (const field of [null, "contextWindow", "maxOutputToken"]) {
+    const h = harness();
+    h.update(previous => ({ ...previous, customProviders: previous.customProviders.map(provider => ({ ...provider,
+      models: provider.models.map(model => ({ ...model, limitsSource: "provider" })) })) }));
+    const surface = h.render();
+    const fields = surface.document.nodes[1].children;
+    assert.equal(fields.find(node => node.id.endsWith(":contextWindow")).variant, "integer-input");
+    assert.equal(fields.find(node => node.id.endsWith(":costInput")).variant, "decimal-input");
+    await h.send("costInput", "1.5");
+    await h.send("inputMode", "text");
+    if (field) await h.send(field, field === "contextWindow" ? "48000" : "16000");
+    h.update(previous => ({ ...previous, customProviders: previous.customProviders.map(provider => ({ ...provider,
+      models: provider.models.map(model => ({ ...model, contextWindow: 64000, maxOutputToken: 24000, ownedBy: "fresh" })) })) }));
+    assert.equal((await h.send("save")).ok, true);
+    const model = h.settings.customProviders[0].models[0];
+    assert.equal(model.contextWindow, field === "contextWindow" ? 48000 : 64000);
+    assert.equal(model.maxOutputToken, field === "maxOutputToken" ? 16000 : 24000);
+    assert.equal(model.limitsSource, field ? "user" : "provider");
+    assert.equal(model.ownedBy, "fresh");
+    assert.equal(model.cost.input, 1.5);
+    assert.deepEqual(model.inputModalities, ["text"]);
+    h.unmount();
+  }
+});
+
+test("native per-model cache protocol overrides and inheritance save without overwriting refreshed metadata", async () => {
+  for (const mode of ["auto", "openai-key", "openrouter-session", "none", "inherit"]) {
+    const h = harness();
+    h.update(previous => ({ ...previous, customProviders: previous.customProviders.map(provider => ({ ...provider,
+      models: provider.models.map(model => ({ ...model, promptCacheHintMode: "openai-key" })) })) }));
+    h.render();
+    assert.equal((await h.send("cacheHint", mode)).ok, true);
+    h.update(previous => ({ ...previous, customProviders: previous.customProviders.map(provider => ({ ...provider,
+      models: provider.models.map(model => ({ ...model, ownedBy: "fresh-catalog" })) })) }));
+    assert.equal((await h.send("save")).ok, true);
+    assert.equal(h.settings.customProviders[0].models[0].promptCacheHintMode, mode === "inherit" ? undefined : mode);
+    assert.equal(h.settings.customProviders[0].models[0].ownedBy, "fresh-catalog");
+    h.unmount();
+  }
+});
+
 test("native model editor uses shared limits/cost rules and preserves current provider metadata", async () => {
   for (const mobile of [true, false]) {
     const h = harness({ mobile }); const surface = h.render();

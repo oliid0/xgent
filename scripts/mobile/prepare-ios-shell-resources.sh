@@ -87,6 +87,8 @@ for command_name in pkg rehash cat chmod curl grep ls rm sh wc; do
   cp "$checkout/Resources/bin/$command_name" "$OUTPUT_ROOT/bin/$command_name"
 done
 
+python3 "$(dirname "${BASH_SOURCE[0]}")/prepare-ios-package-script.py" "$OUTPUT_ROOT/bin/pkg"
+
 python3 "$(dirname "${BASH_SOURCE[0]}")/prepare-ios-command-markers.py" \
   "$OUTPUT_ROOT/bin" \
   "$OUTPUT_ROOT/commandDictionary.plist" "$OUTPUT_ROOT/extraCommandsDictionary.plist"

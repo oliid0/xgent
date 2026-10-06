@@ -1,6 +1,6 @@
 import { isBrowserRuntime } from "@xgent/runtime";
 import { mergeCustomHeaders } from "../../lib/providers/customHeaders";
-import { sortModelsByActiveStateAndVendor } from "../../lib/providers/modelVendor";
+import { applyModelOrderSnapshot, createModelOrderSnapshot } from "../../lib/providers/modelVendor";
 import { prepareProxyRequest, XGENT_UPSTREAM_URL_HEADER } from "../../lib/providers/proxy";
 import {
   type CustomProvider,
@@ -333,14 +333,16 @@ function normalizeGeminiFetchedModels(items: unknown): ProviderModelConfig[] {
     if (!id || seen.has(id)) continue;
     seen.add(id);
 
-    const draft = createProviderModelConfig("gemini", id);
+    // The editor also calls this for saved model configs. Normalize those
+    // through the shared schema before applying any Google catalog fields.
+    const draft = normalizeProviderModelConfigs([{ ...obj, id }], "gemini")[0];
     const ownedBy =
       (typeof obj.ownedBy === "string" ? obj.ownedBy.trim() : "") ||
       (typeof obj.owned_by === "string" ? obj.owned_by.trim() : "");
     const contextWindow = normalizePositiveInteger(obj.inputTokenLimit);
     const maxOutputToken = normalizePositiveInteger(obj.outputTokenLimit);
     out.push({
-      id,
+      ...draft,
       ...(ownedBy ? { ownedBy } : {}),
       contextWindow: contextWindow ?? draft.contextWindow,
       maxOutputToken: maxOutputToken ?? draft.maxOutputToken,
@@ -402,8 +404,12 @@ export function mergeFetchedModels(
 export function sortModelsBySelection(
   models: ProviderModelConfig[],
   activeModels: ReadonlySet<string>,
+  configuredOrder?: readonly string[],
 ): ProviderModelConfig[] {
-  return sortModelsByActiveStateAndVendor(models, activeModels);
+  return applyModelOrderSnapshot(
+    models,
+    createModelOrderSnapshot(models, configuredOrder, activeModels),
+  );
 }
 
 export function createDraftModelConfig(

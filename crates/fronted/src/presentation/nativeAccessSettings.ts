@@ -157,6 +157,10 @@ export function useNativeAccessSettings(
 
   const c = presentationControls();
   if (!enabled) return { nodes: [], handlers: c.handlers };
+  const input = (...args: Parameters<typeof c.input>): PresentationNode => ({
+    ...c.input(...args),
+    ...(mobile ? { variant: "settings-stacked-field" } : {}),
+  });
   const nodes: PresentationNode[] = [];
   const available = !busy;
   const note = (id: string, text: string): PresentationNode => ({
@@ -190,13 +194,13 @@ export function useNativeAccessSettings(
           status: ready ? "completed" : "paused",
           label: t(ready ? "settings.accessComputerPaired" : "settings.accessComputerNotPaired"),
         },
-        c.input(
+        input(
           "lan-url",
           t("settings.accessComputerAddress"),
           settings.access.lanControlUrl,
           (lanControlUrl) => patch({ lanControlUrl }),
         ),
-        c.input(
+        input(
           "lan-pairing-code",
           t("settings.accessLanPairingCode"),
           pairingCode,
@@ -205,7 +209,7 @@ export function useNativeAccessSettings(
           available,
           (value) => value.replace(/\D/g, "").slice(0, 6),
         ),
-        c.input("lan-device-name", t("settings.accessLanDeviceName"), deviceName, setDeviceName),
+        input("lan-device-name", t("settings.accessLanDeviceName"), deviceName, setDeviceName),
         c.action(
           "lan-pair",
           t("settings.accessPairComputer"),
@@ -266,6 +270,7 @@ export function useNativeAccessSettings(
             ready,
           ),
           text: t("settings.accessPreferLanPcHint"),
+          icon: "desktopcomputer",
         },
         c.action(
           "lan-open",
@@ -286,9 +291,16 @@ export function useNativeAccessSettings(
             }),
           available && !!settings.access.lanControlUrl.trim(),
         ),
-        c.toggle("ios-ashell", "a-Shell", settings.access.iosAShellEnabled, (iosAShellEnabled) =>
-          patch({ iosAShellEnabled }),
-        ),
+        {
+          ...c.toggle(
+            "ios-ashell",
+            t("settings.accessIosAShell"),
+            settings.access.iosAShellEnabled,
+            (iosAShellEnabled) => patch({ iosAShellEnabled }),
+          ),
+          text: t("settings.accessIosAShellHint"),
+          icon: "terminal",
+        },
         note("lan-pairing-hint", t("settings.accessLanPairingHint")),
       ]),
     );
@@ -435,16 +447,16 @@ export function useNativeAccessSettings(
   nodes.push(
     c.group(
       "local-capabilities",
-      t("settings.accessPairing"),
+      t("settings.accessDevicePermissions"),
       (
         [
-          ["terminal", "Terminal"],
-          ["browser_automation", "BrowserAutomation"],
-          ["ssh", "Ssh"],
-          ["git", "Git"],
-          ["file_write", "FileWrite"],
+          ["terminal", "Terminal", "terminal"],
+          ["browser_automation", "BrowserAutomation", "globe"],
+          ["ssh", "Ssh", "server.rack"],
+          ["git", "Git", "arrow.triangle.branch"],
+          ["file_write", "FileWrite", "doc"],
         ] as const
-      ).map(([capability, key]) => ({
+      ).map(([capability, key, icon]) => ({
         ...c.toggle(
           `block:${capability}`,
           t(`settings.accessBlock${key}`),
@@ -459,6 +471,7 @@ export function useNativeAccessSettings(
           },
         ),
         text: t(`settings.accessBlock${key}Hint`),
+        icon,
       })),
     ),
   );
@@ -472,20 +485,23 @@ export function useNativeAccessSettings(
           (cloudExecutionEnabled) => patch({ cloudExecutionEnabled }),
         ),
         text: t("settings.accessCloudExecutionHint"),
+        icon: "cloud",
       },
-      c.input(
+      input(
         "github-owner",
         t("settings.accessGithubOwner"),
         settings.access.githubOwner,
         (githubOwner) => patch({ githubOwner }),
       ),
-      c.input(
+      input(
         "github-repository",
         t("settings.accessGithubRepository"),
         settings.access.githubRepository,
         (githubRepository) => patch({ githubRepository }),
       ),
-      note("cloud-environment-hint", t("settings.accessCloudEnvironmentHint")),
+    ]),
+    note("cloud-environment-hint", t("settings.accessCloudEnvironmentHint")),
+    c.group("cloud-credentials", t("settings.accessSecureVault"), [
       {
         id: "github-token-status",
         kind: "StatusDot",
@@ -496,7 +512,7 @@ export function useNativeAccessSettings(
             : "settings.accessTokenMissing",
         ),
       },
-      c.input("github-token", t("settings.accessGithubToken"), token, setToken, true),
+      input("github-token", t("settings.accessGithubToken"), token, setToken, true),
       c.action(
         "github-token-save",
         t("settings.accessSaveToken"),
@@ -547,8 +563,8 @@ export function useNativeAccessSettings(
             ),
           ]
         : []),
-      note("github-vault-hint", t("settings.accessVaultHint")),
     ]),
+    note("github-vault-hint", t("settings.accessVaultHint")),
   );
   if (busy)
     nodes.push({ id: "access-busy", kind: "Progress", label: t("settings.accessConnecting") });

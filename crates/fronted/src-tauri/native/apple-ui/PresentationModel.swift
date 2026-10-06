@@ -156,6 +156,7 @@ struct XgentNode: Decodable, Identifiable {
     let diagramAction: String?
     let focusRequest: Int?
     let selectionAction: String?
+    let editAction: String?
     let disabled: Bool?
     let destructive: Bool?
     let prominent: Bool?
@@ -285,6 +286,11 @@ struct XgentDocument: Decodable, Identifiable {
                     guard node.kind == .composerInput, node.action?.isEmpty == false,
                           !selectionAction.isEmpty, selectionAction != node.action else { throw XgentProtocolError.invalid }
                 }
+                if let editAction = node.editAction {
+                    guard node.kind == .composerInput, node.action?.isEmpty == false,
+                          !editAction.isEmpty, editAction != node.action,
+                          editAction != node.selectionAction else { throw XgentProtocolError.invalid }
+                }
                 let measures = [node.minimum, node.maximum, node.step, node.current, node.total].compactMap { $0 }
                 // Business ranges are finite, not screen dimensions. In particular,
                 // PDF/Office annotation pages use the shared Int32 maximum.
@@ -350,12 +356,18 @@ final class XgentPresentationModel: ObservableObject {
     @Published private(set) var edits: [String: XgentValue] = [:]
     @Published private(set) var busy: Set<String> = []
     @Published var error: String?
+    @Published var windowChromeInstalled = false
+    #if os(macOS)
+    @Published var workspaceState = XgentWorkspacePanelState()
+    private var workspaceIdentities: [XgentWorkspacePanelIdentity] = []
+    #endif
     weak var webview: WKWebView?
     var actionSink: (@MainActor (XgentAction) -> Void)?
     private var revisions: [String: Int] = [:]
     private var pending: [String: (surface: String, node: String, revision: Int)] = [:]
     private var editRequests: [String: String] = [:]
     private var acknowledgedEdits: Set<String> = []
+    @Published private var composerEdits: [String: XgentComposerSnapshot] = [:]
     private var consumedFocusRequests: [String: Int] = [:]
     private var active = true
     private var codeHighlightQueries: [String: XgentCodeHighlightQuery] = [:]
@@ -378,12 +390,18 @@ final class XgentPresentationModel: ObservableObject {
         pending.removeAll()
         editRequests.removeAll()
         acknowledgedEdits.removeAll()
+        composerEdits.removeAll()
         consumedFocusRequests.removeAll()
         revisions.removeAll()
         busy.removeAll()
         edits.removeAll()
         error = nil
         documents.removeAll()
+        windowChromeInstalled = false
+        #if os(macOS)
+        workspaceState = XgentWorkspacePanelState()
+        workspaceIdentities = []
+        #endif
         announcedNotifications.removeAll()
     }
 
@@ -391,6 +409,17 @@ final class XgentPresentationModel: ObservableObject {
         guard active else { return }
         guard document.revision > (revisions[document.surface] ?? 0) else { return }
         revisions[document.surface] = document.revision
+        #if os(macOS)
+        defer {
+            let identities = documents.filter { $0.mode == .panel }.map {
+                XgentWorkspacePanelIdentity(surface: $0.surface, focusRequest: $0.workspacePanel?.focusRequest ?? 0)
+            }
+            if identities != workspaceIdentities {
+                workspaceIdentities = identities
+                workspaceState.synchronize(identities)
+            }
+        }
+        #endif
         if document.removed == true {
             composerKeyboard.clear(surface: document.surface)
             for batch in Array(numberCommitBatches.values) where batch.surface == document.surface { batch.finish(false) }
@@ -407,6 +436,7 @@ final class XgentPresentationModel: ObservableObject {
             let prefix = key(document.surface, "")
             busy = busy.filter { !$0.hasPrefix(prefix) }
             edits = edits.filter { !$0.key.hasPrefix(prefix) }
+            composerEdits = composerEdits.filter { !$0.key.hasPrefix(prefix) }
             editRequests = editRequests.filter { !$0.key.hasPrefix(prefix) }
             acknowledgedEdits = acknowledgedEdits.filter { !$0.hasPrefix(prefix) }
             consumedFocusRequests = consumedFocusRequests.filter { !$0.key.hasPrefix(prefix) }
@@ -443,17 +473,25 @@ final class XgentPresentationModel: ObservableObject {
             for node in nodes {
                 let nodeKey = key(document.surface, node.id)
                 visibleNodes.insert(nodeKey)
-                if let old = previous?.node(id: node.id), old.action != node.action || old.commitAction != node.commitAction || old.kind != node.kind {
+                if let old = previous?.node(id: node.id), old.action != node.action || old.commitAction != node.commitAction || old.editAction != node.editAction || old.kind != node.kind {
                     // Stable field IDs can represent a different provider or
                     // route. Its draft and pending ACK belong to the old action.
                     edits.removeValue(forKey: nodeKey)
+                    composerEdits.removeValue(forKey: nodeKey)
                     editRequests.removeValue(forKey: nodeKey)
                     acknowledgedEdits.remove(nodeKey)
                     busy.remove(nodeKey)
                     for (id, request) in pending where request.node == nodeKey { pending.removeValue(forKey: id) }
                 }
-                if acknowledgedEdits.contains(nodeKey), edits[nodeKey] == node.value {
+                let referencesAcknowledged = composerEdits[nodeKey].map { snapshot in
+                    let encoded = node.children?.first { $0.id == "draft-inline-references" }?.text ?? "[]"
+                    let canonical = XgentComposerRichText.references(text: snapshot.text, encoded: encoded)
+                    return snapshot.text == node.value?.text && snapshot.references.count == canonical.count &&
+                        zip(snapshot.references, canonical).allSatisfy { pair in pair.0.ownsSameRange(as: pair.1) }
+                } ?? true
+                if acknowledgedEdits.contains(nodeKey), edits[nodeKey] == node.value, referencesAcknowledged {
                     edits.removeValue(forKey: nodeKey)
+                    composerEdits.removeValue(forKey: nodeKey)
                     editRequests.removeValue(forKey: nodeKey)
                     acknowledgedEdits.remove(nodeKey)
                 }
@@ -467,6 +505,7 @@ final class XgentPresentationModel: ObservableObject {
         let prefix = key(document.surface, "")
         for nodeKey in Array(edits.keys) where nodeKey.hasPrefix(prefix) && !visibleNodes.contains(nodeKey) {
             edits.removeValue(forKey: nodeKey)
+            composerEdits.removeValue(forKey: nodeKey)
             editRequests.removeValue(forKey: nodeKey)
             acknowledgedEdits.remove(nodeKey)
         }
@@ -481,6 +520,14 @@ final class XgentPresentationModel: ObservableObject {
     func value(_ node: XgentNode, in document: XgentDocument) -> XgentValue {
         let current = documents.first { $0.surface == document.surface }?.node(id: node.id)
         return edits[key(document.surface, node.id)] ?? current?.value ?? node.value ?? .null
+    }
+
+    func composerReferences(_ node: XgentNode, in document: XgentDocument) -> [XgentComposerReference]? {
+        guard let current = documents.first(where: { $0.surface == document.surface })?.node(id: node.id),
+              current.kind == .composerInput, current.action == node.action, current.editAction == node.editAction,
+              let snapshot = composerEdits[key(document.surface, node.id)],
+              snapshot.text == value(current, in: document).text else { return nil }
+        return snapshot.references
     }
 
     func consumeFocusRequest(_ node: XgentNode, in document: XgentDocument) -> Bool {
@@ -498,7 +545,7 @@ final class XgentPresentationModel: ObservableObject {
         guard active, node.kind == .composerInput, node.disabled != true,
               let currentDocument = documents.first(where: { $0.surface == document.surface }),
               let current = currentDocument.node(id: node.id),
-              current.kind == .composerInput, current.action == node.action, current.disabled != true,
+              current.kind == .composerInput, current.action == node.action, current.editAction == node.editAction, current.disabled != true,
               let action = current.selectionAction, action == node.selectionAction,
               value(current, in: document).text == text,
               range.location >= 0, range.length >= 0, range.location <= text.utf16.count,
@@ -511,6 +558,28 @@ final class XgentPresentationModel: ObservableObject {
         emit(XgentAction(surface: document.surface, action: action, requestId: requestId, value: .string(encoded)))
     }
 
+    func sendComposerEdit(text: String, references: [XgentComposerReference], pastes: [XgentComposerPaste] = [], node: XgentNode, in document: XgentDocument) {
+        guard active, node.kind == .composerInput, node.disabled != true,
+              let latest = documents.first(where: { $0.surface == document.surface }),
+              let current = latest.node(id: node.id), current.kind == .composerInput,
+              current.action == node.action, current.editAction == node.editAction,
+              current.disabled != true else { return }
+        guard let action = current.editAction else {
+            send(node, in: latest, value: .string(text), editing: true)
+            return
+        }
+        guard let data = try? JSONEncoder().encode(XgentComposerSnapshot(text: text, references: references, pastes: pastes)),
+              let payload = String(data: data, encoding: .utf8) else { return }
+        let nodeKey = key(document.surface, node.id), requestId = UUID().uuidString
+        // The payload belongs to its own event. The visible optimistic draft and
+        // accepted value are always plain text, never serialized reference JSON.
+        composerEdits[nodeKey] = XgentComposerSnapshot(text: text, references: references, pastes: pastes)
+        edits[nodeKey] = .string(text); editRequests[nodeKey] = requestId
+        acknowledgedEdits.remove(nodeKey)
+        pending[requestId] = (document.surface, nodeKey, latest.revision)
+        emit(XgentAction(surface: document.surface, action: action, requestId: requestId, value: .string(payload)))
+    }
+
     func send(_ node: XgentNode, in document: XgentDocument, value: XgentValue = .null,
               editing: Bool = false, continuous: Bool = false, committing: Bool = false) {
         guard active else { return }
@@ -518,13 +587,14 @@ final class XgentPresentationModel: ObservableObject {
         guard !continuous || ((node.kind == .terminalViewport || node.kind == .shortcutRecorder || node.kind == .spreadsheetGrid) && !editing) else { return }
         guard node.disabled != true,
               let current = documents.first(where: { $0.surface == document.surface })?.node(id: node.id),
-              current.kind == node.kind, current.action == node.action,
+              current.kind == node.kind, current.action == node.action, current.editAction == node.editAction,
               !committing || current.commitAction == node.commitAction,
               current.disabled != true, let action = committing ? current.commitAction : current.action else { return }
         let nodeKey = key(document.surface, node.id)
         if !editing && !continuous && busy.contains(nodeKey) { return }
         let requestId = UUID().uuidString
         if editing {
+            composerEdits.removeValue(forKey: nodeKey)
             edits[nodeKey] = value
             editRequests[nodeKey] = requestId
             acknowledgedEdits.remove(nodeKey)
@@ -706,7 +776,10 @@ final class XgentPresentationModel: ObservableObject {
         busy.remove(request.node)
         if editRequests[request.node] == result.requestId {
             if result.ok {
-                if let value = result.acceptedValue { edits[request.node] = value }
+                if let value = result.acceptedValue {
+                    if composerEdits[request.node]?.text != value.text { composerEdits.removeValue(forKey: request.node) }
+                    edits[request.node] = value
+                }
                 // An action acknowledgement can precede React's next document. Keep the
                 // local edit until the shared value arrives to avoid jumping the caret.
                 acknowledgedEdits.insert(request.node)
@@ -715,6 +788,7 @@ final class XgentPresentationModel: ObservableObject {
                 }
             } else {
                 edits.removeValue(forKey: request.node)
+                composerEdits.removeValue(forKey: request.node)
                 editRequests.removeValue(forKey: request.node)
                 acknowledgedEdits.remove(request.node)
             }

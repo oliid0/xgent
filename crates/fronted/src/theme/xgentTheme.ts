@@ -167,7 +167,7 @@ export const xgentCompactTheme = defineTheme({
   },
   components: {
     button: {
-      base: { borderRadius: "var(--radius-element)" },
+      base: { borderRadius: "var(--radius-element)", minWidth: "0", maxWidth: "100%" },
     },
     card: {
       base: {
@@ -267,7 +267,10 @@ export const xgentCompactTheme = defineTheme({
       },
     },
     "text-input": {
-      base: { borderRadius: "var(--radius-element)" },
+      base: { borderRadius: "var(--radius-element)", minWidth: "0" },
+    },
+    text: {
+      base: { minWidth: "0", overflowWrap: "anywhere" },
     },
   },
 });

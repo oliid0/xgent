@@ -1,15 +1,12 @@
-import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { promisify } from "node:util";
 import ts from "typescript-transpile";
 import { imageBrowserCompletion } from "./image-browser-completion.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const execute = promisify(execFile);
 const candidates = [process.env.CHROME_PATH,
   "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
   "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
@@ -68,17 +65,10 @@ document.getElementById("result").textContent = encode(new TextEncoder().encode(
 </script>`;
     const file = path.join(directory, "test.html");
     await writeFile(file, html);
-    let encoded;
-    if (module === "workspaceImageOperations.ts") {
-      encoded = await imageBrowserCompletion(annotationBrowser, pathToFileURL(file).href, directory);
-    } else {
-      const { stdout, stderr } = await execute(annotationBrowser, ["--headless", "--disable-gpu", "--no-first-run",
-        "--no-default-browser-check", "--no-sandbox", "--allow-file-access-from-files",
-        `--user-data-dir=${path.join(directory, "profile")}`, "--virtual-time-budget=5000", "--dump-dom", pathToFileURL(file).href],
-      { windowsHide: true, timeout: 30000, maxBuffer: 16 * 1024 * 1024 });
-      encoded = /<pre id="result">([A-Za-z0-9+/=]+)<\/pre>/.exec(stdout)?.[1];
-      if (!encoded) throw new Error(`Browser did not complete document annotation: ${stderr.slice(-500)}`);
-    }
+    // ZIP/spreadsheet serialization is asynchronous too. A virtual-time DOM
+    // dump can finish before its actual promise and falsely report a failed
+    // save. Own the browser and await this operation's real completion marker.
+    const encoded = await imageBrowserCompletion(annotationBrowser, pathToFileURL(file).href, directory);
     const result = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
     if (!result.ok) throw new Error(result.error);
     return new Uint8Array(Buffer.from(result.data, "base64"));

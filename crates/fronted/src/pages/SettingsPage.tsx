@@ -406,6 +406,7 @@ export function SettingsPage(props: SettingsPageProps) {
             settings={settings}
             setSettings={setSettings}
             nativeMobile={nativeMobile}
+            compact={compactSettings}
           />
         );
       case "mobileExecution":

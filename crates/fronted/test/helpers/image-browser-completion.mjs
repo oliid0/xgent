@@ -106,12 +106,30 @@ export async function imageBrowserCompletion(browser, fileURL, directory, option
       let clip = { x: 0, y: 0, width: size.width, height: size.height, scale: 1 };
       if (options.screenshotSelector) {
         const selected = await send("Runtime.evaluate", {
-          expression: `(() => {
+          expression: `(async () => {
             const element = document.querySelector(${JSON.stringify(options.screenshotSelector)});
             if (!element) throw new Error("Screenshot fixture was not found");
+            if (${options.isolateScreenshot === true}) {
+              // Measurements already completed. Keep this mounted fixture and
+              // its theme ancestors while removing other cases from the crop;
+              // Chromium cannot reliably capture tiles on hundred-page sheets.
+              let branch = element;
+              while (branch.parentElement && branch.parentElement !== document.documentElement) {
+                for (const sibling of [...branch.parentElement.children]) {
+                  if (sibling !== branch && !['STYLE', 'SCRIPT', 'LINK'].includes(sibling.tagName)) sibling.remove();
+                }
+                branch = branch.parentElement;
+              }
+            }
+            // Large source fixtures place targets many viewports away. Paint
+            // that viewport before capture so Chromium does not return a stale
+            // composited tile from the preceding panel.
+            const destination = element.getBoundingClientRect();
+            scrollTo(destination.x + scrollX, destination.y + scrollY);
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
             const bounds = element.getBoundingClientRect();
             return {x:bounds.x + scrollX,y:bounds.y + scrollY,width:bounds.width,height:bounds.height,scale:1};
-          })()`, returnByValue: true,
+          })()`, returnByValue: true, awaitPromise: true,
         });
         if (selected.exceptionDetails) throw new Error(selected.exceptionDetails.text);
         clip = selected.result.value;

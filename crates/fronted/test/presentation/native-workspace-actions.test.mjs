@@ -58,7 +58,7 @@ test("workspace menus invoke shared project handlers and preserve default, runni
     "Folder creation belongs to the heading control, outside the more menu");
   assert.equal(h.node("workspace-create-group").kind, "IconButton");
   for (const [action, expected] of [["pin", ["pin", "p", true]], ["settings", ["settings", "p"]],
-    ["new-chat", ["new-chat", "p"]], ["browse-tree", ["tree", "p"]], ["browse-system", ["finder", "p"]],
+    ["new-chat", ["new-chat", "p"]],
     ["archive", ["archive", "p"]], ["group:g", ["move", "/project", "g"]], ["ungrouped", ["move", "/project", null]]]) {
     assert.equal((await h.dispatch(`project-actions:p:${action}`)).ok, true);
     assert.deepEqual(h.calls.at(-1), expected);

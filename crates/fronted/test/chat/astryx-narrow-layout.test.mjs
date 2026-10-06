@@ -9,13 +9,14 @@ import React from "react";
 import * as jsx from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
+import { createReactHookHarness } from "../helpers/react-hook-harness.mjs";
 import { annotationBrowser } from "../helpers/document-annotation-browser.mjs";
 import { imageBrowserCompletion } from "../helpers/image-browser-completion.mjs";
 
 const vendor = {};
 vendor["@astryxdesign/core/theme"] = await import("@astryxdesign/core/theme");
 vendor["@astryxdesign/theme-neutral"] = await import("@astryxdesign/theme-neutral");
-for (const module of ["AlertDialog", "Badge", "Banner", "BottomSheet", "Button", "ButtonGroup", "Code", "CodeBlock", "Collapsible", "ComplexSelector", "Dialog", "Divider", "EmptyState", "FormLayout", "Grid", "Icon", "IconButton", "InputGroup", "Layout", "List", "MobileNav", "MoreMenu", "Section", "Selector", "SideNav", "Spinner", "Stack", "StatusDot", "Switch", "Text", "TextInput", "TimeInput", "Token", "TreeList"]) {
+for (const module of ["AlertDialog", "Badge", "Banner", "BottomSheet", "Button", "ButtonGroup", "CheckboxInput", "Code", "CodeBlock", "Collapsible", "ComplexSelector", "Dialog", "Divider", "DropdownMenu", "EmptyState", "FormLayout", "Grid", "Icon", "IconButton", "InputGroup", "Layout", "List", "MobileNav", "MoreMenu", "NumberInput", "Popover", "Section", "Selector", "SideNav", "Spinner", "Stack", "StatusDot", "Switch", "TabList", "Text", "TextArea", "TextInput", "TimeInput", "ToggleButton", "Token", "Toolbar", "TreeList"]) {
   vendor[`@astryxdesign/core/${module}`] = await import(`@astryxdesign/core/${module}`);
 }
 const icon = () => React.createElement("svg", { width: 16, height: 16, "aria-hidden": true });
@@ -73,6 +74,70 @@ const { CompactBackupSyncForm } = createTsModuleLoader({ mocks: {
   ...vendor, react: React, "react/jsx-runtime": jsx,
   "../../components/icons": icons, "../../i18n": { useLocale },
 } }).loadModule("src/pages/settings/CompactBackupSyncForm.tsx");
+const accessLoader = createTsModuleLoader({ mocks: {
+  ...vendor, react: React, "react/jsx-runtime": jsx,
+  "../../components/icons": icons, "../../i18n": { useLocale },
+  "@xgent/runtime": { isBrowserRuntime: () => false },
+  "../../lib/browser/browserSessionController": {},
+  "../../lib/system/clipboardText": {},
+} });
+const { AccessSection } = accessLoader.loadModule("src/pages/settings/AccessSection.tsx");
+const { CompactAccessSettingsForm } = accessLoader.loadModule("src/pages/settings/CompactAccessSettingsForm.tsx");
+const { ProviderSettingsRow } = loader.loadModule("src/pages/settings/ProviderSettingsRow.tsx");
+const { ProvidersSection } = createTsModuleLoader({ mocks: {
+  ...vendor, react: React, "react/jsx-runtime": jsx,
+  "../../components/icons": icons, "../../i18n": { useLocale },
+  "@astryxdesign/core/hooks": { useMediaQuery: () => true },
+  "../../lib/providers/usageQuery": {
+    useProviderUsage: () => ({ getState: () => ({ loading: false, result: { data: [], error: "A quota diagnostic https://example.com/" + "long-quota-path/".repeat(4) } }), refresh: async () => {} }),
+  },
+  "./CodexOAuthAccounts": {}, "./ModelFailoverSection": {}, "./RetryErrorSection": {},
+} }).loadModule("src/pages/settings/ProvidersSection.tsx");
+
+// Open the real private editor through its public list handler, then render it
+// with React and the installed Astryx components. Open panels/model fields with
+// their real handlers so this fixture does not need a copy of editor state.
+function providerEditorForPanel(panel) {
+  let hooks = createReactHookHarness();
+  let capturing = true;
+  let editorLocale;
+  const editorReact = { ...React, ...Object.fromEntries(Object.keys(hooks.react).map(key => [key,
+    (...args) => capturing ? hooks.react[key](...args) : React[key](...args),
+  ])) };
+  const { ProvidersSection: Section } = createTsModuleLoader({ mocks: {
+    ...vendor, react: editorReact, "react/jsx-runtime": jsx,
+    "../../components/icons": icons,
+    "../../i18n": { useLocale: () => capturing ? editorLocale ?? { t: key => key } : useLocale() },
+    "@astryxdesign/core/hooks": { useMediaQuery: () => true },
+    "../../lib/providers/usageQuery": { useProviderUsage: () => ({ getState: () => ({ loading: false }), refresh: noop }) },
+    "./CodexOAuthAccounts": {}, "./ModelFailoverSection": {}, "./RetryErrorSection": {},
+  } }).loadModule("src/pages/settings/ProvidersSection.tsx");
+  const provider = { id: "fixture", type: "claude_code", name: "Example provider", baseUrl: "https://example.com/v1", apiKey: "fixture-key", models: [], activeModels: [] };
+  const props = { settings: { ...settings, customProviders: [provider] }, setSettings() {}, thirdPartyImportEnabled: false };
+  const visit = value => Array.isArray(value) ? value.flatMap(visit) : !value?.type || !value.props ? [] : [value, ...Object.values(value.props).flatMap(visit)];
+  let tree = hooks.render(() => Section(props));
+  visit(tree).find(node => node.type.name === "ProviderList").props.onEdit(provider);
+  tree = hooks.render(() => Section(props));
+  const editor = visit(tree).find(node => node.type.name === "ProviderEditor").type;
+  hooks.unmount(); capturing = false;
+  return function ProviderEditorFixture(props) {
+    editorLocale = useLocale();
+    hooks = createReactHookHarness(); capturing = true;
+    try {
+      let result = hooks.render(() => editor(props));
+      if (panel === "model") {
+        const edit = visit(result).find(node => node.props.label === editorLocale.t("settings.modelSettings"));
+        assert.ok(edit, "The actual per-model settings action must exist");
+        edit.props.onClick();
+      } else {
+        visit(result).find(node => node.props.role === "tablist").props.onChange(panel);
+      }
+      result = hooks.render(() => editor(props));
+      if (panel === "model") assert.ok(visit(result).some(node => node.props.label === editorLocale.t("settings.contextWindow")), "Model parameters must open through their public action");
+      return result;
+    } finally { hooks.unmount(); capturing = false; }
+  };
+}
 const { ToolPermissionsSection } = createTsModuleLoader({ mocks: {
   ...vendor, react: React, "react/jsx-runtime": jsx,
   "../../components/icons": icons, "../../i18n": { useLocale },
@@ -137,6 +202,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
   const reset = readFileSync(new URL(import.meta.resolve("@astryxdesign/core/reset.css")), "utf8");
   const themeCss = generateThemeCSS(xgentCompactTheme);
   const sections = [];
+  const providerEditors = Object.fromEntries(["general", "model", "request", "usage"].map(panel => [panel, providerEditorForPanel(panel)]));
   for (const locale of ["en-US", "zh-CN"]) {
     sections.push(React.createElement(Locale.Provider, { value: locale }, React.createElement("section", {
       className: "fixture-settings-index", style: { width: 320, height: 900 }, "data-locale": locale,
@@ -144,11 +210,72 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
   }
   for (const locale of ["en-US", "zh-CN"]) for (const width of [240, 320, 390, 768]) for (const scale of [1, 1.5]) {
     const t = key => translations[locale][key] ?? key;
+    for (const providerType of ["claude_code", "codex"]) for (const panel of ["general", "model", "request", "usage"]) {
+      sections.push(React.createElement(Locale.Provider, { value: locale }, React.createElement("section", {
+        className: "fixture-provider-editor settings-page settings-page-compact",
+        style: { width, height: 844, "--text-body-size": `${17 * scale}px`, "--text-label-size": `${17 * scale}px`, "--text-supporting-size": `${17 / 1.18 * scale}px` },
+        "data-width": width, "data-scale": scale, "data-locale": locale, "data-panel": panel, "data-provider": providerType,
+      }, React.createElement(providerEditors[panel], {
+        providerType, initialData: {
+          id: "fixture", type: providerType, name: "A provider with a long multilingual name 用户供应商", baseUrl: "https://example.com/" + "long-endpoint/".repeat(5), apiKey: "fixture-key",
+          models: [{ id: "a-model-with-a-long-name-" + "long-model/".repeat(8), contextWindow: 200000, maxOutputToken: 8192 }], activeModels: [],
+          customHeaders: [{ key: "X-Custom-Header", value: "fixture-value" }],
+        }, onSave: noop, onClose: noop,
+      }))));
+    }
+    sections.push(React.createElement(Locale.Provider, { value: locale }, React.createElement("section", {
+      className: "fixture-provider-controller settings-page settings-page-compact",
+      style: { width, height: 844, "--text-body-size": `${17 * scale}px`, "--text-label-size": `${17 * scale}px`, "--text-supporting-size": `${17 / 1.18 * scale}px` },
+      "data-width": width, "data-scale": scale, "data-locale": locale,
+    }, React.createElement(ProvidersSection, {
+      settings: { ...settings, customProviders: [0, 1].map(index => ({ id: `provider-${index}`, type: "claude_code", name: `Provider ${index} with a very long multilingual name 用户自定义供应商`, baseUrl: "https://example.com/" + "long-provider-endpoint/".repeat(5), apiKey: "", models: [], activeModels: ["one", "two", "three"], useSystemProxy: true, usageQuery: { enabled: true } })) },
+      setSettings: noop, nativeMobile: true, thirdPartyImportEnabled: true,
+    }))));
+    sections.push(React.createElement(Locale.Provider, { value: locale }, React.createElement("section", {
+      className: "fixture-provider-details settings-page settings-page-compact",
+      style: { width, padding: 16, "--text-body-size": `${17 * scale}px`, "--text-label-size": `${17 * scale}px`, "--text-supporting-size": `${17 / 1.18 * scale}px` },
+      "data-width": width, "data-scale": scale, "data-locale": locale,
+    }, React.createElement(vendor["@astryxdesign/core/List"].List, { className: "settings-provider-list", density: "compact", hasDividers: true }, React.createElement(ProviderSettingsRow, {
+      id: "long-provider", name: "A provider with a very long multilingual name 用户自定义供应商",
+      icon: React.createElement(vendor["@astryxdesign/core/Icon"].Icon, { className: "settings-provider-brand", icon: icons.ClaudeIcon, size: "sm" }),
+      description: React.createElement(React.Fragment, null,
+        React.createElement("span", null, "https://example.com/" + "long-provider-endpoint/".repeat(5) + " · 3 " + t("settings.activeModels")),
+        React.createElement("span", null, "An actual quota service error with a long diagnostic https://example.com/" + "long-quota-diagnostic/".repeat(3)),
+        React.createElement("span", { className: "settings-provider-proxy" }, React.createElement(vendor["@astryxdesign/core/Icon"].Icon, { icon: icons.Waypoints, size: "sm" }), t("settings.providerUseSystemProxy"))),
+      actions: React.createElement(React.Fragment, null, ...["settings.reorderProvider", "settings.usage.refresh", "settings.edit", "settings.delete"].map((key, index) => React.createElement(vendor["@astryxdesign/core/IconButton"].IconButton, {
+        key, label: t(key), size: "lg", variant: "ghost", icon: React.createElement(vendor["@astryxdesign/core/Icon"].Icon, { icon: [icons.GripVertical, icons.RefreshCw, icons.Pencil, icons.Trash2][index], size: "sm" }), onClick: noop,
+      }))), isSelected: false, onEdit: noop,
+    })))));
     const project = { id: "long", name: "Workspace with a very long multilingual title 工作空间文件夹", path: "/long" };
     const customizedSettings = { ...settings, locale: "en-US", customSettings: { ...settings.customSettings,
       interfaceFontFamily: "Example Custom Interface Font",
       appearance: { ...settings.customSettings.appearance, customized: true },
     } };
+    for (const mobile of [false, true]) {
+      sections.push(React.createElement(Locale.Provider, { value: locale }, React.createElement("section", {
+        className: "fixture-access-details settings-page settings-page-compact",
+        style: { width, padding: 16, "--text-body-size": `${17 * scale}px`, "--text-label-size": `${17 * scale}px`, "--text-supporting-size": `${17 / 1.18 * scale}px` },
+        "data-width": width, "data-scale": scale, "data-locale": locale, "data-mobile": String(mobile),
+      }, React.createElement("div", { "data-settings-section": "access" }, React.createElement(CompactAccessSettingsForm, {
+        access: { ...settings.access, webUiEnabled: true, cloudExecutionEnabled: true, githubOwner: "A multilingual account name 用户名", githubRepository: "A task repository with a long name 任务仓库", lanControlUrl: "http://192.168.1.2:28367/", preferLanPcExecution: true },
+        nativeMobile: mobile, browser: false,
+        localStatus: { enabled: true, running: true, bindAddress: "0.0.0.0", port: 28367, urls: ["http://192.168.1.2:28367/"], pairingCode: "123456", pairedDevices: 1, devices: [{ deviceId: "phone", label: "An already paired device with a very long multilingual name 用户设备", lastSeenAt: Date.UTC(2026, 9, 5, 16) }] },
+        vaultStatus: { githubTokenConfigured: true, githubUsername: "A multilingual account name 用户名" }, lanPcStatus: { paired: true, baseUrl: "http://192.168.1.2:28367/" },
+        lanPairingCode: "123456", lanDeviceName: "A multilingual phone name 用户设备", githubToken: "", busyAction: "", endpoint: "http://192.168.1.2:28367/", localStatusLabel: t("settings.accessRunning"), localStatusPhase: "running",
+        actionError: "Could not connect to https://example.com/" + "long-diagnostic-path/".repeat(8),
+        setLanPairingCode: noop, setLanDeviceName: noop, setGithubToken: noop, patchAccess: noop, setCapabilityBlocked: noop, normalizeAddress: noop,
+        actions: Object.fromEntries(["saveToken", "removeToken", "pair", "disconnect", "refreshLan", "openComputer", "refreshLocal", "rotatePairingCode", "revokeDevice"].map(name => [name, async () => {}])),
+        copyEndpoint: React.createElement(vendor["@astryxdesign/core/IconButton"].IconButton, { label: t("workspaceEditor.context.copy"), icon: React.createElement(icons.Copy), size: "lg", onClick: noop }),
+      })))));
+    }
+    sections.push(React.createElement(Locale.Provider, { value: locale }, React.createElement("section", {
+      className: "fixture-access-controller settings-page settings-page-compact",
+      style: { width, padding: 16, "--text-body-size": `${17 * scale}px`, "--text-label-size": `${17 * scale}px`, "--text-supporting-size": `${17 / 1.18 * scale}px` },
+      "data-width": width, "data-scale": scale, "data-locale": locale, "data-mobile": "true",
+    }, React.createElement("div", { "data-settings-section": "access" }, React.createElement(AccessSection, {
+      settings: { ...settings, access: { ...settings.access, githubOwner: "account", lanControlUrl: "http://192.168.1.2:28367/" } },
+      setSettings: noop, nativeMobile: true, compact: true,
+    })))));
     sections.push(React.createElement(Locale.Provider, { value: locale }, React.createElement("section", {
       className: "fixture-system-details settings-page settings-page-compact",
       style: { width, "--zone-font-scale": scale }, "data-width": width, "data-scale": scale, "data-locale": locale,
@@ -214,7 +341,134 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
   </style>${renderToStaticMarkup(React.createElement(Theme, { theme: xgentCompactTheme, mode: "light" }, ...sections))}<pre id="result"></pre><script>
   addEventListener('error', event => { document.getElementById('result').textContent=JSON.stringify({failures:[{scriptError:event.message}],evidence:[],detailEvidence:[]}); });
   addEventListener('load', () => { requestAnimationFrame(() => {
-    const failures = []; const evidence = []; const detailEvidence = []; const backupEvidence = []; const permissionsEvidence = []; const memoryEvidence = []; const nativeTimeEvidence = [];
+    const failures = []; const evidence = []; const detailEvidence = []; const backupEvidence = []; const permissionsEvidence = []; const memoryEvidence = []; const nativeTimeEvidence = []; const accessEvidence = []; const providerEvidence = [];
+    // This fixture contains hundreds of full-height panels. Chromium's float
+    // coordinates lose 1/64 px precision beyond 262,144 px even when computed
+    // height is exactly 44 px. Keep the same target threshold within 1/32 px.
+    const smallTouchTarget = box => box.width + 1/32 < 44 || box.height + 1/32 < 44;
+    const touchTarget = control => {
+      // Installed Astryx inputs focus on wrapper clicks; Selector delegates
+      // its trigger clicks from the whole surface. Other buttons stay separate.
+      const wrapper = control.matches('input:not([type="checkbox"]), button[role="combobox"]')
+        ? control.closest('.astryx-text-input, .astryx-number-input, .astryx-selector') : null;
+      return (wrapper ?? control).getBoundingClientRect();
+    };
+    for (const section of document.querySelectorAll('.fixture-provider-editor')) {
+      const bounds = section.getBoundingClientRect();
+      const panel = section.querySelector('[role="tabpanel"]');
+      const footer = section.querySelector('.settings-provider-editor-footer');
+      const footerButtons = [...footer.querySelectorAll('button')].map(button => button.getBoundingClientRect());
+      if (footerButtons.length !== 2 || footerButtons.reduce((sum, box) => sum + box.width, 0) < bounds.width - 64 || Math.abs(footerButtons[0].width - footerButtons[1].width) > 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,panel:section.dataset.panel,compressedEditorFooter:footerButtons.map(box => box.width)});
+      if (panel.getBoundingClientRect().bottom > footer.getBoundingClientRect().top + 1) failures.push({width:section.dataset.width,panel:section.dataset.panel,coveredEditorContent:true});
+      const controls = [...section.querySelectorAll('button, input:not([type="hidden"]), textarea, [role="switch"]')];
+      for (const control of controls) {
+        const box = control.getBoundingClientRect();
+        if (box.width <= 1 || box.height <= 1) continue;
+        const label = control.getAttribute('aria-label') || control.textContent;
+        // Astryx focuses TextInput/NumberInput from clicks anywhere on their
+        // wrapper; Selector also opens from its wrapper's onTriggerClick.
+        // Measure that actual delegated target, retaining each independent
+        // button's own target (including clear/status/step controls).
+        const target = touchTarget(control);
+        if (smallTouchTarget(target)) failures.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,panel:section.dataset.panel,smallEditorControl:label,box:{width:target.width,height:target.height,top:target.top,bottom:target.bottom},computed:{height:getComputedStyle(control).height,minHeight:getComputedStyle(control).minHeight,transform:getComputedStyle(control).transform}});
+        if (!control.closest('.astryx-tab-strip') && (box.left < bounds.left - 1 || box.right > bounds.right + 1)) failures.push({width:section.dataset.width,scale:section.dataset.scale,panel:section.dataset.panel,editorControlOverflow:label});
+      }
+      for (const text of panel.querySelectorAll('.astryx-text')) {
+        const box = text.getBoundingClientRect();
+        if (box.width > 1 && (box.left < bounds.left - 1 || box.right > bounds.right + 1 || text.scrollWidth > text.clientWidth + 1)) failures.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,panel:section.dataset.panel,clippedEditorText:text.textContent});
+      }
+      if (panel.getBoundingClientRect().bottom > bounds.bottom + 1 || section.scrollWidth > section.clientWidth + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,panel:section.dataset.panel,editorSurfaceOverflow:true});
+      if (section.dataset.panel === 'model') {
+        const limits = panel.querySelectorAll('input[inputmode="numeric"]');
+        const costs = panel.querySelectorAll('input[inputmode="decimal"]');
+        if (limits.length !== 2 || costs.length !== 4) failures.push({width:section.dataset.width,missingModelParameters:{limits:limits.length,costs:costs.length}});
+        panel.scrollTop = panel.scrollHeight;
+        const last = costs[costs.length - 1]?.closest('.astryx-field') ?? costs[costs.length - 1];
+        const lastBounds = last?.getBoundingClientRect(), port = panel.getBoundingClientRect();
+        if (!lastBounds || lastBounds.top < port.top - 1 || lastBounds.bottom > port.bottom + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,unreachableModelParameters:true});
+        panel.scrollTop = 0;
+      }
+      providerEvidence.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,editor:true,panel:section.dataset.panel,controls:controls.length});
+    }
+    for (const section of document.querySelectorAll('.fixture-provider-details')) {
+      const bounds = section.getBoundingClientRect();
+      const row = section.querySelector('.settings-provider-row');
+      for (const element of section.querySelectorAll('.settings-provider-name, .settings-provider-name .astryx-text, .settings-provider-description, .settings-provider-description .astryx-text, button')) {
+        const box = element.getBoundingClientRect();
+        if (box.width <= 0 || box.left < bounds.left - 1 || box.right > bounds.right + 1 || element.scrollWidth > element.clientWidth + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,providerOverflow:element.className,text:element.textContent});
+      }
+      const buttons = [...section.querySelectorAll('button')];
+      if (buttons.length !== 5) failures.push({width:section.dataset.width,missingProviderControls:buttons.length});
+      for (const button of buttons) {
+        const box = button.getBoundingClientRect();
+        if (smallTouchTarget(box)) failures.push({width:section.dataset.width,providerSmallControl:button.getAttribute('aria-label') ?? button.textContent,widthPx:box.width,height:box.height});
+      }
+      for (let i = 0; i < buttons.length; i++) for (let j = i + 1; j < buttons.length; j++) {
+        const a = buttons[i].getBoundingClientRect(), b = buttons[j].getBoundingClientRect();
+        if (a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1) failures.push({width:section.dataset.width,providerOverlappingControls:true});
+      }
+      const name = section.querySelector('.settings-provider-name .astryx-text');
+      if (getComputedStyle(name).whiteSpace === 'nowrap') failures.push({width:section.dataset.width,providerNameClipped:true});
+      providerEvidence.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,controls:buttons.length,columns:getComputedStyle(row).gridTemplateColumns,height:row.getBoundingClientRect().height});
+    }
+    for (const section of document.querySelectorAll('.fixture-provider-controller')) {
+      const bounds = section.getBoundingClientRect();
+      for (const element of section.querySelectorAll('.settings-provider-name, .settings-provider-description, .settings-provider-actions, .settings-provider-list, .astryx-tab-list, button')) {
+        const box = element.getBoundingClientRect();
+        // Tabs outside the horizontal scrollport are intentionally scrollable.
+        if (element.closest('.astryx-tab-list') && element !== section.querySelector('.astryx-tab-list')) continue;
+        if (box.width <= 0 || box.left < bounds.left - 1 || box.right > bounds.right + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,providerControllerOverflow:element.className,text:element.textContent});
+        if (element.tagName === 'BUTTON' && smallTouchTarget(box)) failures.push({width:section.dataset.width,providerControllerSmallTarget:element.getAttribute('aria-label') ?? element.textContent,widthPx:box.width,height:box.height});
+      }
+      const rows = section.querySelectorAll('[data-provider-reorder-id]');
+      if (rows.length !== 2) failures.push({width:section.dataset.width,missingProviderRows:rows.length});
+      if (getComputedStyle(section.querySelector('.settings-provider-list')).backgroundColor !== 'rgb(255, 255, 255)') failures.push({width:section.dataset.width,missingProviderCard:true});
+      const tabList = section.querySelector('.astryx-tab-list');
+      const scroll = tabList?.querySelector('[role="tablist"]') ?? tabList;
+      if (!scroll || (+section.dataset.width <= 390 && scroll.scrollWidth <= scroll.clientWidth) || !['auto', 'scroll'].includes(getComputedStyle(scroll).overflowX)) failures.push({width:section.dataset.width,missingProviderTabScroll:true});
+      const advanced = section.querySelector('.settings-provider-tabs-toolbar .astryx-icon-button');
+      if (advanced && tabList.getBoundingClientRect().right > advanced.getBoundingClientRect().left + 1) failures.push({width:section.dataset.width,overlappingProviderTabs:true});
+      for (const tab of section.querySelectorAll('[role="tab"]')) {
+        const box = tab.getBoundingClientRect();
+        if (smallTouchTarget(box)) failures.push({width:section.dataset.width,smallProviderTab:tab.textContent,widthPx:box.width,height:box.height});
+      }
+      const glyphs = section.querySelectorAll('.settings-provider-brand[fill]:not([fill="none"]), .settings-provider-brand [fill]:not([fill="none"])');
+      if (glyphs.length < 3) failures.push({width:section.dataset.width,missingProviderBrandGlyphs:true});
+      for (const path of glyphs) {
+        if (getComputedStyle(path).fill !== getComputedStyle(path).color) failures.push({width:section.dataset.width,coloredProviderGlyph:true});
+      }
+      providerEvidence.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,controller:true,rows:rows.length});
+    }
+    for (const section of document.querySelectorAll('.fixture-access-details, .fixture-access-controller')) {
+      const bounds = section.getBoundingClientRect();
+      const visible = element => {
+        const box = element.getBoundingClientRect(), style = getComputedStyle(element);
+        return box.width > 0 && box.height > 0 && !(box.width <= 1 && box.height <= 1 && (style.clip !== 'auto' || style.clipPath !== 'none'));
+      };
+      const texts = [...section.querySelectorAll('.astryx-text, label, .astryx-field-label')].filter(visible);
+      for (const element of [...texts, ...section.querySelectorAll('input, button, .astryx-selector')]) {
+        const box = element.getBoundingClientRect();
+        if (!visible(element)) continue;
+        if (box.left < bounds.left - 1 || box.right > bounds.right + 1 || (texts.includes(element) && element.scrollWidth > element.clientWidth + 1)) failures.push({width:section.dataset.width,scale:section.dataset.scale,mobile:section.dataset.mobile,accessOverflow:element.className,text:element.textContent});
+      }
+      for (const element of section.querySelectorAll('button, input:not([type="hidden"])')) {
+        const box = touchTarget(element);
+        if (!visible(element)) continue;
+        if (smallTouchTarget(box)) failures.push({width:section.dataset.width,mobile:section.dataset.mobile,accessSmallControl:element.getAttribute('aria-label') ?? element.textContent,height:box.height,widthPx:box.width});
+      }
+      for (const child of section.querySelectorAll('.settings-row-group .astryx-list > *')) {
+        if (child.tagName !== 'LI') failures.push({width:section.dataset.width,invalidAccessListChild:child.tagName});
+      }
+      const status = [...section.querySelectorAll('.settings-status-label')];
+      if (status.length !== 2) failures.push({width:section.dataset.width,missingAccessStatus:status.length});
+      const groups = section.querySelectorAll('.settings-row-group').length;
+      if (groups !== (section.dataset.mobile === 'true' ? 3 : 5)) failures.push({width:section.dataset.width,missingAccessGroups:groups});
+      if (section.dataset.mobile === 'true') {
+        const code = section.querySelector('input[autocomplete="one-time-code"]');
+        if (!code || code.inputMode !== 'numeric' || code.maxLength !== 6) failures.push({width:section.dataset.width,missingPairingInputHints:true});
+      }
+      accessEvidence.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,mobile:section.dataset.mobile,controller:section.classList.contains('fixture-access-controller'),groups,status:status.map(element => element.textContent),controls:section.querySelectorAll('button, input').length});
+    }
     for (const section of document.querySelectorAll('.fixture-native-memory-time')) {
       const input = section.querySelector('input[type="time"]');
       if (!input) failures.push({width:section.dataset.width,missingNativeTime:true});
@@ -224,7 +478,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       if (visibleValue && visibleValue.scrollWidth > visibleValue.clientWidth + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,nativeTimeClipped:true});
       for (const control of section.querySelectorAll('input[type="time"],button')) {
         const box = control.getBoundingClientRect(), bounds = section.getBoundingClientRect();
-        if (box.width < 44 || box.height < 44 || box.left < bounds.left - 1 || box.right > bounds.right + 1) failures.push({width:section.dataset.width,nativeTimeBounds:{height:box.height,width:box.width,left:box.left,right:box.right},bounds:{left:bounds.left,right:bounds.right},tag:control.tagName});
+        if (smallTouchTarget(box) || box.left < bounds.left - 1 || box.right > bounds.right + 1) failures.push({width:section.dataset.width,nativeTimeBounds:{height:box.height,width:box.width,left:box.left,right:box.right},bounds:{left:bounds.left,right:bounds.right},tag:control.tagName});
       }
       nativeTimeEvidence.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,native:!!input});
     }
@@ -238,7 +492,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       for (const element of section.querySelectorAll('button, input:not([type="hidden"])')) {
         const box = element.getBoundingClientRect();
         if (box.width === 0 || box.height === 0) continue;
-        if (box.width < 44 || box.height < 44) failures.push({width:section.dataset.width,memorySmallControl:element.getAttribute('aria-label') ?? element.textContent,height:box.height,widthPx:box.width});
+        if (smallTouchTarget(box)) failures.push({width:section.dataset.width,memorySmallControl:element.getAttribute('aria-label') ?? element.textContent,height:box.height,widthPx:box.width});
       }
       for (const label of section.querySelectorAll('.compact-memory-model-row .astryx-complex-selector > button > span')) {
         if (getComputedStyle(label).whiteSpace === 'nowrap' || label.scrollWidth > label.clientWidth + 1) failures.push({width:section.dataset.width,clippedMemoryModel:true});
@@ -268,7 +522,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       }
       for (const button of controls) {
         const box = button.getBoundingClientRect();
-        if (box.width < 44 || box.height < 44) failures.push({width:section.dataset.width,permissionsSmallTarget:button.textContent,height:box.height,widthPx:box.width});
+        if (smallTouchTarget(box)) failures.push({width:section.dataset.width,permissionsSmallTarget:button.textContent,height:box.height,widthPx:box.width});
       }
       permissionsEvidence.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,rows:rows.length,controls:controls.length});
     }
@@ -303,7 +557,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       if (actions.length !== 4) failures.push({width:section.dataset.width,missingBackupActions:actions.length});
       for (const button of section.querySelectorAll('.astryx-button, .astryx-icon-button')) {
         const box=button.getBoundingClientRect();
-        if (box.width < 44 || box.height < 44) failures.push({width:section.dataset.width,smallBackupTarget:button.getAttribute('aria-label') ?? button.textContent,widthPx:box.width,heightPx:box.height});
+        if (smallTouchTarget(box)) failures.push({width:section.dataset.width,smallBackupTarget:button.getAttribute('aria-label') ?? button.textContent,widthPx:box.width,heightPx:box.height});
       }
       const secret=section.querySelector('input[type=password]').getBoundingClientRect();
       const peek=section.querySelector('.astryx-input-group button').getBoundingClientRect();
@@ -341,7 +595,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       }
       for (const control of section.querySelectorAll('[role="switch"]')) {
         const box=control.getBoundingClientRect();
-        if (box.width < 44 || box.height < 44) failures.push({width:section.dataset.width,smallSwitchTarget:{width:box.width,height:box.height,maxWidth:getComputedStyle(control).maxWidth,parentWidth:control.parentElement.getBoundingClientRect().width,parent:control.parentElement.parentElement.className}});
+        if (smallTouchTarget(box)) failures.push({width:section.dataset.width,smallSwitchTarget:{width:box.width,height:box.height,maxWidth:getComputedStyle(control).maxWidth,parentWidth:control.parentElement.getBoundingClientRect().width,parent:control.parentElement.parentElement.className}});
       }
       detailEvidence.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,values:values.length,height:bounds.height});
     }
@@ -361,7 +615,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       if (buttons.length < 3) failures.push({width:section.dataset.width,missingControls:buttons.length});
       for (const button of buttons) {
         const box=button.getBoundingClientRect();
-        if (box.width < 44 || box.height < 44) failures.push({width:section.dataset.width,smallTouchControl:button.getAttribute('aria-label'),widthPx:box.width,heightPx:box.height});
+        if (smallTouchTarget(box)) failures.push({width:section.dataset.width,smallTouchControl:button.getAttribute('aria-label'),widthPx:box.width,heightPx:box.height});
       }
       for (let index=1; index<buttons.length; index++) {
         const a=buttons[index-1].getBoundingClientRect(), b=buttons[index].getBoundingClientRect();
@@ -378,7 +632,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       const grid = section.querySelector('.workspace-file-tree-actions');
       evidence.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,columns:getComputedStyle(grid).gridTemplateColumns.split(' ').length,titleHeight:title.getBoundingClientRect().height,statuses:[...section.querySelectorAll('.settings-navigation-status')].map(element=>element.textContent)});
     }
-    document.getElementById('result').textContent = JSON.stringify({failures,evidence,detailEvidence,backupEvidence,permissionsEvidence,memoryEvidence,nativeTimeEvidence,viewport:{width:document.documentElement.clientWidth,narrow:matchMedia('(max-width:600px)').matches,touch:matchMedia('(pointer:coarse)').matches}});
+    document.getElementById('result').textContent = JSON.stringify({failures,evidence,detailEvidence,backupEvidence,permissionsEvidence,memoryEvidence,nativeTimeEvidence,accessEvidence,providerEvidence,viewport:{width:document.documentElement.clientWidth,narrow:matchMedia('(max-width:600px)').matches,touch:matchMedia('(pointer:coarse)').matches}});
   }); });</script>`;
   const temporaryRoot = path.resolve(tmpdir());
   const directory = await mkdtemp(path.join(temporaryRoot, "xgent-astryx-layout-test-"));
@@ -391,7 +645,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       await writeFile(path.join(evidenceDirectory, "astryx-layout.html"), html);
     }
     const screenshotKind = process.env.XGENT_LAYOUT_SCREENSHOT ?? (process.env.XGENT_LAYOUT_DETAIL ? "detail" : "layout");
-    const screenshotSelectors = { layout: '.fixture-settings-index[data-locale="en-US"]', detail: '.fixture-system-details[data-locale="en-US"][data-width="320"][data-scale="1"]', backup: '.fixture-backup-details[data-locale="en-US"][data-width="320"][data-scale="1"]', permissions: '.fixture-permissions-details[data-locale="en-US"][data-width="320"][data-scale="1"] .astryx-section', memory: '.fixture-memory-details[data-locale="en-US"][data-width="320"][data-scale="1"]' };
+    const screenshotSelectors = { providerEditor: '.fixture-provider-editor[data-locale="en-US"][data-width="320"][data-scale="1"][data-panel="general"]', providerRequest: '.fixture-provider-editor[data-locale="en-US"][data-width="320"][data-scale="1"][data-panel="request"]', providerUsage: '.fixture-provider-editor[data-locale="en-US"][data-width="320"][data-scale="1"][data-panel="usage"]', layout: '.fixture-settings-index[data-locale="en-US"]', detail: '.fixture-system-details[data-locale="en-US"][data-width="320"][data-scale="1"]', backup: '.fixture-backup-details[data-locale="en-US"][data-width="320"][data-scale="1"]', permissions: '.fixture-permissions-details[data-locale="en-US"][data-width="320"][data-scale="1"] .astryx-section', memory: '.fixture-memory-details[data-locale="en-US"][data-width="320"][data-scale="1"]', access: '.fixture-access-details[data-mobile="true"][data-locale="en-US"][data-width="320"][data-scale="1"]', providers: '.fixture-provider-controller[data-locale="en-US"][data-width="320"][data-scale="1"]' };
     assert.ok(screenshotSelectors[screenshotKind], "Use a known source-component screenshot target");
     const viewportResults = [];
     for (const width of [240, 320, 390, 768]) {
@@ -399,7 +653,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       await mkdir(viewportDirectory);
       const result = JSON.parse(await imageBrowserCompletion(annotationBrowser, pathToFileURL(file).href, viewportDirectory, {
         viewport: { width, height: 844, mobile: width <= 390 },
-        ...(evidenceDirectory && width === 390 ? { screenshotPath: path.join(evidenceDirectory, `astryx-${screenshotKind}.png`), screenshotSelector: screenshotSelectors[screenshotKind] } : {}),
+        ...(evidenceDirectory && width === 390 ? { screenshotPath: path.join(evidenceDirectory, `astryx-${screenshotKind}.png`), screenshotSelector: screenshotSelectors[screenshotKind], isolateScreenshot: true } : {}),
       }));
       viewportResults.push(result);
       if (evidenceDirectory) await writeFile(path.join(evidenceDirectory, "astryx-layout.json"), JSON.stringify({ viewportResults }, null, 2));

@@ -25,6 +25,23 @@ const { streamSimpleByApi } = loader.loadModule("src/lib/providers/runtime/strea
 
 const RELAY_BASE_URL = "https://relay.example.com/v1";
 
+test("Anthropic wire respects saved per-model output limits while keeping a smaller configured context budget", async () => {
+  const { normalizeCustomProvider, findProviderModelConfig } = loader.loadModule("src/lib/settings/index.ts");
+  for (const id of ["claude-sonnet-4-6", "claude-sonnet-4-5[1m]", "custom-alias"]) {
+    const provider = normalizeCustomProvider({ id: "relay", type: "claude_code", name: "Relay", baseUrl: RELAY_BASE_URL,
+      models: [{ id, contextWindow: 32000, maxOutputToken: 8000, limitsSource: "user" }], activeModels: [id] });
+    const model = createModelFromConfig(provider.type, id, provider.baseUrl, undefined, findProviderModelConfig(provider, id));
+    let payload;
+    const stream = streamSimpleByApi(model, { messages: [{ role: "user", content: "hi", timestamp: 1 }] }, {
+      apiKey: "sk-test", onPayload: value => { payload = value; throw new Error("__capture_stop__"); },
+    });
+    try { await stream.result(); } catch {}
+    assert.ok(payload, `Expected a payload for ${id}`);
+    assert.equal(model.contextWindow, 32000);
+    assert.equal(payload.max_tokens, 8000, `${id} uses the configured maximum output in its request`);
+  }
+});
+
 function levelsFor(modelId) {
   return getAvailableThinkingLevelsForModel("claude_code", modelId, RELAY_BASE_URL);
 }

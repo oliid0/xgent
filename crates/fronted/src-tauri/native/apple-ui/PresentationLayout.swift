@@ -580,7 +580,10 @@ extension XgentNodeView {
 
     var chatLayout: some View {
         VStack(spacing: 0) {
-            ForEach((node.children ?? []).filter { $0.kind != .composer && $0.id != "workspace-panel-actions" }) { child in
+            ForEach((node.children ?? []).filter {
+                $0.kind != .composer && $0.id != "workspace-panel-actions" &&
+                (!model.windowChromeInstalled || $0.id != "toolbar")
+            }) { child in
                 XgentNodeView(node: child, document: document, model: model)
             }
         }
@@ -658,43 +661,52 @@ struct XgentRootLayout: View {
 
     @ViewBuilder private var application: some View {
         #if os(macOS)
-        XgentDesktopWorkspaceLayout(model: model,
-                                   minimumMainWidth: 440 + (sidebar == nil ? 0 : CGFloat(min(480, max(280, storedSidebarWidth)))),
-                                   enabled: root?.nodes.contains(where: { $0.kind == .chatLayout }) == true) {
-            Group {
-                if let sidebar, let root {
-                    HSplitView {
+        GeometryReader { geometry in
+            let panelEnabled = root?.nodes.contains(where: { $0.kind == .chatLayout }) == true
+            let panels = model.documents.filter { $0.mode == .panel }
+            let panel = panels.first { $0.surface == model.workspaceState.selectedSurface } ?? panels.last
+            let placement = XgentDesktopSidebarPlacement(
+                availableWidth: geometry.size.width, storedWidth: storedSidebarWidth,
+                sidebarVisible: sidebar != nil && root != nil,
+                panelVisible: panelEnabled && model.workspaceState.visible && panel?.workspacePanel != nil,
+                panelExpanded: model.workspaceState.expanded)
+            let drawerVisible = sidebar != nil && root != nil && !placement.inline
+            XgentDesktopWorkspaceLayout(model: model, minimumMainWidth: placement.minimumMainWidth,
+                                       enabled: panelEnabled) {
+                desktopMain(placement: placement)
+            }
+            .disabled(drawerVisible)
+            .allowsHitTesting(!drawerVisible)
+            .accessibilityHidden(drawerVisible)
+            .overlay(alignment: .leading) {
+                if drawerVisible, let sidebar {
+                    ZStack(alignment: .leading) {
+                        Button { model.dismiss(sidebar) } label: {
+                            Color.black.opacity(0.12)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(sidebar.dismissAction == nil || model.isDismissing(sidebar))
+                        .accessibilityLabel(sidebar.node(id: "sidebar-close")?.label ?? sidebar.title)
+                        .accessibilityIdentifier("xgent-sidebar-dismiss-backdrop")
                         content(sidebar)
-                            .frame(
-                                minWidth: 280,
-                                idealWidth: CGFloat(min(480, max(280, storedSidebarWidth))),
-                                maxWidth: 480
-                            )
-                            .background {
-                                GeometryReader { geometry in
-                                    Color.clear.preference(
-                                        key: XgentSidebarWidthPreferenceKey.self,
-                                        value: Double(geometry.size.width)
-                                    )
-                                }
-                            }
-                            .transition(.move(edge: .leading).combined(with: .opacity))
-                        content(root)
-                            .accessibilityIdentifier("xgent-native-root")
-                            .onAppear { NSLog("XgentNativeUI root rendered") }
+                            .frame(width: placement.drawerWidth)
+                            .frame(maxHeight: .infinity)
+                            .background(.regularMaterial)
+                            .shadow(color: .black.opacity(0.16), radius: 12, x: 4)
                     }
-                    .onPreferenceChange(XgentSidebarWidthPreferenceKey.self) { width in
-                        storedSidebarWidth = min(480, max(280, width))
-                    }
-                } else if let sidebar {
-                    content(sidebar)
-                } else if let root {
-                    content(root)
-                        .accessibilityIdentifier("xgent-native-root")
-                        .onAppear { NSLog("XgentNativeUI root rendered") }
+                    .transition(.move(edge: .leading).combined(with: .opacity))
                 }
             }
             .animation(transitionAnimation, value: sidebar?.id)
+            .onChange(of: root?.node(id: "chat")?.value) { previous, current in
+                // Streaming output changes the document revision, but only
+                // an accepted conversation selection closes a narrow drawer.
+                if drawerVisible, previous != nil, current != nil, let sidebar {
+                    model.dismiss(sidebar)
+                }
+            }
         }
         #else
         if let root, root.formFactor == .mobile {
@@ -715,4 +727,34 @@ struct XgentRootLayout: View {
         }
         #endif
     }
+
+    #if os(macOS)
+    @ViewBuilder private func desktopMain(placement: XgentDesktopSidebarPlacement) -> some View {
+        if placement.inline, let sidebar, let root {
+            HSplitView {
+                content(sidebar)
+                    .frame(minWidth: 280, idealWidth: placement.columnWidth, maxWidth: placement.maximumWidth)
+                    .background {
+                        GeometryReader { geometry in
+                            Color.clear.preference(key: XgentSidebarWidthPreferenceKey.self,
+                                                   value: Double(geometry.size.width))
+                        }
+                    }
+                content(root)
+                    .frame(minWidth: 440)
+                    .accessibilityIdentifier("xgent-native-root")
+                    .onAppear { NSLog("XgentNativeUI root rendered") }
+            }
+            .onPreferenceChange(XgentSidebarWidthPreferenceKey.self) { width in
+                if let preferred = placement.widthToRemember(width) { storedSidebarWidth = preferred }
+            }
+        } else if let root {
+            content(root)
+                .accessibilityIdentifier("xgent-native-root")
+                .onAppear { NSLog("XgentNativeUI root rendered") }
+        } else if let sidebar {
+            content(sidebar)
+        }
+    }
+    #endif
 }

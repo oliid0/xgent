@@ -115,8 +115,7 @@ export function useNativeWorkspaceActions(
           const current = project(item.id);
           if (current) {
             await run(current, scope.props);
-            if (["new-chat", "settings", "browse-tree", "browse-system"].includes(suffix))
-              scope.props.onNavigate?.();
+            if (["new-chat", "settings"].includes(suffix)) scope.props.onNavigate?.();
           }
         },
         available,
@@ -175,18 +174,6 @@ export function useNativeWorkspaceActions(
     else if (props.onArchiveProject && activeCount > 1)
       children.push(
         action("archive", "chat.workspaceArchive", (current, p) => p.onArchiveProject?.(current)),
-      );
-    if (props.onBrowseProjectInFileTree)
-      children.push(
-        action("browse-tree", "chat.workspaceBrowseInFileTree", (current, p) =>
-          p.onBrowseProjectInFileTree?.(current),
-        ),
-      );
-    if (props.onBrowseProjectInSystemFileManager)
-      children.push(
-        action("browse-system", "chat.workspaceBrowseInSystemFileManager", (current, p) =>
-          p.onBrowseProjectInSystemFileManager?.(current),
-        ),
       );
     if (props.onRemoveProject && !isDefault)
       children.push({

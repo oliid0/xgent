@@ -47,12 +47,16 @@ state, renders an Apple popover and scopes the confirmation to its conversation.
 Dispatch tests cover both form factors, the threshold, concurrent-task disabling,
 draft preservation and retired conversations. Native rendering remains subject
 to the next remote Apple SDK checks; this does not establish complete parity.
-Another concrete remaining difference is keyboard submission: Astryx's
-`MentionComposer` handles Enter/send, Shift-Enter/newline and Ctrl/Cmd-Enter/steer,
-whereas `XgentComposerInput` currently only reports native text and selection and
-`NativeChatPage` does not receive `onSteer`. Matching buttons is therefore not
-sufficient evidence of matching composer interaction. This requires a native
-keyboard and IME-safe implementation and actual input verification.
+Native keyboard submission now routes Enter/send, Shift-Enter/newline and
+Ctrl/Cmd-Enter/steer through the shared handlers, preserving IME composition.
+History and atomic reference editing also have shared/native source coverage;
+their new physical-keyboard SDK fixtures still require hosted execution.
+The native editor now has handwritten SwiftUI inline reference badges hosted by
+Apple TextKit, compatible with the macOS 15 deployment target. Exact reference
+identities and UTF-16 projection preserve shared draft metadata across editing
+and native undo; pending metadata-only edits also wait for their canonical
+reference acknowledgement. New Apple SDK fixtures still require hosted
+compilation/rendering and installed input acceptance before claiming input parity.
 
 `NativeChatPage` uses the existing composer store, transcript/live store, activity
 store, approval controller and queued-turn handlers. The audit checked model
@@ -733,3 +737,185 @@ applied once. A new hosted test checks the fonts and sizes of actual native
 composer/search fields; existing narrow/large-text accessibility bounds remain.
 Swift compilation and installed font/layout evidence require the next exact-SHA
 CI/release. Prompt history and atomic mention keyboard editing remain open.
+
+# Release 134 installed evidence and current source follow-up (2026-10-05)
+
+Release 134 tested de4a0130f7465b71c462c9e43d45bd79d6e6d307 and has finished.
+The macOS packages, signed APK, device IPA and simulator builds succeeded;
+macOS/Android/iOS installed interaction acceptance failed. Current uncommitted
+source repairs were not exercised by that release. Evidence is SHA-256 verified
+under .ci-artifacts/release134-*; detailed findings and digests are in history.md.
+
+macOS source now uses a real native AppKit container as the hosting view's AX
+ancestor rather than promoting SwiftUI proxies into the Tauri sibling list.
+Intel runner recovery is bounded to the affected macOS 26 x86_64 CI environment
+and must pass an actual AppKit icon-rendering probe after recovery. Android's
+smoke input helper waits for focused, stable terminal bounds and verifies the
+exact typed command before executing it. Neither change weakens command results.
+
+iOS source now places transparent form-button hit bounds inside their labels,
+identifies only the actual toggle/button control, and removes covered background
+content from sheet accessibility navigation. The added hosted switch test checks
+AX identity, physical UISwitch center hit testing and shared edit delivery; the
+installed test still performs ordinary taps and preference/relaunch assertions.
+Mobile voice copy describes device speech and omits unrelated HealthKit text.
+These Swift changes require future hosted SDK and installed-app acceptance.
+
+The pinned pkg script now resolves its bundled helper commands with a scoped
+native-only PATH and bare names. This addresses both upstream's unquoted APPDIR
+and ios_system's unquoted argv[0] serialization for pkg operations. The actual
+registry probe remains mandatory. Source tests execute pkg list/help with spaced
+environment/home paths, but do not execute iOS frameworks or install packages.
+Arbitrary spaced executable paths remain a separate upstream bridge limitation.
+
+Relevant source regression: 30/30 pass; TypeScript, Biome error checks, native
+state contract and architecture checks pass. The earlier broad 853/853 source
+run predates this iOS follow-up. Full installed acceptance, remaining detailed
+component parity and measured 90% visual similarity remain open. No own push or
+dispatch has occurred; final push follows the complete repair and source review.
+
+
+# Astryx provider-list source follow-up (2026-10-05)
+
+Provider rows now wrap full names, endpoints, active-model counts, quota feedback
+and proxy state, with an independent action group that moves below details in a
+narrow panel. Compact settings use rounded light cards and monochrome provider
+glyphs. Larger Add/import/row actions and compact vendor tabs retain the original
+editor, advanced settings, quota and import routes. Long import labels wrap.
+
+The actual shared ordering callback now rejects foreign pointers, discards a
+cancelled preview, and cancels on vendor changes. Regression cases also exercise
+keyboard ordering, usage refresh, preserving saved secrets/headers/retry policy
+through edit/save, and confirmation before deletion.
+
+Real React/Astryx source browser evidence covers 32 provider fixtures per live
+viewport at 240/320/390/768, in English/Chinese with 1x/1.5x controlled typography.
+All final bounds, overlap, targets, cards and nonempty computed glyph-color checks
+pass. The source screenshot was inspected. Relevant source regression: 30/30
+pass, zero skips/cancellations; TypeScript, Biome error checks, native state and
+architecture checks pass. Source fixtures do not prove installed application
+acceptance or the overall visual similarity target.
+
+Native ProviderList still places drag/menu beside text, omits its provided row
+icon, and replaces endpoint/model metadata with quota text. Native list/detail
+adaptation and editor request ownership remain open. No current push/dispatch;
+finished Release 134 tested the earlier committed source, not these changes.
+
+
+# Native provider-list source adaptation (2026-10-05)
+
+This supersedes the earlier open provider-row note at the source level. Both
+presentations now use the shared providerListDetails formatter, preserving
+endpoint/model counts beside quota feedback. Native rows render the provided
+monochrome symbol, proxy icon/state and independent refresh/edit/delete actions;
+the reorder menu keeps accessible move commands and drag behavior.
+
+The native row layout measures wrapped details within their actual available
+width. It stacks the action flow below details at the same narrow threshold as
+Astryx and retains side actions in wide rows, including right-to-left placement.
+Cards use the current theme's rounded card surface and metadata uses the app's
+font family/scale. Added hosted iOS width/large-text/RTL geometry and unique-AX
+assertions; they require future SDK execution and are not installed evidence.
+
+Real controller tests exposed and fixed a retired delete confirmation targeting
+another newly opened confirmation. Ownership now also distinguishes reopening
+the same provider. Native list/model/request/runtime plus actual Astryx browser
+regression: 60/60 pass, zero skips/cancellations. TypeScript, Biome error checks,
+native contract and architecture checks pass. No local Swift compilation or
+push/dispatch occurred.
+
+Native vendor tabs/header, provider add/draft/save behavior, detailed editor
+layouts and Astryx model-fetch ownership remain open. Overall visual similarity
+and current-source installed interaction acceptance remain unproven.
+
+
+## Provider editor discovery ownership and compact controls (2026-10-05)
+
+Actual ProviderEditor handler regressions reproduced three distinct failures before repair: an accepted credential edit could still admit the old catalog before the next render; repeated manual taps issued duplicate discovery and left the automatic timer active; leaving the editor allowed retired callbacks, replies and scheduled discovery to continue. Current source tracks editor lifetime, committed configuration, synchronous edit version and individual pending request ownership. Request-affecting edits invalidate before the next render, manual refresh cancels its automatic duplicate, and an obsolete success/error/finally cannot replace models, errors or a newer loading state. Successful save, back/cancel and effect cleanup retire requests. No transport, discovery endpoint or secret behavior was replaced.
+
+Added eight actual-editor interaction tests through the public ProviderList edit handler, without exporting the private editor or mocking its merge logic. Cases cover credential changes before render, duplicate taps, close/save, current failure/manual retry, normalized-equivalent whitespace changes, models URL/proxy/header/auth changes, cleared/replaced credentials, preserving user model limits and manual activation during discovery, and effect cleanup/replay. All eight pass. The broader relevant native/provider/model/request/runtime source regression passes 64/64 with zero failures/skips/cancellations, log .ci-artifacts/astryx-narrow-20261005/provider-editor-source-regression.log.
+
+Compact editor tabs/actions now request supported touch sizes. Secret inputs use their existing compact composition; field input surfaces and selectors retain a 44px minimum. Added scoped editor layout rules: constrained credentials/auth grids, wrapping model actions, full wrapped model IDs, adaptive model details and edit/delete controls, stacked narrow custom header fields with visible independent actions, header-count wrapping, bounded panel scrolling, and equal-width footer save/cancel controls. Removed the compact tab/footer decorative divider. Search positioning and footer width have explicit semantic source styles instead of relying on incidental utility layout. Screenshot inspection caught a too-narrow footer even after the earlier generic bounds checks passed; fixed the actual Toolbar content slot and added balanced width and content-not-covered assertions.
+
+The real React/Astryx browser fixture opens the private editor using its public production handler, then renders all three actual panels. It checks 48 editor combinations per live viewport (EN/ZH, component widths 240/320/390/768, controlled 1x/1.5x typography, General/Request/Usage) at four live viewports, alongside existing provider/settings/access/sidebar/file-tree fixtures. Final 192 editor measurements and existing checks pass with zero failures. Source HTML/JSON and inspected General screenshot: .ci-artifacts/astryx-narrow-20261005/provider-editor-verified; log provider-editor-layout-verified.log. This fixture uses current source CSS and installed Astryx CSS; it does not execute the complete application's generated Tailwind output or an installed app, and cannot prove device keyboard/scroll behavior or overall visual similarity. Do not count its early baseline diagnostics as hundreds of installed application defects.
+
+React's official useEffect cleanup guidance and Astryx MCP TabList documentation informed request lifetime and supported scrollable/lg tabs. TypeScript --noEmit, Biome error checks, native state contract (55 kinds/45 properties), architecture and normalized diff checks pass. No local build/dev/install/cargo/Swift compile, commit, push or dispatch occurred.
+
+Goal remains active. The earlier Astryx model-discovery ownership open note is superseded at the source level. Usage-test reply ownership, native provider root tabs/header and immediate persistence of newly added native providers still require review; native detailed layouts, SDK compilation and installed parity remain open. No overall completion or 90% visual similarity claim. Release 134 tested the earlier committed source, not this dirty tree.
+
+
+## Native provider drafts and macOS window toolbar (2026-10-06)
+
+Read the updated user objective in C:/Users/ox_i/.codex/attachments/3dd9d266-c4a2-40ca-8ffa-f4e21516f8ac/goal-objective.md. Its full cross-platform repair scope remains active. The macOS titlebar reference is additional steering, with no authorization to push before the full source repair is complete.
+
+Native provider general/model/request pages now share an unsaved editor draft. Adding no longer persists an unnamed placeholder; Save validates the latest accepted fields and updates the authoritative previous settings, preserving unrelated changes. Back/Cancel discard the draft; cleared names survive nested model/request normalization and remain invalid. Removed providers cannot be resurrected. Nested request and model Save update only the outer draft, and usage testing of a new unsaved provider is disabled with the existing save-first explanation. The separate runtime/failover settings remain global by design. Older catalog responses are rejected after a credential edit before repaint. Deletion confirmations are owned by both editor session and individual confirmation; two failing actual-handler cases reproduced stale confirmation reuse and pending deletion leaking into a reopened editor before repair. All 11 native editor interaction cases pass, using the actual parent and actual model/request child code.
+
+Added a shared handwritten native provider footer with balanced Save/Cancel actions and no decorative divider. The iOS sheet and desktop detail scroll area reserve footer space and omit it from scrolling fields. Updated the earlier blanket safeAreaInset guard to keep the prohibition specifically on the iOS chat composer while allowing the new settings footer. Added an iOS actual-sheet layout fixture for widths 240/320/430/768 and larger Dynamic Type; it is not compiled or run locally, and no hit-test acceptance is claimed.
+
+macOS now installs an actual NSToolbar through the native host. AppKit owns traffic lights, window dragging and overflow; SwiftUI renders titles and the tab area. Native buttons use the real shared actions for chat history and browser navigation, and the same observable workspace state as the right pane for expand/collapse/selection. Chat history retains at most 100 visited IDs, skips removed conversations, replaces the forward branch after a new selection and rejects repeated/retired callbacks. Conversation titles come from the authoritative sidebar store. Browser titles and full URLs, file names/paths and terminal session names come from existing documents; editor tab actions retain the existing code-host draft commit helper. Compact windows expose the tab list through a menu; the native toolbar has its own overflow representation. Current file/browser tab closing remains available after their content tab rows move into the titlebar. Browser status and whole-browser close remain available in the title menu.
+
+The host reserves the real AppKit safe area instead of drawing content underneath the toolbar. Duplicate in-content toolbar/sidebar-close/panel-tab/browser-header rows are omitted only while window chrome is installed; the mobile path retains its original compact controls. Window reset/detach restores the original toolbar, style, title, appearance and separator. Forced light/dark appearance applies to the native titlebar as well, and refresh requests are coalesced. Settings/confirmation overlays own title/back navigation and block underlying sidebar/tab interactions. The installed macOS smoke source now targets the actual titlebar sidebar button and checks real bounds, overlap and enabled hit targets at full and narrow window widths.
+
+Added three actual NativeChatPage handler regressions for history/title behavior, removed targets/failure retry and mobile separation. Added four executable macOS SDK fixtures for browser context, file/terminal actions, overlay ownership and actual public C-bridge host installation/reset; the latter checks widths 320/640/1156, traffic-light separation, native content placement, real forward dispatch and captures full window chrome. These Swift fixtures and the packaged UI checks have NOT been compiled/run on this Windows host. The existing CI native package test scheme discovers them automatically; no new dependency was installed.
+
+Relevant combined source regression: 226/226 pass, zero failures/skips/cancellations; log .ci-artifacts/astryx-narrow-20261005/window-provider-combined-regression.log. After the final deletion URL-draft cleanup, the affected native editor/contract follow-up passes 16/16 (native-window-editor-final-regression.log), and macOS preparation/contract checks pass 6/6. TypeScript --noEmit, targeted Biome error checks, native schema (55 kinds/45 properties), architecture and normalized diff checks pass. The Swift/installed tests are pending and are not included in these counts.
+
+Primary references read: Apple NSToolbarItem.view, NSToolbar.visibleItems/centeredItemIdentifiers, NSWindow.toolbarStyle/contentLayoutRect and NSView.safeAreaLayoutGuide documentation through Swift MCP; CodeEdit's real window-toolbar implementation through GitHub MCP. No local build/dev/install/cargo/Swift compilation, stage, commit, push or Actions dispatch occurred. HEAD remains de4a0130f7465b71c462c9e43d45bd79d6e6d307. Release 134 does not validate this dirty source tree.
+
+Remaining scope includes native provider category/header layouts, usage-test reply ownership, narrow macOS body/sidebar sizing, the broader settings/component/function parity audit, platform build/installed acceptance, and measured overall visual comparison. This checkpoint does not establish 90% similarity or completion of the goal.
+
+## Shared model configuration and native input follow-up (2026-10-06)
+
+Read the current objective attachment at C:/Users/ox_i/.codex/attachments/70bff371-2011-4a3f-9cac-faf0cf4461b0/goal-objective.md. The full repair scope remains active. The current source includes native provider category/header wrapping, usage-test request ownership and narrow macOS sidebar placement repairs, superseding those three earlier source-level open notes. Their hosted Swift and packaged interaction assertions remain pending remote execution.
+
+Both provider editors now persist model order and use it in the chat model picker, with adjacent move/reset actions. Search and bulk-edit states prevent ambiguous reordering; actions use the latest models, active selection and accepted order before repaint. Provider/model cache-hint choices reach the existing runtime, including inheritance and explicit clearing. Model input capability overrides reach real model construction and native image attachment payloads. DeepSeek's current image-rejecting adapter is excluded from this choice. Explicit text-only Anthropic aliases skip image/PDF reads while retaining text documents; automatic aliases retain their existing image-upload behavior, now accurately represented by their model input metadata.
+
+Actual Astryx editor interactions also exposed model-edit changes being lost when Save preceded repaint, and Gemini user limits, costs and input capability being discarded on editor reopen. The final model and active-model snapshots are accepted synchronously. Gemini normalization now preserves saved configuration through reopen, catalog refresh and Save, while retaining newly fetched catalog metadata. Tests exercise the real editor through the public provider-list handler, not a second implementation of its merge logic.
+
+Native prompt history uses the shared recall session, with scoped lazy history, logical-line boundaries, UTF-16 caret payloads and complete rich-draft restoration. Native reference arrows and deletion now use ranges from the authoritative rich draft; software-keyboard deletion crossing a reference removes its whole segment and retains neighboring metadata. Physical native key tests and malformed-range tests were added for future SDK execution. This fixes an interaction gap but does not yet render native inline references as the Astryx visual chips; that visual work remains open.
+
+Compact memory/system/backup/provider controls now receive semantic monochrome glyphs, including independently mounted native details. Native workspace and group names wrap without the conversation-title line cap. Both workspace more menus omit the requested folder-browsing entries, retaining the direct Files route and existing workspace operations. Native mobile settings details show persistence errors without an extra healthy-save status row, matching the shared settings behavior; desktop chrome retains its own contextual state.
+
+The real React/Astryx source-browser fixture covers Claude and Codex editor General/Request/Usage panels at EN/ZH, widths 240/320/390/768 and 1x/1.5x controlled typography: 96 combinations per live viewport, 384 editor measurements across four live viewports. Bounds, overlap, targets, card surfaces and existing settings/sidebar/file-tree checks pass. The expanded fixture page exceeded 262144px in height, where Chromium measured a computed 44px target as 43.984375px; touch-size assertions allow 1/32px numerical precision, without changing bounds/overlap checks or actual target styles. The provider and memory source screenshots were visually inspected. This is source-CSS evidence, not complete generated Tailwind output or installed-device acceptance.
+
+Validation evidence: the broad frontend run passed 1886/1886 with no skips/cancellations (current-frontend-final-regression.log), before the final Anthropic/reference/settings-status changes. Subsequent affected suites pass 37/37 for model input/Anthropic/runtime/native model settings (alias-model-input-regression.log), 87/87 for Gemini configuration and editor/normalization flows (gemini-model-config-regression.log), 61/61 for settings/sidebar/native provider drafts (settings-sidebar-final-regression.log), and 127/127 for composer references/history/messages/native contract/localization (composer-atomic-regression.log). Release/platform helper regressions pass 49/49 (release-platform-source-regression.log); expanded source-browser checks pass with no skips (memory-icons-layout.log). Logs live under .ci-artifacts/astryx-narrow-20261005/. TypeScript --noEmit, Biome errors, native state contract (55 kinds/45 properties), architecture and normalized diff checks pass. These counts exclude Swift compilation, device execution, Cargo and actual application packaging.
+
+Latest remote evidence still belongs to Release 134 on de4a0130f7465b71c462c9e43d45bd79d6e6d307: Windows/Linux succeeded; macOS Intel/ARM, iOS and Android failed installed smoke interactions after producing application packages. Current source repairs native AX ancestry/hit targets, iOS pkg command discovery, Android focused input and the bounded Intel runner IconServices probe. They have not been validated in a new installed application. No local build/dev/install/cargo/Swift compile, stage, commit, push or dispatch occurred in this follow-up.
+
+Primary references consulted through available internet tools: Apple KeyEquivalent.delete/deleteForward, NSHostingView/ViewThatFits and Liquid Glass documentation; Astryx components/TabList; SwiftPackageIndex and the upstream SwiftTerm/SwiftUI-Flow repositories; Anthropic image/PDF request documentation; React useEffect cleanup. No callable GitHub/Swift/Astryx MCP tools were exposed during this follow-up; do not present web reads as MCP calls. Existing pinned packages remain in place, without adding packages merely to increase their count. Overall functional/installed parity, native inline-reference visuals and measured 90% visual similarity remain open. Goal is not complete.
+
+## Per-model parameters and Astryx component correction (2026-10-06)
+
+Read the active 70bff371 objective attachment again. The user clarified that provider configuration includes editing one model's parameters, and explicitly rejected extensive handwritten CSS. Compared the actual yy/PC-Desktop/agent-ui provider model draft and save handlers. Both editors now distinguish edited limits from untouched catalog limits: changing cost/input/cache settings does not freeze catalog limits as user overrides, and discovery completing during an open model edit retains fresh untouched limits. The Astryx outer Save commits a valid open model draft; switching models preserves its accepted edits, while invalid edits block Save/switch and explicit Cancel discards that draft. Tests exercise the real private editor through its public provider-list action. Claude model lookup and runtime construction now honor saved user context limits, rather than replacing them with catalog context. Actual pi-ai Anthropic request tests verify the saved output limit reaches the wire, including adaptive, long-context and custom aliases. Native numeric/decimal field variants request the matching iOS keyboard; their new UIKit SDK fixture has not run locally.
+
+Removed the added provider-editor layout stylesheet and compact-access input overrides. Tabs, scroll ownership, authentication choices, credentials, model rows/fields, search/clear controls, header actions, input validation and footer sizing use documented Astryx Stack/StackItem/Grid/TextInput/Selector/Button/Banner props and the existing compact theme. Removed old fixed-height utility classes that would override mobile component sizes in the actual application's generated CSS. The index.css diff is now 46 additions / 8 removals, including formatting of existing rules; remaining provider rules handle its narrow ListItem action slot and monochrome legacy brand SVGs. The compact List surface now receives its card color from the Astryx theme instead of being forced transparent by a blanket rule. This supersedes the earlier scoped provider CSS approach.
+
+Expanded the actual React/Astryx browser fixture to open model parameters through their real action, as well as General/Request/Usage. It covers EN/ZH, widths 240/320/390/768, controlled 1x/1.5x typography and Claude/Codex: 128 editor cases per live viewport, 512 measurements across four viewports. All existing bounds, overlap, touch-target, grouped surface, footer and other settings/sidebar/file-tree checks pass; the two limit and four cost fields also exist and remain scroll-reachable. Input hit targets measure Astryx's actual click-delegating wrapper, verified against installed TextInput/NumberInput/Selector source, retaining separate measurements for independent buttons. Screenshot inspection exposed unreliable Chromium crops on the hundred-page fixture: screenshots now optionally isolate the already-measured mounted case with its original theme ancestors, then wait for painting. All measurements finish on the full fixture before isolation. Inspected current general/provider screenshots; this remains source-CSS evidence, not complete generated CSS or installed device acceptance.
+
+Validation: the expanded browser passes with zero failures/skips; .ci-artifacts/astryx-provider-components/astryx-layout.json records all four viewports. The broad frontend regression passes 1899/1899 with zero failures/skips/cancellations (.ci-artifacts/current-frontend-astryx-regression.log); it began before the final component-prop adjustments. Final affected editor/list/navigation/theme/native model/runtime/wire suites pass 45/45 (.ci-artifacts/astryx-model-component-final-regression.log), and release/platform helper regressions pass 49/49 (.ci-artifacts/astryx-provider-release-followup.log). TypeScript --noEmit, targeted Biome errors, native state/action contract and architecture checks pass. These counts exclude Apple SDK compilation and installed execution.
+
+GitHub, Swift and Astryx MCP are callable again in this follow-up. GitHub MCP revalidated the latest release and retrieved all four failed jobs from Release 134 on de4a0130f7465b71c462c9e43d45bd79d6e6d307. Android failed Shell exit-status interaction; macOS ARM failed composer reachability; Intel timed out querying UI; iOS failed cron reachability, voice persistence and pkg registry verification with path_helper exit 127. Packages were produced before these failures. Current source contains corresponding repairs and helper coverage, but no new hosted/installed run proves them fixed. Primary component APIs and numeric keyboard documentation were read through Astryx/Swift MCP; GitHub code search and upstream STTextView attachment examples plus Apple's TextEditor/attachment documentation informed the remaining native inline-reference work. The SwiftUI attributed editor requires macOS 26, while this app supports macOS 15, so it cannot simply replace the shared native input without a compatible editor and selection mapping.
+
+Goal remains active. Native inline reference visuals, complete installed function/interaction parity and measured 90% visual similarity remain open. No local build/dev/install/cargo/Swift compile, staging, commit, push or Actions dispatch occurred. The user has authorized pushing and triggering builds once the required repairs/checks are ready; no additional permission is required.
+
+## Native composer inline references and editing (2026-10-06)
+
+Re-read the requested 02ddd770 objective attachment and continued its full repair scope. Replaced the plain native composer field with a handwritten SwiftUI wrapper around Apple TextKit text views. Inline SwiftUI badges represent file/folder, Skill, commit, Git file, code and large-paste references. Their SF Symbols, selected font, application/Dynamic Type scale, semantic colors, bounded widths and rounded surfaces remain native. Badge hosting views let the text view own pointer placement and selection. The editor keeps its native view/coordinator, composition, focus requests, shared history/menu/submit shortcuts and one-to-six-line scrolling behavior; iOS retains a 44-point minimum editing target. No new stylesheet rules or package dependencies were introduced for this feature.
+
+Native attachments occupy one UTF-16 unit. A separate immutable reference attribute retains their original prompt text, and the projection maps selection, copying and shared keyboard payloads to/from the complete prompt. Clipboard paste stays literal text and normalizes line endings; copying and cutting export original prompt text. Reference identifiers are scoped to the shared composer store and retain complete original draft metadata, including two same-named Skills from different paths. A bounded archive supports native undo without reassigning expired identifiers to unrelated objects. Whole native snapshots validate IDs, ordered ranges and exact original substrings before rebuilding shared draft segments; foreign, expired or malformed references cannot silently become another file or Skill.
+
+Added a distinct checked `editAction` transport property, separate from literal text and caret reports. The native optimistic value and its ACK remain plain prompt text. Pending reference metadata also stays optimistic until matching canonical references arrive; equal text alone cannot acknowledge replacing a chip with the same literal label. Action ownership changes, rejected latest edits, disappearing fields, removed surfaces and invalidation retire this state. Hardware arrows/deletion use the native single-unit attachment when rendered; the previous shared atomic command remains available for legacy plain-text fields. New Swift fixtures cover UTF-16/grapheme boundaries, malformed descriptors, metadata-only acknowledgements, retired owners, actual native copy/cut/undo, narrow long badges, font scale and the current real NSTextView font control. These fixtures have not been compiled or executed locally.
+
+Apple documentation was queried through Swift MCP for attributed TextEditor availability, TextKit attachment/view-provider APIs and typing attributes. GitHub MCP read STTextView's actual AppKit attachment examples and LiYanan2004/RichText's SwiftUI hosting implementation. The latter confirms that TextKit's nonisolated attachment overrides need explicit main-actor hosting rather than isolating the whole attachment subclass. Primary references: https://developer.apple.com/documentation/appkit/nstextattachmentlayout/viewprovider(for:location:textcontainer:), https://developer.apple.com/documentation/uikit/nstextattachmentviewprovider/attachmentbounds(for:location:textcontainer:proposedlinefragment:position:), https://developer.apple.com/documentation/uikit/uitextview/typingattributes and https://github.com/krzyzanowskim/STTextView/blob/main/TextEdit/Mac/TextAttachments.swift. Existing dependencies were retained instead of adding packages to increase their number.
+
+Validation: complete frontend source regression passed 1905/1905, zero failures/skips/cancellations (.ci-artifacts/current-native-inline-frontend.log). This includes the new identity, deletion/undo, literal-label replacement, validation, desktop/mobile publication and owner checks. The subsequently added multiline large-paste case and all other composer cases passed 15/15 (.ci-artifacts/native-inline-large-paste-final.log); composer/document validation also passed 21/21 before that addition (.ci-artifacts/native-inline-core-final.log). TypeScript --noEmit, full Biome error checks across 680 source files, architecture, native state/action contract (55 kinds/46 properties) and diff checks pass. Full Biome exposed two compact CSS declarations requiring formatting only; the index.css diff is now 51 additions/8 removals, with no additional styling behavior in this follow-up. Source checks do not establish Apple SDK compilation, native attachment rendering/undo, installed interaction acceptance or measured visual similarity.
+
+GitHub MCP confirms Release 134 / 37383846789 on de4a0130 remains the latest release failure; no newer build has tested this dirty tree. Its previously retrieved failed job logs remain the basis for the Android Shell, macOS ARM composer, Intel query timeout and iOS cron/voice/pkg repairs. Their new installed acceptance, all settings/sidebar/chat routes and cross-platform functional/visual acceptance are still pending. Goal remains active. No local build/dev/install/cargo/Swift compile, staging, commit, push or Actions dispatch occurred.
+
+## Clipboard parity and push preparation (2026-10-06)
+
+Large clipboard pastes now use shared 8000-UTF-16-unit/200-line thresholds, normalized line endings, numbering and previews in both frontends. Native snapshots declare new scoped paste IDs without duplicating their bodies. Validation rejects foreign, malformed, unused and undersized declarations; undo/redo retains reference identity and complete metadata. UIKit uses attributed fragment edits with reciprocal native undo registration. TextKit projection inserts semantic word boundaries around chips without creating editable native units; hidden paste line breaks do not block shared prompt history. Styling updates preserve native attachment positions and undo ranges. SDK fixtures cover clipboard expansion/collapse, native undo/redo, reference spacing and restyling; hosted SDK execution is required to establish their actual behavior.
+
+Validation: complete frontend source regression passed 1911/1911 (.ci-artifacts/native-large-paste-frontend.log), with no failures/skips/cancellations. Final affected suites including desktop/mobile scoped paste publication passed 69/69 (.ci-artifacts/native-large-paste-final-affected.log). TypeScript --noEmit, full Biome errors across 681 files, architecture and native document contract (55 kinds/46 properties) passed. Release/platform helper regressions passed 49/49 again during push preparation (.ci-artifacts/push-release-preflight.log). No local build/dev/install/cargo/Swift compilation occurred. No stylesheet rules were added in this continuation.
+
+The user's latest instruction is to prepare and push, then ensure CI and Release pass. The macOS packaged smoke now queries the real NSTextView accessibility role while retaining actual click/type/value assertions and every settings route. Remote main was fetched and matched the local base de4a0130 before preparation. These source checks do not replace hosted SDK compilation or packaged execution; the requested push and smoke-enabled manual Release will provide that evidence. Overall installed functional parity and measured visual similarity remain open.

@@ -56,7 +56,7 @@ import type { PendingToolApprovalSummary, ToolApprovalDecision } from "../lib/to
 import { sortWorkspaceProjectsByActivity } from "../lib/workspaceProjects";
 import type { ChatQueueTurnPreview } from "../pages/chat/components/ChatComposerBar";
 import type { SectionId } from "../pages/settings/types";
-import { createNativeComposerStore } from "./composerStore";
+import { type ComposerAtomicKey, createNativeComposerStore } from "./composerStore";
 import { presentationControls } from "./controls";
 import { NativeSurface } from "./NativeSurface";
 import { NativeWorkspaceSearchPalette } from "./NativeWorkspaceSearchPalette";
@@ -75,6 +75,7 @@ import {
   createNativeConversationActions,
   mutateNativeConversation,
 } from "./nativeConversationActions";
+import { useNativeConversationNavigation } from "./nativeConversationNavigation";
 import { decodeNativeFiles } from "./nativeFiles";
 import { nativeReadOnlyCodeNodes } from "./nativeReadOnlyCode";
 import { attachReadOnlySyntax, readOnlySyntaxPalette } from "./nativeReadOnlySyntax";
@@ -113,6 +114,7 @@ export type NativeChatPageProps = NativeWorkspaceActionsProps & {
   composerRef: MutableRefObject<MentionComposerHandle | null>;
   sidebarStore: SidebarStore;
   historyItems: RenderTimelineItem[];
+  loadHistoryPrompts?: () => readonly string[];
   liveTranscriptStore: LiveTranscriptStore;
   modelOptions: ModelOption[];
   chatRuntimeControls: ChatRuntimeControls;
@@ -238,6 +240,11 @@ export function NativeChatPage(props: NativeChatPageProps) {
     props.sidebarStore.subscribe,
     props.sidebarStore.getSnapshot,
   );
+  const navigation = useNativeConversationNavigation(
+    props.conversationId,
+    () => props.sidebarStore.getSnapshot().byId,
+    props.onSelectConversation,
+  );
   const workspaceActions = useNativeWorkspaceActions(
     {
       ...props,
@@ -280,6 +287,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
     attachmentContext.conversationId = props.conversationId;
     attachmentContext.workdir = props.uploadWorkdir;
     attachmentContext.revision += 1;
+    composer.resetHistory();
   }
   const [sidebarOpen, setSidebarOpen] = useState(
     () => !compact && readChatLayoutPreferences().leftSidebarOpen,
@@ -535,6 +543,18 @@ export function NativeChatPage(props: NativeChatPageProps) {
     props.modelOptions.length > 0 &&
     (!draft.isEmpty || props.uploads.length > 0);
   const keyboardScope = `${props.conversationId}:${attachmentContext.revision}`;
+  const referenceEditAction = `draft-references:${keyboardScope}`;
+  const referenceEditRevision = attachmentContext.revision;
+  handlers.set(referenceEditAction, {
+    enabled: !props.inputDisabled,
+    accepts: (value) =>
+      attachmentContext.revision === referenceEditRevision &&
+      !currentProps.current.inputDisabled &&
+      typeof value === "string" &&
+      composer.acceptsNativeSnapshot(value),
+    run: (value) => composer.replaceNativeSnapshot(value as string),
+    resultValue: (value) => value as string,
+  });
   const keyboardEnabled =
     !props.inputDisabled && !props.isUploading && props.modelOptions.length > 0;
   const keyboardSubmit = (steer: boolean): PresentationNode => {
@@ -572,6 +592,41 @@ export function NativeChatPage(props: NativeChatPageProps) {
       ),
     };
   };
+  const keyboardHistory = (direction: "prev" | "next"): PresentationNode => {
+    const revision = attachmentContext.revision;
+    const available = () =>
+      attachmentContext.revision === revision &&
+      !currentProps.current.inputDisabled &&
+      !!currentProps.current.loadHistoryPrompts;
+    const enabled =
+      available() &&
+      (direction === "next"
+        ? composer.isRecallingHistory()
+        : composer.isRecallingHistory() ||
+          props.historyItems.some((item) => item.kind === "user" && !!item.text.trim()));
+    return {
+      id: `draft-keyboard-history-${direction}`,
+      kind: "Button",
+      label: t(
+        direction === "prev" ? "chat.composer.historyPrevious" : "chat.composer.historyNext",
+      ),
+      disabled: !enabled,
+      action: change(
+        `draft-keyboard-history:${keyboardScope}:${direction}`,
+        (value) => {
+          const caret = decodeNativeComposerSelection(value);
+          if (!available() || !caret || !composer.reportSelection(caret))
+            throw new Error("This composer history request is no longer available.");
+          composer.stepHistory(direction, () => currentProps.current.loadHistoryPrompts?.() ?? []);
+        },
+        (value) => {
+          const caret = decodeNativeComposerSelection(value);
+          return available() && caret?.text === composer.handle.getText() && caret.length === 0;
+        },
+        enabled,
+      ),
+    };
+  };
   const dismissSuggestions: PresentationNode | undefined = mentionContext
     ? {
         id: "draft-keyboard-dismiss",
@@ -591,6 +646,33 @@ export function NativeChatPage(props: NativeChatPageProps) {
         ),
       }
     : undefined;
+  const keyboardAtomic = (key: ComposerAtomicKey): PresentationNode => {
+    const revision = attachmentContext.revision;
+    const ranges = composer.getAtomicRanges();
+    const available = () =>
+      attachmentContext.revision === revision && !currentProps.current.inputDisabled;
+    return {
+      id: `draft-keyboard-atomic-${key}`,
+      kind: "Button",
+      label: t(`chat.composer.reference.${key}`),
+      value: JSON.stringify(ranges),
+      disabled: !available() || ranges.length === 0,
+      action: change(
+        `draft-keyboard-atomic:${keyboardScope}:${key}`,
+        (value) => {
+          const caret = decodeNativeComposerSelection(value);
+          if (!available() || !caret || !composer.reportSelection(caret))
+            throw new Error("This composer reference is no longer available.");
+          composer.applyAtomicKey(key);
+        },
+        (value) => {
+          const caret = decodeNativeComposerSelection(value);
+          return available() && caret?.text === composer.handle.getText() && caret.length === 0;
+        },
+        available() && ranges.length > 0,
+      ),
+    };
+  };
   const queuedTurns: PresentationNode[] = props.queuedTurns.map((turn, index) => {
     const prefix = `queue:${props.conversationId}:${turn.id}`;
     const queueAction = (
@@ -686,6 +768,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
     {
       id: "chat",
       kind: "ChatLayout",
+      value: props.conversationId,
       text: props.editorSessions
         ? JSON.stringify({ editorSessions: props.editorSessions })
         : undefined,
@@ -744,12 +827,49 @@ export function NativeChatPage(props: NativeChatPageProps) {
           kind: "HStack",
           padding: 12,
           children: [
+            ...(!compact
+              ? [
+                  {
+                    ...button(
+                      `window-back:${navigation.revision}`,
+                      t("browser.back"),
+                      () => navigation.move(-1),
+                      navigation.canBack,
+                    ),
+                    id: "window-back",
+                    kind: "IconButton" as const,
+                    icon: "arrow.left",
+                  },
+                  {
+                    ...button(
+                      `window-forward:${navigation.revision}`,
+                      t("browser.forward"),
+                      () => navigation.move(1),
+                      navigation.canForward,
+                    ),
+                    id: "window-forward",
+                    kind: "IconButton" as const,
+                    icon: "arrow.right",
+                  },
+                ]
+              : []),
             {
               ...button("sidebar", t("tooltip.openSidebar"), () => setSidebarOpen(!sidebarOpen)),
               kind: "IconButton",
               icon: compact ? "xgent.sidebar" : "sidebar.leading",
               variant: compact ? "secondary" : undefined,
             },
+            ...(!compact
+              ? [
+                  {
+                    ...button("window-right-sidebar", t("chat.resizeAuxiliaryPanel"), () =>
+                      setToolsOpen(true),
+                    ),
+                    kind: "IconButton" as const,
+                    icon: "sidebar.trailing",
+                  },
+                ]
+              : []),
             { id: "toolbar-space", kind: "Spacer" },
             ...(!compact && props.onNewSideConversation
               ? [
@@ -880,6 +1000,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
             {
               id: "draft",
               kind: "ComposerInput",
+              editAction: referenceEditAction,
               focusRequest: composer.getFocusRevision(),
               text: composer.getSelectionRequest(),
               selectionAction: change(
@@ -897,8 +1018,17 @@ export function NativeChatPage(props: NativeChatPageProps) {
               label: props.inputPlaceholder,
               value: draft.text,
               children: [
+                { id: "draft-paste-rules", kind: "Text", text: composer.getPasteRules() },
+                {
+                  id: "draft-inline-references",
+                  kind: "Text",
+                  text: JSON.stringify(composer.getInlineReferences()),
+                },
                 keyboardSubmit(false),
                 keyboardSubmit(true),
+                keyboardHistory("prev"),
+                keyboardHistory("next"),
+                ...(["left", "right", "backspace", "delete"] as const).map(keyboardAtomic),
                 ...(dismissSuggestions ? [dismissSuggestions] : []),
               ],
               disabled: props.inputDisabled,
@@ -1605,7 +1735,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
       <NativeSurface
         document={{
           mode: "root",
-          title: "Xgent",
+          title: sidebar.byId.get(props.conversationId)?.title?.trim() || t("chat.newConversation"),
           appearance: props.settings.theme,
           formFactor: compact ? "mobile" : "desktop",
           theme: createNativePresentationTheme(props.settings, compact, "chat"),

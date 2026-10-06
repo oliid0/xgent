@@ -205,3 +205,19 @@ export function createModelOrderSnapshot<T extends ModelVendorInput>(
     ...sortModelsByActiveStateAndVendor(missingModels, activeModelIds),
   ].map((model) => model.id);
 }
+
+/** Move only within the complete list, retaining unknown/new models on refresh. */
+export function moveModelOrder<T extends ModelVendorInput>(
+  models: readonly T[],
+  configuredOrder: readonly string[] | undefined,
+  activeModelIds: ReadonlySet<string>,
+  id: string,
+  offset: -1 | 1,
+): string[] | undefined {
+  const order = createModelOrderSnapshot(models, configuredOrder, activeModelIds);
+  const index = order.indexOf(id),
+    target = index + offset;
+  if (index < 0 || target < 0 || target >= order.length) return undefined;
+  [order[index], order[target]] = [order[target], order[index]];
+  return order;
+}

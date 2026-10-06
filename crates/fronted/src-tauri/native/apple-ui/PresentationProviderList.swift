@@ -1,4 +1,5 @@
 import Foundation
+import Flow
 import SwiftUI
 
 private struct XgentProviderRowHeights: PreferenceKey {
@@ -18,6 +19,13 @@ struct XgentProviderListView: View {
     @State private var heights: [String: CGFloat] = [:]
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.layoutDirection) private var layoutDirection
+    @ScaledMetric(relativeTo: .body) private var supportingScale = 1.0
+
+    private var supportingFont: Font {
+        XgentFonts.body(theme.fontFamily,
+            size: CGFloat(theme.typography.supporting * theme.fontScale * supportingScale))
+    }
 
     private var rows: [XgentNode] {
         let children = node.children ?? []
@@ -67,32 +75,47 @@ struct XgentProviderListView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(xgentHex: theme.palette(for: colorScheme).card),
+                    in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.container), style: .continuous))
         .onPreferenceChange(XgentProviderRowHeights.self) { heights = $0 }
         .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder private func rowContent(_ row: XgentNode) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            if rows.count > 1, let id = row.value?.text {
-                Image(systemName: "line.3.horizontal")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24, height: 44)
-                    .contentShape(Rectangle())
-                    .draggable(id)
-                    .accessibilityLabel(node.label ?? "")
-                    .accessibilityIdentifier("provider-drag:" + id)
-            }
+        XgentProviderRowLayout(layoutDirection: layoutDirection) {
             if let title = row.children?.first(where: { $0.kind == .navigationRow }) {
                 Button { model.send(title, in: document) } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(title.label ?? "").modifier(XgentControlTypography(node: title))
-                            .fontWeight(.medium).fixedSize(horizontal: false, vertical: true)
-                        if let description = title.text, !description.isEmpty {
-                            Text(description).font(.subheadline).foregroundStyle(.secondary)
+                        HStack(alignment: .top, spacing: 8) {
+                            if let icon = title.icon {
+                                XgentControlIcon(name: icon).font(.system(size: 17))
+                                    .frame(width: 20, height: 20)
+                                    .padding(.top, 3).accessibilityHidden(true)
+                            }
+                            Text(title.label ?? "").modifier(XgentControlTypography(node: title))
                                 .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        ForEach((row.children ?? []).filter { $0.kind != .navigationRow && $0.kind != .menu }) { child in
-                            XgentNodeView(node: child, document: document, model: model)
+                        if let description = title.text, !description.isEmpty {
+                            Text(description).font(supportingFont).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.leading, 28)
+                        }
+                        ForEach((row.children ?? []).filter {
+                            $0.kind != .navigationRow && $0.kind != .menu && $0.kind != .iconButton
+                        }) { child in
+                            if let icon = child.icon {
+                                HStack(alignment: .top, spacing: 4) {
+                                    XgentControlIcon(name: icon).accessibilityHidden(true)
+                                    Text(child.label ?? child.text ?? "")
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .font(supportingFont).foregroundStyle(.secondary)
+                                .padding(.leading, 28)
+                            } else {
+                                XgentNodeView(node: child, document: document, model: model)
+                                    .padding(.leading, 28)
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -102,11 +125,32 @@ struct XgentProviderListView: View {
                 .disabled(title.disabled == true || model.isBusy(title, in: document))
                 .accessibilityIdentifier(title.id)
             }
-            if let actions = row.children?.first(where: { $0.kind == .menu }) {
-                XgentNativeMenu(node: actions, document: document, model: model)
-                    .accessibilityIdentifier(actions.id)
+            HFlow(horizontalAlignment: .trailing, verticalAlignment: .center,
+                  horizontalSpacing: 4, verticalSpacing: 4) {
+                if let actions = row.children?.first(where: { $0.kind == .menu }) {
+                    if rows.count > 1, let id = row.value?.text {
+                        reorderMenu(actions).draggable(id)
+                    } else { reorderMenu(actions) }
+                }
+                ForEach((row.children ?? []).filter { $0.kind == .iconButton }) { action in
+                    XgentIconButton(node: action, document: document, model: model)
+                }
             }
+            .disabled(node.disabled == true || model.isBusy(node, in: document))
         }
         .accessibilityElement(children: .contain)
+    }
+
+    private func reorderMenu(_ actions: XgentNode) -> some View {
+        Menu {
+            XgentNativeMenuItems(nodes: actions.children ?? [], document: document, model: model)
+        } label: {
+            XgentControlIcon(name: actions.icon ?? "line.3.horizontal")
+                .frame(width: 44, height: 44).contentShape(Rectangle())
+        }
+        .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.plain)
+        .disabled(actions.disabled == true)
+        .accessibilityIdentifier(actions.id)
+        .accessibilityLabel(actions.accessibilityLabel ?? actions.label ?? "")
     }
 }

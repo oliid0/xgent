@@ -188,7 +188,7 @@ private func iosToolchainPayload(
 final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private let installationPreferenceKey = "xgent.mobileExecution.iosShellInstalled"
     private let installationVerificationKey = "xgent.mobileExecution.iosShellVerification"
-    private let installationVerificationVersion = "ios-a-shell-v6"
+    private let installationVerificationVersion = "ios-a-shell-v7"
     private let installationDirectoryName = "environment-v3"
     private let installationMarkerName = ".xgent-environment"
     private let installationProbeToken = "xgent-ios-shell-ready"
@@ -1308,6 +1308,10 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         setenv("PYTHONUNBUFFERED", "1", 1)
         setenv("TERM", "xterm-256color", 1)
         setenv("LANG", "C.UTF-8", 1)
+        // Task shells must not inherit a runner's interactive startup files.
+        // They can overwrite PATH with simulator host commands (path_helper).
+        setenv("ENV", "", 1)
+        setenv("BASH_ENV", "", 1)
     }
 
     private func isCancelled(_ runId: String) -> Bool {

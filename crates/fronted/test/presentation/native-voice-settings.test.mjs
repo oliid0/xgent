@@ -10,7 +10,7 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 
-function fixture(service = { update: async value => value, test: async () => ({ result: "connected" }) }) {
+function fixture(service = { update: async value => value, test: async () => ({ result: "connected" }) }, mobile = false) {
   const hooks = createReactHookHarness();
   const empty = () => ({ nodes: [], handlers: new Map() });
   const locale = { SUPPORTED_LOCALES: ["system", "zh-CN", "en-US"], useLocale: () => ({ t: key => key }) };
@@ -32,6 +32,12 @@ function fixture(service = { update: async value => value, test: async () => ({ 
     "./nativeFontSettings": { useNativeFontSettings: empty },
     "./nativeAccessSettings": { useNativeAccessSettings: empty },
     "../lib/stt/desktopSttSettingsService": { desktopSttSettingsService: service },
+    "../lib/mobileAssistant": {
+      mobileAssistantStatus: async () => ({ voiceInputAvailable: true, permissionAliases: { microphone: "record" },
+        detail: "HealthKit supports selected health metrics" }),
+      checkMobileAssistantPermissions: async () => ({ microphone: "granted" }),
+      normalizeMobileAssistantPermissions: (_status, permissions) => permissions,
+    },
     "../pages/settings/useCodexOAuthAccounts": {
       useCodexOAuthAccounts: () => ({ status: { accounts: [] }, loaded: true, locked: false }),
     },
@@ -39,7 +45,7 @@ function fixture(service = { update: async value => value, test: async () => ({ 
   const { NativeSettingsPage } = loader.loadModule("src/presentation/NativeSettingsPage.tsx");
   const { getDefaultSettings, normalizeSettings } = loader.loadModule("src/lib/settings/index.ts");
   const props = {
-    settings: getDefaultSettings(), initialSection: "voice", nativeMobile: false,
+    settings: getDefaultSettings(), initialSection: "voice", nativeMobile: mobile,
     setSettings(update) { props.settings = update(props.settings); },
     saveState: { status: "saved" }, onBack() {}, appUpdate: {},
   };
@@ -52,6 +58,34 @@ function fixture(service = { update: async value => value, test: async () => ({ 
     nodes: () => allNodes(rendered.props.document.nodes),
   };
 }
+
+test("native mobile voice describes device speech, preserves credentials and returns from real permissions", async () => {
+  const previousWindow = globalThis.window, previousDocument = globalThis.document;
+  globalThis.window = new EventTarget();
+  globalThis.document = Object.assign(new EventTarget(), { visibilityState: "visible" });
+  const f = fixture(undefined, true);
+  try {
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); f.render();
+    const toggle = f.nodes().find(node => node.id === "voice-enabled");
+    assert.equal(toggle.label, "settings.navVoice");
+    assert.equal(toggle.icon, "mic");
+    assert.equal(toggle.text, "settings.mobileAssistant.microphoneDescription");
+    assert.ok(!f.nodes().some(node => node.kind === "TextInput" || node.id === "voice-device-detail"));
+    assert.equal(f.nodes().find(node => node.id === "voice-device-status").label, "settings.native.speechAvailable");
+    f.props.settings.stt.providers.aliyun_dashscope.apiKey = "desktop-secret";
+    await f.run("voice-enabled", true); f.render();
+    assert.equal(f.props.settings.stt.enabled, true);
+    assert.equal(f.props.settings.stt.providers.aliyun_dashscope.apiKey, "desktop-secret");
+    await f.run("voice-permissions"); f.render();
+    assert.ok(f.nodes().some(node => node.id === "permission:microphone"));
+    await f.run("back"); f.render();
+    assert.equal(f.nodes().find(node => node.id === "voice-enabled").value, true);
+  } finally {
+    f.hooks.unmount();
+    if (previousWindow === undefined) delete globalThis.window; else globalThis.window = previousWindow;
+    if (previousDocument === undefined) delete globalThis.document; else globalThis.document = previousDocument;
+  }
+});
 
 test("native desktop voice exposes all five provider schemas, saved secret hints and independent credentials", async () => {
   const f = fixture();

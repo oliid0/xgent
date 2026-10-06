@@ -521,7 +521,12 @@ struct XgentIOSSheetPresentation: View {
         visibleNodes.count == 1 && visibleNodes.first?.kind == .list ? visibleNodes.first : nil
     }
 
-    private var contentNodes: [XgentNode] { list?.children ?? visibleNodes }
+    private var providerEditorFooter: XgentNode? {
+        visibleNodes.first { $0.kind == .hStack && $0.variant == "provider-editor-actions" }
+    }
+    private var contentNodes: [XgentNode] {
+        (list?.children ?? visibleNodes).filter { $0.id != providerEditorFooter?.id }
+    }
     private var isSettingsIndex: Bool {
         back == nil && contentNodes.contains { $0.kind == .settingsGroup && $0.id == "mobile-theme" }
     }
@@ -643,7 +648,13 @@ struct XgentIOSSheetPresentation: View {
                 .scrollDismissesKeyboard(.interactively)
             }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let footer = providerEditorFooter {
+                XgentProviderEditorFooter(node: footer, document: document, model: model)
+            }
+        }
         .background { XgentThemeBackground().ignoresSafeArea() }
+        .accessibilityHidden(nextSheet != nil)
         // Astryx menus use the capped sheet budget while settings and detail
         // surfaces use the tall budget. Long pages must never open at medium.
         .presentationDetents(detents)

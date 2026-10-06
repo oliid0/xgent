@@ -4,7 +4,6 @@ import { VStack } from "@astryxdesign/core/Layout";
 import { ListItem } from "@astryxdesign/core/List";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Switch } from "@astryxdesign/core/Switch";
-import { Text } from "@astryxdesign/core/Text";
 import { ChevronRight, Mic, RefreshCw, Shield } from "../../components/icons";
 import { useLocale } from "../../i18n";
 import { normalizeSettings } from "../../lib/settings";
@@ -41,7 +40,7 @@ export function MobileVoiceSettingsSection({
   return (
     <VStack gap={5} width="100%">
       <SettingsRowGroup
-        title={t("settings.stt.title")}
+        title={t("settings.navVoice")}
         titleEndContent={
           <IconButton
             label={t("settings.mobileAssistant.refresh")}
@@ -55,12 +54,12 @@ export function MobileVoiceSettingsSection({
         }
       >
         <SettingsRow
-          label={t("settings.stt.title")}
+          label={t("settings.navVoice")}
           icon={<Mic />}
           description={t("settings.mobileAssistant.microphoneDescription")}
         >
           <Switch
-            label={t("settings.stt.title")}
+            label={t("settings.navVoice")}
             isLabelHidden
             value={settings.stt.enabled}
             onChange={(enabled) =>
@@ -86,11 +85,6 @@ export function MobileVoiceSettingsSection({
           onClick={onOpenPermissions}
         />
       </SettingsRowGroup>
-      {status?.detail ? (
-        <Text type="supporting" color="secondary" wordBreak="break-word">
-          {status.detail}
-        </Text>
-      ) : null}
       {error ? <Banner status="error" title={error} collapsible={false} /> : null}
     </VStack>
   );

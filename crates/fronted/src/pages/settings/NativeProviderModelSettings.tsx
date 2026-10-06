@@ -1,11 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { useConfirmDialog } from "../../components/astryx/useConfirmDialog";
 import { useLocale } from "../../i18n";
+import {
+  MODEL_INPUT_OPTIONS,
+  type ModelInputMode,
+  modelInputMode,
+  supportsModelInputOverride,
+  withModelInputMode,
+} from "../../lib/models/modelInput";
 import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
+import type { PromptCacheHintMode } from "../../lib/settings";
 import { presentationControls } from "../../presentation/controls";
 import { NativeSurface } from "../../presentation/NativeSurface";
+import { withNativeSettingsIcons } from "../../presentation/nativeSettingsIcons";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
+import { PROVIDER_CACHE_HINT_OPTIONS } from "./providerCacheSettings";
 import {
   applyModelEdit,
   createModelEditDraft,
@@ -69,18 +79,75 @@ export function NativeProviderModelSettings(
     ];
     nodes.push(
       c.group(`${prefix}:fields`, `${t("settings.modelSettings")} · ${model.id}`, [
+        ...(provider && supportsModelInputOverride(provider.type)
+          ? [
+              c.select(
+                `${prefix}:inputMode`,
+                t("settings.modelInput"),
+                modelInputMode(draft.model),
+                MODEL_INPUT_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: t(option.labelKey),
+                })),
+                (value) => {
+                  if (!alive.current || !draftRef.current || deleteLock.current) return;
+                  draftRef.current = {
+                    ...draftRef.current,
+                    model: withModelInputMode(draftRef.current.model, value as ModelInputMode),
+                  };
+                  setDraftState(draftRef.current);
+                },
+                !deleting,
+              ),
+            ]
+          : []),
+        ...(provider?.type === "codex"
+          ? [
+              c.select(
+                `${prefix}:cacheHint`,
+                t("settings.promptCacheHintModelOverride"),
+                draft.model.promptCacheHintMode ?? "inherit",
+                [
+                  { value: "inherit", label: t("settings.promptCacheHintMode.inherit") },
+                  ...PROVIDER_CACHE_HINT_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: t(option.labelKey),
+                  })),
+                ],
+                (value) => {
+                  if (!alive.current || !draftRef.current || deleteLock.current) return;
+                  draftRef.current = {
+                    ...draftRef.current,
+                    model: {
+                      ...draftRef.current.model,
+                      promptCacheHintMode:
+                        value === "inherit" ? undefined : (value as PromptCacheHintMode),
+                    },
+                  };
+                  setDraftState(draftRef.current);
+                },
+                !deleting,
+              ),
+            ]
+          : []),
         ...fields.flatMap(([field, label]) => [
           ...(field === "costInput"
             ? [{ id: `${prefix}:cost-title`, kind: "Text" as const, text: t("settings.modelCost") }]
             : []),
-          c.input(
-            `${prefix}:${field}`,
-            t(label),
-            draft[field],
-            (value) => patch(field, value),
-            false,
-            !deleting,
-          ),
+          {
+            ...c.input(
+              `${prefix}:${field}`,
+              t(label),
+              draft[field],
+              (value) => patch(field, value),
+              false,
+              !deleting,
+            ),
+            variant:
+              field === "contextWindow" || field === "maxOutputToken"
+                ? "integer-input"
+                : "decimal-input",
+          },
         ]),
         {
           id: `${prefix}:cost-hint`,
@@ -156,7 +223,7 @@ export function NativeProviderModelSettings(
           formFactor: compact ? "mobile" : "desktop",
           theme: createNativePresentationTheme(settings, compact),
           dismissAction: `${prefix}:back`,
-          nodes,
+          nodes: compact ? nodes.map(withNativeSettingsIcons) : nodes,
         }}
         handlers={c.handlers}
         onError={setFailure}

@@ -6353,6 +6353,7 @@ export function ChatPage(props: ChatPageProps) {
           composerRef={composerRef}
           sidebarStore={sidebarStore}
           historyItems={historyRenderItems}
+          loadHistoryPrompts={loadComposerHistoryPrompts}
           liveTranscriptStore={liveTranscriptStore}
           modelOptions={modelOptions}
           chatRuntimeControls={chatRuntimeControlsForCurrentProvider}

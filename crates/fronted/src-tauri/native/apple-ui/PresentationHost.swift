@@ -17,7 +17,9 @@ private final class XgentPresentationHost: NSObject {
     let controller: UIHostingController<XgentPresentationView>
     #else
     let controller: NSHostingController<XgentPresentationView>
+    private let nativeContainer: XgentNativePresentationContainer
     private let accessibilityBoundary: XgentPresentationAccessibilityBoundary
+    private let windowChrome: XgentDesktopWindowChrome
     #endif
 
     init?(webview: WKWebView, parent: UnsafeMutableRawPointer?) {
@@ -30,9 +32,14 @@ private final class XgentPresentationHost: NSObject {
         #else
         guard let container = webview.superview else { return nil }
         controller = NSHostingController(rootView: XgentPresentationView(model: model))
+        nativeContainer = XgentNativePresentationContainer(hostedView: controller.view)
         accessibilityBoundary = XgentPresentationAccessibilityBoundary(transport: webview)
+        windowChrome = XgentDesktopWindowChrome(model: model)
         #endif
         super.init()
+        #if os(macOS)
+        nativeContainer.windowChanged = { [weak self] in self?.updateVisibility() }
+        #endif
         model.webview = webview
         #if os(iOS)
         parentController.addChild(controller)
@@ -40,20 +47,31 @@ private final class XgentPresentationHost: NSObject {
         controller.view.backgroundColor = .clear
         container.addSubview(controller.view)
         #else
-        container.addSubview(controller.view, positioned: .above, relativeTo: webview)
+        container.addSubview(nativeContainer, positioned: .above, relativeTo: webview)
         #endif
-        controller.view.translatesAutoresizingMaskIntoConstraints = false
+        hostView.translatesAutoresizingMaskIntoConstraints = false
+        #if os(macOS)
+        let topConstraint = hostView.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor)
+        #else
+        let topConstraint = hostView.topAnchor.constraint(equalTo: container.topAnchor)
+        #endif
         constraints = [
-            controller.view.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            controller.view.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            controller.view.topAnchor.constraint(equalTo: container.topAnchor),
-            controller.view.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            hostView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            hostView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            topConstraint,
+            hostView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
         ]
         NSLayoutConstraint.activate(constraints)
         #if os(iOS)
         controller.didMove(toParent: parentController)
         #endif
     }
+
+    #if os(iOS)
+    private var hostView: UIView { controller.view }
+    #else
+    private var hostView: NSView { nativeContainer }
+    #endif
 
     func detach(from webview: WKWebView) {
         // Invalidate callbacks before SwiftUI dismisses sheets and bindings.
@@ -64,12 +82,13 @@ private final class XgentPresentationHost: NSObject {
         #endif
         NSLayoutConstraint.deactivate(constraints)
         constraints.removeAll()
-        controller.view.removeFromSuperview()
+        hostView.removeFromSuperview()
         #if os(iOS)
         controller.removeFromParent()
         webview.isUserInteractionEnabled = true
         webview.accessibilityElementsHidden = false
         #else
+        windowChrome.detach()
         accessibilityBoundary.reset()
         webview.setAccessibilityHidden(false)
         #endif
@@ -77,7 +96,7 @@ private final class XgentPresentationHost: NSObject {
     }
 
     func updateVisibility() {
-        controller.view.isHidden = model.documents.isEmpty
+        hostView.isHidden = model.documents.isEmpty
         // The opaque SwiftUI root covers the shared TypeScript execution host.
         // Do not hide WKWebView: WebKit can suspend animation-frame callbacks
         // used by the shared runtime when its view is hidden.
@@ -86,6 +105,8 @@ private final class XgentPresentationHost: NSObject {
         model.webview?.isUserInteractionEnabled = !nativeRoot
         model.webview?.accessibilityElementsHidden = nativeRoot
         #else
+        if nativeRoot, let window = hostView.window { windowChrome.install(on: window) }
+        else { windowChrome.detach() }
         accessibilityBoundary.update(nativeRoot: nativeRoot)
         #endif
     }

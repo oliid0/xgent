@@ -66,11 +66,33 @@ export function editedProviderModel(draft: ModelEditDraft | null): ProviderModel
     ...draft.model,
     contextWindow,
     maxOutputToken,
-    limitsSource: "user",
+    limitsSource:
+      contextWindow !== draft.model.contextWindow || maxOutputToken !== draft.model.maxOutputToken
+        ? "user"
+        : draft.model.limitsSource,
     cost:
       input > 0 || output > 0 || cacheRead > 0 || cacheWrite > 0
         ? { input, output, cacheRead, cacheWrite }
         : undefined,
+  };
+}
+
+/** Discovery can finish while a model editor is open. Keep its current metadata. */
+export function mergeModelEdit(
+  current: ProviderModelConfig,
+  edited: ProviderModelConfig,
+  original: ProviderModelConfig,
+): ProviderModelConfig {
+  const contextChanged = edited.contextWindow !== original.contextWindow;
+  const outputChanged = edited.maxOutputToken !== original.maxOutputToken;
+  return {
+    ...current,
+    contextWindow: contextChanged ? edited.contextWindow : current.contextWindow,
+    maxOutputToken: outputChanged ? edited.maxOutputToken : current.maxOutputToken,
+    limitsSource: contextChanged || outputChanged ? "user" : current.limitsSource,
+    cost: edited.cost,
+    promptCacheHintMode: edited.promptCacheHintMode,
+    inputModalities: edited.inputModalities,
   };
 }
 
@@ -97,15 +119,7 @@ export function applyModelEdit(
         : {
             ...provider,
             models: provider.models.map((model) =>
-              model.id !== edited.id
-                ? model
-                : {
-                    ...model,
-                    contextWindow: edited.contextWindow,
-                    maxOutputToken: edited.maxOutputToken,
-                    limitsSource: "user",
-                    cost: edited.cost,
-                  },
+              model.id !== edited.id ? model : mergeModelEdit(model, edited, draft.model),
             ),
           },
     ),

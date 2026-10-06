@@ -463,10 +463,14 @@ async function buildOpenAIChatCompletionsNativeContentParts(params: {
 
 async function buildAnthropicNativeAttachmentContentPart(params: {
   workdir: string;
+  model: Model<Api>;
   file: PendingUploadedFile;
 }): Promise<AnthropicNativeAttachmentContentPart | null> {
-  const { file, workdir } = params;
+  const { file, model, workdir } = params;
   if (file.kind !== "image" && file.kind !== "pdf" && file.kind !== "text") {
+    return null;
+  }
+  if ((file.kind === "image" || file.kind === "pdf") && !modelSupportsImageInput(model)) {
     return null;
   }
 
@@ -511,6 +515,7 @@ async function buildAnthropicNativeAttachmentContentPart(params: {
 
 async function buildAnthropicNativeContentParts(params: {
   workdir: string;
+  model: Model<Api>;
   files: PendingUploadedFile[];
 }) {
   const parts: AnthropicNativeAttachmentContentPart[] = [];
@@ -518,6 +523,7 @@ async function buildAnthropicNativeContentParts(params: {
     try {
       const part = await buildAnthropicNativeAttachmentContentPart({
         workdir: params.workdir,
+        model: params.model,
         file,
       });
       if (part) parts.push(part);
@@ -764,6 +770,7 @@ async function applyNativeAttachmentsToAnthropicPayload(params: {
 
     const nativeParts = await buildAnthropicNativeContentParts({
       workdir: params.workdir,
+      model: params.model,
       files,
     });
     if (nativeParts.length === 0) {

@@ -13,6 +13,7 @@ import {
   normalizeUsageQueryConfig,
   PROVIDER_RETRY_DEFAULT_MAX_RETRIES,
   PROVIDER_RETRY_MAX_RETRIES_LIMITS,
+  type PromptCacheHintMode,
   switchUsageQueryMode,
   type UsageQueryConfig,
   type UsageQueryMode,
@@ -21,8 +22,10 @@ import {
 import { createUuid } from "../../lib/shared/id";
 import { presentationControls } from "../../presentation/controls";
 import { NativeSurface } from "../../presentation/NativeSurface";
+import { withNativeSettingsIcons } from "../../presentation/nativeSettingsIcons";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
+import { PROVIDER_CACHE_HINT_OPTIONS } from "./providerCacheSettings";
 import type { SettingsSectionProps } from "./types";
 
 type RequestDraft = {
@@ -30,6 +33,7 @@ type RequestDraft = {
   retry: "default" | "off" | "custom";
   retries: number;
   caching: boolean;
+  cacheHint: PromptCacheHintMode;
   retention: "short" | "long";
   headers: { id: string; key: string; value: string }[];
   usage: UsageQueryConfig;
@@ -43,6 +47,7 @@ function createDraft(provider?: CustomProvider): RequestDraft {
         ? provider.retryPolicy.maxRetries
         : PROVIDER_RETRY_DEFAULT_MAX_RETRIES,
     caching: provider?.promptCachingEnabled ?? true,
+    cacheHint: provider?.promptCacheHintMode ?? "auto",
     retention: provider?.promptCacheRetention === "long" ? "long" : "short",
     headers: (provider?.customHeaders ?? []).map((header) => ({ ...header, id: createUuid() })),
     usage: normalizeUsageQueryConfig(provider?.usageQuery),
@@ -53,6 +58,7 @@ function createDraft(provider?: CustomProvider): RequestDraft {
 export function NativeProviderRequestSettings(
   props: SettingsSectionProps & {
     providerId: string;
+    canTestUsage?: boolean;
     onBack: () => void;
   },
 ) {
@@ -148,6 +154,8 @@ export function NativeProviderRequestSettings(
                     ? { mode: "off" }
                     : { mode: "custom", maxRetries: value.retries },
               promptCachingEnabled: supportsCache && value.caching,
+              promptCacheHintMode:
+                item.type === "codex" ? value.cacheHint : item.promptCacheHintMode,
               promptCacheRetention:
                 item.type === "claude_code" && value.caching && value.retention === "long"
                   ? "long"
@@ -172,7 +180,7 @@ export function NativeProviderRequestSettings(
     back();
   };
   const testUsage = async () => {
-    if (!current() || scope.testing || !provider) return;
+    if (!current() || scope.testing || !provider || props.canTestUsage === false) return;
     scope.testing = true;
     const requestRevision = ++scope.testRevision;
     const ownsTest = () => current() && requestRevision === scope.testRevision;
@@ -284,6 +292,20 @@ export function NativeProviderRequestSettings(
                         { value: "long", label: t("settings.promptCacheRetentionLong") },
                       ],
                       (retention) => patch({ retention: retention as RequestDraft["retention"] }),
+                    ),
+                  ]
+                : []),
+              ...(provider.type === "codex" && draft.caching
+                ? [
+                    c.select(
+                      "provider-cache-hint",
+                      t("settings.promptCacheHintMode"),
+                      draft.cacheHint,
+                      PROVIDER_CACHE_HINT_OPTIONS.map((option) => ({
+                        value: option.value,
+                        label: t(option.labelKey),
+                      })),
+                      (value) => patch({ cacheHint: value as PromptCacheHintMode }),
                     ),
                   ]
                 : []),
@@ -500,7 +522,22 @@ export function NativeProviderRequestSettings(
               },
             ]
           : []),
-        c.action("provider-usage-test", t("settings.usage.test"), testUsage, !testState.loading),
+        c.action(
+          "provider-usage-test",
+          t("settings.usage.test"),
+          testUsage,
+          !testState.loading && props.canTestUsage !== false,
+        ),
+        ...(props.canTestUsage === false
+          ? [
+              {
+                id: "provider-usage-save-first",
+                kind: "Text" as const,
+                secondary: true,
+                text: t("settings.usage.saveBeforeTest"),
+              },
+            ]
+          : []),
         ...(testState.loading
           ? [
               {
@@ -549,7 +586,7 @@ export function NativeProviderRequestSettings(
         formFactor: mobile ? "mobile" : "desktop",
         theme: createNativePresentationTheme(settings, mobile),
         dismissAction: "provider-request-back",
-        nodes,
+        nodes: mobile ? nodes.map(withNativeSettingsIcons) : nodes,
       }}
       handlers={c.handlers}
       onError={(cause) => {

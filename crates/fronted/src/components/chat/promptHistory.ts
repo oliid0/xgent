@@ -22,22 +22,22 @@ export type PromptHistoryStash<TPaste> = {
   pastes: ReadonlyArray<readonly [string, TPaste]>;
 };
 
-export type PromptHistorySession<TPaste> = {
+export type PromptHistorySession<TPaste, TStash = PromptHistoryStash<TPaste>> = {
   /** Recallable prompts, oldest → newest, frozen at session entry. */
   entries: readonly string[];
   /** Index into entries of the prompt currently shown in the editor. */
   cursor: number;
   /** Draft to restore when ↓ walks past the newest entry. */
-  stash: PromptHistoryStash<TPaste>;
+  stash: TStash;
 };
 
-export type PromptHistoryStep<TPaste> =
+export type PromptHistoryStep<TPaste, TStash = PromptHistoryStash<TPaste>> =
   /** Not a history move — let the browser handle the key. */
   | { type: "pass" }
   /** A history move with nowhere to go (already at the oldest entry). */
   | { type: "consume" }
-  | { type: "apply"; text: string; session: PromptHistorySession<TPaste> }
-  | { type: "restore"; stash: PromptHistoryStash<TPaste> };
+  | { type: "apply"; text: string; session: PromptHistorySession<TPaste, TStash> }
+  | { type: "restore"; stash: TStash };
 
 export const PROMPT_HISTORY_MAX_ENTRIES = 200;
 
@@ -59,16 +59,16 @@ export function normalizePromptHistoryEntries(raw: readonly string[]): string[] 
   return newestFirst.reverse();
 }
 
-export function stepPromptHistory<TPaste>(args: {
+export function stepPromptHistory<TPaste, TStash = PromptHistoryStash<TPaste>>(args: {
   direction: "prev" | "next";
-  session: PromptHistorySession<TPaste> | null;
+  session: PromptHistorySession<TPaste, TStash> | null;
   caretOnFirstLine: boolean;
   caretOnLastLine: boolean;
   /** Called lazily, only when ↑ actually enters a recall session. */
   loadEntries: () => readonly string[];
   /** Called lazily, only when ↑ actually enters a recall session. */
-  makeStash: () => PromptHistoryStash<TPaste>;
-}): PromptHistoryStep<TPaste> {
+  makeStash: () => TStash;
+}): PromptHistoryStep<TPaste, TStash> {
   const { direction, session } = args;
 
   if (direction === "prev") {
@@ -80,7 +80,7 @@ export function stepPromptHistory<TPaste>(args: {
     }
     const entries = normalizePromptHistoryEntries(args.loadEntries());
     if (entries.length === 0) return { type: "pass" };
-    const entered: PromptHistorySession<TPaste> = {
+    const entered: PromptHistorySession<TPaste, TStash> = {
       entries,
       cursor: entries.length - 1,
       stash: args.makeStash(),

@@ -78,27 +78,57 @@ def tap(labels, timeout=30, scroll=False, scroll_direction="down"):
     raise AssertionError(f"No enabled visible control: {labels}; visible state: {visible[-30:]}")
 
 
+def terminal_inputs(root):
+    for panel in root.iter("node"):
+        if panel.get("class") == "android.view.View" and matches(
+            panel, {"移动终端", "Mobile terminal"}
+        ):
+            for node in panel.iter("node"):
+                if node.get("class") == "android.widget.EditText" and node.get("enabled") == "true":
+                    yield node
+
+
 def tap_terminal_input(timeout=30):
     deadline = time.monotonic() + timeout
+    tapped = False
+    previous_bounds = None
     while time.monotonic() < deadline:
-        for panel in snapshot().iter("node"):
-            if panel.get("class") != "android.view.View" or not matches(
-                panel, {"移动终端", "Mobile terminal"}
-            ):
+        for node in terminal_inputs(snapshot()):
+            bounds = list(map(int, re.findall(r"-?\d+", node.get("bounds", ""))))
+            if len(bounds) != 4 or bounds[2] <= bounds[0] or bounds[3] <= bounds[1]:
                 continue
-            for node in panel.iter("node"):
-                if node.get("class") != "android.widget.EditText" or node.get("enabled") != "true":
-                    continue
-                bounds = list(map(int, re.findall(r"\d+", node.get("bounds", ""))))
-                if len(bounds) == 4 and bounds[2] > bounds[0] and bounds[3] > bounds[1]:
-                    adb(
-                        "shell", "input", "tap",
-                        str((bounds[0] + bounds[2]) // 2),
-                        str((bounds[1] + bounds[3]) // 2),
-                    )
+            if not tapped:
+                adb("shell", "input", "tap", str((bounds[0] + bounds[2]) // 2),
+                    str((bounds[1] + bounds[3]) // 2))
+                tapped = True
+            elif node.get("focused") == "true":
+                # Opening the IME resizes the WebView asynchronously. The first
+                # injected key must not double as the request to focus it.
+                if bounds == previous_bounds:
                     return
-        time.sleep(1)
-    raise AssertionError("No enabled visible terminal command input")
+                previous_bounds = bounds
+            else:
+                previous_bounds = None
+        time.sleep(0.25)
+    capture("terminal-input-not-focused")
+    raise AssertionError("The terminal input must gain focus and settle before typing")
+
+
+def enter_terminal_text(value, timeout=10):
+    tap_terminal_input()
+    type_text(value)
+    deadline = time.monotonic() + timeout
+    actual = []
+    while time.monotonic() < deadline:
+        actual = [node.get("text", "") for node in terminal_inputs(snapshot())
+                  if node.get("focused") == "true"]
+        if actual == [value]:
+            return
+        time.sleep(0.25)
+    capture("terminal-input-mismatch")
+    # Fail at the input boundary, without retrying or executing a different
+    # command. This separates lost keys from a Shell/backend failure.
+    raise AssertionError(f"Terminal input mismatch: expected {value!r}, actual {actual!r}")
 
 
 def capture(name):
@@ -180,12 +210,10 @@ def run_terminal(command, expected_output=None, expected_exit=0, clear=True, exa
                  program_input=None, eof=False):
     if clear:
         tap({"清空终端记录", "Clear terminal history"})
-    tap_terminal_input()
-    type_text(command)
+    enter_terminal_text(command)
     tap({"运行命令", "Run command"})
     if program_input is not None:
-        tap_terminal_input()
-        type_text(program_input)
+        enter_terminal_text(program_input)
         tap({"发送输入", "Send input"})
     if eof:
         tap({"结束输入（EOF）", "End input (EOF)"})

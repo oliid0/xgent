@@ -23,10 +23,9 @@ final class XgentPresentationAccessibilityBoundary {
         }
         if nativeRoot {
             transport.setAccessibilityHidden(true)
-            // Keep every native sibling (including the hosting controller)
-            // while excluding the transport before WebKit's remote AX query.
-            let nativeChildren = NSAccessibility.unignoredChildren(from:
-                container.subviews.filter { $0 !== transport })
+            // Keep real native ancestors. SwiftUI proxies retain their parent
+            // inside the native container; never promote them into this list.
+            let nativeChildren = container.subviews.filter { $0 !== transport }
             container.setAccessibilityChildren(nativeChildren)
             ownsChildren = true
         } else {

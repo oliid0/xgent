@@ -9,7 +9,6 @@ import { List, ListItem } from "@astryxdesign/core/List";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
-import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -41,6 +40,8 @@ import {
 } from "../../lib/localAccess";
 import type { AppSettings } from "../../lib/settings";
 import { writeClipboardText } from "../../lib/system/clipboardText";
+import { type AccessSettingsActions, CompactAccessSettingsForm } from "./CompactAccessSettingsForm";
+import { SettingsStatus } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
 const EMPTY_LOCAL_STATUS: LocalAccessStatus = {
@@ -56,7 +57,7 @@ const EMPTY_LOCAL_STATUS: LocalAccessStatus = {
 const EMPTY_VAULT_STATUS: CloudSecretVaultStatus = { githubTokenConfigured: false };
 const EMPTY_LAN_PC_STATUS: LanPcClientStatus = { paired: false };
 
-type AccessSectionProps = SettingsSectionProps & { nativeMobile: boolean };
+type AccessSectionProps = SettingsSectionProps & { nativeMobile: boolean; compact?: boolean };
 type LocalAccessCapability = AppSettings["access"]["blockedLocalCapabilities"][number];
 
 function updateAccess(
@@ -82,12 +83,20 @@ function setLocalCapabilityBlocked(
   });
 }
 
-function CopyButton({ value, label }: { value: string; label: string }) {
+function CopyButton({
+  value,
+  label,
+  compact = false,
+}: {
+  value: string;
+  label: string;
+  compact?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   return (
     <IconButton
       variant="ghost"
-      size="sm"
+      size={compact ? "lg" : "sm"}
       label={label}
       tooltip={label}
       icon={<Icon icon={copied ? Check : Copy} size="sm" color="inherit" />}
@@ -102,7 +111,12 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
-export function AccessSection({ settings, setSettings, nativeMobile }: AccessSectionProps) {
+export function AccessSection({
+  settings,
+  setSettings,
+  nativeMobile,
+  compact = nativeMobile,
+}: AccessSectionProps) {
   const { t } = useLocale();
   const browser = isBrowserRuntime();
   const [localStatus, setLocalStatus] = useState(EMPTY_LOCAL_STATUS);
@@ -291,6 +305,134 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
     }
   }
 
+  const actions: AccessSettingsActions = {
+    removeToken: () =>
+      runAction("remove-token", async (current) => {
+        operation.vaultRevision++;
+        const next = await invoke<CloudSecretVaultStatus>("cloud_secret_vault_remove_github_token");
+        if (current()) {
+          operation.vaultRevision++;
+          setVaultStatus(next);
+          setGithubToken("");
+        }
+      }),
+    saveToken: () =>
+      runAction("save-token", async (current) => {
+        operation.vaultRevision++;
+        const next = await invoke<CloudSecretVaultStatus>("cloud_secret_vault_set_github_token", {
+          username: settings.access.githubOwner,
+          token: githubToken,
+        });
+        if (current()) {
+          operation.vaultRevision++;
+          setVaultStatus(next);
+          setGithubToken((previous) => (previous === githubToken ? "" : previous));
+        }
+      }),
+    pair: () =>
+      runAction("lan-pair", async (current) => {
+        operation.lanRevision++;
+        const url = normalizeLanControlUrl(settings.access.lanControlUrl);
+        const next = await invoke<LanPcClientStatus>("lan_pc_pair", {
+          baseUrl: url,
+          code: lanPairingCode,
+          deviceName: lanDeviceName.trim(),
+        });
+        if (current()) {
+          operation.lanRevision++;
+          setLanPcStatus(next);
+          setLanPairingCode((previous) => (previous === lanPairingCode ? "" : previous));
+          updateAccess(setSettings, {
+            lanControlUrl: next.baseUrl ? normalizeLanControlUrl(next.baseUrl) : url,
+          });
+        }
+      }),
+    disconnect: () =>
+      runAction("lan-disconnect", async (current) => {
+        operation.lanRevision++;
+        const next = await invoke<LanPcClientStatus>("lan_pc_disconnect");
+        if (current()) {
+          operation.lanRevision++;
+          setLanPcStatus(next);
+          updateAccess(setSettings, { preferLanPcExecution: false });
+        }
+      }),
+    refreshLan: () => runAction("lan-refresh", refreshLanPcStatus),
+    openComputer: () =>
+      runAction("lan-control", async (current) => {
+        const url = normalizeLanControlUrl(settings.access.lanControlUrl);
+        await browserSessionController.ensureSession({
+          sessionId: "lan-control",
+          url,
+          visible: false,
+        });
+        if (current()) {
+          updateAccess(setSettings, { lanControlUrl: url });
+          browserSessionController.openPanel("lan-control", "user");
+        }
+      }),
+    refreshLocal: () => runAction("refresh", refreshLocalStatus),
+    rotatePairingCode: () =>
+      runAction("pair", async (current) => {
+        const next = await invoke<LocalAccessStatus>("local_access_rotate_pairing_code");
+        if (current()) {
+          operation.localRevision++;
+          setLocalStatus(next);
+        }
+      }),
+    revokeDevice: (deviceId) =>
+      runAction(`revoke-device:${deviceId}`, async (current) => {
+        const next = await invoke<LocalAccessStatus>("local_access_revoke_device", {
+          deviceId,
+        });
+        if (current()) {
+          operation.localRevision++;
+          setLocalStatus(next);
+        }
+      }),
+  };
+
+  if (compact) {
+    return (
+      <CompactAccessSettingsForm
+        access={settings.access}
+        nativeMobile={nativeMobile}
+        browser={browser}
+        localStatus={localStatus}
+        vaultStatus={vaultStatus}
+        lanPcStatus={lanPcStatus}
+        lanPairingCode={lanPairingCode}
+        lanDeviceName={lanDeviceName}
+        githubToken={githubToken}
+        busyAction={busyAction}
+        actionError={actionError}
+        endpoint={endpoint}
+        localStatusLabel={localStatusLabel}
+        localStatusPhase={localStatusPhase}
+        setLanPairingCode={setLanPairingCode}
+        setLanDeviceName={setLanDeviceName}
+        setGithubToken={setGithubToken}
+        patchAccess={(patch) => updateAccess(setSettings, patch)}
+        setCapabilityBlocked={(capability, blocked) =>
+          setLocalCapabilityBlocked(setSettings, capability, blocked)
+        }
+        normalizeAddress={() => {
+          const value = settings.access.lanControlUrl.trim();
+          if (!value) return;
+          try {
+            updateAccess(setSettings, { lanControlUrl: normalizeLanControlUrl(value) });
+          } catch {
+            /* Keep the invalid draft visible for correction. */
+          }
+        }}
+        actions={actions}
+        copyEndpoint={
+          <CopyButton value={endpoint} label={t("workspaceEditor.context.copy")} compact />
+        }
+      />
+    );
+  }
+
   const cloudDetails = (
     <VStack gap={3}>
       <Grid columns={{ minWidth: 240, max: 2, repeat: "fit" }} gap={3} width="100%">
@@ -319,7 +461,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
               <Icon icon={Key} size="sm" color="secondary" />
               <Text type="label">{t("settings.accessSecureVault")}</Text>
             </HStack>
-            <StatusDot
+            <SettingsStatus
               variant={vaultStatus.githubTokenConfigured ? "success" : "neutral"}
               label={
                 vaultStatus.githubTokenConfigured
@@ -342,19 +484,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                 label={t("settings.accessRemoveToken")}
                 variant="secondary"
                 isDisabled={browser || busyAction !== ""}
-                onClick={() =>
-                  void runAction("remove-token", async (current) => {
-                    operation.vaultRevision++;
-                    const next = await invoke<CloudSecretVaultStatus>(
-                      "cloud_secret_vault_remove_github_token",
-                    );
-                    if (current()) {
-                      operation.vaultRevision++;
-                      setVaultStatus(next);
-                      setGithubToken("");
-                    }
-                  })
-                }
+                onClick={() => void actions.removeToken()}
               />
             ) : null}
             <Button
@@ -367,23 +497,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                 !githubToken.trim() ||
                 busyAction !== ""
               }
-              onClick={() =>
-                void runAction("save-token", async (current) => {
-                  operation.vaultRevision++;
-                  const next = await invoke<CloudSecretVaultStatus>(
-                    "cloud_secret_vault_set_github_token",
-                    {
-                      username: settings.access.githubOwner,
-                      token: githubToken,
-                    },
-                  );
-                  if (current()) {
-                    operation.vaultRevision++;
-                    setVaultStatus(next);
-                    setGithubToken((previous) => (previous === githubToken ? "" : previous));
-                  }
-                })
-              }
+              onClick={() => void actions.saveToken()}
             />
           </HStack>
           {vaultStatus.githubUsername ? (
@@ -418,7 +532,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                   </Text>
                 </VStack>
               </HStack>
-              <StatusDot
+              <SettingsStatus
                 variant={lanPcReady ? "success" : "neutral"}
                 label={
                   lanPcReady
@@ -483,44 +597,14 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                   !lanDeviceName.trim() ||
                   busyAction !== ""
                 }
-                onClick={() =>
-                  void runAction("lan-pair", async (current) => {
-                    operation.lanRevision++;
-                    const url = normalizeLanControlUrl(settings.access.lanControlUrl);
-                    const next = await invoke<LanPcClientStatus>("lan_pc_pair", {
-                      baseUrl: url,
-                      code: lanPairingCode,
-                      deviceName: lanDeviceName.trim(),
-                    });
-                    if (current()) {
-                      operation.lanRevision++;
-                      setLanPcStatus(next);
-                      setLanPairingCode((previous) =>
-                        previous === lanPairingCode ? "" : previous,
-                      );
-                      updateAccess(setSettings, {
-                        lanControlUrl: next.baseUrl ? normalizeLanControlUrl(next.baseUrl) : url,
-                      });
-                    }
-                  })
-                }
+                onClick={() => void actions.pair()}
               />
               {lanPcStatus.paired ? (
                 <Button
                   label={t("settings.accessDisconnectComputer")}
                   variant="secondary"
                   isDisabled={busyAction !== ""}
-                  onClick={() =>
-                    void runAction("lan-disconnect", async (current) => {
-                      operation.lanRevision++;
-                      const next = await invoke<LanPcClientStatus>("lan_pc_disconnect");
-                      if (current()) {
-                        operation.lanRevision++;
-                        setLanPcStatus(next);
-                        updateAccess(setSettings, { preferLanPcExecution: false });
-                      }
-                    })
-                  }
+                  onClick={() => void actions.disconnect()}
                 />
               ) : null}
               {lanPcStatus.paired ? (
@@ -529,7 +613,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                   variant="secondary"
                   isLoading={busyAction === "lan-refresh"}
                   isDisabled={busyAction !== "" || !pairedLanUrl}
-                  onClick={() => void runAction("lan-refresh", refreshLanPcStatus)}
+                  onClick={() => void actions.refreshLan()}
                 />
               ) : null}
             </HStack>
@@ -553,20 +637,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
               variant="primary"
               isLoading={busyAction === "lan-control"}
               isDisabled={!settings.access.lanControlUrl.trim() || busyAction !== ""}
-              onClick={() =>
-                void runAction("lan-control", async (current) => {
-                  const url = normalizeLanControlUrl(settings.access.lanControlUrl);
-                  await browserSessionController.ensureSession({
-                    sessionId: "lan-control",
-                    url,
-                    visible: false,
-                  });
-                  if (current()) {
-                    updateAccess(setSettings, { lanControlUrl: url });
-                    browserSessionController.openPanel("lan-control", "user");
-                  }
-                })
-              }
+              onClick={() => void actions.openComputer()}
             />
             <Text type="supporting" color="secondary">
               {t("settings.accessLanPairingHint")}
@@ -587,7 +658,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                 </VStack>
               </HStack>
               <HStack gap={2} vAlign="center">
-                <StatusDot
+                <SettingsStatus
                   variant={
                     localStatusPhase === "running"
                       ? "success"
@@ -654,7 +725,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                 size="sm"
                 isLoading={busyAction === "refresh"}
                 isDisabled={busyAction !== "" || browser}
-                onClick={() => void runAction("refresh", refreshLocalStatus)}
+                onClick={() => void actions.refreshLocal()}
               />
             </HStack>
             <List density="compact" hasDividers>
@@ -752,23 +823,12 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                 variant="secondary"
                 isLoading={busyAction === "pair"}
                 isDisabled={!settings.access.webUiEnabled || busyAction !== "" || browser}
-                onClick={() =>
-                  void runAction("pair", async (current) => {
-                    const next = await invoke<LocalAccessStatus>(
-                      "local_access_rotate_pairing_code",
-                    );
-                    if (current()) {
-                      operation.localRevision++;
-                      setLocalStatus(next);
-                    }
-                  })
-                }
+                onClick={() => void actions.rotatePairingCode()}
               />
             </HStack>
             {localStatus.devices.length > 0 ? (
               <List density="compact" hasDividers>
                 {localStatus.devices.map((device) => {
-                  const revokeAction = `revoke-device:${device.deviceId}`;
                   return (
                     <ListItem
                       key={device.deviceId}
@@ -786,20 +846,7 @@ export function AccessSection({ settings, setSettings, nativeMobile }: AccessSec
                           variant="ghost"
                           size="sm"
                           isDisabled={browser || busyAction !== ""}
-                          onClick={() =>
-                            void runAction(revokeAction, async (current) => {
-                              const next = await invoke<LocalAccessStatus>(
-                                "local_access_revoke_device",
-                                {
-                                  deviceId: device.deviceId,
-                                },
-                              );
-                              if (current()) {
-                                operation.localRevision++;
-                                setLocalStatus(next);
-                              }
-                            })
-                          }
+                          onClick={() => void actions.revokeDevice(device.deviceId)}
                         />
                       }
                     />

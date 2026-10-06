@@ -43,6 +43,9 @@ test("native system controls update shared settings and reject unsupported value
   const group = document.nodes.find((node) => node.id === "system-settings");
   assert.equal(group.kind, "SettingsGroup");
   assert.match(document.nodes.find((node) => node.id === "save-status").text, /Disk full/);
+  for (const status of ["idle", "saved", "saving"]) {
+    assert.ok(!render({ status }).props.document.nodes.some(node => node.id === "save-status"));
+  }
   assert.equal(document.nodes.find(node => node.id === "back").action, "close");
   assert.equal(group.children.find((node) => node.id === "locale").value, "zh-CN");
   assert.equal(group.children.find((node) => node.id === "execution-mode").value, "text");

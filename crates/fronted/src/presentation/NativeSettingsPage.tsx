@@ -27,13 +27,11 @@ import {
 } from "../lib/mobileExecution";
 import {
   type CustomProvider,
-  normalizeCustomProvider,
   normalizeFontScale,
   normalizeSettings,
   STT_PROVIDER_IDS,
   type SttProviderId,
   type SttProviderSettings,
-  updateCustomProviders,
   updateCustomSettings,
   updateSystem,
 } from "../lib/settings";
@@ -75,10 +73,12 @@ import { useNativeDesktopProxy } from "./nativeDesktopProxy";
 import { useNativeDesktopSystem } from "./nativeDesktopSystem";
 import { useNativeFontSettings } from "./nativeFontSettings";
 import { nativeOAuthAccounts } from "./nativeOAuthAccounts";
+import { useNativeProviderEditor } from "./nativeProviderEditor";
 import { useNativeProviderImports } from "./nativeProviderImports";
 import { useNativeProviderList } from "./nativeProviderList";
 import { useNativeProviderModels } from "./nativeProviderModels";
 import { setNativeSettingsChrome } from "./nativeSettingsChrome";
+import { withNativeSettingsIcons } from "./nativeSettingsIcons";
 import { createNativePresentationTheme } from "./nativeTheme";
 import { createNativeToolPermissions } from "./nativeToolPermissions";
 import type { PresentationNode } from "./types";
@@ -165,7 +165,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [providerUrlDraft, setProviderUrlDraft] = useState<{ id: string; value: string } | null>(
     null,
   );
-  const [providerDeletePending, setProviderDeletePending] = useState(false);
   const [voiceTest, setVoiceTest] = useState<{
     ok: boolean;
     message: string;
@@ -197,20 +196,31 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     setProviderId("");
     setProviderModelId("");
     setProviderRequestOpen(false);
-    setProviderDeletePending(false);
     setProviderUrlDraft(null);
     setProviderRuntimeOpen(props.initialSection === "failover" || props.initialSection === "usage");
     setShellFilesOpen(false);
     setError("");
     operations.revision++;
   }, [props.initialSection, nativeMobile]);
-  const provider = settings.customProviders.find((item) => item.id === providerId);
+  const providerEditor = useNativeProviderEditor(props, providerId, page === "providers", t);
+  const provider = providerEditor.provider;
+  const providerProps = {
+    ...props,
+    settings: providerEditor.settings,
+    setSettings: providerEditor.setSettings,
+  };
   // Native controls can finish editing after a route changes. Reused field
   // IDs retain their layout identity; their actions belong to this provider
   // and authentication mode so a late credential cannot edit another account.
   const c = presentationControls(
     page === "providers" && provider
-      ? JSON.stringify(["provider", provider.id, provider.type, provider.authMode ?? "api-key"])
+      ? JSON.stringify([
+          "provider",
+          provider.id,
+          provider.type,
+          provider.authMode ?? "api-key",
+          providerEditor.revision,
+        ])
       : undefined,
   );
   const oauth = useCodexOAuthAccounts(
@@ -230,7 +240,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const providerUrl =
     providerUrlDraft?.id === providerId ? providerUrlDraft.value : (provider?.baseUrl ?? "");
   const providerModels = useNativeProviderModels(
-    props,
+    providerProps,
     page === "providers" ? provider : undefined,
     page === "providers" &&
       !!provider &&
@@ -384,14 +394,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   if (failure) throw failure;
 
   function patchProvider(patch: Partial<CustomProvider>) {
-    setSettings((previous) =>
-      updateCustomProviders(
-        previous,
-        previous.customProviders.map((item) =>
-          item.id === providerId ? { ...item, ...patch } : item,
-        ),
-      ),
-    );
+    providerEditor.patch(patch);
   }
   function patchSttProvider(patch: Partial<SttProviderSettings>) {
     const targetProvider = settings.stt.provider;
@@ -466,8 +469,9 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     .map(
       ({ id, icon }): PresentationNode => ({
         ...row(`desktop-nav:${id}`, titles[id], icon, () => {
+          providerEditor.cancel();
           setProviderId("");
-          setProviderDeletePending(false);
+          setProviderUrlDraft(null);
           setProviderRuntimeOpen(false);
           setProviderModelId("");
           setProviderRequestOpen(false);
@@ -540,7 +544,13 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             text:
               props.saveState.status === "error"
                 ? props.saveState.message
-                : t(props.saveState.status === "saving" ? "settings.saving" : "settings.saved"),
+                : t(
+                    provider
+                      ? "workspaceEditor.unsaved"
+                      : props.saveState.status === "saving"
+                        ? "settings.saving"
+                        : "settings.saved",
+                  ),
           },
           handlers: new Map(c.handlers),
         },
@@ -549,9 +559,10 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     return (
       <NativeProviderRequestSettings
         key={provider.id}
-        settings={settings}
-        setSettings={setSettings}
+        settings={providerEditor.settings}
+        setSettings={providerEditor.setSettings}
         providerId={provider.id}
+        canTestUsage={!providerEditor.isNew}
         onBack={() => setProviderRequestOpen(false)}
         nativeSettingsSurfaceId={sessionSurface}
       />
@@ -577,8 +588,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     return (
       <NativeProviderModelSettings
         key={`${provider.id}:${providerModelId}`}
-        settings={settings}
-        setSettings={setSettings}
+        settings={providerEditor.settings}
+        setSettings={providerEditor.setSettings}
         providerId={provider.id}
         modelId={providerModelId}
         onBack={() => setProviderModelId("")}
@@ -706,8 +717,9 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     nodes.push({
       ...c.action("back", t("settings.native.back"), () => {
         if (providerId) {
+          if (!providerEditor.cancel()) return;
           setProviderId("");
-          setProviderDeletePending(false);
+          setProviderUrlDraft(null);
         } else {
           setPage(returnPage);
           setReturnPage("");
@@ -716,15 +728,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       }),
       icon: "chevron.left",
     });
-  if (!nativeMobile || page || props.saveState.status === "error")
+  if (props.saveState.status === "error")
     nodes.push({
       id: "save-status",
       kind: "Text",
-      secondary: props.saveState.status !== "error",
-      text:
-        props.saveState.status === "error"
-          ? props.saveState.message
-          : t(props.saveState.status === "saving" ? "settings.saving" : "settings.saved"),
+      text: `${t("settings.saveError")}: ${props.saveState.message}`,
     });
   if (error) nodes.push({ id: "error", kind: "Banner", label: error, status: "error" });
   if (busy)
@@ -1075,34 +1083,38 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       for (const [id, handler] of desktopProxy.handlers) c.handlers.set(id, handler);
     }
   } else if (page === "providers") {
-    nodes.push(
-      c.action(
+    const providerRuntimeAction = {
+      ...c.action(
         "provider-runtime-settings",
         t("settings.openCustomSettings"),
         () => setProviderRuntimeOpen(true),
         !busy,
       ),
-    );
+      kind: "IconButton" as const,
+      icon: "slider.horizontal.3",
+      size: "large" as const,
+      variant: "ghost",
+    };
     if (!provider) {
+      const [vendorSelector, ...providerRows] = providerList.nodes;
+      nodes.push({
+        id: "provider-category-toolbar",
+        kind: "HStack",
+        variant: "provider-category-toolbar",
+        children: [...(vendorSelector ? [vendorSelector] : []), providerRuntimeAction],
+      });
       nodes.push(...providerImports.listNodes);
       for (const [id, handler] of providerImports.handlers) c.handlers.set(id, handler);
-      nodes.push(...providerList.nodes);
+      nodes.push(...providerRows);
       for (const [id, handler] of providerList.handlers) c.handlers.set(id, handler);
       nodes.push(
         c.action("add-provider", t("settings.native.addProvider"), () => {
-          const id = createUuid();
-          const next = normalizeCustomProvider({
-            id,
-            name: t("settings.native.newProvider"),
-            type: providerList.type,
-          });
-          setSettings((previous) =>
-            updateCustomProviders(previous, [...previous.customProviders, next]),
-          );
-          setProviderId(id);
+          const id = providerEditor.add(providerList.type);
+          if (id) setProviderId(id);
         }),
       );
     } else {
+      nodes.push(providerRuntimeAction);
       nodes.push(
         c.group("provider-details", provider.name, [
           c.input("provider-name", t("settings.native.name"), provider.name, (name) =>
@@ -1272,41 +1284,84 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           !busy,
         ),
       );
-      nodes.push(
-        providerDeletePending
-          ? {
-              id: "provider-delete-confirmation",
-              kind: "Banner",
-              label: t("settings.native.deleteProvider"),
-              text: t("settings.native.deleteProviderDetail"),
-              status: "paused",
-              children: [
-                {
-                  ...c.action("provider-delete-confirm", t("settings.delete"), () => {
-                    const targetId = provider.id;
-                    setSettings((previous) =>
-                      updateCustomProviders(
-                        previous,
-                        previous.customProviders.filter((item) => item.id !== targetId),
-                      ),
-                    );
-                    setProviderDeletePending(false);
-                    setProviderId("");
-                  }),
-                  destructive: true,
-                },
-                c.action("provider-delete-cancel", t("settings.cancel"), () =>
-                  setProviderDeletePending(false),
-                ),
-              ],
-            }
-          : {
-              ...c.action("provider-delete", t("settings.delete"), () =>
-                setProviderDeletePending(true),
-              ),
-              destructive: true,
-            },
+      if (providerEditor.error)
+        nodes.push({
+          id: "provider-editor-error",
+          kind: "Banner",
+          label: providerEditor.error,
+          status: "error",
+        });
+      nodes.push({
+        id: "provider-editor-actions",
+        kind: "HStack",
+        variant: "provider-editor-actions",
+        spacing: 8,
+        children: [
+          {
+            ...c.action("provider-editor-cancel", t("settings.cancel"), () => {
+              if (!providerEditor.cancel()) return;
+              setProviderId("");
+              setProviderUrlDraft(null);
+            }),
+            size: "large",
+            fill: true,
+            variant: "secondary",
+          },
+          {
+            ...c.action("provider-editor-save", t("settings.save"), () => {
+              if (!providerEditor.save()) return;
+              setProviderId("");
+              setProviderUrlDraft(null);
+            }),
+            size: "large",
+            fill: true,
+            variant: "primary",
+          },
+        ],
+      });
+      const deleteControls = presentationControls(
+        JSON.stringify([
+          "provider-delete",
+          provider.id,
+          providerEditor.revision,
+          providerEditor.deleteRevision,
+        ]),
       );
+      if (!providerEditor.isNew)
+        nodes.push(
+          providerEditor.deletePending
+            ? {
+                id: "provider-delete-confirmation",
+                kind: "Banner",
+                label: t("settings.native.deleteProvider"),
+                text: t("settings.native.deleteProviderDetail"),
+                status: "paused",
+                children: [
+                  {
+                    ...deleteControls.action(
+                      "provider-delete-confirm",
+                      t("settings.delete"),
+                      () => {
+                        if (!providerEditor.remove()) return;
+                        setProviderId("");
+                        setProviderUrlDraft(null);
+                      },
+                    ),
+                    destructive: true,
+                  },
+                  deleteControls.action("provider-delete-cancel", t("settings.cancel"), () =>
+                    providerEditor.cancelRemove(),
+                  ),
+                ],
+              }
+            : {
+                ...c.action("provider-delete", t("settings.delete"), () =>
+                  providerEditor.requestRemove(),
+                ),
+                destructive: true,
+              },
+        );
+      for (const [id, handler] of deleteControls.handlers) c.handlers.set(id, handler);
     }
   } else if (page === "mobileAssistant") {
     nodes.push(
@@ -1591,24 +1646,29 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   } else if (page === "voice") {
     if (nativeMobile) {
       nodes.push(
-        c.group("voice-general", t("settings.stt.title"), [
+        c.group("voice-general", t("settings.navVoice"), [
           {
-            ...c.toggle("voice-enabled", t("settings.stt.title"), settings.stt.enabled, (enabled) =>
+            ...c.toggle("voice-enabled", t("settings.navVoice"), settings.stt.enabled, (enabled) =>
               setSettings((previous) =>
                 normalizeSettings({ ...previous, stt: { ...previous.stt, enabled } }),
               ),
             ),
             text: t("settings.mobileAssistant.microphoneDescription"),
+            icon: "mic",
           },
           {
             id: "voice-device-status",
             kind: "StatusDot",
             label: !status
-              ? t("settings.native.speechChecking")
+              ? t(error ? "settings.native.speechUnavailable" : "settings.native.speechChecking")
               : status.voiceInputAvailable
                 ? t("settings.native.speechAvailable")
                 : t("settings.native.speechUnavailable"),
-            status: status?.voiceInputAvailable ? "completed" : status ? "error" : "running",
+            status: status?.voiceInputAvailable
+              ? "completed"
+              : status || error
+                ? "error"
+                : "running",
           },
           {
             ...row(
@@ -1635,13 +1695,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           },
         ]),
       );
-      if (status?.detail)
-        nodes.push({
-          id: "voice-device-detail",
-          kind: "Text",
-          secondary: true,
-          text: status.detail,
-        });
     } else {
       const providerId = settings.stt.provider;
       const sttProvider = settings.stt.providers[providerId];
@@ -1767,30 +1820,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     accepts: (value) => value === null,
     run: props.onBack,
   });
-  const settingIcons: Record<string, string> = {
-    theme: "sun.max",
-    "appearance-preset": "paintpalette",
-    mode: "terminal",
-    language: "globe",
-    thinking: "brain",
-    "appearance-customized": "slider.horizontal.3",
-    "appearance-radius": "rectangle.roundedtop",
-    "font-scale:sidebar": "textformat.size",
-    "font-scale:chat": "textformat.size",
-    "font-scale:workspaceTools": "textformat.size",
-    "font-family:interfaceFontFamily": "textformat",
-    "font-family:chatFontFamily": "textformat",
-    "font-family:codeFontFamily": "textformat",
-  };
-  function withSettingIcons(node: PresentationNode): PresentationNode {
-    return {
-      ...node,
-      icon: node.icon ?? settingIcons[node.id],
-      children: node.children?.map(withSettingIcons),
-    };
-  }
   const renderedNodes: PresentationNode[] = nativeMobile
-    ? nodes.map(withSettingIcons)
+    ? nodes.map(withNativeSettingsIcons)
     : [
         {
           id: "settings-layout",

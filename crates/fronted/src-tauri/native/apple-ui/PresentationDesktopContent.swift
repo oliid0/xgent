@@ -119,7 +119,9 @@ extension XgentNodeView {
                 #endif
             }
         case .hStack:
-            if node.variant == "sidebar-section-heading" {
+            if node.variant == "provider-category-toolbar" {
+                XgentProviderCategoryToolbar(node: node, document: document, model: model)
+            } else if node.variant == "sidebar-section-heading" {
                 XgentSidebarSectionHeading(node: node, document: document, model: model)
             } else if node.variant == "workspace-file-metadata" {
                 XgentWorkspaceFileMetadata(node: node, document: document, model: model)
@@ -200,7 +202,9 @@ extension XgentNodeView {
         case .toggle:
             XgentSwitch(node: node, document: document, model: model)
         case .selector:
-            if node.variant == "workspace-file-sheets" {
+            if node.variant == "provider-vendor-tabs" {
+                XgentProviderCategoryTabs(node: node, document: document, model: model)
+            } else if node.variant == "workspace-file-sheets" {
                 XgentSpreadsheetSheets(node: node, document: document, model: model)
             } else if node.variant == "terminal-session-tabs" {
                 XgentTerminalSessionTabs(node: node, document: document, model: model)

@@ -1,5 +1,6 @@
 import type { Model, ModelThinkingLevel, OpenAICompletionsCompat } from "@earendil-works/pi-ai";
 import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
+import { normalizeModelInput } from "../../models/modelInput";
 import {
   type ModelThinkingCapability,
   resolveModelThinking,
@@ -320,7 +321,7 @@ export function createModelFromConfig(
   const defaults = getProviderModelDefaults(providerId, modelId);
   const configuredContextWindow = modelConfig?.contextWindow ?? defaults.contextWindow;
   const contextWindow =
-    providerId === "claude_code"
+    providerId === "claude_code" && modelConfig?.limitsSource !== "user"
       ? resolveAnthropicContextWindow(
           modelId,
           configuredContextWindow,
@@ -330,6 +331,7 @@ export function createModelFromConfig(
   const maxTokens = modelConfig?.maxOutputToken ?? defaults.maxOutputToken;
 
   const configuredCost = modelConfig?.cost;
+  const configuredInput = normalizeModelInput(modelConfig?.inputModalities);
   const zeroCost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   const customModelCost = configuredCost ?? zeroCost;
   const thinking = resolveModelThinking(providerId, modelId);
@@ -385,6 +387,7 @@ export function createModelFromConfig(
       return applyDeepSeekModelDefaults(
         {
           ...known,
+          ...(configuredInput ? { input: configuredInput } : {}),
           contextWindow,
           maxTokens,
           ...(configuredCost ? { cost: configuredCost } : {}),
@@ -420,7 +423,7 @@ export function createModelFromConfig(
       baseUrl: normalizedBaseUrl,
 
       ...resolveModelThinkingFields(thinking, isXaiTarget ? XAI_THINKING_LEVEL_MAP : undefined),
-      input: resolveCodexModelInput(api, modelId),
+      input: configuredInput ?? resolveCodexModelInput(api, modelId),
       cost: customModelCost,
       contextWindow,
       maxTokens,
@@ -457,6 +460,7 @@ export function createModelFromConfig(
     if (known && known.api === "google-generative-ai") {
       return {
         ...known,
+        ...(configuredInput ? { input: configuredInput } : {}),
         contextWindow,
         maxTokens,
         ...(configuredCost ? { cost: configuredCost } : {}),
@@ -474,7 +478,7 @@ export function createModelFromConfig(
       provider: "google",
       baseUrl: normalizedBaseUrl,
       ...resolveModelThinkingFields(thinking),
-      input: ["text", "image"],
+      input: configuredInput ?? ["text", "image"],
       cost: customModelCost,
       contextWindow,
       maxTokens,
@@ -487,6 +491,7 @@ export function createModelFromConfig(
     return applyDeepSeekModelDefaults(
       {
         ...known,
+        ...(configuredInput ? { input: configuredInput } : {}),
         contextWindow,
         maxTokens,
         ...(configuredCost ? { cost: configuredCost } : {}),
@@ -515,7 +520,9 @@ export function createModelFromConfig(
       thinking,
       thinkingOverrides.thinkingLevelMap as ThinkingLevelMap | undefined,
     ),
-    input: ["text"],
+    // Unknown Anthropic aliases already use native image attachments. Describe
+    // that existing behavior accurately; a text-only relay can override it.
+    input: configuredInput ?? ["text", "image"],
     cost: customModelCost,
     contextWindow,
     maxTokens,

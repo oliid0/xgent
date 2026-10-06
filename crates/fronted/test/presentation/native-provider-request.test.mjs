@@ -43,6 +43,27 @@ function harness(options = {}) {
     failSave: value => { failSave = value; }, unmount: () => hooks.unmount() };
 }
 
+test("native cache protocol accepts all runtime modes and saves the latest choice before repaint", () => {
+  for (const mode of ["auto", "openai-key", "openrouter-session", "none"]) {
+    const h = harness({ type: "codex" });
+    const published = h.render();
+    assert.deepEqual(h.nodes().find(node => node.id === "provider-cache-hint").options.map(option => option.value),
+      ["auto", "openai-key", "openrouter-session", "none"]);
+    h.action("provider-cache-hint", mode, published);
+    h.action("provider-request-save", null, published);
+    assert.equal(h.settings().customProviders[0].promptCacheHintMode ?? "auto", mode);
+    h.unmount();
+  }
+  const h = harness({ type: "codex" });
+  h.action("provider-cache-hint", "openrouter-session");
+  h.action("provider-prompt-cache", false);
+  assert.ok(!h.render().handlers.has("provider-cache-hint"));
+  h.action("provider-request-save");
+  assert.equal(h.settings().customProviders[0].promptCacheHintMode, "openrouter-session");
+  assert.equal(h.settings().customProviders[0].promptCachingEnabled, false);
+  h.unmount();
+});
+
 test("native per-provider request settings save proxy, bounded retry, cache retention and final header text", () => {
   const h = harness({ mobile: false });
   assert.equal(h.render().document.formFactor, "desktop");

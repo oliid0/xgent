@@ -35,7 +35,7 @@ final class PresentationTransportTests: XCTestCase {
         let document: [String: Any] = ["version": 1, "surface": "page", "revision": 1,
             "mode": "root", "title": "Native host", "formFactor": "desktop", "appearance": "light",
             "nodes": [["id": "host-controls", "kind": "VStack", "children": [
-                ["id": "draft", "kind": "TextInput", "label": "Message", "value": "Draft", "action": "edit"],
+                ["id": "draft", "kind": "ComposerInput", "label": "Message", "value": "Draft", "action": "edit"],
                 ["id": "native-action", "kind": "Button", "label": "Native action", "action": "send"],
             ]]]]
         let data = try JSONSerialization.data(withJSONObject: document)
@@ -47,6 +47,15 @@ final class PresentationTransportTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(250))
         let native = try XCTUnwrap(container.subviews.first { $0 !== transport })
         let children = try XCTUnwrap(container.accessibilityChildren())
+        XCTAssertTrue(children.contains { ($0 as? NSView) === native },
+                      "The sibling list must retain the actual native ancestor, not promoted SwiftUI proxies")
+        XCTAssertTrue(native.isAccessibilityElement())
+        XCTAssertEqual(native.accessibilityRole(), .group)
+        let parent = try XCTUnwrap(native.accessibilityParent())
+        let actualParent = try XCTUnwrap(NSAccessibility.unignoredAncestor(of: parent) as? NSObject)
+        let expectedParent = try XCTUnwrap(NSAccessibility.unignoredAncestor(of: container) as? NSObject)
+        XCTAssertTrue(actualParent === expectedParent,
+                      "AXChildren and AXParent must agree for the real native container")
         XCTAssertFalse(children.contains { ($0 as? NSView) === transport }, "The covered execution host must not own accessibility")
         XCTAssertTrue(transport.isAccessibilityHidden())
         XCTAssertTrue(transport.window === window)
@@ -78,13 +87,45 @@ final class PresentationTransportTests: XCTestCase {
         let accessibilityHit = try XCTUnwrap(window.accessibilityHitTest(screenPoint) as? NSObject)
         XCTAssertEqual(NativeMacAccessibilityElement(object: accessibilityHit).accessibilityIdentifier(), "native-action",
                        "Accessibility hit testing must reach the same native control as pointer input")
+        let draft = try XCTUnwrap(nativeElements.first { $0.accessibilityIdentifier() == "draft" })
+        let draftFrame = draft.accessibilityFrame()
+        let draftScreenPoint = NSPoint(x: draftFrame.midX, y: draftFrame.midY)
+        let draftHit = try XCTUnwrap(window.accessibilityHitTest(draftScreenPoint) as? NSObject)
+        XCTAssertEqual(NativeMacAccessibilityElement(object: draftHit).accessibilityIdentifier(), "draft",
+                       "The real multiline composer must be reachable through native accessibility")
+        let draftPoint = window.convertPoint(fromScreen: draftScreenPoint)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            window.sendEvent(try XCTUnwrap(NSEvent.mouseEvent(with: type, location: draftPoint,
+                modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+                context: nil, eventNumber: 0, clickCount: 1, pressure: 1)))
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        let editor = try XCTUnwrap(window.firstResponder as? NSTextView,
+                                  "Clicking the composer must focus its actual native field editor")
+        XCTAssertEqual(editor.string, "Draft")
+        editor.setSelectedRange(NSRange(location: editor.string.utf16.count, length: 0))
+        for type in [NSEvent.EventType.keyDown, .keyUp] {
+            window.sendEvent(try XCTUnwrap(NSEvent.keyEvent(with: type, location: .zero,
+                modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                characters: "x", charactersIgnoringModifiers: "x", isARepeat: false, keyCode: 7)))
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(editor.string, "Draftx", "Physical keyboard input must edit the native composer")
+        let draftDeadline = ContinuousClock.now + .seconds(3)
+        var edited: [String: Any]?
+        while edited == nil, ContinuousClock.now < draftDeadline {
+            edited = try await transport.evaluateJavaScript("window.nativeActions.find(action => action.action === 'edit') ?? null") as? [String: Any]
+            if edited == nil { try await Task.sleep(for: .milliseconds(50)) }
+        }
+        XCTAssertEqual(try XCTUnwrap(edited)["value"] as? String, "Draftx",
+                       "The clicked and typed draft must reach the shared execution host")
         let value = try await transport.evaluateJavaScript("6 * 7")
         XCTAssertEqual((value as? NSNumber)?.intValue, 42, "Native accessibility must preserve shared JS execution")
         XCTAssertTrue(action.accessibilityPerformPress())
         let actionDeadline = ContinuousClock.now + .seconds(3)
         var emitted: [String: Any]?
         while emitted == nil, ContinuousClock.now < actionDeadline {
-            emitted = try await transport.evaluateJavaScript("window.nativeActions[0] ?? null") as? [String: Any]
+            emitted = try await transport.evaluateJavaScript("window.nativeActions.find(action => action.action === 'send') ?? null") as? [String: Any]
             if emitted == nil { try await Task.sleep(for: .milliseconds(50)) }
         }
         let delivered = try XCTUnwrap(emitted)

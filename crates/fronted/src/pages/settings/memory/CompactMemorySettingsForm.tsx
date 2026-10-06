@@ -7,7 +7,7 @@ import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { type ISOTimeString, TimeInput } from "@astryxdesign/core/TimeInput";
 import type { ReactNode } from "react";
-import { Clock3, History, Play, Trash2 } from "../../../components/icons";
+import { Brain, Clock3, History, Layers, Play, Settings2, Trash2 } from "../../../components/icons";
 import type {
   AppSettings,
   MemoryOrganizerFrequency,
@@ -80,7 +80,7 @@ export function CompactMemorySettingsForm(props: {
         <Banner status="warning" title={t("settings.memoryModelEmpty")} collapsible={false} />
       ) : null}
       <SettingsRowGroup title={t("settings.memoryOrganizerTitle")}>
-        <SettingsRow label={t("settings.memoryOrganizerToggle")}>
+        <SettingsRow label={t("settings.memoryOrganizerToggle")} icon={<Brain />}>
           <Switch
             label={t("settings.memoryOrganizerToggle")}
             isLabelHidden
@@ -89,7 +89,11 @@ export function CompactMemorySettingsForm(props: {
             onChange={props.onToggle}
           />
         </SettingsRow>
-        <SettingsRow label={t("settings.memoryOrganizerSchedule")} controlLayout="value">
+        <SettingsRow
+          label={t("settings.memoryOrganizerSchedule")}
+          icon={<Clock3 />}
+          controlLayout="value"
+        >
           <SettingsValueSelector
             label={t("settings.memoryOrganizerSchedule")}
             isLabelHidden
@@ -117,7 +121,11 @@ export function CompactMemorySettingsForm(props: {
           />
         </SettingsRow>
         {memory.organizerSchedule.frequency === "weekly" ? (
-          <SettingsRow label={t("settings.memoryOrganizerWeekday")} controlLayout="value">
+          <SettingsRow
+            label={t("settings.memoryOrganizerWeekday")}
+            icon={<Clock3 />}
+            controlLayout="value"
+          >
             <SettingsValueSelector
               label={t("settings.memoryOrganizerWeekday")}
               isLabelHidden
@@ -131,7 +139,11 @@ export function CompactMemorySettingsForm(props: {
             />
           </SettingsRow>
         ) : null}
-        <SettingsRow label={t("settings.memoryOrganizerScope")} controlLayout="value">
+        <SettingsRow
+          label={t("settings.memoryOrganizerScope")}
+          icon={<Layers />}
+          controlLayout="value"
+        >
           <SettingsValueSelector
             label={t("settings.memoryOrganizerScope")}
             isLabelHidden
@@ -144,7 +156,11 @@ export function CompactMemorySettingsForm(props: {
             onChange={(value) => props.onScopeChange(value as MemoryOrganizerScope)}
           />
         </SettingsRow>
-        <SettingsRow label={t("settings.memoryOrganizerMode")} controlLayout="value">
+        <SettingsRow
+          label={t("settings.memoryOrganizerMode")}
+          icon={<Settings2 />}
+          controlLayout="value"
+        >
           <SettingsValueSelector
             label={t("settings.memoryOrganizerMode")}
             isLabelHidden

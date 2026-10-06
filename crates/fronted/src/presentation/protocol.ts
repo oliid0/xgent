@@ -68,6 +68,7 @@ export const presentationNodeProperties = [
   "diagramAction",
   "focusRequest",
   "selectionAction",
+  "editAction",
   "disabled",
   "destructive",
   "prominent",

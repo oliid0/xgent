@@ -137,6 +137,7 @@ struct XgentActionButton: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    @Environment(\.xgentSettingsRow) private var isFormRow
 
     var body: some View {
         Button(role: XgentButtonEmphasis(node: node) == .destructive ? .destructive : nil) {
@@ -147,11 +148,39 @@ struct XgentActionButton: View {
                 else if let icon = node.icon { Image(systemName: icon) }
                 Text(node.label ?? "").lineLimit(node.maxLines)
             }
+            // The label owns the interactive bounds. A transparent, expanded
+            // ButtonStyle alone can report a full row to AX while only the
+            // text at its leading edge responds to an ordinary touch.
+            .frame(maxWidth: expandsLabel ? .infinity : nil, minHeight: labelHeight, alignment: labelAlignment)
+            .contentShape(Rectangle())
         }
         .buttonStyle(XgentActionButtonStyle(node: node))
         .disabled(node.disabled == true || model.isBusy(node, in: document))
         .accessibilityIdentifier(node.id)
         .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
+    }
+
+    private var expandsLabel: Bool {
+        #if os(iOS)
+        return node.fill == true || isFormRow
+        #else
+        return node.fill == true
+        #endif
+    }
+
+    private var labelHeight: CGFloat? {
+        #if os(iOS)
+        return isFormRow ? 44 : nil
+        #else
+        return nil
+        #endif
+    }
+
+    private var labelAlignment: Alignment {
+        #if os(iOS)
+        if isFormRow && XgentButtonEmphasis(node: node) != .primary { return .leading }
+        #endif
+        return .center
     }
 }
 

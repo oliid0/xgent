@@ -46,6 +46,15 @@ function document(node) {
   };
 }
 
+test("rich composer edits require a distinct live handler and cannot be interpreted as literal text or a caret report", () => {
+  const handlers = new Map(["draft", "selection", "references"].map(action => [action, { enabled: true, accepts: value => typeof value === "string", run() {} }]));
+  const input = { id: "draft", kind: "ComposerInput", action: "draft", selectionAction: "selection", editAction: "references" };
+  assert.doesNotThrow(() => validatePresentationDocument(document(input), handlers));
+  for (const patch of [{ kind: "TextArea", selectionAction: undefined }, { action: undefined, selectionAction: undefined }, { editAction: "" }, { editAction: "draft" }, { editAction: "selection" }, { editAction: "missing" }]) {
+    assert.throws(() => validatePresentationDocument(document({ ...input, ...patch }), handlers), /composer edit action/);
+  }
+});
+
 test("composer caret reports require their own live handler and cannot reuse a text edit action", () => {
   const handlers = new Map(["draft", "selection"].map(action => [action, { enabled: true, accepts: value => typeof value === "string", run() {} }]));
   const input = { id: "draft", kind: "ComposerInput", action: "draft", selectionAction: "selection" };

@@ -20,8 +20,9 @@ final class PackagedApplicationTests: XCTestCase {
         testedApp = app
         app.launch()
         let window = app.windows.firstMatch
-        let draft = window.textFields["draft"].firstMatch
+        let draft = window.textViews["draft"].firstMatch
         XCTAssertTrue(draft.waitForExistence(timeout: 60), "The actual SwiftUI chat must render after packaged launch")
+        assertWindowToolbar(window)
         record(app, name: "macos-packaged-chat")
         XCTAssertEqual(window.webViews.count, 0, "The covered execution host must be excluded from native accessibility")
         XCTAssertTrue(draft.isHittable, "The composer must remain reachable")
@@ -32,7 +33,7 @@ final class PackagedApplicationTests: XCTestCase {
                        "Actual pointer and keyboard input must edit the packaged composer")
 
         let settings = window.buttons["settings"].firstMatch
-        if !settings.exists { click(window.buttons["sidebar"].firstMatch) }
+        if !settings.exists { click(window.buttons["xgent-window-left"].firstMatch) }
         click(settings)
         let title = window.staticTexts["settings-detail-title"].firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 30))
@@ -72,7 +73,7 @@ final class PackagedApplicationTests: XCTestCase {
         let before = window.frame
         let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -2, dy: -2))
         corner.press(forDuration: 0.1, thenDragTo: corner.withOffset(CGVector(dx: 640 - before.width, dy: 0)))
-        if !settings.exists { click(window.buttons["sidebar"].firstMatch) }
+        if !settings.exists { click(window.buttons["xgent-window-left"].firstMatch) }
         click(settings)
         let compact = window.descendants(matching: .any)["settings-navigation-menu"].firstMatch
         XCTAssertTrue(compact.waitForExistence(timeout: 15), "A narrow desktop must use the compact settings navigation")
@@ -82,7 +83,25 @@ final class PackagedApplicationTests: XCTestCase {
         click(window.buttons["settings-close"].firstMatch)
         XCTAssertTrue(draft.waitForExistence(timeout: 30))
         XCTAssertTrue(draft.isHittable, "Closing settings must restore the actual composer")
+        assertWindowToolbar(window)
         record(app, name: "macos-packaged-chat-narrow")
+    }
+
+    private func assertWindowToolbar(_ window: XCUIElement) {
+        var frames: [CGRect] = []
+        for id in ["xgent-window-back", "xgent-window-forward", "xgent-window-left", "xgent-window-right"] {
+            let control = window.buttons[id].firstMatch
+            XCTAssertTrue(control.waitForExistence(timeout: 30), "Missing actual native window toolbar control: \(id)")
+            let frame = control.frame
+            XCTAssertGreaterThanOrEqual(frame.width, 31)
+            XCTAssertGreaterThanOrEqual(frame.height, 31)
+            XCTAssertGreaterThanOrEqual(frame.minX, window.frame.minX)
+            XCTAssertLessThanOrEqual(frame.maxX, window.frame.maxX + 1)
+            XCTAssertLessThanOrEqual(frame.maxY, window.frame.minY + 100, "Window controls must use the titlebar area")
+            XCTAssertFalse(frames.contains { $0.intersects(frame) }, "Window toolbar controls must not overlap")
+            if control.isEnabled { XCTAssertTrue(control.isHittable) }
+            frames.append(frame)
+        }
     }
 
     private func click(_ element: XCUIElement) {

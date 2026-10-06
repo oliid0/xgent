@@ -21,6 +21,9 @@ struct XgentDesktopSettingsLayout: View {
         detail?.children?.first { $0.id == "save-status" && $0.secondary != true }
     }
     private var titleNode: XgentNode? { detail?.children?.first { $0.id == "settings-detail-title" } }
+    private var providerEditorFooter: XgentNode? {
+        detail?.children?.first { $0.kind == .hStack && $0.variant == "provider-editor-actions" }
+    }
     private var sectionTitle: String { navigation.first { $0.selected == true }?.label ?? document.title }
 
     var body: some View {
@@ -135,7 +138,8 @@ struct XgentDesktopSettingsLayout: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: CGFloat(theme.spacing.lg)) {
                         ForEach((detail.children ?? []).filter {
-                            $0.id != "settings-detail-title" && $0.id != "save-status"
+                            $0.id != "settings-detail-title" && $0.id != "save-status" &&
+                            $0.id != providerEditorFooter?.id
                         }) { child in
                             XgentNodeView(node: child, document: document, model: model, parentAxis: .vertical)
                         }
@@ -143,6 +147,13 @@ struct XgentDesktopSettingsLayout: View {
                     .padding(20)
                     .frame(maxWidth: 640, alignment: .leading)
                     .frame(maxWidth: .infinity, alignment: .top)
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if let footer = providerEditorFooter {
+                        XgentProviderEditorFooter(node: footer, document: document, model: model)
+                            .frame(maxWidth: 640)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

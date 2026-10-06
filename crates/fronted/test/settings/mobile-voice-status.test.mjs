@@ -41,13 +41,16 @@ test("mobile permission and platform service state has visible text in addition 
 test("voice recognition state remains visible and a failed discovery does not keep claiming to check", () => {
   for (const [status, error, label] of [
     [undefined, "", "speechChecking"], [undefined, "Native service failed", "speechUnavailable"],
-    [{ voiceInputAvailable: true }, "", "speechAvailable"], [{ voiceInputAvailable: false }, "", "speechUnavailable"],
+    [{ voiceInputAvailable: true, detail: "Unrelated HealthKit capability overview" }, "", "speechAvailable"],
+    [{ voiceInputAvailable: false }, "", "speechUnavailable"],
   ]) {
     const l = loader({ status, permissions: {}, busy: "", error, refresh() {} });
     const { MobileVoiceSettingsSection } = l.loadModule("src/pages/settings/MobileVoiceSettingsSection.tsx");
     const settings = l.loadModule("src/lib/settings/index.ts").getDefaultSettings();
     const rendered = nodes(MobileVoiceSettingsSection({ settings, setSettings() {}, onOpenPermissions() {} }));
     assert.ok(rendered.some(node => node.type === "SettingsRow" && node.props.label === `settings.native.${label}`));
+    assert.equal(rendered.find(node => node.type === "Switch").props.label, "settings.navVoice");
+    assert.ok(!rendered.some(node => node.props.children === status?.detail && status?.detail));
     if (error) assert.ok(rendered.some(node => node.type === "Banner" && node.props.title === error));
   }
 });

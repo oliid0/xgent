@@ -706,8 +706,6 @@ export const ProjectRow = memo(function ProjectRow(props: {
     renameDraft,
     onSelectProject,
     onOpenWorkspaceSettings,
-    onBrowseProjectInFileTree,
-    onBrowseProjectInSystemFileManager,
     onStartRenamingProject,
     onProjectRenameDraftChange,
     onCommitProjectRename,
@@ -755,14 +753,6 @@ export const ProjectRow = memo(function ProjectRow(props: {
   const handleTogglePinned = useCallback(() => {
     onSetProjectPinned(project, !isPinned);
   }, [isPinned, onSetProjectPinned, project]);
-
-  const handleBrowseInFileTree = useCallback(() => {
-    onBrowseProjectInFileTree?.(project);
-  }, [onBrowseProjectInFileTree, project]);
-
-  const handleBrowseInSystemFileManager = useCallback(() => {
-    onBrowseProjectInSystemFileManager?.(project);
-  }, [onBrowseProjectInSystemFileManager, project]);
 
   const handleArchive = useCallback(() => {
     onArchiveProject(project);
@@ -1067,26 +1057,6 @@ export const ProjectRow = memo(function ProjectRow(props: {
                             label: t("chat.workspaceUnarchive"),
                             icon: <ArchiveRestore aria-hidden="true" />,
                             onClick: handleUnarchive,
-                          },
-                        ]
-                      : []),
-                    ...(onBrowseProjectInFileTree
-                      ? [
-                          {
-                            id: "browse-tree",
-                            label: t("chat.workspaceBrowseInFileTree"),
-                            icon: <FolderTree aria-hidden="true" />,
-                            onClick: handleBrowseInFileTree,
-                          },
-                        ]
-                      : []),
-                    ...(onBrowseProjectInSystemFileManager
-                      ? [
-                          {
-                            id: "browse-system",
-                            label: t("chat.workspaceBrowseInSystemFileManager"),
-                            icon: <FolderOpen aria-hidden="true" />,
-                            onClick: handleBrowseInSystemFileManager,
                           },
                         ]
                       : []),
