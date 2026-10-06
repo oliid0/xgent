@@ -265,6 +265,7 @@ struct XgentSwitch: View {
     }
 
     var body: some View {
+        Group {
         #if os(iOS)
         HStack(spacing: 12) {
             label
@@ -287,6 +288,7 @@ struct XgentSwitch: View {
         .toggleStyle(.switch)
         .accessibilityIdentifier(node.id)
         #endif
+        }
         .modifier(XgentControlTypography(node: node))
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .disabled(node.disabled == true)
