@@ -95,7 +95,7 @@ final class WindowChromeTests: XCTestCase {
     @MainActor func testActualHostInstallsNativeToolbarWithoutCoveringContentAndRestoresWindowOnReset() async throws {
         let accessibility = try NativeMacAccessibilitySession()
         defer { accessibility.restore() }
-        for width: CGFloat in [320, 640, 1156] {
+        for width: CGFloat in [320, 640, 871, 1156] {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 720),
                                   styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                                   backing: .buffered, defer: false)
@@ -157,6 +157,35 @@ final class WindowChromeTests: XCTestCase {
             } while received.isEmpty && ContinuousClock.now < actionDeadline
             XCTAssertEqual(received.count, 1)
             XCTAssertEqual(received.first?["action"] as? String, "forward")
+            // Release smoke opens the sidebar in an 871-point Tauri window.
+            // Exercise the public bridge, including drawer/inline transitions,
+            // while the host remains pinned to the real window container.
+            var sidebar: [String: Any] = ["version": 1, "surface": "sidebar", "revision": 1,
+                "mode": "sidebar", "title": "XGent", "appearance": "light", "formFactor": "desktop",
+                "dismissAction": "close", "nodes": [["id": "sidebar-layout", "kind": "VStack", "children": [
+                    ["id": "sidebar-title", "kind": "Heading", "text": "XGent"],
+                    ["id": "sidebar-list", "kind": "List", "children": [
+                        ["id": "new-chat", "kind": "Button", "label": "New conversation", "action": "new-chat"]]],
+                    ["id": "sidebar-footer", "kind": "HStack", "children": [
+                        ["id": "settings", "kind": "Button", "label": "Settings", "action": "settings"]]]]]]
+            ]
+            XCTAssertEqual(try publish(sidebar, to: pointer), 0)
+            for resizedWidth: CGFloat in [871, 1156, 640, width] {
+                window.setContentSize(NSSize(width: resizedWidth, height: 720))
+                container.layoutSubtreeIfNeeded()
+                try await Task.sleep(for: .milliseconds(200))
+                XCTAssertTrue(window.frame.width.isFinite)
+                XCTAssertEqual(container.bounds.width, resizedWidth, accuracy: 0.5)
+                XCTAssertEqual(native.frame.width, container.bounds.width, accuracy: 0.5)
+                XCTAssertEqual(native.subviews.first?.frame.width ?? 0, native.bounds.width, accuracy: 0.5)
+                XCTAssertTrue(native.frame.height.isFinite)
+            }
+            sidebar["revision"] = 2
+            sidebar["removed"] = true
+            XCTAssertEqual(try publish(sidebar, to: pointer), 0)
+            container.layoutSubtreeIfNeeded()
+            try await Task.sleep(for: .milliseconds(200))
+            XCTAssertEqual(native.frame.width, container.bounds.width, accuracy: 0.5)
             let frameView = try XCTUnwrap(container.superview)
             let bitmap = try XCTUnwrap(frameView.bitmapImageRepForCachingDisplay(in: frameView.bounds))
             frameView.cacheDisplay(in: frameView.bounds, to: bitmap)

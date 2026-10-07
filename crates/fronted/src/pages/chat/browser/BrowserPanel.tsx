@@ -417,15 +417,6 @@ export function BrowserPanel(
         if (payload.sessionId === browserSessionController.getSnapshot().activeSessionId)
           shortcut(payload.key);
       }),
-      listen<{ sessionId: string; url: string }>("browser-open-tab", ({ payload }) => {
-        if (
-          browserSessionController
-            .sessionsForConversation()
-            .some((session) => session.sessionId === payload.sessionId)
-        ) {
-          void browserSessionController.newSession(payload.url).catch(() => undefined);
-        }
-      }),
     ];
     return () => {
       window.removeEventListener("keydown", onKey);

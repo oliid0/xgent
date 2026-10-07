@@ -10,8 +10,8 @@ from pathlib import Path
 evidence = Path(os.environ["RUNNER_TEMP"])
 
 
-def adb(*args):
-    return subprocess.check_output(["adb", *args], timeout=30)
+def adb(*args, timeout=30):
+    return subprocess.check_output(["adb", *args], timeout=timeout)
 
 
 def type_text(value):
@@ -20,15 +20,25 @@ def type_text(value):
     adb("shell", "input", "text", shlex.quote(value.replace(" ", "%s")))
 
 
-def snapshot():
+def snapshot(deadline=None):
     # AOSP DumpCommand returns normally without writing when its root is null
     # or idle detection times out. Never reuse a previous successful hierarchy.
     errors = []
-    for _ in range(4):
+    attempts = 0
+    def read(*args):
+        if deadline is None:
+            return adb(*args)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(["adb", *args], 0)
+        return adb(*args, timeout=min(30, remaining))
+
+    while attempts < 4 if deadline is None else time.monotonic() < deadline:
+        attempts += 1
         try:
-            adb("shell", "rm", "-f", "/sdcard/xgent-interactions.xml")
-            adb("shell", "uiautomator", "dump", "/sdcard/xgent-interactions.xml")
-            data = adb("exec-out", "cat", "/sdcard/xgent-interactions.xml")
+            read("shell", "rm", "-f", "/sdcard/xgent-interactions.xml")
+            read("shell", "uiautomator", "dump", "/sdcard/xgent-interactions.xml")
+            data = read("exec-out", "cat", "/sdcard/xgent-interactions.xml")
             root = ET.fromstring(data)
             if root.tag != "hierarchy" or not list(root.iter("node")):
                 raise ValueError("Empty Android accessibility hierarchy")
@@ -36,7 +46,7 @@ def snapshot():
             return root
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ET.ParseError, ValueError) as error:
             errors.append(str(error))
-            time.sleep(0.5)
+            time.sleep(0.5 if deadline is None else max(0, min(0.5, deadline - time.monotonic())))
     capture("accessibility-unavailable")
     raise AssertionError(f"Could not obtain a fresh Android hierarchy: {errors}")
 
@@ -174,7 +184,7 @@ if any(matches(node, {"安装基础环境", "Install base environment"}) for nod
     tap({"安装基础环境", "Install base environment"}, scroll=True)
     deadline = time.monotonic() + 180
     while time.monotonic() < deadline:
-        nodes = list(snapshot().iter("node"))
+        nodes = list(snapshot(deadline=deadline).iter("node"))
         if any(matches(node, {"已就绪", "Ready"}) for node in nodes):
             break
         time.sleep(2)
@@ -210,7 +220,10 @@ deadline = time.monotonic() + 90
 while time.monotonic() < deadline:
     output = [
         node.get(key, "")
-        for node in snapshot().iter("node")
+        # A live APK install can prevent UIAutomator from finding an idle root
+        # longer than the ordinary four attempts. Keep trying only within this
+        # existing output deadline; require a freshly written hierarchy.
+        for node in snapshot(deadline=deadline).iter("node")
         for key in ("text", "content-desc")
     ]
     if any(

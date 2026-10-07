@@ -32,6 +32,10 @@ private final class XgentPresentationHost: NSObject {
         #else
         guard let container = webview.superview else { return nil }
         controller = NSHostingController(rootView: XgentPresentationView(model: model))
+        // The Tauri container determines all four bounds. Content-derived
+        // hosting constraints feed GeometryReader/sidebar measurements back
+        // into AppKit and can grow the window indefinitely during a toggle.
+        controller.sizingOptions = []
         nativeContainer = XgentNativePresentationContainer(hostedView: controller.view)
         accessibilityBoundary = XgentPresentationAccessibilityBoundary(transport: webview)
         windowChrome = XgentDesktopWindowChrome(model: model)

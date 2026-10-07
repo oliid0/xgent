@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.Message
 import android.util.Base64
 import android.view.View
 import android.view.ViewGroup
@@ -125,6 +126,7 @@ private data class BrowserSession(
     var visible: Boolean = false,
     var pendingNavigation: PendingBrowserNavigation? = null,
     var pendingMedia: PermissionRequest? = null,
+    val pendingPopups: MutableMap<WebView, Runnable> = linkedMapOf(),
 )
 
 private data class PendingBrowserNavigation(
@@ -273,6 +275,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
             (activity as? BrowserInteractionHost)?.cancelBrowserMedia(sessionId)
             session.pendingMedia?.deny()
             session.pendingMedia = null
+            closePendingPopups(session)
             val payload = summary(session)
             (session.webView.parent as? ViewGroup)?.removeView(session.webView)
             session.webView.stopLoading()
@@ -326,6 +329,13 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
         }
     }
 
+    private fun closePendingPopups(session: BrowserSession) {
+        session.pendingPopups.toMap().forEach { (popup, cleanup) ->
+            popup.removeCallbacks(cleanup)
+            cleanup.run()
+        }
+    }
+
     private fun configureWebView(session: BrowserSession, userAgent: String?) {
         val webView = session.webView
         webView.setBackgroundColor(android.graphics.Color.WHITE)
@@ -337,11 +347,67 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
             allowContentAccess = true
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             mediaPlaybackRequiresUserGesture = true
-            setSupportMultipleWindows(false)
+            setSupportMultipleWindows(true)
             javaScriptCanOpenWindowsAutomatically = false
             userAgent?.takeIf { it.isNotBlank() }?.let { userAgentString = it }
         }
         webView.webChromeClient = object : WebChromeClient() {
+            override fun onCreateWindow(
+                view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?,
+            ): Boolean {
+                if (!isUserGesture || view !== session.webView || sessions[session.sessionId] !== session)
+                    return false
+                val transport = resultMsg?.obj as? WebView.WebViewTransport ?: return false
+                // Android supplies the destination only after the new WebView
+                // accepts its transport. Retire this temporary window as soon
+                // as the shared controller can open a normal managed tab.
+                val popup = WebView(activity)
+                popup.visibility = View.INVISIBLE
+                popup.layoutParams = FrameLayout.LayoutParams(1, 1)
+                val cleanup = Runnable {
+                    if (session.pendingPopups.remove(popup) == null) return@Runnable
+                    (popup.parent as? ViewGroup)?.removeView(popup)
+                    popup.stopLoading()
+                    popup.destroy()
+                }
+                var handled = false
+                fun destination(url: String?) {
+                    if (handled || url.isNullOrBlank() || url == "about:blank") return
+                    handled = true
+                    if (sessions[session.sessionId] === session && session.webView === view &&
+                        Uri.parse(url).scheme?.lowercase(Locale.ROOT) in setOf("http", "https")) {
+                        trigger("openTab", JSObject().apply {
+                            put("sessionId", session.sessionId)
+                            put("url", url)
+                        })
+                    }
+                    popup.removeCallbacks(cleanup)
+                    popup.post(cleanup)
+                }
+                popup.webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                        val url = request?.url?.toString() ?: return true
+                        if (url == "about:blank") return false
+                        destination(url)
+                        return true
+                    }
+                    override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                        destination(url)
+                    }
+                    override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                        popup.removeCallbacks(cleanup)
+                        cleanup.run()
+                        return true
+                    }
+                }
+                session.pendingPopups[popup] = cleanup
+                contentRoot().addView(popup)
+                popup.postDelayed(cleanup, 10_000L)
+                transport.webView = popup
+                resultMsg.sendToTarget()
+                return true
+            }
+
             override fun onReceivedTitle(view: WebView?, title: String?) {
                 session.title = title
             }
@@ -518,6 +584,7 @@ class BrowserAutomationPlugin(private val activity: Activity) : Plugin(activity)
         (activity as? BrowserInteractionHost)?.cancelBrowserMedia(session.sessionId)
         session.pendingMedia?.deny()
         session.pendingMedia = null
+        closePendingPopups(session)
         root.removeView(failedView)
         failedView.destroy()
 

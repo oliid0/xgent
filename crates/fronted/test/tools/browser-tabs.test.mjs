@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
-function setup(action) {
+function setup(action, openTabListener) {
   const sessions = new Map();
   let opens = 0;
   const client = {
@@ -21,8 +21,94 @@ function setup(action) {
   };
   const loader = createTsModuleLoader({ mocks: { "../browserAutomation": { localBrowserAutomationClient: client } } });
   const { BrowserSessionController } = loader.loadModule("src/lib/browser/browserSessionController.ts");
-  return { controller: new BrowserSessionController(client), client, opens: () => opens };
+  return { controller: new BrowserSessionController(client, openTabListener), client, opens: () => opens };
 }
+
+const flushPopups = async () => {
+  for (let index = 0; index < 3; index++) await new Promise(resolve => setImmediate(resolve));
+};
+
+test("shared native popup listener creates one real tab with both presentation subscribers", async () => {
+  let callback, registrations = 0, cleanups = 0;
+  const { controller, opens } = setup(undefined, async handler => {
+    registrations++; callback = handler;
+    return () => { cleanups++; };
+  });
+  controller.selectConversation("chat-a");
+  const source = await controller.newSession("https://example.test/source");
+  const leaveWeb = controller.subscribe(() => {}), leaveNative = controller.subscribe(() => {});
+  controller.openPanel(source.sessionId, "user");
+  callback({ sessionId: source.sessionId, url: "https://example.test/destination?q=1" });
+  await flushPopups();
+  assert.equal(registrations, 1);
+  assert.equal(opens(), 2);
+  const destination = controller.sessionsForConversation().find(tab => tab.sessionId !== source.sessionId);
+  assert.equal(destination.url, "https://example.test/destination?q=1");
+  assert.equal(controller.getSnapshot().activeSessionId, destination.sessionId);
+  leaveWeb(); await flushPopups(); assert.equal(cleanups, 0);
+  leaveNative(); await flushPopups(); assert.equal(cleanups, 1);
+  callback({ sessionId: destination.sessionId, url: "https://example.test/retired" });
+  await flushPopups(); assert.equal(opens(), 2);
+});
+
+test("popup routing rejects malformed, hidden, foreign, inactive and unsafe destinations", async () => {
+  let callback;
+  const { controller, opens } = setup(undefined, async handler => { callback = handler; return () => {}; });
+  controller.selectConversation("chat-a");
+  const source = await controller.newSession(), background = await controller.newSession();
+  const leave = controller.subscribe(() => {});
+  controller.openPanel(source.sessionId, "user");
+  for (const request of [null, {}, { sessionId: source.sessionId, url: 42 },
+    { sessionId: background.sessionId, url: "https://example.test" },
+    ...["file:///tmp/private", "javascript:alert(1)", "data:text/html,hi", "about:blank", "invalid"].map(url => ({ sessionId: source.sessionId, url }))]) callback(request);
+  controller.closePanel(); callback({ sessionId: source.sessionId, url: "https://example.test/hidden" });
+  controller.selectConversation("chat-b");
+  const other = await controller.newSession(); controller.openPanel(other.sessionId, "user");
+  callback({ sessionId: source.sessionId, url: "https://example.test/foreign" });
+  await flushPopups(); assert.equal(opens(), 3); assert.equal(controller.sessionsForConversation().length, 1);
+  leave();
+});
+
+test("late popup registration is retired and does not disconnect its replacement", async () => {
+  const callbacks = [], resolveRegistrations = [], cleaned = [];
+  const { controller, opens } = setup(undefined, handler => {
+    const id = callbacks.push(handler);
+    return new Promise(resolve => resolveRegistrations.push(() => resolve(() => cleaned.push(id))));
+  });
+  const source = await controller.newSession(); controller.openPanel(source.sessionId, "user");
+  const leaveFirst = controller.subscribe(() => {}); leaveFirst();
+  const leaveSecond = controller.subscribe(() => {});
+  resolveRegistrations[0](); await flushPopups(); assert.deepEqual(cleaned, [1]);
+  callbacks[0]({ sessionId: source.sessionId, url: "https://example.test/stale" });
+  callbacks[1]({ sessionId: source.sessionId, url: "https://example.test/live" });
+  await flushPopups(); assert.equal(opens(), 2);
+  leaveSecond(); resolveRegistrations[1](); await flushPopups(); assert.deepEqual(cleaned, [1, 2]);
+});
+
+test("popup completion preserves a new conversation or manually selected tab and exposes actual errors", async () => {
+  let callback;
+  const { controller, client } = setup(undefined, async handler => { callback = handler; return () => {}; });
+  controller.selectConversation("chat-a"); const source = await controller.newSession();
+  controller.selectConversation("chat-b"); const other = await controller.newSession();
+  controller.selectConversation("chat-a"); controller.openPanel(source.sessionId, "user");
+  const leave = controller.subscribe(() => {});
+  const originalOpen = client.openSession; let complete;
+  client.openSession = args => new Promise(resolve => { complete = () => originalOpen(args).then(resolve); });
+  callback({ sessionId: source.sessionId, url: "https://example.test/slow" });
+  await flushPopups(); controller.selectConversation("chat-b"); controller.openPanel(other.sessionId, "user");
+  complete(); await flushPopups(); assert.equal(controller.getSnapshot().activeSessionId, other.sessionId);
+  assert.equal(controller.sessionsForConversation("chat-a").length, 2);
+  controller.selectConversation("chat-a"); controller.openPanel(source.sessionId, "user");
+  const selected = controller.sessionsForConversation().find(tab => tab.sessionId !== source.sessionId);
+  callback({ sessionId: source.sessionId, url: "https://example.test/another-slow-popup" });
+  await flushPopups(); controller.selectSession(selected.sessionId);
+  complete(); await flushPopups(); assert.equal(controller.getSnapshot().activeSessionId, selected.sessionId);
+  controller.selectSession(source.sessionId);
+  client.openSession = async () => { throw Error("Native browser rejected new tab"); };
+  callback({ sessionId: source.sessionId, url: "https://example.test/error" });
+  await flushPopups(); assert.match(controller.getSnapshot().error, /Native browser rejected/);
+  assert.equal(controller.getSnapshot().activeSessionId, source.sessionId); leave();
+});
 
 test("clearing sessions removes every successful close and retains failed sessions with their actual error", async () => {
   const { controller, client } = setup();

@@ -108,7 +108,7 @@ private final class BrowserSession {
 }
 
 @MainActor
-private final class BrowserNavigationDelegate: NSObject, WKNavigationDelegate {
+private final class BrowserNavigationDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
     weak var owner: BrowserAutomationPlugin?
     let sessionId: String
 
@@ -131,6 +131,19 @@ private final class BrowserNavigationDelegate: NSObject, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation?) {
         owner?.pageDidStart(sessionId: sessionId, navigation: navigation)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        createWebViewWith configuration: WKWebViewConfiguration,
+        for navigationAction: WKNavigationAction,
+        windowFeatures: WKWindowFeatures
+    ) -> WKWebView? {
+        guard navigationAction.targetFrame == nil,
+              let url = navigationAction.request.url,
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
+        owner?.requestNewTab(sessionId: sessionId, source: webView, url: url)
+        return nil
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation?) {
@@ -310,6 +323,7 @@ final class BrowserAutomationPlugin: Plugin {
                 let delegate = BrowserNavigationDelegate(owner: self, sessionId: sessionId)
                 session.navigationDelegate = delegate
                 webView.navigationDelegate = delegate
+                webView.uiDelegate = delegate
                 try rootView().addSubview(webView)
                 sessions[sessionId] = session
                 applyViewport(request.viewport, to: session)
@@ -407,6 +421,11 @@ final class BrowserAutomationPlugin: Plugin {
     }
 
     @MainActor
+    fileprivate func requestNewTab(sessionId: String, source: WKWebView, url: URL) {
+        guard sessions[sessionId]?.webView === source else { return }
+        trigger("openTab", data: ["sessionId": sessionId, "url": url.absoluteString])
+    }
+
     fileprivate func pageDidStart(sessionId: String, navigation: WKNavigation?) {
         guard let session = sessions[sessionId] else { return }
         session.loading = true

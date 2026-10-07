@@ -3,9 +3,11 @@ import {
   type BrowserActionInput,
   type BrowserActionResponse,
   type BrowserAutomationClient,
+  type BrowserOpenTabListener,
   type BrowserSessionSummary,
   type BrowserStatus,
   type BrowserViewport,
+  listenBrowserOpenTabs,
   localBrowserAutomationClient,
 } from "../browserAutomation";
 
@@ -106,7 +108,10 @@ function mergeSession(
 }
 
 export class BrowserSessionController {
-  constructor(private readonly client: BrowserAutomationClient = localBrowserAutomationClient) {}
+  constructor(
+    private readonly client: BrowserAutomationClient = localBrowserAutomationClient,
+    private readonly openTabListener?: BrowserOpenTabListener,
+  ) {}
 
   private homePage = DEFAULT_BROWSER_HOME;
   private conversationId = "";
@@ -182,11 +187,77 @@ export class BrowserSessionController {
   private readonly openingSessions = new Map<string, Promise<BrowserSessionSummary>>();
   private nextUserTabId = 0;
   private closeAllPromise: Promise<void> | null = null;
+  private stopOpenTabListener?: () => void;
 
   subscribe = (listener: Listener) => {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    this.startOpenTabListener();
+    return () => {
+      this.listeners.delete(listener);
+      if (this.listeners.size === 0) {
+        this.stopOpenTabListener?.();
+        this.stopOpenTabListener = undefined;
+      }
+    };
   };
+
+  private startOpenTabListener() {
+    if (!this.openTabListener || this.stopOpenTabListener) return;
+    let active = true;
+    let unlisten: (() => void | Promise<void>) | undefined;
+    const stop = (cleanup: () => void | Promise<void>) => {
+      void Promise.resolve()
+        .then(cleanup)
+        .catch(() => undefined);
+    };
+    this.stopOpenTabListener = () => {
+      active = false;
+      if (unlisten) stop(unlisten);
+    };
+    void this.openTabListener((request) => {
+      if (
+        !active ||
+        !request ||
+        typeof request.url !== "string" ||
+        !this.state.panelOpen ||
+        request.sessionId !== this.state.activeSessionId
+      )
+        return;
+      if (
+        !this.sessionsForConversation().some((session) => session.sessionId === request.sessionId)
+      )
+        return;
+      let url: URL;
+      try {
+        url = new URL(request.url);
+      } catch {
+        return;
+      }
+      if (url.protocol !== "http:" && url.protocol !== "https:") return;
+      const conversationId = this.conversationId;
+      void this.newSession(url.href, { conversationId, preserveActive: true })
+        .then((session) => {
+          if (
+            active &&
+            this.conversationId === conversationId &&
+            this.state.panelOpen &&
+            this.state.activeSessionId === request.sessionId
+          )
+            this.selectSession(session.sessionId);
+        })
+        .catch((error) => {
+          if (active && this.conversationId === conversationId)
+            this.update({ error: errorMessage(error) });
+        });
+    })
+      .then((cleanup) => {
+        if (active) unlisten = cleanup;
+        else stop(cleanup);
+      })
+      .catch((error) => {
+        if (active) this.update({ error: errorMessage(error) });
+      });
+  }
 
   getSnapshot = () => this.state;
 
@@ -776,4 +847,7 @@ export class BrowserSessionController {
   }
 }
 
-export const browserSessionController = new BrowserSessionController();
+export const browserSessionController = new BrowserSessionController(
+  localBrowserAutomationClient,
+  listenBrowserOpenTabs,
+);

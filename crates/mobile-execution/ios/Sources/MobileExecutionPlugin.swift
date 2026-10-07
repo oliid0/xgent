@@ -1319,7 +1319,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         // shell when this sentinel is absent (procargs calls ios_getenv).
         // Task scripts must skip /etc/profile, including the simulator host's
         // path_helper. Set the virtual PID environment before ios_fork copies it.
-        ios_setenv("DASH_LOGIN_SHELL", "1", 1)
+        ios_setenv("_DASH_LOGIN_SHELL", "1", 1)
     }
 
     private func isCancelled(_ runId: String) -> Bool {

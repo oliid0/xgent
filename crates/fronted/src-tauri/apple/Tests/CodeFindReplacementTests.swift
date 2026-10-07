@@ -94,8 +94,21 @@ final class CodeFindReplacementTests: XCTestCase {
         defer { model.invalidate(); window.close() }
         let root = host
         #endif
-        try await Task.sleep(nanoseconds: 500_000_000)
-        let input = try XCTUnwrap(editor(in: root))
+        // The retained code host publishes its configuration asynchronously.
+        // Use the same mounted-input readiness condition as CodeHostTests;
+        // a fixed delay can expire before a busy simulator attaches the view.
+        let deadline = ContinuousClock.now + .seconds(2)
+        repeat {
+            #if os(iOS)
+            root.layoutIfNeeded()
+            #else
+            root.layoutSubtreeIfNeeded()
+            #endif
+            if editor(in: root)?.window != nil { break }
+            try await Task.sleep(for: .milliseconds(50))
+        } while ContinuousClock.now < deadline
+        let input = try XCTUnwrap(editor(in: root).flatMap { $0.window != nil ? $0 : nil },
+                                 "The editable find input must mount within two seconds: \(model.codeHosts.nativeEvidence())")
         model.update(try findFixture(before, revision: 2, edit: true))
         try await Task.sleep(nanoseconds: 300_000_000)
         XCTAssertEqual(source(input), after)

@@ -1,4 +1,17 @@
-import { invoke } from "@xgent/runtime";
+import { invoke, isTauriRuntime, listen, listenNativePlugin } from "@xgent/runtime";
+import { isNativeMobileRuntime } from "./runtimePlatform";
+
+export type BrowserOpenTabRequest = { sessionId: string; url: string };
+export type BrowserOpenTabListener = (
+  handler: (request: BrowserOpenTabRequest) => void,
+) => Promise<() => void | Promise<void>>;
+
+export const listenBrowserOpenTabs: BrowserOpenTabListener = async (handler) => {
+  if (!isTauriRuntime()) return () => {};
+  if (isNativeMobileRuntime())
+    return listenNativePlugin<BrowserOpenTabRequest>("browser-automation", "openTab", handler);
+  return listen<BrowserOpenTabRequest>("browser-open-tab", ({ payload }) => handler(payload));
+};
 
 export type BrowserBackend = "desktop-webview" | "android-webview" | "ios-wk-webview";
 

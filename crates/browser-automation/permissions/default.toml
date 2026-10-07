@@ -3,6 +3,7 @@
 [default]
 description = "Allows Xgent to create isolated browser sessions and operate them on the user's behalf."
 permissions = [
+  "allow-native-event-listeners",
   "allow-status",
   "allow-open-session",
   "allow-list-sessions",

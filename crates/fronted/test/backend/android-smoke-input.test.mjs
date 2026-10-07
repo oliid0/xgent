@@ -125,3 +125,47 @@ with tempfile.TemporaryDirectory() as directory:
 `, script], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr || result.stdout);
 });
+
+test("busy installation recovers fresh hierarchy beyond four attempts within its original deadline", () => {
+  const script = fileURLToPath(new URL("../../../../scripts/release/smoke-android-interactions.py", import.meta.url));
+  const result = spawnSync(process.platform === "win32" ? "python" : "python3", ["-c", String.raw`
+import ast, pathlib, subprocess, sys, tempfile, xml.etree.ElementTree as ET
+tree = ast.parse(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
+function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'snapshot')
+class Clock:
+    now = 0
+    def monotonic(self): return self.now
+    def sleep(self, duration): self.now += duration
+clock = Clock()
+state = {'dumps': 0, 'data': b'<hierarchy><node text="stale"/></hierarchy>', 'fail': False}
+captures, timeouts = [], []
+def adb(*args, timeout=30):
+    assert 0 < timeout <= min(30, deadline - clock.now), 'ADB must use the remaining deadline'
+    timeouts.append(timeout)
+    clock.sleep(min(0.1, timeout))
+    if args[1] == 'rm': state['data'] = None; return b''
+    if args[1] == 'uiautomator':
+        state['dumps'] += 1
+        if state['dumps'] > 5 and not state['fail']:
+            state['data'] = b'<hierarchy><node text="(1/76) Installing ncurses"/></hierarchy>'
+        return b''
+    return state['data'] or b'cat: No such file or directory'
+with tempfile.TemporaryDirectory() as directory:
+    namespace = {'adb':adb, 'ET':ET, 'subprocess':subprocess, 'time':clock,
+                 'evidence':pathlib.Path(directory), 'capture':captures.append}
+    exec(compile(ast.Module(body=[function], type_ignores=[]), sys.argv[1], 'exec'), namespace)
+    deadline = 10
+    root = namespace['snapshot'](deadline=deadline)
+    assert state['dumps'] == 6 and clock.now < deadline
+    assert root.find('node').get('text') == '(1/76) Installing ncurses'
+    assert not captures
+    state['fail'] = True
+    deadline = clock.now + 1
+    try: namespace['snapshot'](deadline=deadline)
+    except AssertionError as error: assert 'fresh Android hierarchy' in str(error)
+    else: raise AssertionError('A busy installer must still fail when its existing deadline expires')
+    assert clock.now <= deadline and captures == ['accessibility-unavailable']
+    assert max(timeouts) <= 10
+`, script], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+});

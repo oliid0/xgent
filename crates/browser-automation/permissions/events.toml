@@ -1,0 +1,6 @@
+"$schema" = "schemas/schema.json"
+
+[[permission]]
+identifier = "allow-native-event-listeners"
+description = "Allows the native new-tab listener lifecycle used by Xgent's mobile browser."
+commands.allow = ["register_listener", "registerListener", "remove_listener", "removeListener"]
