@@ -35,6 +35,11 @@ private final class XgentCodeRevealState: ObservableObject {
 
     func schedule(_ location: XgentCodeLocation?, text: String, position: Binding<CodeEditor.Position>, to view: XgentRevealTextView) {
         self.location = location; self.text = text; self.position = position; self.view = view
+        // Introspection can resolve the retained input before it has its real
+        // frame. Retry from that input's layout, not only the SwiftUI overlay.
+        if let native = view as? XgentCodeNativeTextView {
+            native.onRevealReady = { [weak self] in self?.resume() }
+        }
         resume()
     }
     func resume() {
@@ -51,6 +56,7 @@ private final class XgentCodeRevealState: ObservableObject {
     }
     func cancel() {
         generation += 1
+        (view as? XgentCodeNativeTextView)?.onRevealReady = nil
         pending = false; view = nil
     }
     private func apply(_ location: XgentCodeLocation?, text: String, to view: XgentRevealTextView) {

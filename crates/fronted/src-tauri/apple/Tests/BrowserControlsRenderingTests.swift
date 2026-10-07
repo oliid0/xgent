@@ -57,6 +57,20 @@ final class BrowserControlsRenderingTests: XCTestCase {
                 }
                 for id in ["tool-review", "tool-terminal", "tool-files", "tool-chat"] {
                     var current = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view).flattenToElements()
+                    // LazyVGrid does not expose unmounted offscreen rows to
+                    // accessibility. Walk the real viewport until the row is
+                    // loaded, then verify the complete button is reachable.
+                    if let scroll = verticalScrollView(in: host.view) {
+                        while !current.contains(where: { $0.identifier == id }) {
+                            let bottom = max(0, scroll.contentSize.height - scroll.bounds.height)
+                            let next = min(bottom, scroll.contentOffset.y + max(44, scroll.bounds.height / 2))
+                            guard next > scroll.contentOffset.y + 1 else { break }
+                            scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: next), animated: false)
+                            host.view.layoutIfNeeded()
+                            try await Task.sleep(for: .milliseconds(100))
+                            current = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view).flattenToElements()
+                        }
+                    }
                     var element = try XCTUnwrap(current.first { $0.identifier == id }, id)
                     var viewport = host.view.bounds
                     if let scroll = verticalScrollView(in: host.view) {

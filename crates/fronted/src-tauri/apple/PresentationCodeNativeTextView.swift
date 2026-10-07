@@ -9,6 +9,9 @@ final class XgentCodeNativeTextView: UITextView {
     let fileUndo = UndoManager()
     override var undoManager: UndoManager? { fileUndo }
     var lineIndex = XgentCodeLineIndex("")
+    var onRevealReady: (() -> Void)?
+    override func didMoveToWindow() { super.didMoveToWindow(); onRevealReady?() }
+    override func layoutSubviews() { super.layoutSubviews(); onRevealReady?() }
     override func unmarkText() {
         super.unmarkText()
         delegate?.textViewDidChange?(self)
@@ -25,6 +28,9 @@ import AppKit
 final class XgentCodeNativeTextView: NSTextView {
     let fileUndo = UndoManager()
     var lineIndex = XgentCodeLineIndex("")
+    var onRevealReady: (() -> Void)?
+    override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); onRevealReady?() }
+    override func layout() { super.layout(); onRevealReady?() }
     override var undoManager: UndoManager? { fileUndo }
     override func draw(_ rect: NSRect) {
         super.draw(rect)

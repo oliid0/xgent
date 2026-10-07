@@ -277,27 +277,55 @@ export async function writeSpreadsheetEdits(
         throw new Error(
           "This cell belongs to a shared or array formula; edit it in a spreadsheet application",
         );
+      // OfficeCLI ApplyCellProperties and GenOffice serializeStyledCell retain
+      // numeric/boolean storage independently of style. This text-only editor
+      // preserves an existing value's type when the new input is unambiguous;
+      // text identifiers and '='-leading text stay literal.
+      const previousType = cell.getAttribute("t");
+      const hadValue = Array.from(cell.children).some(
+        (entry) => entry.namespaceURI === namespace && entry.localName === "v",
+      );
+      const input = value.trim();
+      const numeric =
+        (previousType === null || previousType === "n") &&
+        hadValue &&
+        /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(input) &&
+        !/^[+-]?0\d/.test(input) &&
+        Number.isFinite(Number(input)) &&
+        (!Number.isInteger(Number(input)) || Number.isSafeInteger(Number(input)));
+      const boolean = previousType === "b" && /^(?:true|false|yes|no|1|0)$/i.test(input);
       for (const child of Array.from(cell.children)) {
         if (child.namespaceURI === namespace && ["f", "v", "is"].includes(child.localName))
           cell.removeChild(child);
       }
-      cell.setAttribute("t", "inlineStr");
-      const inline = element("is"),
-        text = element("t");
-      text.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve");
-      // OOXML escapes XML-invalid controls and literal escape sequences independently of XML entities.
-      text.textContent = Array.from(
-        value.replace(/_x[0-9a-f]{4}_/gi, (sequence) => `_x005F_${sequence.slice(1)}`),
-      )
-        .map((character) => {
-          const code = character.codePointAt(0)!;
-          return (code < 32 && code !== 9 && code !== 10) || code === 0xfffe || code === 0xffff
-            ? `_x${code.toString(16).padStart(4, "0")}_`
-            : character;
-        })
-        .join("");
-      inline.appendChild(text);
-      cell.insertBefore(inline, cell.firstChild);
+      if (numeric || boolean) {
+        cell.setAttribute("t", numeric ? "n" : "b");
+        const content = element("v");
+        content.textContent = numeric
+          ? String(Number(input))
+          : /^(?:true|yes|1)$/i.test(input)
+            ? "1"
+            : "0";
+        cell.insertBefore(content, cell.firstChild);
+      } else {
+        cell.setAttribute("t", "inlineStr");
+        const inline = element("is"),
+          text = element("t");
+        text.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve");
+        // OOXML escapes XML-invalid controls and literal escape sequences independently of XML entities.
+        text.textContent = Array.from(
+          value.replace(/_x[0-9a-f]{4}_/gi, (sequence) => `_x005F_${sequence.slice(1)}`),
+        )
+          .map((character) => {
+            const code = character.codePointAt(0)!;
+            return (code < 32 && code !== 9 && code !== 10) || code === 0xfffe || code === 0xffff
+              ? `_x${code.toString(16).padStart(4, "0")}_`
+              : character;
+          })
+          .join("");
+        inline.appendChild(text);
+        cell.insertBefore(inline, cell.firstChild);
+      }
       rowElement.removeAttribute("spans");
       range = range
         ? {

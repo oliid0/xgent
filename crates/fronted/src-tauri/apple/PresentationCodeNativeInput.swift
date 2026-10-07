@@ -139,6 +139,7 @@ final class XgentCodeNativeInput: NSObject {
 
     func retire() {
         mountedText = nil; text = nil; position = nil
+        view.onRevealReady = nil
         view.isEditable = false
         view.fileUndo.removeAllActions()
     }

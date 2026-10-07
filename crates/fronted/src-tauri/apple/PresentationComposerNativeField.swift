@@ -72,7 +72,11 @@ struct XgentComposerNativeField: NSViewRepresentable {
     private var appliedSelection = 0
     private var style = ""
     private var width: CGFloat = 320
+    private var measuredWidth: CGFloat = 320
     private var measuredHeight: CGFloat = 44
+    #if os(macOS)
+    private var viewportRefreshScheduled = false
+    #endif
     private let contentStorage: NSTextContentStorage
 
     init(_ configuration: XgentComposerFieldConfiguration) {
@@ -102,10 +106,12 @@ struct XgentComposerNativeField: NSViewRepresentable {
         view.isAutomaticLinkDetectionEnabled = false
         view.isVerticallyResizable = true; view.isHorizontallyResizable = false
         view.autoresizingMask = [.width]
+        container.widthTracksTextView = true
         view.textContainerInset = CGSize(width: 0, height: 8)
         scroll.borderType = .noBorder; scroll.drawsBackground = false
         scroll.hasVerticalScroller = false; scroll.hasHorizontalScroller = false
         scroll.documentView = view
+        view.onViewport = { [weak self] in self?.scheduleViewportRefresh() }
         #endif
         view.onKey = { [weak self] key in
             guard let self, !self.retired else { return .ignored }
@@ -230,32 +236,63 @@ struct XgentComposerNativeField: NSViewRepresentable {
         #endif
         guard proposed.isFinite, proposed < CGFloat.greatestFiniteMagnitude,
               viewportWidth.map({ !$0.isFinite || $0 <= 0 || proposed <= $0 }) ?? true else {
-            return CGSize(width: width, height: measuredHeight)
+            return CGSize(width: measuredWidth, height: measuredHeight)
         }
         let nextWidth = max(44, proposed)
+        #if os(iOS)
         if width != nextWidth {
             updating = true; width = nextWidth
             if !configuration.fieldState.composing { refreshContent() }
             updating = false
         }
+        #endif
         let line = configuration.fontSize * 1.3
         #if os(iOS)
         let measured = view.sizeThatFits(CGSize(width: nextWidth, height: CGFloat.greatestFiniteMagnitude)).height
         let minimum = max(44, line + 16)
         #else
-        view.frame.size.width = nextWidth
-        view.textContainer?.containerSize.width = nextWidth
-        var measured = line + 16
-        if let manager = view.textLayoutManager, let range = manager.textContentManager?.documentRange {
-            manager.ensureLayout(for: range)
-            measured = manager.usageBoundsForTextContainer.height + 16
-        }
-        view.frame.size.height = measured
+        // SwiftUI can probe several finite widths in the same layout pass.
+        // Measure a separate attributed snapshot: changing the live scroll
+        // document here recursively invalidates AppKit hosting constraints.
+        let projection = XgentComposerRichText(attributed)
+        let snapshot = XgentComposerAttributedText.make(text: projection.text,
+            references: projection.spans.compactMap(\.reference), fontFamily: configuration.fontFamily,
+            fontSize: configuration.fontSize, palette: configuration.palette, width: nextWidth,
+            pastes: projection.pastes, preserving: attributed)
+        let storage = NSTextStorage()
+        storage.setAttributedString(snapshot)
+        let manager = NSLayoutManager()
+        let container = NSTextContainer(size: CGSize(width: nextWidth, height: CGFloat.greatestFiniteMagnitude))
+        container.lineFragmentPadding = 0
+        storage.addLayoutManager(manager)
+        manager.addTextContainer(container)
+        _ = manager.glyphRange(for: container)
+        let measured = manager.usedRect(for: container).height + 16
         let minimum = line + 16
         #endif
+        measuredWidth = nextWidth
         measuredHeight = max(minimum, min(line * 6 + 16, measured))
         return CGSize(width: nextWidth, height: measuredHeight)
     }
+
+    #if os(macOS)
+    private func scheduleViewportRefresh() {
+        guard !retired, !viewportRefreshScheduled else { return }
+        viewportRefreshScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.viewportRefreshScheduled = false
+            let actual = self.view.frame.width
+            guard !self.retired, actual.isFinite, actual >= 44, actual != self.width else { return }
+            // The scroll document's actual frame owns attachment wrapping,
+            // not a proposed measurement. Coalesce changes outside layout.
+            self.updating = true
+            self.width = actual
+            if !self.configuration.fieldState.composing { self.refreshContent() }
+            self.updating = false
+        }
+    }
+    #endif
 
     private func changed() {
         guard !updating, !retired, !configuration.disabled else { return }
@@ -290,6 +327,9 @@ struct XgentComposerNativeField: NSViewRepresentable {
     func retire() {
         retired = true; pendingFocus = false
         view.onKey = nil; view.onWindow = nil; view.onPaste = nil; view.onPasteAttachments = nil
+        #if os(macOS)
+        view.onViewport = nil
+        #endif
         view.delegate = nil; view.isEditable = false
         #if os(macOS)
         view.setAccessibilityEnabled(false)

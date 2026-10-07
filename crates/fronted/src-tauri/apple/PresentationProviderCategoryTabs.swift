@@ -72,8 +72,15 @@ struct XgentProviderCategoryTabs: View {
                     HStack(alignment: .center, spacing: 4) {
                         ForEach(options) { option in tab(option, viewportWidth: geometry.size.width).id(option.value) }
                     }
+                    .onGeometryChange(for: CGSize.self) { $0.size } action: { _ in
+                        // Width proposals can arrive before the resized strip
+                        // has laid out. Reveal again when its actual size is
+                        // available, without reacting to scrolling offsets.
+                        proxy.scrollTo(selected, anchor: .center)
+                    }
                 }
                 .frame(width: geometry.size.width, height: rowHeight)
+                .clipped()
                 .scrollIndicators(.hidden)
                 .task(id: "\(selected):\(geometry.size.width):\(dynamicTypeSize):\(theme.fontScale):\(layoutDirection)") {
                     // Scroll directly to the actual button after layout. A

@@ -53,6 +53,50 @@ test("shared spreadsheet write updates selected cells and preserves unrelated fo
   assert.deepEqual(Buffer.from(previewBytes(`data:application/octet-stream;base64,${previewBytesBase64(output)}`)), Buffer.from(output));
 });
 
+test("editing existing numeric and boolean cells keeps their calculation types and text identifiers remain literal", async () => {
+  const workbook = utils.book_new();
+  const sheet = utils.aoa_to_sheet([[12.5, true, "00123", "=literal", 25]]);
+  sheet.A1.z = "0.00";
+  sheet.E1.f = "A1*2";
+  utils.book_append_sheet(workbook, sheet, "Data");
+  const bytes = new Uint8Array(write(workbook, { type: "array", bookType: "xlsx" }));
+  const output = await writeSpreadsheetEdits(bytes, {
+    Data: { "0:0": "23.50", "0:1": "FALSE", "0:2": "00456", "0:3": "=SUM(A1)" },
+  });
+  const saved = read(output, { type: "array", cellNF: true }).Sheets.Data;
+  assert.equal(saved.A1.t, "n", "Changed totals must remain usable as formula inputs");
+  assert.equal(saved.A1.v, 23.5);
+  assert.equal(saved.A1.z, "0.00");
+  assert.equal(saved.A1.w, "23.50");
+  assert.equal(saved.B1.t, "b");
+  assert.equal(saved.B1.v, false);
+  assert.equal(saved.C1.t, "s");
+  assert.equal(saved.C1.v, "00456");
+  assert.equal(saved.D1.v, "=SUM(A1)");
+  assert.equal(saved.D1.f, undefined, "Text editing must not silently create formulas");
+  assert.equal(saved.E1.f, "A1*2");
+});
+
+test("typed XLSX edits retain zero and finite exponents without coercing empty, unsafe or identifier text", async () => {
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, utils.aoa_to_sheet([[1, 1, 1, 1, 1, 1, 1, "123", true, true]]), "Data");
+  const bytes = new Uint8Array(write(workbook, { type: "array", bookType: "xlsx" }));
+  const values = ["0", " -1.25e2 ", "", "00123", "9007199254740993", "1e309", "=SUM(A1)", "456", "0", "disabled"];
+  const edits = Object.fromEntries(values.map((value, index) => [`0:${index}`, value]));
+  const output = await writeSpreadsheetEdits(bytes, { Data: edits });
+  const saved = read(output, { type: "array" }).Sheets.Data;
+  for (const [index, type, value] of [
+    [0, "n", 0], [1, "n", -125], [2, "s", ""], [3, "s", "00123"],
+    [4, "s", "9007199254740993"], [5, "s", "1e309"], [6, "s", "=SUM(A1)"],
+    [7, "s", "456"], [8, "b", false], [9, "s", "disabled"],
+  ]) {
+    const cell = saved[utils.encode_cell({ r: 0, c: index })];
+    assert.equal(cell.t, type);
+    assert.equal(cell.v, value);
+    assert.equal(cell.f, undefined);
+  }
+});
+
 test("shared spreadsheet limits retain first 250 rows and 80 columns without dropping them during write", async () => {
   const workbook = utils.book_new();
   const sheet = { A1: { t: "s", v: "First" }, CE251: { t: "s", v: "Beyond viewport" }, "!ref": "A1:CE251" };

@@ -5,6 +5,8 @@ struct XgentBrowserStartTools: View {
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
     @Environment(\.dynamicTypeSize) private var textSize
+    @Environment(\.xgentPresentationTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     @State private var availableWidth: CGFloat = 0
 
     private var columns: [GridItem] {
@@ -31,6 +33,8 @@ struct XgentBrowserStartTools: View {
                         .contentShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.bordered)
+                    .buttonBorderShape(.roundedRectangle(radius: CGFloat(theme.radius.element)))
+                    .tint(Color(xgentHex: theme.palette(for: colorScheme).text))
                     .disabled(item.disabled == true || model.isBusy(item, in: document))
                     .accessibilityIdentifier(item.id)
                 }

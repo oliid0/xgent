@@ -136,6 +136,7 @@ struct XgentComposerKey {
 @MainActor final class XgentComposerNativeTextView: NSTextView {
     var onKey: ((XgentComposerKey) -> KeyPress.Result)?
     var onWindow: (() -> Void)?
+    var onViewport: (() -> Void)?
     var onPaste: ((String) -> Bool)?
     var onPasteAttachments: (([XgentClipboardAttachment]) -> Bool)?
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { isEditable }
@@ -144,6 +145,11 @@ struct XgentComposerKey {
         super.mouseDown(with: event)
     }
     override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); onWindow?() }
+    override func setFrameSize(_ newSize: NSSize) {
+        let previousWidth = frame.width
+        super.setFrameSize(newSize)
+        if frame.width != previousWidth { onViewport?() }
+    }
     override func keyDown(with event: NSEvent) {
         var modifiers: EventModifiers = []
         if event.modifierFlags.contains(.shift) { modifiers.insert(.shift) }

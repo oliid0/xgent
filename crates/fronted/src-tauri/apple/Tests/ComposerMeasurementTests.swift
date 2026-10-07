@@ -24,6 +24,10 @@ final class ComposerMeasurementTests: XCTestCase {
         let selected = coordinator.view.selectedRange()
         #endif
         let frame = coordinator.view.frame
+        #if os(macOS)
+        let containerWidth = coordinator.view.textContainer?.containerSize.width
+        let contents = coordinator.view.attributedString().copy() as! NSAttributedString
+        #endif
         let probes: [CGFloat] = [.infinity, -.infinity, .nan, .greatestFiniteMagnitude]
         for probe in probes {
             let measured = coordinator.size(width: probe)
@@ -34,12 +38,22 @@ final class ComposerMeasurementTests: XCTestCase {
             XCTAssertEqual(coordinator.view.selectedRange, selected)
             #else
             XCTAssertEqual(coordinator.view.selectedRange(), selected)
-            XCTAssertEqual(coordinator.view.textContainer?.containerSize.width, initial.width)
+            XCTAssertEqual(coordinator.view.textContainer?.containerSize.width, containerWidth)
             #endif
         }
         let resized = coordinator.size(width: 480)
         XCTAssertEqual(resized.width, 480)
         XCTAssertTrue(resized.height.isFinite)
+        #if os(macOS)
+        let finiteProbes: [CGFloat] = [44, 240, 480, 320, 480]
+        for probe in finiteProbes {
+            XCTAssertTrue(coordinator.size(width: probe).height.isFinite)
+            XCTAssertEqual(coordinator.view.frame, frame, "Finite fitting proposals must not resize the live editor")
+            XCTAssertEqual(coordinator.view.textContainer?.containerSize.width, containerWidth)
+            XCTAssertEqual(coordinator.view.selectedRange(), selected)
+            XCTAssertTrue(coordinator.view.attributedString().isEqual(to: contents))
+        }
+        #endif
         XCTAssertEqual(coordinator.size(width: .infinity), resized,
                        "The next split-view probe uses the accepted finite viewport")
     }
