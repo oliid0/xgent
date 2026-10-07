@@ -27,7 +27,7 @@ final class ComposerReferenceRenderingTests: XCTestCase {
             "An attributed undo record restored under a different theme/font must be restyled")
     }
 
-    @MainActor func testLargeClipboardTextUsesANativeUndoableCardAndCarriesItsSharedPasteDeclaration() async throws {
+    @MainActor func testLargeClipboardTextUsesANativeUndoableCardAndCarriesItsSharedPasteDeclaration() throws {
         let document = try fixture(), model = XgentPresentationModel()
         model.update(document)
         var actions: [XgentAction] = []; model.actionSink = { actions.append($0) }
@@ -40,7 +40,7 @@ final class ComposerReferenceRenderingTests: XCTestCase {
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 240, height: 220))
         window.rootViewController = host; window.makeKeyAndVisible()
         defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
-        host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(220))
+        host.view.layoutIfNeeded(); settleComposer(after: 0.22)
         func descendants(_ view: UIView) -> [UIView] { [view] + view.subviews.flatMap { descendants($0) } }
         let field = try XCTUnwrap(descendants(host.view).compactMap { $0 as? XgentComposerNativeTextView }.first)
         field.selectedRange = NSRange(location: field.attributedText.length, length: 0)
@@ -56,7 +56,7 @@ final class ComposerReferenceRenderingTests: XCTestCase {
             model.invalidate(); window.close()
             print("composer-long-paste: teardown complete")
         }
-        host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(220))
+        host.layoutSubtreeIfNeeded(); settleComposer(after: 0.22)
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
         let field = try XCTUnwrap(descendants(host).compactMap { $0 as? XgentComposerNativeTextView }.first)
         field.setSelectedRange(NSRange(location: field.string.utf16.count, length: 0))
@@ -64,7 +64,7 @@ final class ComposerReferenceRenderingTests: XCTestCase {
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString(source, forType: .string)
         #endif
         print("composer-long-paste: paste begin")
-        field.paste(nil); try await Task.sleep(for: .milliseconds(120))
+        field.paste(nil); settleComposer(after: 0.12)
         print("composer-long-paste: paste complete")
         let edit = try XCTUnwrap(actions.last { $0.action == "references" })
         let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(edit.value.text.utf8)) as? [String: Any])
@@ -89,7 +89,9 @@ final class ComposerReferenceRenderingTests: XCTestCase {
         let undo = try XCTUnwrap(field.undoManager)
         XCTAssertTrue(undo.canUndo)
         print("composer-long-paste: undo begin, groups=\(undo.groupingLevel)")
-        undo.undo(); try await Task.sleep(for: .milliseconds(120))
+        undo.undo()
+        print("composer-long-paste: undo returned")
+        settleComposer(after: 0.12)
         print("composer-long-paste: undo complete, canRedo=\(undo.canRedo)")
         let restored = try XCTUnwrap(actions.last { $0.action == "references" })
         let restoredPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(restored.value.text.utf8)) as? [String: Any])
@@ -97,7 +99,9 @@ final class ComposerReferenceRenderingTests: XCTestCase {
         XCTAssertEqual((restoredPayload["pastes"] as? [[String: Any]])?.count, 0)
         XCTAssertTrue(undo.canRedo, "Undo must preserve the pasted card's redo record")
         print("composer-long-paste: redo begin, groups=\(undo.groupingLevel)")
-        undo.redo(); try await Task.sleep(for: .milliseconds(120))
+        undo.redo()
+        print("composer-long-paste: redo returned")
+        settleComposer(after: 0.12)
         print("composer-long-paste: redo complete")
         let redone = try XCTUnwrap(actions.last { $0.action == "references" })
         let redonePayload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(redone.value.text.utf8)) as? [String: Any])
@@ -215,6 +219,15 @@ final class ComposerReferenceRenderingTests: XCTestCase {
                 XCTAssertEqual(XgentComposerRichText(value).text, document.nodes[0].value?.text)
             }
         }
+    }
+
+    @MainActor private func settleComposer(after delay: TimeInterval) {
+        // CI #326 aborts in XCTest's async error observer while undo executes.
+        // Keep AppKit exceptions observable by the synchronous XCTest runner,
+        // and still let native layout and event-based undo groups settle.
+        let settled = expectation(description: "Composer layout and undo groups settle")
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { settled.fulfill() }
+        wait(for: [settled], timeout: 3)
     }
 
     private func fixture(label: String = "/review") throws -> XgentDocument {
