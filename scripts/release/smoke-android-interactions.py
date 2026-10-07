@@ -74,7 +74,14 @@ def tap(labels, timeout=30, scroll=False, scroll_direction="down"):
                 obscured_above = True
                 continue
             if right > left and bottom > top:
-                adb("shell", "input", "tap", str((left + right) // 2), str((top + bottom) // 2))
+                x, y = (left + right) // 2, (top + bottom) // 2
+                trace = (f"Tap {sorted(labels)!r}: text={node.get('text')!r}, "
+                         f"description={node.get('content-desc')!r}, "
+                         f"clickable={node.get('clickable')!r}, bounds={bounds}, point=({x},{y})\n")
+                print(trace, end="", flush=True)
+                with (evidence / "xgent-android-taps.log").open("a", encoding="utf-8") as output:
+                    output.write(trace)
+                adb("shell", "input", "tap", str(x), str(y))
                 time.sleep(1)
                 return
         if scroll and swipes < 12:
@@ -145,8 +152,10 @@ def enter_terminal_text(value, timeout=10):
     raise AssertionError(f"Terminal input mismatch: expected {value!r}, actual {actual!r}")
 
 
-def capture(name):
+def capture(name, hierarchy=False):
     (evidence / f"xgent-android-{name}.png").write_bytes(adb("exec-out", "screencap", "-p"))
+    if hierarchy:
+        ET.ElementTree(snapshot()).write(evidence / f"xgent-android-{name}.xml", encoding="utf-8")
 
 
 # These labels come from the same zh/en dictionaries as the installed controls.
@@ -155,9 +164,9 @@ tap({"设置", "Settings"})
 capture("settings")
 tap({"关闭", "Close"})
 tap({"工作工具", "Workspace tools"})
-capture("workspace-tools-menu")
+capture("workspace-tools-menu", hierarchy=True)
 tap({"Shell 管理", "Shell management"})
-capture("shell-settings-opened")
+capture("shell-settings-opened", hierarchy=True)
 tap({"刷新状态", "Refresh status"}, scroll=True)
 capture("shell-settings")
 nodes = list(snapshot().iter("node"))

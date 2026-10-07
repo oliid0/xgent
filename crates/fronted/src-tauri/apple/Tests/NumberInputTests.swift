@@ -35,6 +35,26 @@ final class NumberInputTests: XCTestCase {
         XCTAssertThrowsError(try decode(extra: ["minimum": 1, "maximum": 2147483647, "value": 2147483648]).validate())
     }
 
+    func testExplicitNullOptionalNumberSurvivesWireDecodingAndMissingValueStillFails() throws {
+        let optional = try decode(extra: ["value": NSNull(), "minimum": 0,
+                                          "maximum": NSNull(), "clearable": true, "integerOnly": true])
+        XCTAssertEqual(optional.nodes[0].value, .null)
+        XCTAssertNoThrow(try optional.validate())
+        XCTAssertThrowsError(try decode(extra: ["value": NSNull()]).validate())
+
+        let absentData = Data(#"{"version":1,"surface":"numbers","revision":1,"mode":"sheet","title":"Cron","appearance":"light","nodes":[{"id":"remaining","kind":"NumberInput","minimum":0,"step":1,"clearable":true}]}"#.utf8)
+        let absent = try JSONDecoder().decode(XgentDocument.self, from: absentData)
+        XCTAssertNil(absent.nodes[0].value)
+        XCTAssertThrowsError(try absent.validate())
+
+        let cleared = try JSONDecoder().decode(XgentActionResult.self,
+            from: Data(#"{"surface":"numbers","requestId":"clear","ok":true,"acceptedValue":null}"#.utf8))
+        XCTAssertEqual(cleared.acceptedValue, .null)
+        let unchanged = try JSONDecoder().decode(XgentActionResult.self,
+            from: Data(#"{"surface":"numbers","requestId":"save","ok":true}"#.utf8))
+        XCTAssertNil(unchanged.acceptedValue)
+    }
+
     @MainActor
     func testNativeNumericDraftEntryRendersAtNarrowAndWideWidths() async throws {
         #if os(iOS)

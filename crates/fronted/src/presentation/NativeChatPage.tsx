@@ -245,17 +245,14 @@ export function NativeChatPage(props: NativeChatPageProps) {
     detectedMentionContext?.end,
   ]);
   const mentionContext = mentionScope === dismissedMentionScope ? null : detectedMentionContext;
-  const mentionKey = nativeMentionSearchKey(
-    props.conversationId,
-    props.uploadWorkdir,
-    mentionContext,
-  );
+  const mentionWorkdir = agentToolsEnabled ? props.uploadWorkdir : "";
+  const mentionKey = nativeMentionSearchKey(props.conversationId, mentionWorkdir, mentionContext);
   const mentionContextRef = useRef(mentionContext);
   mentionContextRef.current = mentionContext;
   useEffect(() => {
-    void mentionSearch.search(mentionKey, props.uploadWorkdir, mentionContextRef.current);
+    void mentionSearch.search(mentionKey, mentionWorkdir, mentionContextRef.current);
     return () => mentionSearch.cancel();
-  }, [mentionSearch, mentionKey, props.uploadWorkdir]);
+  }, [mentionSearch, mentionKey, mentionWorkdir]);
   const sidebar = useSyncExternalStore(
     props.sidebarStore.subscribe,
     props.sidebarStore.getSnapshot,

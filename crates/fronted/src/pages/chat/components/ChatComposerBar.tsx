@@ -410,8 +410,11 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
 
   const acceptsWorkspacePath = useCallback(
     (payload: WorkspacePathDragPayload | null) =>
-      payload !== null && !isInputDisabled && workspacePathDragMatchesProject(payload, workdir),
-    [isInputDisabled, workdir],
+      isAgentMode &&
+      payload !== null &&
+      !isInputDisabled &&
+      workspacePathDragMatchesProject(payload, workdir),
+    [isAgentMode, isInputDisabled, workdir],
   );
   const insertWorkspacePath = useCallback(
     (payload: WorkspacePathDragPayload | null) => {
@@ -1032,7 +1035,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                 loadHistoryPrompts={loadHistoryPrompts}
                 placeholder={inputPlaceholder}
                 disabled={isInputDisabled}
-                workdir={workdir}
+                workdir={isAgentMode ? workdir : ""}
                 enabledSkills={enabledSkills}
                 preferNativeContextMenu={mobileExperience}
                 compact={mobileExperience}

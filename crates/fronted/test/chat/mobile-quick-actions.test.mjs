@@ -13,13 +13,15 @@ test("mobile tool actions dispatch real navigation and XChat exposes only browse
   const calls = [];
   const props = Object.fromEntries(["Terminal", "Rootfs", "Browser", "BrowserSettings", "GitReview", "Ssh", "BackgroundTasks"].map(name => [`onOpen${name}`, () => calls.push(name)]));
   const agent = MobileQuickActions({ ...props, agentToolsEnabled: true });
+  assert.equal(agent.props.presentation, "bottom-sheet");
   const actions = agent.props.items.flatMap(group => group.items);
   assert.deepEqual(actions.map(item => item.id), ["terminal", "rootfs", "browser", "browser-settings", "git", "ssh", "background"]);
-  actions.find(item => item.id === "rootfs").onClick();
-  assert.deepEqual(calls, ["Rootfs"]);
+  for (const action of actions) action.onClick();
+  assert.deepEqual(calls, ["Terminal", "Rootfs", "Browser", "BrowserSettings", "GitReview", "Ssh", "BackgroundTasks"]);
+  calls.length = 0;
   const chat = MobileQuickActions({ ...props, agentToolsEnabled: false });
   const safe = chat.props.items.flatMap(group => group.items);
   assert.deepEqual(safe.map(item => item.id), ["browser", "browser-settings"]);
   safe[0].onClick();
-  assert.deepEqual(calls, ["Rootfs", "Browser"]);
+  assert.deepEqual(calls, ["Browser"]);
 });

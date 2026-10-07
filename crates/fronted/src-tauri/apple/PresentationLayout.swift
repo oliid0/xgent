@@ -584,7 +584,7 @@ extension XgentNodeView {
             .padding(CGFloat(presentationTheme.spacing.md))
             .modifier(XgentGlassSurface(radius: CGFloat(presentationTheme.radius.chat), floating: true))
             .overlay(alignment: .top) {
-                if let suggestions = node.child(id: "composer-suggestions") {
+                if let suggestions = node.children?.first(where: { $0.id == "composer-suggestions" }) {
                     XgentComposerSuggestions(node: suggestions, document: document, model: model, floatsAboveInput: true)
                 }
             }

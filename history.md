@@ -1,30 +1,29 @@
 # Current objective
-Repair Apple CI/Release and align functional settings/sidebar/chat behavior and Astryx/SwiftUI visuals across platforms. No local build/dev/Cargo. Finish coherent fixes and non-Cargo checks before one push; preserve the user's request to avoid frequent CI.
+Repair Apple CI/Release and align functional settings/sidebar/chat behavior and Astryx/SwiftUI visuals across platforms. No local build/dev/Cargo. Finish coherent fixes and non-Cargo checks before one push; avoid frequent CI.
 
-## Completed / evidence
-- Apple UI moved to src-tauri/apple; macOS CUA moved to crates/computer-use/macos; native directory removed and build/workflow references updated.
-- Provider RTL/selection, exact installed Iconify glyphs, full quota/proxy diagnostics and mounted Skills sheets fixed. Actual Astryx narrow/large-font provider screenshots checked.
-- macOS long-paste crash traced to overlapping AppKit/custom undo records; one attributed inverse owns each edit. Paste/copy/undo/redo/teardown pass in CI #328. Xcode 26.4.1 pinned.
-- Composer image attachments inside input, blue inline file/folder mentions, floating suggestions; native image lifecycle uses shared workspace reads with cancellation/loading/error/removal.
+## Completed
+- Apple UI moved to src-tauri/apple; macOS CUA moved to crates/computer-use/macos; native directory and old build/workflow references removed.
+- Provider diagnostics, RTL/selection, installed glyphs and mounted Skills sheets fixed; narrow/large-font Astryx screenshots inspected.
+- macOS long-paste crash fixed at overlapping AppKit/custom undo ownership; physical paste/copy/undo/redo/teardown pass in CI #328.
+- Composer images inside input, blue inline file/folder references and floating suggestions. Work grouping shares verified MCP identity/common intent, real details and status between both UIs.
+- Functional browser landing actions, real copy/open/navigation, Review/Files shared data, rounded address controls. Bottom terminal uses real PTY/SwiftTerm sessions, bounds/resizing and keeps chat/browser above.
+- XChat hides/guards agent workspace tools and panels while retaining the browser. System PowerShell banner/profile restored and PTY creation moved off the main thread; startup speed remains unmeasured.
+- Removed geometry persistence/plugin; cleanup targets only exact obsolete geometry files and numeric migration copies. Unified .xgent storage, iOS sandbox migration and CUA preferences; Android retains its OS app directory.
 
-## Coherent local fix group
-- XChat receives no agent workspace path; manual workspace tools, existing panels and workspace dialogs hidden/guarded. Browser remains. Desktop/mobile launch and archive regressions pass.
-- Functional browser new-tab Review/Terminal/Files/side-chat actions; side Review/Files reuse existing shared panel/data. Both UIs use real copy-address/default-browser actions, errors, translated more/devtools menus and rounded address fields. Native tools visibly named.
-- Bottom terminal reuses real PTY/session, keeps browser/chat above, resizes and returns to side. Shared native docking state, retirement/output regression and real SwiftTerm/browser/chat rendering coverage added. Short-height bounds and unique tab/panel accessibility IDs fixed.
-- System PowerShell normal banner/profile/policy restored; PTY creation uses existing spawn_blocking pattern. Startup speed is unmeasured; Rust checks remain CI-only.
-- Removed all obsolete window geometry saving/restoring/plugin/dependency. Startup cleans only exact old geometry files/numeric migration copies, preserving other data. CUA preference uses unified storage. iOS uses sandbox data/.xgent and migrates old nested root; Android retains OS app directory. Cleanup/migration Rust regression added; iterator prefix dereference audited against Rust Pattern signature.
-- Shared work grouping uses verified MCP identity or explicit common intent, preserving file targets, narratives, rounds, actual details and error/running states. Both UIs use the same grouping; native call counts translated.
-- AOSP confirms null-root dump may succeed without writing; Android smoke deletes stale snapshots, bounded retries and intermediate captures. Packaged mac smoke records computed AX failure and physically clicks/selects/types exact composer replacements at startup/dismissal/narrow width; actual outcome awaits CI.
+## Current coherent repair group (uncommitted)
+- Apple compilation: replace inaccessible iOS-file-private child helper with direct children lookup.
+- Cron editor: preserve explicit JSON .null in XgentValue optional decoding while keeping absent values nil. Regression checks clearable/required/missing numbers and action acknowledgements.
+- iOS Shell: exact pinned dash archive SHA256 9a30ac6b... and simulator/device procargs disassembly verify DASH_LOGIN_SHELL forces first login if absent. Set virtual environment sentinel before ios_fork to prevent host /etc/profile/path_helper. Smoke verifies real stdout, localized numeric exits, explicit exit 7 followed by success, no profile stderr, Python, stdin/EOF/cancellation.
+- Both composer UIs cancel/suppress old agent-directory autocomplete in XChat; Astryx also rejects workspace-reference drags. Explicit user uploads remain; native image/mention root matches conversation-scoped uploads.
+- Android screenshot shows Shell tap left the anchored menu open. Mobile actions use installed Astryx 0.6.3 modal scrollable BottomSheet, verified with MCP/CLI/source, preserving all live routes and XChat filtering. Smoke records tap geometry and intermediate XML/screenshots; artifact upload includes every captured XML. Packaged transition awaits CI.
 
 ## Verification / CI
-- CI #328 (7bf5d2bb): ALL jobs success, including macOS/iOS/device/frontend/Rust/guards.
-- Release #142 (same SHA): Linux/Windows success; Intel/ARM fail computed empty-composer hit; Android failed navigation after null-root snapshots; iOS simulator smoke still running. AX client is untrusted, so direct AX error does not prove a blocked composer.
-- Clean final non-Cargo suite: ALL 1986 passed (350.6 s), no failures/cancellations/skips. One earlier transient image worker stall was terminated; all 3 actual raster/encoding tests passed independently and again in clean suite. Two obsolete grouping/composer assertions corrected without dropping their behavioral checks.
-- Latest check/lint pass (685 files); native contract 55 kinds/46 properties and architecture guard pass. Browser SSR with installed components/icons + Edge at 240/320/390/640/1280 px renders all 9 controls without horizontal clipping; screenshot inspected (.ci-artifacts/browser-dock).
-- Local commits 18bc254/74b66cb plus completed 48-file feature/storage/smoke group will be pushed together after final checks. No CI triggered during the local group.
+- CI #328 (7bf5d2bb): all jobs success. Prior coherent 48-file group c8f8d53b pushed once; its clean non-Cargo suite passed 1986/1986.
+- CI #329 (c8f8d53b): frontend/Rust/guards pass; Apple compilation fails at the child lookup fixed above.
+- Release #143 run 37589800007: Windows/Linux pass; macOS fails the same lookup; Android package builds but Shell menu interaction fails; iOS still building. Release #142 established actual Cron rejection and Shell exit 2 with host path_helper stderr, addressed above.
+- Current group: all 1987 non-Cargo tests pass (366.7 s), no failures/cancellations/skips. 56 focused mobile/native and 13 release-workflow regressions also pass; check/lint, native protocol (55 kinds/46 properties), architecture and diff checks pass. Swift/Rust compilation and packaged behavior require CI.
 
 ## Remaining
-- One coherent commit/push; track CI and unsigned/non-publishing Release to complete success, including new native dock/landing and actual packaged input.
-- Full settings/sidebar/preview/chat parity audit, extension integration and complex multi-app task evidence; 90% similarity/completion equivalence not independently established. Installed Tauri extension API does not support Apple; no fake install controls.
+One coherent commit/push, then track CI and unsigned/non-publishing Release including real native input/dock/menu/Shell flows to complete success. Continue detailed settings/sidebar/preview parity audit, extension integration and complex multi-app task evidence; 90% visual similarity and equivalent task completion are not independently established. No fake extension-install controls.
 
-Touched: composer/presentation, ChatPage/browser/right-sidebar/mobile actions/work transcript, Apple panel/control/layout tests, terminal runtime, unified storage/startup/window dependency, release interaction smoke/tests, locales and history.
+Touched: Apple layout/model/number tests, shared/native composers and chat mode regression, mobile quick actions, iOS execution environment, packaged iOS/Android interaction smoke, release evidence upload and history.

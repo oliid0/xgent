@@ -33,6 +33,16 @@ enum XgentValue: Codable, Equatable {
     var boolean: Bool { self == .bool(true) }
 }
 
+extension KeyedDecodingContainer {
+    // Synthesized Optional decoding normally collapses explicit JSON null into
+    // nil. The wire value has a distinct .null case for clearing optional
+    // controls and acknowledging that clear; absent values must stay absent.
+    func decodeIfPresent(_ type: XgentValue.Type, forKey key: Key) throws -> XgentValue? {
+        guard contains(key) else { return nil }
+        return try decode(type, forKey: key)
+    }
+}
+
 struct XgentOption: Decodable, Identifiable {
     let value: String
     let label: String

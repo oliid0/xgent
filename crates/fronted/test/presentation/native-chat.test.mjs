@@ -139,10 +139,12 @@ function harness(overrides = {}, options = {}) {
   const mobile = options.mobile ?? false;
   const states = [];
   const cleanups = [];
+  const pendingEffects = [];
   let cursor = 0;
   let mounted = false;
   const loader = createTsModuleLoader({ mocks: {
     ...(options.invoke ? { "@tauri-apps/api/core": { invoke: options.invoke } } : {}),
+    ...(options.fsInvoke ? { "../lib/tools/fsBackend": { invokeFs: options.fsInvoke } } : {}),
     react: {
       lazy: () => "NativeDesktopTrajectory",
       Suspense: "Suspense",
@@ -160,7 +162,18 @@ function harness(overrides = {}, options = {}) {
       },
       useMemo: (create) => create(),
       useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
-      useEffect() {},
+      useEffect(effect, dependencies) {
+        if (!options.effects) return;
+        const index = cursor++;
+        const previous = states[index];
+        if (dependencies && previous?.dependencies?.length === dependencies.length &&
+            dependencies.every((item, i) => Object.is(item, previous.dependencies[i]))) return;
+        pendingEffects.push(() => {
+          previous?.cleanup?.();
+          states[index] = { dependencies, cleanup: effect() };
+        });
+        if (!previous) cleanups.push(() => states[index]?.cleanup?.());
+      },
       useLayoutEffect(effect) { if (!mounted) cleanups.push(effect()); },
     },
     "../i18n": { useLocale: () => ({ t: (key) => key }) },
@@ -208,6 +221,7 @@ function harness(overrides = {}, options = {}) {
     cursor = 0;
     const element = NativeChatPage(props);
     mounted = true;
+    for (const effect of pendingEffects.splice(0)) effect();
     const children = element.props.children.filter(Boolean);
     searchProps = children.find(child => child.props?.conversations)?.props;
     const surfaces = children.filter(child => child.props?.document);
@@ -1599,5 +1613,43 @@ test("XChat cannot dispatch agent workspace tools while its browser remains usab
     assert.equal((await h.dispatch("files", null, "sidebar")).ok, false);
     assert.deepEqual(opened, ["browser"]);
     h.unmount();
+  }
+});
+
+
+test("switching to XChat retires a pending workspace mention without disabling explicit uploads", async () => {
+  const flatten = nodes => nodes.flatMap(node => [node, ...flatten(node.children ?? [])]);
+  const { getDefaultSettings } = createTsModuleLoader().loadModule("src/lib/settings");
+  for (const mobile of [false, true]) {
+    const reads = [], picked = [];
+    const settings = getDefaultSettings(); settings.system.executionMode = "tools";
+    const h = harness({ settings, onImportFiles: async files => picked.push(...files.map(file => file.name)) }, {
+      mobile, effects: true,
+      fsInvoke: (command, args) => new Promise(resolve => reads.push({ command, args, resolve })),
+    });
+    try {
+      h.props.composerRef.current.setText("@doc"); h.render();
+      assert.equal(reads.length, 1);
+      assert.equal(reads[0].command, "fs_mention_list");
+      assert.equal(reads[0].args.workdir, "/project");
+      h.props.settings.system.executionMode = "text"; h.render();
+      reads[0].resolve({ entries: [{ path: "docs/private.md", kind: "file" }] });
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(flatten(h.render().nodes).some(node => node.id.startsWith("mention-file:")), false);
+      assert.equal(reads.length, 1, "XChat must never search the old agent directory");
+      const attach = flatten(h.render().nodes).find(node => node.id === "attach");
+      assert.ok(attach && !attach.disabled, "Explicit user uploads remain available");
+      const payload = JSON.stringify([{ fileName: "selected.txt", mimeType: "text/plain", contentBase64: "aGk=" }]);
+      assert.equal((await h.dispatch(attach.action, payload)).ok, true);
+      assert.deepEqual(picked, ["selected.txt"]);
+      h.props.settings.system.executionMode = "tools"; h.render();
+      assert.equal(reads.length, 2);
+      reads[1].resolve({ entries: [{ path: "docs/selected.md", kind: "file" }] });
+      await new Promise(resolve => setImmediate(resolve));
+      const file = flatten(h.render().nodes).find(node => node.id === "mention-file:docs/selected.md");
+      assert.ok(file);
+      assert.equal((await h.dispatch(file.action)).ok, true);
+      assert.ok(h.props.composerRef.current.getText().includes("docs/selected.md"));
+    } finally { h.unmount(); }
   }
 });

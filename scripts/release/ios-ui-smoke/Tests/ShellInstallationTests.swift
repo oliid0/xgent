@@ -61,20 +61,39 @@ final class ShellInstallationTests: XCTestCase {
         command.typeText("printf xgent-ios-shell-ok")
         tap(app.buttons["run"], in: app)
 
-        let output = app.staticTexts.matching(NSPredicate(format: "identifier ENDSWITH ':output'")).firstMatch
+        let output = app.scrollViews.matching(NSPredicate(format: "identifier ENDSWITH ':stdout'")).firstMatch.staticTexts
         let exit = app.staticTexts.matching(NSPredicate(format: "identifier ENDSWITH ':exit'")).firstMatch
         XCTAssertTrue(exit.waitForExistence(timeout: 45), "The installed a-Shell command must return")
-        XCTAssertEqual(exit.label, "Exit: 0")
-        XCTAssertTrue(output.label.contains("xgent-ios-shell-ok"), "Verify actual command output")
+        assertExit(0, element: exit)
+        XCTAssertTrue(output.matching(NSPredicate(format: "label CONTAINS %@", "xgent-ios-shell-ok")).firstMatch.exists, "Verify actual command output")
+
+        XCTAssertFalse(app.scrollViews.matching(NSPredicate(format: "identifier ENDSWITH ':stderr'")).firstMatch.exists,
+                       "A plain task command must not execute the simulator host profile")
+
+        tap(app.buttons["clear"], in: app)
+        tap(command, in: app)
+        command.typeText("printf xgent-before-error; exit 7")
+        tap(app.buttons["run"], in: app)
+        XCTAssertTrue(exit.waitForExistence(timeout: 45))
+        assertExit(7, element: exit)
+        XCTAssertTrue(output.matching(NSPredicate(format: "label CONTAINS %@", "xgent-before-error")).firstMatch.exists)
+
+        tap(app.buttons["clear"], in: app)
+        tap(command, in: app)
+        command.typeText("printf xgent-after-error-ok")
+        tap(app.buttons["run"], in: app)
+        XCTAssertTrue(exit.waitForExistence(timeout: 45))
+        assertExit(0, element: exit)
+        XCTAssertTrue(output.matching(NSPredicate(format: "label CONTAINS %@", "xgent-after-error-ok")).firstMatch.exists)
 
         tap(app.buttons["clear"], in: app)
         tap(command, in: app)
         command.typeText("python3 -c 'import sqlite3, ssl, zlib; print(\"xgent-python-modules-ok\")'; python3.9 -m pip --version")
         tap(app.buttons["run"], in: app)
         XCTAssertTrue(exit.waitForExistence(timeout: 45), "Both Python invocations must finish")
-        XCTAssertEqual(exit.label, "Exit: 0")
-        XCTAssertTrue(output.label.contains("xgent-python-modules-ok"))
-        XCTAssertTrue(output.label.contains("pip 22."))
+        assertExit(0, element: exit)
+        XCTAssertTrue(output.matching(NSPredicate(format: "label CONTAINS %@", "xgent-python-modules-ok")).firstMatch.exists)
+        XCTAssertTrue(output.matching(NSPredicate(format: "label CONTAINS %@", "pip 22.")).firstMatch.exists)
 
         tap(app.buttons["clear"], in: app)
         tap(command, in: app)
@@ -85,8 +104,8 @@ final class ShellInstallationTests: XCTestCase {
         programInput.typeText("ready")
         tap(app.buttons["send-input"], in: app)
         XCTAssertTrue(exit.waitForExistence(timeout: 45), "Live stdin must unblock the actual command")
-        XCTAssertEqual(exit.label, "Exit: 0")
-        XCTAssertTrue(output.label.contains("xgent-input-ready"))
+        assertExit(0, element: exit)
+        XCTAssertTrue(output.matching(NSPredicate(format: "label CONTAINS %@", "xgent-input-ready")).firstMatch.exists)
 
         tap(app.buttons["clear"], in: app)
         tap(command, in: app)
@@ -94,7 +113,7 @@ final class ShellInstallationTests: XCTestCase {
         tap(app.buttons["run"], in: app)
         tap(app.buttons["input-eof"], in: app)
         XCTAssertTrue(exit.waitForExistence(timeout: 45), "EOF must finish a command waiting on stdin")
-        XCTAssertEqual(exit.label, "Exit: 0")
+        assertExit(0, element: exit)
 
         tap(app.buttons["clear"], in: app)
         tap(command, in: app)
@@ -109,8 +128,13 @@ final class ShellInstallationTests: XCTestCase {
         command.typeText("printf xgent-ios-after-cancel-ok")
         tap(app.buttons["run"], in: app)
         XCTAssertTrue(exit.waitForExistence(timeout: 45))
-        XCTAssertEqual(exit.label, "Exit: 0")
-        XCTAssertTrue(output.label.contains("xgent-ios-after-cancel-ok"))
+        assertExit(0, element: exit)
+        XCTAssertTrue(output.matching(NSPredicate(format: "label CONTAINS %@", "xgent-ios-after-cancel-ok")).firstMatch.exists)
+    }
+
+    private func assertExit(_ code: Int, element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertNotNil(element.label.range(of: "(?:^|[^0-9])\(code)$", options: .regularExpression),
+                        "Expected actual exit code \(code), received \(element.label)", file: file, line: line)
     }
 
     private func tap(_ element: XCUIElement, in app: XCUIApplication) {

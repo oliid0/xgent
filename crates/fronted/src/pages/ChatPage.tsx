@@ -6469,7 +6469,7 @@ export function ChatPage(props: ChatPageProps) {
           }
           editorSessions={nativeEditorSessions}
           conversationId={currentConversationId}
-          uploadWorkdir={workdir}
+          uploadWorkdir={displayedConversationWorkdir}
           settings={settings}
           composerRef={composerRef}
           sidebarStore={sidebarStore}

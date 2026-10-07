@@ -1315,6 +1315,11 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
         // They can overwrite PATH with simulator host commands (path_helper).
         setenv("ENV", "", 1)
         setenv("BASH_ENV", "", 1)
+        // The pinned dash binary forces its first invocation to be a login
+        // shell when this sentinel is absent (procargs calls ios_getenv).
+        // Task scripts must skip /etc/profile, including the simulator host's
+        // path_helper. Set the virtual PID environment before ios_fork copies it.
+        ios_setenv("DASH_LOGIN_SHELL", "1", 1)
     }
 
     private func isCancelled(_ runId: String) -> Bool {
