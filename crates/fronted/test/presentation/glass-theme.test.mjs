@@ -37,6 +37,10 @@ test("every preset and customized appearance resolves with the installed Astryx 
             "var(--xgent-material-filter, none)",
           );
           assert.equal(theme.components.dialog["variant:fullscreen"].backdropFilter, "none");
+          for (const popup of ["dropdown-menu", "popover-surface", "selector-popup"]) {
+            assert.equal(theme.components[popup].base.backgroundColor, "var(--color-background-popover)");
+            assert.equal(theme.components[popup].base.color, "var(--color-text-primary)");
+          }
         }
       }
     }

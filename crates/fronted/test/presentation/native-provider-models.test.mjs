@@ -173,3 +173,14 @@ test("native model catalogue requires the current credential and ignores a retir
   assert.deepEqual(h.provider().activeModels, ["beta"]);
   h.unmount();
 });
+
+test("native model ordering and edit actions own separate menus without duplicated identities", () => {
+  const h = harness();
+  try {
+    const nodes = h.nodes();
+    const reorder = nodes.find(node => node.id === "model-reorder:one:alpha");
+    const actions = nodes.find(node => node.id === "model-actions:one:alpha");
+    assert.deepEqual(reorder.children.map(node => node.id), ["model-move-up:one:alpha", "model-move-down:one:alpha"]);
+    assert.deepEqual(actions.children.map(node => node.id), ["model-edit:one:alpha", "model-delete:one:alpha"]);
+  } finally { h.unmount(); }
+});

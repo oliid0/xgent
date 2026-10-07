@@ -94,10 +94,15 @@ final class PresentationTransportTests: XCTestCase {
         XCTAssertEqual(NativeMacAccessibilityElement(object: draftHit).accessibilityIdentifier(), "draft",
                        "The real multiline composer must be reachable through native accessibility")
         let draftPoint = window.convertPoint(fromScreen: draftScreenPoint)
-        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-            window.sendEvent(try XCTUnwrap(NSEvent.mouseEvent(with: type, location: draftPoint,
-                modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
-                context: nil, eventNumber: 0, clickCount: 1, pressure: 1)))
+        let click = try [NSEvent.EventType.leftMouseDown, .leftMouseUp].enumerated().map { index, type in
+            try XCTUnwrap(NSEvent.mouseEvent(with: type, location: draftPoint,
+                modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                context: nil, eventNumber: index + 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+        }
+        NSApp.postEvent(click[1], atStart: true)
+        window.sendEvent(click[0])
+        if let release = NSApp.nextEvent(matching: .leftMouseUp, until: Date(), inMode: .default, dequeue: true) {
+            window.sendEvent(release)
         }
         try await Task.sleep(for: .milliseconds(100))
         let editor = try XCTUnwrap(window.firstResponder as? NSTextView,

@@ -49,6 +49,11 @@ test("native provider details retain endpoints and active models beside quota er
     assert.equal(f.nodes().find(node => node.id === "provider-list-usage:a").text, details.usage);
     assert.match(details.usage, /remaining: 0 credits/);
     assert.equal(f.nodes().find(node => node.id === "provider:a").icon, "sun.max");
+    const row = f.nodes().find(node => node.id === "provider-list-row:a");
+    assert.ok(row.children.find(node => node.id === "provider-list-actions:a"), "Ordering has a separate leading control");
+    const menu = row.children.find(node => node.id === "provider-more:a");
+    assert.deepEqual(menu.children.map(node => node.id), ["provider-usage-refresh:a", "provider-edit:a", "provider-list-delete:a"], "The trailing menu retains every action");
+
     assert.ok(f.nodes().some(node => node.id === "provider-list-proxy:a"));
     for (const id of ["provider-edit:a", "provider-usage-refresh:a", "provider-list-delete:a"]) {
       const node = f.nodes().find(node => node.id === id);

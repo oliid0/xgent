@@ -62,7 +62,9 @@ test("mobile chat keeps one accessible header action cluster and a one-line func
 });
 
 test("mobile navigation and settings retain Astryx drawer and bottom-sheet hierarchy", () => {
-  assert.match(sidebarSource, /<MobileNav[\s\S]*?width=\{320\}[\s\S]*?side="start"/);
+  assert.match(sidebarSource, /as="aside"[\s\S]*?className="chat-mobile-sidebar"/);
+  assert.doesNotMatch(sidebarSource, /<MobileNav/);
+  assert.match(stylesSource, /data-mobile-sidebar-open="true"[\s\S]*?translateX\(min\(320px, 85vw\)\)/);
   for (const destination of ["library", "projects", "plugins", "scheduled", "remote", "more"]) {
     assert.match(sidebarSource, new RegExp(`sidebar\\.mobile\\.${destination}`));
   }
@@ -81,7 +83,7 @@ test("mobile navigation and settings retain Astryx drawer and bottom-sheet hiera
   assert.match(nativeFilesSource, /files-header[\s\S]*?files-search-row[\s\S]*?files-actions/);
   assert.doesNotMatch(nativeFilesSource, /id: "files-hidden"/);
   assert.match(appSource, /<BottomSheet[\s\S]*?height="tall"[\s\S]*?<SettingsPage/);
-  assert.match(appSource, /<BottomSheet[\s\S]*?purpose="form"[\s\S]*?height="tall"[\s\S]*?<SettingsPage/);
+  assert.match(appSource, /<BottomSheet[\s\S]*?purpose="info"[\s\S]*?height="tall"[\s\S]*?<SettingsPage/);
   assert.match(
     appSource,
     /<BottomSheet[\s\S]*?className="settings-bottom-sheet"[\s\S]*?paddingBlockStart=\{0\}[\s\S]*?<SettingsPage/,

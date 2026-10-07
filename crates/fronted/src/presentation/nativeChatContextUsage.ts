@@ -48,7 +48,6 @@ export function createNativeChatContextUsage(
             },
           ]
         : []),
-      { id: "context-cancel", kind: "Button", label: t("chat.cancel") },
       ...(offerCompaction
         ? [
             {

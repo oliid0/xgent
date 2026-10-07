@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 #if os(iOS)
 import UIKit
 #else
@@ -32,6 +33,7 @@ struct XgentComposerKey {
     var onKey: ((XgentComposerKey) -> KeyPress.Result)?
     var onWindow: (() -> Void)?
     var onPaste: ((String) -> Bool)?
+    var onPasteAttachments: (([XgentClipboardAttachment]) -> Bool)?
     var insertingLineBreak = false
     override func didMoveToWindow() { super.didMoveToWindow(); onWindow?() }
 
@@ -77,9 +79,30 @@ struct XgentComposerKey {
         insertText("")
     }
     override func paste(_ sender: Any?) {
-        guard isEditable, let text = UIPasteboard.general.string else { return }
+        guard isEditable else { return }
+        if onPasteAttachments?(XgentClipboardAttachment.providers(UIPasteboard.general.itemProviders)) == true { return }
+        guard let text = UIPasteboard.general.string else { return }
         if onPaste?(text) == true { return }
         insertText(text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n"))
+    }
+
+    override func paste(itemProviders: [NSItemProvider]) {
+        guard isEditable else { return }
+        let attachments = XgentClipboardAttachment.providers(itemProviders)
+        if !attachments.isEmpty {
+            // Files belong to the shared importer; never insert an untracked
+            // native image into a disabled or retired conversation draft.
+            _ = onPasteAttachments?(attachments)
+            return
+        }
+        super.paste(itemProviders: itemProviders)
+    }
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if action == #selector(paste(_:)), isEditable, onPasteAttachments != nil {
+            return UIPasteboard.general.numberOfItems > 0
+        }
+        return super.canPerformAction(action, withSender: sender)
     }
 
     func insertComposerFragment(_ fragment: NSAttributedString) -> Bool {
@@ -114,6 +137,12 @@ struct XgentComposerKey {
     var onKey: ((XgentComposerKey) -> KeyPress.Result)?
     var onWindow: (() -> Void)?
     var onPaste: ((String) -> Bool)?
+    var onPasteAttachments: (([XgentClipboardAttachment]) -> Bool)?
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { isEditable }
+    override func mouseDown(with event: NSEvent) {
+        if isEditable { window?.makeFirstResponder(self) }
+        super.mouseDown(with: event)
+    }
     override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); onWindow?() }
     override func keyDown(with event: NSEvent) {
         var modifiers: EventModifiers = []
@@ -135,12 +164,44 @@ struct XgentComposerKey {
     }
     override func cut(_ sender: Any?) {
         guard isEditable, selectedRange().length > 0 else { return }
-        copy(sender); insertText("", replacementRange: selectedRange())
+        copy(sender); _ = insertComposerFragment(NSAttributedString(string: ""))
     }
     override func paste(_ sender: Any?) {
-        guard isEditable, let text = NSPasteboard.general.string(forType: .string) else { return }
+        guard isEditable else { return }
+        if onPasteAttachments?(XgentClipboardAttachment.pasteboard(.general)) == true { return }
+        guard let text = NSPasteboard.general.string(forType: .string) else { return }
         if onPaste?(text) == true { return }
         insertText(text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n"), replacementRange: selectedRange())
+    }
+
+    // Restore attributed fragments and notify the shared draft on both undo
+    // and redo. NSTextView's plain insertion path loses this declaration.
+    func insertComposerFragment(_ fragment: NSAttributedString) -> Bool {
+        guard isEditable, !hasMarkedText() else { return false }
+        let manager = undoManager
+        manager?.beginUndoGrouping()
+        defer { manager?.endUndoGrouping() }
+        let range = selectedRange()
+        return replaceComposerFragment(in: range, with: fragment,
+            selectionAfter: NSRange(location: range.location + fragment.length, length: 0))
+    }
+
+    @discardableResult private func replaceComposerFragment(in range: NSRange, with fragment: NSAttributedString,
+                                                           selectionAfter: NSRange) -> Bool {
+        guard isEditable, let storage = textStorage,
+              XgentComposerRange.isValid(range, in: storage.string),
+              shouldChangeText(in: range, replacementString: fragment.string) else { return false }
+        let previous = storage.attributedSubstring(from: range), previousSelection = selectedRange()
+        let replaced = NSRange(location: range.location, length: fragment.length)
+        undoManager?.registerUndo(withTarget: self) { target in
+            MainActor.assumeIsolated {
+                _ = target.replaceComposerFragment(in: replaced, with: previous, selectionAfter: previousSelection)
+            }
+        }
+        storage.beginEditing(); storage.replaceCharacters(in: range, with: fragment); storage.endEditing()
+        setSelectedRange(selectionAfter)
+        didChangeText()
+        return true
     }
 }
 #endif

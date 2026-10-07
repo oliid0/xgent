@@ -6,6 +6,7 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 function elements(value) {
   if (Array.isArray(value)) return value.flatMap(elements);
+  if (value?.label && typeof value.onClick === "function") return [{ type: "menuitem", props: value }];
   if (!value?.type || !value.props) return [];
   return [value, ...Object.values(value.props).flatMap(elements)];
 }
@@ -45,7 +46,11 @@ function fixture() {
     return elements(list);
   };
   const rows = () => elements(list).filter(node => node.type.name === "ProviderSettingsRow");
-  const action = (id, label) => elements(rows().find(row => row.props.id === id).props.actions).find(node => node.props.label === label);
+  const action = (id, label) => {
+    const row = rows().find(row => row.props.id === id);
+    const confirmation = elements(row.props.actions).find(node => node.type.name === "ConfirmDeletePopover");
+    return elements([row.props.reorder, row.props.actions, confirmation?.props.children(() => {})]).find(node => node.props.label === label);
+  };
   const click = node => node.props.onClick({ stopPropagation() {} });
   renderList();
   return { props, refreshed, rows, action, click, renderList, renderPage, list: () => elements(list), close() { pageHooks.unmount(); listHooks.unmount(); } };
@@ -58,7 +63,8 @@ test("responsive provider rows preserve usage refresh, keyboard and pointer orde
   try {
     assert.deepEqual(f.rows().map(row => row.props.id), ["a", "b"]);
     const usage = f.action("a", "settings.usage.refresh");
-    assert.equal(usage.props.size, "lg");
+    assert.equal(usage.type, "menuitem", "Usage refresh remains reachable in the trailing menu");
+    assert.equal(f.rows()[0].props.reorder.props.label, "settings.reorderProvider: Long provider name a");
     f.click(usage);
     await Promise.resolve();
     assert.deepEqual(f.refreshed, ["a"]);
@@ -96,7 +102,7 @@ test("responsive provider rows preserve usage refresh, keyboard and pointer orde
 
     const confirmation = elements(f.rows()[0].props.actions).find(node => node.type.name === "ConfirmDeletePopover");
     let opened = 0;
-    f.click(confirmation.props.children(() => { opened++; }));
+    f.click(elements(confirmation.props.children(() => { opened++; })).find(node => node.props.label === "settings.delete"));
     assert.equal(opened, 1);
     assert.equal(f.props.settings.customProviders.length, 3, "Opening confirmation must not delete a provider");
     confirmation.props.onConfirm();

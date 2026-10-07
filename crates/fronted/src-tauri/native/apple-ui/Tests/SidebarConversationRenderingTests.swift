@@ -13,6 +13,10 @@ import AppKit
 final class SidebarConversationRenderingTests: XCTestCase {
     @MainActor
     func testConversationMenusRemainSeparateFromLongTitlesAtNarrowAndAccessibleWidths() async throws {
+        #if os(macOS)
+        let accessibilitySession = try NativeMacAccessibilitySession()
+        defer { accessibilitySession.restore() }
+        #endif
         let cases: [(workspace: Bool, width: CGFloat, archived: Bool)] = [
             (false, 240, false), (false, 320, false), (true, 240, false), (true, 320, false),
             (true, 240, true), (true, 320, true),

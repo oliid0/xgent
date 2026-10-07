@@ -59,6 +59,20 @@ final class DesktopSettingsRenderingTests: XCTestCase {
             XCTAssertTrue(backdrop.enabled)
             XCTAssertNotNil(backdrop.dismiss)
             XCTAssertTrue(backdrop.window === window)
+            XCTAssertEqual(backdrop.dialogSize.width / host.bounds.width, 0.866, accuracy: 0.002)
+            XCTAssertEqual(backdrop.dialogSize.height / host.bounds.height, 0.866, accuracy: 0.002)
+            if width == 1040 {
+                window.setContentSize(CGSize(width: 1600, height: 1000))
+                host.layoutSubtreeIfNeeded()
+                try await Task.sleep(for: .milliseconds(160))
+                XCTAssertEqual(backdrop.dialogSize.width / host.bounds.width, 0.866, accuracy: 0.002,
+                    "An already-open settings dialog must follow window resizing")
+                XCTAssertEqual(backdrop.dialogSize.height / host.bounds.height, 0.866, accuracy: 0.002)
+                XCTAssertGreaterThan(backdrop.dialogSize.width, 1000)
+                window.setContentSize(CGSize(width: width, height: 720))
+                host.layoutSubtreeIfNeeded()
+                try await Task.sleep(for: .milliseconds(160))
+            }
             // Avoid the resizable window's corner, which AppKit handles before
             // content hit testing. This is in the dialog's 16-point left gutter.
             let outsidePoint = NSPoint(x: 12, y: host.bounds.midY)

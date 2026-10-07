@@ -1992,6 +1992,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.providerModelsUrlHint":
       "可填写完整的 /models 地址；留空时会根据 Base URL 的末尾路径自动补全。",
     "settings.reorderProvider": "调整供应商排序",
+    "settings.providerMore": "供应商更多操作",
     "settings.reorderModel": "调整模型排序",
     "settings.resetModelOrder": "恢复自动排序",
     "settings.promptCacheHintMode": "缓存提示协议",
@@ -5089,6 +5090,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.providerModelsUrlHint":
       "Enter a complete /models endpoint, or leave it empty to infer the path from Base URL.",
     "settings.reorderProvider": "Reorder provider",
+    "settings.providerMore": "More provider actions",
     "settings.reorderModel": "Reorder model",
     "settings.resetModelOrder": "Restore automatic ordering",
     "settings.promptCacheHintMode": "Cache hint protocol",

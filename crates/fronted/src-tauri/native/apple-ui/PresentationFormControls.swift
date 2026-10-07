@@ -267,13 +267,7 @@ struct XgentSwitch: View {
                 .contentShape(Rectangle())
                 .onTapGesture { value.wrappedValue.toggle() }
                 .accessibilityHidden(true)
-            Toggle(node.accessibilityLabel ?? node.label ?? "", isOn: value)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .tint(Color(uiColor: .systemGreen))
-                .frame(minHeight: 44)
-                .accessibilityIdentifier(node.id)
-                .accessibilityHint(node.accessibilityHint ?? node.text ?? "")
+            XgentIOSNativeSwitch(value: value, node: node)
                 .fixedSize(horizontal: true, vertical: false)
         }
         .accessibilityElement(children: .contain)

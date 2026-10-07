@@ -100,6 +100,7 @@ export async function imageBrowserCompletion(browser, fileURL, directory, option
     if (evaluated.exceptionDetails) throw new Error(evaluated.exceptionDetails.exception?.description ?? evaluated.exceptionDetails.text);
     if (typeof evaluated.result?.value !== "string") throw new Error("Image browser returned no completion result");
     const encoded = evaluated.result.value;
+    if (options.interact) await options.interact(send);
     if (options.screenshotPath) {
       const metrics = await send("Page.getLayoutMetrics");
       const size = metrics.cssContentSize ?? metrics.contentSize;

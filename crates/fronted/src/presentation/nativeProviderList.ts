@@ -237,7 +237,7 @@ export function useNativeProviderList(
               const usage = scope.usage.get(provider.id);
               const result = usage?.result;
               const details = providerListDetails(provider, result, t);
-              return {
+              const row: PresentationNode = {
                 id: "provider-list-row:" + provider.id,
                 kind: "VStack",
                 variant: "provider-list-row",
@@ -349,6 +349,20 @@ export function useNativeProviderList(
                     : []),
                 ],
               };
+              const actions = row.children?.filter((child) => child.kind === "IconButton") ?? [];
+              row.children = [
+                ...(row.children?.filter((child) => child.kind !== "IconButton") ?? []),
+                {
+                  id: "provider-more:" + provider.id,
+                  kind: "Menu",
+                  variant: "compact",
+                  icon: "ellipsis",
+                  size: "large",
+                  label: `${t("settings.providerMore")}: ${provider.name}`,
+                  children: actions,
+                },
+              ];
+              return row;
             }),
           },
         ]

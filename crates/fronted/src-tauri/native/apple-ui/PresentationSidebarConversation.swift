@@ -16,16 +16,14 @@ struct XgentSidebarConversationRow: View {
 
     private var title: some View {
         Text(node.label ?? "")
-            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+            .truncationMode(.tail)
             .fixedSize(horizontal: false, vertical: true)
     }
 
     @ViewBuilder private var stateIndicator: some View {
         if node.status == "running" {
             ProgressView().controlSize(.small).accessibilityHidden(true)
-        } else if node.selected == true {
-            Circle().fill(Color(xgentHex: palette.accent)).frame(width: 6, height: 6)
-                .accessibilityHidden(true)
         }
     }
 
@@ -33,7 +31,7 @@ struct XgentSidebarConversationRow: View {
         if dynamicTypeSize.isAccessibilitySize {
             VStack(alignment: .leading, spacing: 8) {
                 title.frame(maxWidth: .infinity, alignment: .leading)
-                if node.icon != nil || node.status == "running" || node.selected == true {
+                if node.icon != nil || node.status == "running" {
                     HStack(spacing: 8) {
                         if let icon = node.icon {
                             Image(systemName: icon).font(.caption).accessibilityHidden(true)
@@ -89,6 +87,7 @@ struct XgentSidebarConversationRow: View {
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier(node.id)
             .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
+            .help(node.label ?? "")
             .accessibilityValue(node.accessibilityValue ?? "")
             .accessibilityAddTraits(node.selected == true ? [.isButton, .isSelected] : .isButton)
             if let menu {

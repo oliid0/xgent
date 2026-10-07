@@ -46,10 +46,13 @@ struct XgentIOSRootPresentation: View {
                     .zIndex(0)
                 if let sidebar {
                     Button { model.dismiss(sidebar) } label: {
-                        Color.black.opacity(0.32).contentShape(Rectangle()).ignoresSafeArea()
+                        Color.clear.contentShape(Rectangle())
+                            .frame(width: max(0, geometry.size.width - drawerWidth), height: geometry.size.height)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text("Close sidebar"))
+                    .accessibilityIdentifier("mobile-sidebar-dismiss")
+                    .offset(x: drawerWidth)
                     .zIndex(100)
                     XgentIOSSidebarPresentation(document: sidebar, model: model)
                         .frame(width: drawerWidth, height: geometry.size.height)
@@ -61,11 +64,14 @@ struct XgentIOSRootPresentation: View {
                         .clipped()
                         .zIndex(101)
                         .transition(.move(edge: .leading))
-                        .gesture(DragGesture().onEnded {
-                            if $0.translation.width < -60 { model.dismiss(sidebar) }
-                        })
+
                 }
             }
+            .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { gesture in
+                guard let sidebar, gesture.translation.width < -60,
+                      abs(gesture.translation.width) > abs(gesture.translation.height) * 1.2 else { return }
+                model.dismiss(sidebar)
+            })
             .animation(transition, value: sidebar?.id)
             .clipped()
         }
@@ -166,16 +172,20 @@ struct XgentIOSPagePresentation: View {
             let drawerWidth = min(320, geometry.size.width * 0.85)
             ZStack(alignment: .leading) {
                 page
-                    .opacity(sidebar == nil ? 1 : 0)
+                    .clipShape(RoundedRectangle(cornerRadius: sidebar == nil ? 0 : 26, style: .continuous))
+                    .offset(x: sidebar == nil ? 0 : drawerWidth)
                     .accessibilityHidden(sidebar != nil)
                     .allowsHitTesting(sidebar == nil)
                     .zIndex(0)
                 if let sidebar {
                     Button { model.dismiss(sidebar) } label: {
-                        Color.black.opacity(0.32).contentShape(Rectangle()).ignoresSafeArea()
+                        Color.clear.contentShape(Rectangle())
+                            .frame(width: max(0, geometry.size.width - drawerWidth), height: geometry.size.height)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text("Close sidebar"))
+                    .accessibilityIdentifier("mobile-sidebar-dismiss")
+                    .offset(x: drawerWidth)
                     .zIndex(100)
                     XgentIOSSidebarPresentation(document: sidebar, model: model)
                         .frame(width: drawerWidth, height: geometry.size.height)
@@ -185,11 +195,14 @@ struct XgentIOSPagePresentation: View {
                         .clipped()
                         .zIndex(101)
                         .transition(.move(edge: .leading))
-                        .gesture(DragGesture().onEnded {
-                            if $0.translation.width < -60 { model.dismiss(sidebar) }
-                        })
+
                 }
             }
+            .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { gesture in
+                guard let sidebar, gesture.translation.width < -60,
+                      abs(gesture.translation.width) > abs(gesture.translation.height) * 1.2 else { return }
+                model.dismiss(sidebar)
+            })
             .animation(transition, value: sidebar?.id)
             .clipped()
         }

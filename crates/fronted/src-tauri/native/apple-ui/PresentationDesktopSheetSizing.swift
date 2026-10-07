@@ -11,7 +11,9 @@ struct XgentDesktopSheetSizing: ViewModifier {
     static func settingsSize(in available: CGSize) -> CGSize {
         let width = available.width.isFinite && available.width > 0 ? available.width : 1156
         let height = available.height.isFinite && available.height > 0 ? available.height : 700
-        return CGSize(width: min(896, max(1, width - 32)), height: min(608, max(1, height - 32)))
+        // 86.6% of each dimension occupies approximately 75% of the window.
+        return CGSize(width: min(width * 0.866, max(1, width - 32)),
+                      height: min(height * 0.866, max(1, height - 32)))
     }
 
     @ViewBuilder func body(content: Content) -> some View {

@@ -45,7 +45,7 @@ final class ContextUsageRenderingTests: XCTestCase {
             let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
             let elements = hierarchy.flattenToElements()
             var frames: [CGRect] = []
-            for id in ["context-usage", "context-cancel", "context-confirm"] {
+            for id in ["context-usage", "context-confirm"] {
                 let element = try XCTUnwrap(elements.first { $0.identifier == id })
                 let frame = element.shape.bezierPath.bounds
                 XCTAssertGreaterThanOrEqual(frame.height, 44)
@@ -77,19 +77,15 @@ final class ContextUsageRenderingTests: XCTestCase {
             host.layoutSubtreeIfNeeded()
             try await Task.sleep(for: .milliseconds(60))
             let elements = nativeMacAccessibilityTree(window)
-            let cancel = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "context-cancel" })
+            XCTAssertFalse(elements.contains { $0.accessibilityIdentifier() == "context-cancel" })
             let confirm = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "context-confirm" })
             XCTAssertGreaterThanOrEqual(confirm.accessibilityFrame().height, 44)
             XCTAssertLessThanOrEqual(confirm.accessibilityFrame().width, 280)
-            XCTAssertFalse(cancel.accessibilityFrame().intersects(confirm.accessibilityFrame()))
-            XCTAssertTrue(cancel.accessibilityPerformPress())
-            try await Task.sleep(for: .milliseconds(80))
-            XCTAssertEqual(closed, 1)
-            XCTAssertTrue(actions.isEmpty, "Reading or canceling must not compact")
+            XCTAssertTrue(actions.isEmpty, "Reading context details must not compact")
             XCTAssertTrue(confirm.accessibilityPerformPress())
             try await Task.sleep(for: .milliseconds(80))
             XCTAssertEqual(actions.last?.action, "compact-current-conversation")
-            XCTAssertEqual(closed, 2)
+            XCTAssertEqual(closed, 1)
             model.update(try fixture(disabled: true, revision: 2))
             try await Task.sleep(for: .milliseconds(100))
             let disabled = try XCTUnwrap(nativeMacAccessibilityTree(window).first {
@@ -118,7 +114,6 @@ final class ContextUsageRenderingTests: XCTestCase {
                        "value": "conversation", "label": "Context usage", "current": 50_000, "total": 100_000,
                        "text": "50,000 / 100,000 tokens (50%)", "children": [
                 ["id": "context-description", "kind": "Text", "text": "Summarize the conversation to leave space for more work."],
-                ["id": "context-cancel", "kind": "Button", "label": "Cancel"],
                 ["id": "context-confirm", "kind": "Button", "label": "Compact conversation",
                  "action": "compact-current-conversation", "disabled": disabled],
             ]]]]

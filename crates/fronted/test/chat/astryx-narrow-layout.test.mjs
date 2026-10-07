@@ -60,7 +60,7 @@ const mocks = {
 const loader = createTsModuleLoader({ mocks });
 const { xgentCompactTheme } = loader.loadModule("src/theme/xgentTheme.ts");
 const { Theme, generateThemeCSS } = vendor["@astryxdesign/core/theme"];
-const { ProjectRow, HistoryRow } = loader.loadModule("src/components/chat/ChatHistorySidebar.tsx");
+const { ChatSidebarSurface, ProjectRow, HistoryRow } = loader.loadModule("src/components/chat/ChatHistorySidebar.tsx");
 const { SettingsRow, SettingsRowGroup, SettingsNavigationRow } = loader.loadModule("src/pages/settings/shared.tsx");
 const { mobileSettingsStatus } = loader.loadModule("src/pages/settings/mobileSettingsStatus.ts");
 const settings = loader.loadModule("src/lib/settings/index.ts").getDefaultSettings();
@@ -114,7 +114,7 @@ function providerEditorForPanel(panel) {
   } }).loadModule("src/pages/settings/ProvidersSection.tsx");
   const provider = { id: "fixture", type: "claude_code", name: "Example provider", baseUrl: "https://example.com/v1", apiKey: "fixture-key", models: [], activeModels: [] };
   const props = { settings: { ...settings, customProviders: [provider] }, setSettings() {}, thirdPartyImportEnabled: false };
-  const visit = value => Array.isArray(value) ? value.flatMap(visit) : !value?.type || !value.props ? [] : [value, ...Object.values(value.props).flatMap(visit)];
+  const visit = value => Array.isArray(value) ? value.flatMap(visit) : value?.label && typeof value.onClick === "function" ? [{ type: "menuitem", props: value }] : !value?.type || !value.props ? [] : [value, ...Object.values(value.props).flatMap(visit)];
   let tree = hooks.render(() => Section(props));
   visit(tree).find(node => node.type.name === "ProviderList").props.onEdit(provider);
   tree = hooks.render(() => Section(props));
@@ -242,9 +242,9 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
         React.createElement("span", null, "https://example.com/" + "long-provider-endpoint/".repeat(5) + " · 3 " + t("settings.activeModels")),
         React.createElement("span", null, "An actual quota service error with a long diagnostic https://example.com/" + "long-quota-diagnostic/".repeat(3)),
         React.createElement("span", { className: "settings-provider-proxy" }, React.createElement(vendor["@astryxdesign/core/Icon"].Icon, { icon: icons.Waypoints, size: "sm" }), t("settings.providerUseSystemProxy"))),
-      actions: React.createElement(React.Fragment, null, ...["settings.reorderProvider", "settings.usage.refresh", "settings.edit", "settings.delete"].map((key, index) => React.createElement(vendor["@astryxdesign/core/IconButton"].IconButton, {
-        key, label: t(key), size: "lg", variant: "ghost", icon: React.createElement(vendor["@astryxdesign/core/Icon"].Icon, { icon: [icons.GripVertical, icons.RefreshCw, icons.Pencil, icons.Trash2][index], size: "sm" }), onClick: noop,
-      }))), isSelected: false, onEdit: noop,
+      reorder: React.createElement(vendor["@astryxdesign/core/IconButton"].IconButton, { label: t("settings.reorderProvider"), size: "lg", variant: "ghost", icon: React.createElement(vendor["@astryxdesign/core/Icon"].Icon, { icon: icons.GripVertical, size: "sm" }), onClick: noop }),
+      actions: React.createElement(vendor["@astryxdesign/core/MoreMenu"].MoreMenu, { label: t("settings.providerMore"), size: "lg", items: ["settings.usage.refresh", "settings.edit", "settings.delete"].map(key => ({ id: key, label: t(key), onClick: noop })) }),
+      isSelected: false, onEdit: noop,
     })))));
     const project = { id: "long", name: "Workspace with a very long multilingual title 工作空间文件夹", path: "/long" };
     const customizedSettings = { ...settings, locale: "en-US", customSettings: { ...settings.customSettings,
@@ -328,12 +328,32 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
         }, React.createElement(Switch, { label: "Show progress", isLabelHidden: true, value: true, onChange: noop })))),
       React.createElement(FileTreePanel, { active: true, touchActions: true }))));
   }
+  for (const width of [240, 320, 390, 768]) {
+    sections.push(React.createElement("section", { className: "fixture-desktop-sidebar", style: { width }, "data-width": width },
+      React.createElement(HistoryRow, {
+        item: { id: "desktop-chat", title: "A very long conversation title that stays on one line when selected and hovered", updatedAt: 1, isPinned: false },
+        isActive: true, isRunning: true, isBusy: false, isDeleteDisabled: false,
+        isRenaming: false, isPendingDelete: false, renameDraft: "", projects: [],
+        selectionMode: false, isSelected: false, onToggleSelection: noop, onEnterSelection: noop,
+        onSetPendingDelete: noop, onMoveToWorkspace: noop,
+        touchActions: false, projectActionStyle: false, hidePinAction: false,
+        onSelectConversation: noop, onSetPinned: noop, onStartRenaming: noop, onDeleteConversation: noop,
+      })));
+    sections.push(React.createElement("section", { className: "fixture-sidebar-reveal", style: { width, height: 800, position: "relative", overflow: "hidden" }, "data-width": width },
+      React.createElement(ChatSidebarSurface, { mobileExperience: true, isOpen: true, onClose: noop, mobileHeader: "Xgent", desktopWidth: 320, fontScale: 1 }, "Navigation"),
+      React.createElement("div", { className: "chat-workspace-main", "data-mobile-chat-workspace": "true", "data-mobile-sidebar-open": "true", style: { width: "100%", height: "100%" } }, "Chat")));
+  }
+  sections.push(React.createElement(vendor["@astryxdesign/core/Dialog"].Dialog, {
+    isOpen: true, isInline: true, onOpenChange: noop, className: "fixture-settings-resize",
+    width: "var(--xgent-settings-dialog-width)", maxHeight: "var(--xgent-settings-dialog-height)",
+    style: { height: "var(--xgent-settings-dialog-height)" },
+  }, "Settings"));
   const html = `<!doctype html><html data-theme="light" data-astryx-theme="${xgentCompactTheme.name}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${reset}\n${vendorCss}\n@layer reset {${themeCss.prose}}\n@layer astryx-theme {${themeCss.component}}\n${css}
   :root { --spacing-1:4px; --spacing-2:8px; --size-element-sm:32px; --size-element-md:40px; --size-element-lg:44px; }
   body { margin:0; } .fixture, .fixture-settings-index, .fixture-system-details, .fixture-backup-details, .fixture-permissions-details, .fixture-memory-details { margin:16px; border:1px solid black; }
   #result { display:none; } .fixture .settings-control-row { font-size:inherit; }
   .workspace-project-row, .chat-history-row { display:grid; min-width:0; grid-template-columns:minmax(0,1fr) auto; }
-  @layer utilities { .opacity-0 {opacity:0;} .max-w-16 {max-width:64px;} }
+  @layer utilities { .opacity-0 {opacity:0;} .chat-history-row:hover .sidebar-row-actions, .chat-history-row:focus-within .sidebar-row-actions {opacity:1;} .max-w-16 {max-width:64px;} }
   .workspace-project-row .astryx-more-menu { flex-shrink:0; }
   .fixture * { box-sizing:border-box; } .fixture .astryx-text { font-size:inherit; }
   .fixture-system-details .astryx-text[data-type="body"] { font-size:calc(var(--text-body-size) * var(--zone-font-scale)); }
@@ -375,7 +395,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       }
       for (const text of panel.querySelectorAll('.astryx-text')) {
         const box = text.getBoundingClientRect();
-        if (box.width > 1 && (box.left < bounds.left - 1 || box.right > bounds.right + 1 || text.scrollWidth > text.clientWidth + 1)) failures.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,panel:section.dataset.panel,clippedEditorText:text.textContent});
+        if (box.width > 1 && (box.left < bounds.left - 1 || box.right > bounds.right + 1 || (text.scrollWidth > text.clientWidth + 1 && !text.classList.contains("settings-provider-model-label")))) failures.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,panel:section.dataset.panel,clippedEditorText:text.textContent});
       }
       if (panel.getBoundingClientRect().bottom > bounds.bottom + 1 || section.scrollWidth > section.clientWidth + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,panel:section.dataset.panel,editorSurfaceOverflow:true});
       if (section.dataset.panel === 'model') {
@@ -395,10 +415,10 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       const row = section.querySelector('.settings-provider-row');
       for (const element of section.querySelectorAll('.settings-provider-name, .settings-provider-name .astryx-text, .settings-provider-description, .settings-provider-description .astryx-text, button')) {
         const box = element.getBoundingClientRect();
-        if (box.width <= 0 || box.left < bounds.left - 1 || box.right > bounds.right + 1 || element.scrollWidth > element.clientWidth + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,providerOverflow:element.className,text:element.textContent});
+        if (box.width <= 0 || box.left < bounds.left - 1 || box.right > bounds.right + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,providerOverflow:element.className,text:element.textContent});
       }
       const buttons = [...section.querySelectorAll('button')];
-      if (buttons.length !== 5) failures.push({width:section.dataset.width,missingProviderControls:buttons.length});
+      if (buttons.length !== 3) failures.push({width:section.dataset.width,missingProviderControls:buttons.length});
       for (const button of buttons) {
         const box = button.getBoundingClientRect();
         if (smallTouchTarget(box)) failures.push({width:section.dataset.width,providerSmallControl:button.getAttribute('aria-label') ?? button.textContent,widthPx:box.width,height:box.height});
@@ -408,7 +428,10 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
         if (a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1) failures.push({width:section.dataset.width,providerOverlappingControls:true});
       }
       const name = section.querySelector('.settings-provider-name .astryx-text');
-      if (getComputedStyle(name).whiteSpace === 'nowrap') failures.push({width:section.dataset.width,providerNameClipped:true});
+      if (name.getBoundingClientRect().height > parseFloat(getComputedStyle(name).lineHeight) + 1) failures.push({width:section.dataset.width,providerNameWrapped:true});
+      const grip = buttons.find(button => button.getAttribute('aria-label') === '${translations["en-US"]["settings.reorderProvider"]}');
+      const firstAction = buttons.find(button => button.getAttribute('aria-label') === '${translations["en-US"]["settings.providerMore"]}');
+      if (section.dataset.locale === 'en-US' && (!grip || !firstAction || grip.getBoundingClientRect().right > name.getBoundingClientRect().left || firstAction.getBoundingClientRect().left < name.getBoundingClientRect().right)) failures.push({width:section.dataset.width,providerOrderingNotLeading:true});
       providerEvidence.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,controls:buttons.length,columns:getComputedStyle(row).gridTemplateColumns,height:row.getBoundingClientRect().height});
     }
     for (const section of document.querySelectorAll('.fixture-provider-controller')) {
@@ -609,7 +632,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       const title = section.querySelector('.workspace-project-title');
       if (title.scrollWidth > title.clientWidth + 1) failures.push({width:section.dataset.width,titleOverflow:true});
       const label = section.querySelector('.workspace-project-title .astryx-side-nav-item > span');
-      if (getComputedStyle(label).whiteSpace === 'nowrap') failures.push({width:section.dataset.width,titleClipped:true});
+      if (getComputedStyle(label).whiteSpace !== 'nowrap' || label.getBoundingClientRect().height > parseFloat(getComputedStyle(label).lineHeight) + 1) failures.push({width:section.dataset.width,titleWrapped:true});
       for (const sidebarRow of section.querySelectorAll('.workspace-project-row, .chat-history-row')) {
       const buttons = [...sidebarRow.querySelectorAll('button')];
       if (buttons.length < 3) failures.push({width:section.dataset.width,missingControls:buttons.length});
@@ -653,6 +676,55 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       await mkdir(viewportDirectory);
       const result = JSON.parse(await imageBrowserCompletion(annotationBrowser, pathToFileURL(file).href, viewportDirectory, {
         viewport: { width, height: 844, mobile: width <= 390 },
+        interact: async send => {
+          await send("DOM.enable"); await send("CSS.enable");
+          const root = (await send("DOM.getDocument")).root.nodeId;
+          const rows = (await send("DOM.querySelectorAll", { nodeId: root, selector: ".fixture-desktop-sidebar .chat-history-row" })).nodeIds;
+          const measure = async () => {
+            const response = await send("Runtime.evaluate", { returnByValue: true, expression: `JSON.stringify([...document.querySelectorAll('.fixture-desktop-sidebar .chat-history-row')].map(row => {
+              const label=row.querySelector('.astryx-side-nav-item > span'); const box=label.getBoundingClientRect();
+              return {width:box.width,height:box.height,rowHeight:row.getBoundingClientRect().height,status:!!row.querySelector('[role=img]'),nowrap:getComputedStyle(label).whiteSpace,actions:getComputedStyle(row.querySelector('.sidebar-row-actions')).opacity};
+            }))` });
+            return JSON.parse(response.result.value);
+          };
+          const before = await measure(); assert.equal(before.length, 4);
+          for (const nodeId of rows) await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: ["hover"] });
+          await new Promise(resolve => setTimeout(resolve, 200));
+          const hovered = await measure();
+          for (let index=0; index<before.length; index++) {
+            assert.equal(hovered[index].width, before[index].width, "Hover must reserve title width");
+            assert.equal(hovered[index].height, before[index].height, "Hover must not wrap titles");
+            assert.equal(hovered[index].rowHeight, before[index].rowHeight);
+            assert.equal(hovered[index].nowrap, "nowrap"); assert.equal(hovered[index].status, true);
+            assert.equal(hovered[index].actions, "1", "Hover actions must be visible");
+          }
+          await send("Runtime.evaluate", { expression: `document.querySelector('.fixture-desktop-sidebar button').focus()` });
+          for (const nodeId of rows) await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: [] });
+          const focused = await measure(); assert.equal(focused[0].width, before[0].width);
+          const reveal = await send("Runtime.evaluate", { returnByValue: true, expression: `JSON.stringify([...document.querySelectorAll('.fixture-sidebar-reveal')].map(section => {
+            const nav=section.querySelector('aside').getBoundingClientRect(), page=section.querySelector('.chat-workspace-main').getBoundingClientRect(), parent=section.getBoundingClientRect();
+            return {drawer:nav.width,pageWidth:page.width,offset:page.left-parent.left,viewport:parent.width,modal:!!section.querySelector('dialog')};
+          }))` });
+          for (const geometry of JSON.parse(reveal.result.value)) {
+            assert.ok(Math.abs(geometry.offset-geometry.drawer)<1, "Sidebar must push the page to its own edge");
+            assert.equal(geometry.pageWidth, geometry.viewport, "Opening navigation must preserve page width");
+            assert.equal(geometry.modal, false);
+          }
+          if (width === 768) {
+            const measureSettings = async () => {
+              const response = await send("Runtime.evaluate", { returnByValue: true, expression: `JSON.stringify((() => {
+                const box=document.querySelector('.fixture-settings-resize').getBoundingClientRect();
+                return {width:box.width,height:box.height,area:box.width*box.height/(innerWidth*innerHeight)};
+              })())` }); return JSON.parse(response.result.value);
+            };
+            const beforeResize = await measureSettings();
+            await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, mobile: false, deviceScaleFactor: 1 });
+            const afterResize = await measureSettings();
+            assert.ok(afterResize.width > beforeResize.width && afterResize.height > beforeResize.height);
+            assert.ok(Math.abs(afterResize.area - 0.75) < 0.01, "Settings should occupy approximately 75% of the resized window");
+            await send("Emulation.setDeviceMetricsOverride", { width, height: 844, mobile: false, deviceScaleFactor: 1 });
+          }
+        },
         ...(evidenceDirectory && width === 390 ? { screenshotPath: path.join(evidenceDirectory, `astryx-${screenshotKind}.png`), screenshotSelector: screenshotSelectors[screenshotKind], isolateScreenshot: true } : {}),
       }));
       viewportResults.push(result);

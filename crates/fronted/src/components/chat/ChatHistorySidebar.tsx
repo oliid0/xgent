@@ -3,7 +3,6 @@ import { Button as AstryxButton, Button } from "@astryxdesign/core/Button";
 import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
 import { Icon as AstryxIcon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
-import { MobileNav } from "@astryxdesign/core/MobileNav";
 import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { SideNavItem, SideNavSection } from "@astryxdesign/core/SideNav";
 import { Stack as AstryxStack, StackItem, VStack } from "@astryxdesign/core/Stack";
@@ -169,7 +168,7 @@ type ChatHistorySidebarProps = {
   onOpenWorkspaceTool?: (target: WorkspaceToolTarget, shell?: string) => void;
 };
 
-function ChatSidebarSurface(props: {
+export function ChatSidebarSurface(props: {
   children: ReactNode;
   mobileExperience: boolean;
   isOpen: boolean;
@@ -180,18 +179,26 @@ function ChatSidebarSurface(props: {
 }) {
   if (props.mobileExperience) {
     return (
-      <MobileNav
-        isOpen={props.isOpen}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) props.onClose();
+      <AstryxStack
+        as="aside"
+        direction="vertical"
+        className="chat-mobile-sidebar"
+        data-open={props.isOpen ? "true" : "false"}
+        aria-label="Xgent"
+        aria-hidden={!props.isOpen}
+        inert={!props.isOpen}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") props.onClose();
         }}
-        header={<StackItem size="fill">{props.mobileHeader}</StackItem>}
-        label="Xgent"
-        width={320}
-        side="start"
       >
+        <VStack
+          padding={3}
+          style={{ paddingBlockStart: "max(var(--spacing-3), env(safe-area-inset-top, 0px))" }}
+        >
+          {props.mobileHeader}
+        </VStack>
         {props.children}
-      </MobileNav>
+      </AstryxStack>
     );
   }
 
@@ -538,7 +545,7 @@ export const HistoryRow = memo(function HistoryRow(props: {
             onClick={handleSelect}
             className="min-w-0"
             endContent={
-              touchActions && isRunning ? (
+              isRunning ? (
                 <span role="img" aria-label={t("chat.statusRunningReply")}>
                   <Loader2 className="h-4 w-4 animate-spin" />
                 </span>
@@ -552,38 +559,15 @@ export const HistoryRow = memo(function HistoryRow(props: {
           direction="horizontal"
           data-touch-actions={touchActions ? "true" : undefined}
           className={cn(
-            "sidebar-row-actions relative flex items-center justify-end overflow-hidden transition-[max-width,opacity] duration-200 ease-out",
-            isRunning
-              ? "max-w-7 opacity-100 group-hover/item:max-w-16 group-focus-within/item:max-w-16"
-              : "max-w-0 opacity-0 group-hover/item:max-w-16 group-hover/item:opacity-100 group-focus-within/item:max-w-16 group-focus-within/item:opacity-100",
-            touchActions && "max-w-16 opacity-100",
-            menuOpen && "max-w-16 opacity-100",
+            "sidebar-row-actions flex shrink-0 items-center justify-end transition-opacity duration-150",
+            "opacity-0 pointer-events-none group-hover/item:opacity-100 group-hover/item:pointer-events-auto group-focus-within/item:opacity-100 group-focus-within/item:pointer-events-auto",
+            touchActions && "opacity-100 pointer-events-auto",
+            menuOpen && "opacity-100 pointer-events-auto",
           )}
         >
-          {isRunning && !touchActions ? (
-            <AstryxStack
-              as="span"
-              direction="horizontal"
-              role="img"
-              aria-label={t("chat.statusRunningReply")}
-              className={cn(
-                "pointer-events-none absolute right-1.5 flex h-4 w-4 items-center justify-center text-muted-foreground transition-opacity duration-200",
-                "opacity-100 group-hover/item:opacity-0 group-focus-within/item:opacity-0",
-                menuOpen && "opacity-0",
-              )}
-            >
-              <Loader2 className="h-4 w-4 animate-spin" />
-            </AstryxStack>
-          ) : null}
           <AstryxStack
             direction="horizontal"
-            className={cn(
-              "sidebar-row-action-buttons flex items-center gap-0.5 transition-opacity duration-200",
-              isRunning
-                ? "opacity-0 group-hover/item:opacity-100 group-focus-within/item:opacity-100"
-                : "opacity-100",
-              menuOpen && "opacity-100",
-            )}
+            className="sidebar-row-action-buttons flex items-center gap-0.5"
           >
             <IconButton
               variant="ghost"
@@ -892,7 +876,7 @@ export const ProjectRow = memo(function ProjectRow(props: {
               isSelected={isActive}
               isDisabled={isArchived}
               endContent={
-                touchActions && isRunning && !isMissing ? (
+                isRunning && !isMissing ? (
                   <span role="img" aria-label={t("chat.statusRunningReply")}>
                     <Loader2 className="h-4 w-4 animate-spin" />
                   </span>
@@ -921,40 +905,14 @@ export const ProjectRow = memo(function ProjectRow(props: {
           direction="horizontal"
           data-touch-actions={touchActions ? "true" : undefined}
           className={cn(
-            "sidebar-row-actions relative flex items-center justify-end overflow-hidden transition-[max-width,opacity] duration-200 ease-out",
-            isMissing
-              ? "max-w-8 opacity-100"
-              : isRunning
-                ? "max-w-7 opacity-100 group-hover/project:max-w-16 group-focus-within/project:max-w-16"
-                : "max-w-0 opacity-0 group-hover/project:max-w-16 group-hover/project:opacity-100 group-focus-within/project:max-w-16 group-focus-within/project:opacity-100",
-            touchActions && "max-w-16 opacity-100",
-            menuOpen && "max-w-16 opacity-100",
+            "sidebar-row-actions flex shrink-0 items-center justify-end transition-opacity duration-150",
+            "opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto group-focus-within/project:opacity-100 group-focus-within/project:pointer-events-auto",
+            (isMissing || touchActions || menuOpen) && "opacity-100 pointer-events-auto",
           )}
         >
-          {isRunning && !isMissing && !touchActions ? (
-            <AstryxStack
-              as="span"
-              direction="horizontal"
-              role="img"
-              aria-label={t("chat.statusRunningReply")}
-              className={cn(
-                "pointer-events-none absolute right-1.5 flex h-4 w-4 items-center justify-center text-muted-foreground transition-opacity duration-200",
-                "opacity-100 group-hover/project:opacity-0 group-focus-within/project:opacity-0",
-                menuOpen && "opacity-0",
-              )}
-            >
-              <Loader2 className="h-4 w-4 animate-spin" />
-            </AstryxStack>
-          ) : null}
           <AstryxStack
             direction="horizontal"
-            className={cn(
-              "sidebar-row-action-buttons flex items-center gap-0.5 transition-opacity duration-200",
-              isRunning && !isMissing
-                ? "opacity-0 group-hover/project:opacity-100 group-focus-within/project:opacity-100"
-                : "opacity-100",
-              menuOpen && "opacity-100",
-            )}
+            className="sidebar-row-action-buttons flex items-center gap-0.5"
           >
             {isMissing && !isArchived ? (
               !isDefaultProject ? (
@@ -2189,24 +2147,22 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                     title={t("chat.workspaceSection")}
                     endContent={
                       <>
-                        <IconButton
-                          label={t("chat.workspaceGroupCreate")}
-                          tooltip={t("chat.workspaceGroupCreate")}
-                          icon={<FolderTree aria-hidden="true" />}
-                          variant="ghost"
-                          size={mobileExperience ? "lg" : "md"}
-                          isDisabled={!onCreateWorkspaceGroup}
-                          onClick={() => {
-                            setCreatingWorkspaceGroup(true);
-                            setWorkspaceGroupDraft("");
-                          }}
-                        />
                         <MoreMenu
                           label={t("chat.workspaceMore")}
                           size={mobileExperience ? "lg" : "sm"}
                           placement="below"
                           alignment="end"
                           items={[
+                            {
+                              id: "workspace-group-create",
+                              label: t("chat.workspaceGroupCreate"),
+                              icon: <FolderTree aria-hidden="true" />,
+                              isDisabled: !onCreateWorkspaceGroup,
+                              onClick: () => {
+                                setCreatingWorkspaceGroup(true);
+                                setWorkspaceGroupDraft("");
+                              },
+                            },
                             ...(selectedWorkspaceProject && onOpenWorkspaceSettings
                               ? [
                                   {

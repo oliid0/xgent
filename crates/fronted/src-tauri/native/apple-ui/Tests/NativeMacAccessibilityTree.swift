@@ -37,8 +37,11 @@ struct NativeMacAccessibilityElement {
     }
     func isAccessibilityEnabled() -> Bool {
         if let modern = object as? any NSAccessibilityProtocol { return modern.isAccessibilityEnabled() }
-        if object.responds(to: NSSelectorFromString("isAccessibilityEnabled")),
-           let value = object.value(forKey: "accessibilityEnabled") as? NSNumber { return value.boolValue }
+        let selector = NSSelectorFromString("isAccessibilityEnabled")
+        if object.responds(to: selector), let implementation = object.method(for: selector) {
+            typealias Enabled = @convention(c) (AnyObject, Selector) -> Bool
+            return unsafeBitCast(implementation, to: Enabled.self)(object, selector)
+        }
         return (legacy(.enabled) as? NSNumber)?.boolValue ?? false
     }
     func accessibilityPerformPress() -> Bool {

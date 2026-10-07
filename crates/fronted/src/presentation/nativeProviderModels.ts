@@ -278,7 +278,7 @@ export function useNativeProviderModels(
             })),
           !busy,
         );
-    return {
+    const row: PresentationNode = {
       id: `model-row:${id}`,
       kind: "VStack",
       variant: "provider-model-row",
@@ -354,6 +354,26 @@ export function useNativeProviderModels(
         },
       ],
     };
+    const actions = row.children?.find((child) => child.id === `model-actions:${id}`);
+    if (actions) {
+      const children = actions.children ?? [];
+      row.children = [
+        ...(row.children ?? []),
+        {
+          id: `model-reorder:${id}`,
+          kind: "Menu",
+          label: `${t("settings.reorderModel")}: ${model.id}`,
+          icon: "line.3.horizontal",
+          variant: "compact",
+          size: "large",
+          disabled: busy || !!ui.query.trim() || ui.bulk,
+          children: children.filter((child) => child.id.startsWith("model-move-")),
+        },
+      ];
+      actions.children = children.filter((child) => !child.id.startsWith("model-move-"));
+      actions.size = "large";
+    }
+    return row;
   });
   const add = () => {
     const id = scope.ui.draft.trim();

@@ -13,6 +13,7 @@ import {
   LAN_PC_SESSION_CHANGED_EVENT,
   listen,
 } from "@xgent/runtime";
+import type { CSSProperties } from "react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppConversationSurface, AppStartupSurface } from "./components/AppStartupSurface";
@@ -741,8 +742,14 @@ export default function App() {
                           if (!isOpen) closeSettings();
                         }}
                         label={translate("settings.title", settings.locale)}
-                        purpose="form"
+                        purpose="info"
                         height="tall"
+                        style={
+                          {
+                            "--_sheet-budget":
+                              "calc(100dvh - max(24px, env(safe-area-inset-top, 0px)))",
+                          } as CSSProperties
+                        }
                       >
                         <AppErrorBoundary>
                           <VStack
@@ -778,6 +785,7 @@ export default function App() {
                         maxHeight="var(--xgent-settings-dialog-height)"
                         padding={0}
                         aria-label={translate("settings.title", settings.locale)}
+                        style={{ height: "var(--xgent-settings-dialog-height)" }}
                       >
                         <AppErrorBoundary>
                           <SettingsPage

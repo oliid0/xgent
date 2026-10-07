@@ -6,6 +6,7 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 function elements(value) {
   if (Array.isArray(value)) return value.flatMap(elements);
+  if (value?.label && typeof value.onClick === "function") return [{ type: "menuitem", props: value }];
   if (!value?.type || !value.props) return [];
   return [value, ...Object.values(value.props).flatMap(elements)];
 }

@@ -24,17 +24,32 @@ function buttons(node) {
   ];
 }
 
-test("a collapsed sidebar can reopen after compact-to-wide and wide-to-compact transitions", () => {
-  let sidebarOpen = false, opens = 0;
+const { WorkspaceNavigationRail } = createTsModuleLoader({ mocks: {
+  "../../i18n": { useLocale: () => ({ t: key => key }) },
+  "@astryxdesign/core/SideNav": { SideNav: "SideNav", SideNavItem: "IconButton", SideNavSection: "SideNavSection" },
+  "../icons": Object.fromEntries(["Cable", "FolderTree", "MessageSquare", "PanelLeft", "SkillIcon", "SquarePen"].map(name => [name, name])),
+  "../MacOsTitleBarSpacer": { MacOsTitleBarSpacer: "MacOsTitleBarSpacer" },
+  "../AppUpdateButton": { AppUpdateButton: "AppUpdateButton" },
+  "./SidebarActionMenu": { SidebarActionMenu: "SidebarActionMenu" },
+} }).loadModule("src/components/workspace-tools/WorkspaceNavigationRail.tsx");
+
+test("sidebar reopening follows responsive transitions with one desktop entry and a mobile toggle", () => {
+  let sidebarOpen = false, toggles = 0;
+  const toggle = () => { sidebarOpen = !sidebarOpen; toggles++; };
   for (const mobileExperience of [true, false, true, false]) {
-    const props = () => ({ sidebarOpen, mobileExperience, onOpenSidebar() { sidebarOpen = true; opens++; } });
-    const reopen = buttons(ChatHeader(props())).filter(button => button.label === "tooltip.openSidebar");
-    assert.equal(reopen.length, 1);
-    assert.equal(reopen[0].size, "lg");
-    reopen[0].onClick();
-    assert.equal(sidebarOpen, true);
-    assert.equal(buttons(ChatHeader(props())).length, 0);
-    sidebarOpen = false;
+    const props = () => ({ sidebarOpen, mobileExperience, onOpenSidebar: toggle });
+    const header = buttons(ChatHeader(props()));
+    assert.equal(header.length, mobileExperience ? 1 : 0, "Wide chat headers must not duplicate the navigation rail");
+    const rail = WorkspaceNavigationRail({ panelOpen: sidebarOpen, activeTarget: "conversations", onTogglePanel: toggle });
+    const reopen = mobileExperience ? header[0] : buttons(rail.props.topContent).find(button => button.label === "sidebar.openSidebar");
+    assert.ok(reopen); reopen.onClick(); assert.equal(sidebarOpen, true);
+    const openedHeader = buttons(ChatHeader(props()));
+    if (mobileExperience) {
+      assert.equal(openedHeader.length, 1); assert.equal(openedHeader[0].label, "tooltip.closeSidebar");
+      openedHeader[0].onClick(); assert.equal(sidebarOpen, false);
+    } else {
+      assert.equal(openedHeader.length, 0); sidebarOpen = false;
+    }
   }
-  assert.equal(opens, 4);
+  assert.equal(toggles, 6);
 });

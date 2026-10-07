@@ -7,8 +7,12 @@ struct XgentComposerInput: View {
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
     @StateObject private var fieldState = XgentComposerFieldState()
+    @StateObject private var clipboard = XgentComposerClipboard()
 
     private var value: String { model.value(node, in: document).text }
+    private var lease: String {
+        "\(document.surface):\(node.action ?? ""):\(node.selectionAction ?? ""):\(node.editAction ?? "")"
+    }
 
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
@@ -38,15 +42,19 @@ struct XgentComposerInput: View {
                 readReferences: { model.composerReferences(node, in: document) },
                 pasteRules: node.children?.first { $0.id == "draft-paste-rules" }?.text ?? "",
                 selectionRequest: node.text, focusRequest: node.focusRequest,
-                lease: "\(document.surface):\(node.action ?? ""):\(node.selectionAction ?? ""):\(node.editAction ?? "")",
+                lease: lease,
                 label: node.accessibilityLabel ?? node.label ?? "", identifier: node.id,
                 disabled: node.disabled == true, fontFamily: theme.fontFamily, fontSize: fontSize,
                 palette: theme.palette(for: colorScheme), fieldState: fieldState,
                 consumeFocus: { model.consumeFocusRequest(node, in: document) },
                 edit: { model.sendComposerEdit(text: $0, references: $1, pastes: $2, node: node, in: document) },
                 select: { model.reportComposerSelection($0, text: $1, node: node, in: document) },
-                key: handleKey))
+                key: handleKey,
+                pasteAttachments: { clipboard.paste($0, input: node, document: document, model: model) }))
         }
+        .onDisappear { clipboard.cancel() }
+        .onChange(of: lease) { _, _ in clipboard.cancel() }
+        .onChange(of: node.disabled) { _, disabled in if disabled == true { clipboard.cancel() } }
     }
     private func handleKey(_ key: XgentComposerKey) -> KeyPress.Result {
         guard node.disabled != true, !fieldState.composing else { return .ignored }

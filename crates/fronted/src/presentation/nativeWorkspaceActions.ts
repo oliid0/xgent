@@ -84,17 +84,14 @@ export function useNativeWorkspaceActions(
       scope.props.onCreateProject();
       scope.props.onNavigate?.();
     }),
+    ...(props.onCreateWorkspaceGroup
+      ? [
+          c.action("workspace-create-group", t("chat.workspaceGroupCreate"), () =>
+            open("create-group"),
+          ),
+        ]
+      : []),
   ]);
-  const createGroup: PresentationNode | undefined = props.onCreateWorkspaceGroup
-    ? {
-        ...c.action("workspace-create-group", t("chat.workspaceGroupCreate"), () =>
-          open("create-group"),
-        ),
-        kind: "IconButton",
-        icon: "folder.badge.plus",
-        variant: "ghost",
-      }
-    : undefined;
 
   function projectMenu(item: WorkspaceProject) {
     const prefix = `project-actions:${item.id}`;
@@ -315,7 +312,6 @@ export function useNativeWorkspaceActions(
     projectMenu,
     groupMenu,
     workspaceMenu,
-    createGroup,
     handlers: c.handlers,
     dialog: dialog && target ? { title, nodes: dialogNodes, handlers: dc.handlers } : null,
   };

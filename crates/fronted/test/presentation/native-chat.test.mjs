@@ -1553,3 +1553,23 @@ test("empty native model selection stays in the footer and opens provider settin
   assert.equal((await h.dispatch("send")).ok, false);
   h.unmount();
 });
+
+
+test("clipboard attachment metadata uses the current file importer without replacing the draft", async () => {
+  const imported = [];
+  const h = harness({ onImportFiles: async files => {
+    for (const file of files) imported.push({ name: file.name, type: file.type, bytes: Buffer.from(await file.arrayBuffer()) });
+  } }, { mobile: true });
+  const control = (document, id) => {
+    const find = nodes => nodes.flatMap(node => [node, ...find(node.children ?? [])]);
+    return find(document.nodes).find(node => node.id === id);
+  };
+  const draft = control(h.render(), "draft");
+  const target = draft.children.find(node => node.id === "draft-attachment-target").text;
+  const picker = control(h.render(), target);
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "base64");
+  assert.equal((await h.dispatch(picker.action, JSON.stringify([{ fileName: "Clipboard.png", mimeType: "image/png", contentBase64: png.toString("base64") }]))).ok, true);
+  assert.deepEqual(imported, [{ name: "Clipboard.png", type: "image/png", bytes: png }]);
+  assert.equal(control(h.render(), "draft").value, draft.value);
+  h.unmount();
+});

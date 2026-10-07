@@ -1019,6 +1019,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
               value: draft.text,
               children: [
                 { id: "draft-paste-rules", kind: "Text", text: composer.getPasteRules() },
+                { id: "draft-attachment-target", kind: "Text", text: "attach" },
                 {
                   id: "draft-inline-references",
                   kind: "Text",
@@ -1863,10 +1864,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                         kind: "HStack",
                         variant: "sidebar-section-heading",
                         text: t("chat.workspaceSection"),
-                        children: [
-                          ...(workspaceActions.createGroup ? [workspaceActions.createGroup] : []),
-                          workspaceActions.workspaceMenu,
-                        ],
+                        children: [workspaceActions.workspaceMenu],
                       },
                       ...projectNodes,
                       { id: "recents-label", kind: "Heading", text: t("chat.recentConversation") },

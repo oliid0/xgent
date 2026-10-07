@@ -1,4 +1,5 @@
 import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Section } from "@astryxdesign/core/Layout";
@@ -6918,6 +6919,8 @@ export function ChatPage(props: ChatPageProps) {
         size="fill"
         inert={mobileExperience && mobileActivityOpen ? true : undefined}
         data-mobile-chat-workspace={mobileExperience ? "true" : undefined}
+        data-mobile-sidebar-open={mobileExperience && sidebarOpen ? "true" : undefined}
+        data-mobile-left-drawer={mobileExperience && sidebarOpen ? "true" : undefined}
         className={cn(
           "chat-workspace-main zone-scroll-region",
           activeView === "chat" && "zone-font-scale",
@@ -6932,6 +6935,24 @@ export function ChatPage(props: ChatPageProps) {
             : { position: "relative", overflow: "hidden" }
         }
       >
+        {mobileExperience && sidebarOpen ? (
+          <Button
+            label={t("tooltip.closeSidebar")}
+            isIconOnly
+            icon={<span aria-hidden="true" />}
+            variant="ghost"
+            onClick={handleCloseSidebar}
+            style={{
+              position: "absolute",
+              inset: "calc(env(safe-area-inset-top, 0px) + 64px) 0 0",
+              width: "auto",
+              height: "auto",
+              zIndex: 30,
+              borderRadius: 0,
+              background: "transparent",
+            }}
+          />
+        ) : null}
         <HStack height="100%" width="100%" gap={0}>
           {!desktopAuxiliaryFullscreen ? (
             <VStack
@@ -6979,7 +7000,7 @@ export function ChatPage(props: ChatPageProps) {
                   <AstryxStack direction="vertical" className="relative z-20">
                     <ChatHeader
                       sidebarOpen={sidebarOpen}
-                      onOpenSidebar={handleOpenSidebar}
+                      onOpenSidebar={handleToggleSidebar}
                       mobileExperience={mobileExperience}
                       trailingActions={
                         mobileExperience ? (

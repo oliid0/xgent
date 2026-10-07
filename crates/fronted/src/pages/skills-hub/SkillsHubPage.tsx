@@ -2980,16 +2980,11 @@ function InstalledSkillPreviewDrawer(props: {
       aria-label={t("settings.skillsInstalledPreviewTitle")}
       purpose="info"
       variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "min(var(--xgent-drawer-width), 40dvw)"}
+      width={isCompact ? "100dvw" : "var(--xgent-settings-dialog-width)"}
+      maxHeight="var(--xgent-settings-dialog-height)"
       padding={0}
       style={{
-        marginInlineStart: "auto",
-        marginInlineEnd: 0,
-        blockSize: "var(--xgent-viewport-height)",
-        maxBlockSize: "var(--xgent-viewport-height)",
-        ...(isCompact
-          ? {}
-          : { borderRadius: "var(--radius-container) 0 0 var(--radius-container)" }),
+        blockSize: isCompact ? "100dvh" : "var(--xgent-settings-dialog-height)",
       }}
     >
       <AstryxStack direction="vertical" as="aside" className="flex h-full w-full flex-col">
@@ -3807,16 +3802,11 @@ function SkillsStorePreviewDrawer(props: {
       aria-label={t("settings.skillsStorePreviewTitle")}
       purpose="info"
       variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "min(var(--xgent-drawer-width), 40dvw)"}
+      width={isCompact ? "100dvw" : "var(--xgent-settings-dialog-width)"}
+      maxHeight="var(--xgent-settings-dialog-height)"
       padding={0}
       style={{
-        marginInlineStart: "auto",
-        marginInlineEnd: 0,
-        blockSize: "var(--xgent-viewport-height)",
-        maxBlockSize: "var(--xgent-viewport-height)",
-        ...(isCompact
-          ? {}
-          : { borderRadius: "var(--radius-container) 0 0 var(--radius-container)" }),
+        blockSize: isCompact ? "100dvh" : "var(--xgent-settings-dialog-height)",
       }}
     >
       <Layout

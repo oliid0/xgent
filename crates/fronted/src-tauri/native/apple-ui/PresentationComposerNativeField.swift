@@ -1,6 +1,7 @@
 import SwiftUI
 #if os(iOS)
 import UIKit
+import UniformTypeIdentifiers
 #else
 import AppKit
 #endif
@@ -26,6 +27,7 @@ struct XgentComposerFieldConfiguration {
     let edit: (String, [XgentComposerReference], [XgentComposerPaste]) -> Void
     let select: (NSRange, String) -> Void
     let key: (XgentComposerKey) -> KeyPress.Result
+    var pasteAttachments: (([XgentClipboardAttachment]) -> Bool)? = nil
 }
 
 #if os(iOS)
@@ -87,6 +89,10 @@ struct XgentComposerNativeField: NSViewRepresentable {
         view.showsVerticalScrollIndicator = false
         view.textContainerInset = UIEdgeInsets(top: 8, left: 0, bottom: 8, right: 0)
         view.contentInsetAdjustmentBehavior = .never
+        view.pasteConfiguration = UIPasteConfiguration(acceptableTypeIdentifiers: [
+            UTType.fileURL.identifier, UTType.image.identifier, UTType.pdf.identifier,
+            UTType.plainText.identifier, UTType.data.identifier
+        ])
         #else
         view.drawsBackground = false; view.isRichText = true; view.importsGraphics = false
         view.allowsUndo = true; view.usesFontPanel = false
@@ -106,6 +112,11 @@ struct XgentComposerNativeField: NSViewRepresentable {
         }
         view.onWindow = { [weak self] in self?.applyFocus() }
         view.onPaste = { [weak self] in self?.paste($0) ?? false }
+        view.onPasteAttachments = { [weak self] sources in
+            guard let self, !self.retired, !self.configuration.disabled,
+                  !self.configuration.fieldState.composing else { return false }
+            return self.configuration.pasteAttachments?(sources) ?? false
+        }
     }
 
     private var attributed: NSAttributedString {
@@ -252,12 +263,7 @@ struct XgentComposerNativeField: NSViewRepresentable {
         let fragment = XgentComposerAttributedText.make(text: text, references: [reference],
             fontFamily: configuration.fontFamily, fontSize: configuration.fontSize,
             palette: configuration.palette, width: width, pastes: [XgentComposerPaste(id: id)])
-        #if os(iOS)
         return view.insertComposerFragment(fragment)
-        #else
-        view.insertText(fragment, replacementRange: selection)
-        return true
-        #endif
     }
     private func reportSelection() {
         guard !updating, !retired, !configuration.disabled else { return }
@@ -269,7 +275,8 @@ struct XgentComposerNativeField: NSViewRepresentable {
     }
     func retire() {
         retired = true; pendingFocus = false
-        view.onKey = nil; view.onWindow = nil; view.onPaste = nil; view.delegate = nil; view.isEditable = false
+        view.onKey = nil; view.onWindow = nil; view.onPaste = nil; view.onPasteAttachments = nil
+        view.delegate = nil; view.isEditable = false
         #if os(macOS)
         view.setAccessibilityEnabled(false)
         #endif

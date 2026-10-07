@@ -70,8 +70,8 @@
     --xgent-chat-landing-suggestions-width: 32rem;
     --xgent-settings-content-max-width: 40rem;
     --xgent-settings-sidebar-width: 14rem;
-    --xgent-settings-dialog-width: min(56rem, calc(100dvw - (var(--spacing-4) * 2)));
-    --xgent-settings-dialog-height: min(38rem, calc(100dvh - (var(--spacing-4) * 2)));
+    --xgent-settings-dialog-width: min(86.6dvw, calc(100dvw - (var(--spacing-4) * 2)));
+    --xgent-settings-dialog-height: min(86.6dvh, calc(100dvh - (var(--spacing-4) * 2)));
     --xgent-settings-header-height: 3.75rem;
     --xgent-settings-control-width: 18rem;
     --xgent-http-method-width: 6.25rem;
@@ -3302,6 +3302,39 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   background: var(--color-background-surface);
 }
 
+/* The compact navigation reveals the sidebar behind the translated page. */
+.chat-mobile-sidebar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: min(320px, 85vw);
+  height: 100%;
+  background: var(--color-background-body);
+  transform: translateX(-100%);
+  transition: transform 240ms cubic-bezier(0.2, 0, 0, 1);
+  overflow: hidden;
+}
+.chat-mobile-sidebar[data-open="true"] {
+  transform: translateX(0);
+}
+.chat-workspace-main[data-mobile-chat-workspace="true"] {
+  flex: 0 0 100%;
+  transition:
+    transform 240ms cubic-bezier(0.2, 0, 0, 1),
+    border-radius 240ms;
+  background: var(--color-background-body);
+}
+.chat-workspace-main[data-mobile-sidebar-open="true"] {
+  transform: translateX(min(320px, 85vw));
+  border-radius: var(--radius-page);
+  box-shadow: var(--shadow-high);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-mobile-sidebar,
+  .chat-workspace-main[data-mobile-chat-workspace="true"] {
+    transition: none;
+  }
+}
+
 .workspace-navigation-rail-shell {
   width: 38px;
   max-width: 38px;
@@ -3329,6 +3362,21 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   background: var(--astryx-theme-xgent-glass-surface, var(--color-background-surface));
   -webkit-backdrop-filter: var(--xgent-material-filter, none);
   backdrop-filter: var(--xgent-material-filter, none);
+}
+
+/* Preview actions wrap as a group instead of squeezing the title and icons. */
+.workspace-preview-toolbar .astryx-toolbar {
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+.workspace-preview-toolbar .astryx-toolbar > div:first-child {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.workspace-preview-toolbar .astryx-toolbar > div:last-child {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-inline-start: auto;
 }
 
 .chat-composer-layer {
@@ -3559,12 +3607,13 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   height: auto;
   min-height: 32px;
   font-size: calc(14px * var(--zone-font-scale, 1));
+  background-color: transparent;
 }
 .workspace-project-title .astryx-side-nav-item > span,
 .sidebar-history-title .astryx-side-nav-item > span {
-  white-space: normal;
-  overflow-wrap: anywhere;
-  overflow: visible;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sidebar-row-actions[data-touch-actions="true"] {
   max-width: none;
@@ -3585,8 +3634,9 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   padding-block: 6px;
 }
 .workspace-group-name {
-  overflow-wrap: anywhere;
-  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 @media (pointer: coarse) {
   .workspace-group-toggle,
@@ -4414,27 +4464,6 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 .settings-provider-tabs-toolbar .astryx-tab-list {
   width: 100%;
   min-width: 0;
-}
-/* Astryx ListItem keeps its action slot beside its label. This local
-   container rule moves that slot below the label in narrow provider lists. */
-.settings-provider-list {
-  container-name: provider-list;
-  container-type: inline-size;
-}
-.settings-provider-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 16px;
-  min-width: 0;
-}
-@container provider-list (max-width: 32rem) {
-  .settings-provider-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .settings-provider-row > :last-child {
-    min-width: 0;
-    width: 100%;
-  }
 }
 .settings-provider-brand[fill]:not([fill="none"]),
 .settings-provider-brand [fill]:not([fill="none"]) {

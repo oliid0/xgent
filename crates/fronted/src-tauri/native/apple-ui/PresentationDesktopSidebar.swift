@@ -67,7 +67,8 @@ struct XgentDesktopSidebar: View {
                 Spacer(minLength: 8)
                 if let search {
                     Button { model.send(search, in: document) } label: {
-                        Image(systemName: "magnifyingglass").frame(width: 32, height: 32)
+                        Image(systemName: "magnifyingglass").accessibilityHidden(true)
+                            .frame(width: 32, height: 32).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .disabled(search.disabled == true || model.isBusy(search, in: document))
@@ -76,7 +77,8 @@ struct XgentDesktopSidebar: View {
                 }
                 if !model.windowChromeInstalled, let close {
                     Button { model.send(close, in: document) } label: {
-                        Image(systemName: close.icon ?? "sidebar.leading").frame(width: 32, height: 32)
+                        Image(systemName: close.icon ?? "sidebar.leading").accessibilityHidden(true)
+                            .frame(width: 32, height: 32).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .disabled(close.disabled == true)

@@ -128,6 +128,7 @@ struct XgentDesktopWorkspaceLayout<Main: View>: View {
             XgentNodeChildren(nodes: document.nodes, document: document, model: model)
                 .id(document.surface)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("xgent-workspace-panel-content")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

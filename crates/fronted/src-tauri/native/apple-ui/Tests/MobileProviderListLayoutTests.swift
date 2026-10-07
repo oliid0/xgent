@@ -16,9 +16,11 @@ final class MobileProviderListLayoutTests: XCTestCase {
                      "text": "https://example.test/long-provider-endpoint/long-provider-endpoint/ · 3 active models", "icon": "sun.max", "action": "edit"],
                     ["id": "provider-list-actions:a", "kind": "Menu", "variant": "compact", "label": "Reorder provider", "icon": "line.3.horizontal", "disabled": true,
                      "children": [["id": "provider-up:a", "kind": "Button", "label": "Move up", "action": "up", "disabled": true]]],
-                    ["id": "provider-usage-refresh:a", "kind": "IconButton", "label": "Refresh usage", "icon": "arrow.clockwise", "variant": "ghost", "size": "large", "action": "refresh"],
-                    ["id": "provider-edit:a", "kind": "IconButton", "label": "Edit provider", "icon": "pencil", "variant": "ghost", "size": "large", "action": "edit"],
-                    ["id": "provider-list-delete:a", "kind": "IconButton", "label": "Delete provider", "icon": "trash", "variant": "ghost", "size": "large", "action": "delete"],
+                    ["id": "provider-more:a", "kind": "Menu", "label": "More provider actions", "icon": "ellipsis", "variant": "compact", "size": "large", "children": [
+                        ["id": "provider-usage-refresh:a", "kind": "IconButton", "label": "Refresh usage", "icon": "arrow.clockwise", "action": "refresh"],
+                        ["id": "provider-edit:a", "kind": "IconButton", "label": "Edit provider", "icon": "pencil", "action": "edit"],
+                        ["id": "provider-list-delete:a", "kind": "IconButton", "label": "Delete provider", "icon": "trash", "action": "delete", "destructive": true]
+                    ]],
                     ["id": "provider-list-usage:a", "kind": "Text", "text": "Quota diagnostic https://example.test/long-diagnostic-path/long-diagnostic-path/", "secondary": true],
                     ["id": "provider-list-proxy:a", "kind": "Badge", "label": "Use system proxy", "icon": "arrow.triangle.branch"]
                 ]]]]]
@@ -44,7 +46,7 @@ final class MobileProviderListLayoutTests: XCTestCase {
                     host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(200))
                     let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
                     let elements = hierarchy.flattenToElements()
-                    let identifiers = ["provider:a", "provider-list-actions:a", "provider-usage-refresh:a", "provider-edit:a", "provider-list-delete:a"]
+                    let identifiers = ["provider:a", "provider-list-actions:a", "provider-more:a"]
                     var frames: [CGRect] = []
                     for id in identifiers {
                         let identified = elements.filter { $0.identifier == id }
@@ -63,12 +65,13 @@ final class MobileProviderListLayoutTests: XCTestCase {
                                 "Provider text and independent actions must not overlap")
                         }
                     }
-                    if width <= 512 {
-                        XCTAssertTrue(frames.dropFirst().allSatisfy { $0.minY >= frames[0].maxY },
-                            "Narrow controls must sit below the complete wrapped details")
+                    if direction == .leftToRight {
+                        XCTAssertLessThanOrEqual(frames[1].maxX, frames[0].minX,
+                            "Ordering remains at the leading edge at every width")
+                        XCTAssertGreaterThanOrEqual(frames[2].minX, frames[0].maxX)
                     } else {
-                        XCTAssertTrue(frames.dropFirst().allSatisfy { $0.midY < frames[0].maxY },
-                            "Wide rows retain their independent side action group")
+                        XCTAssertGreaterThanOrEqual(frames[1].minX, frames[0].maxX)
+                        XCTAssertLessThanOrEqual(frames[2].maxX, frames[0].minX)
                     }
                     let name = "providers-\(Int(width))-\(size)-\(direction)"
                     try attachNativeAccessibilityEvidence(hierarchy, name: name)

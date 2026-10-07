@@ -44,6 +44,12 @@ final class MobileSwitchInteractionTests: XCTestCase {
                     "A normal tap at the accessibility frame's center must hit UISwitch, rather than its label")
                 let hit = try XCTUnwrap(host.view.hitTest(tap, with: nil))
                 XCTAssertTrue(hit === control || hit.isDescendant(of: control))
+                for offset in [CGFloat(-21), 21] {
+                    let edge = CGPoint(x: tap.x, y: tap.y + offset)
+                    let target = try XCTUnwrap(host.view.hitTest(edge, with: nil))
+                    XCTAssertTrue(target === control || target.isDescendant(of: control),
+                        "The complete 44-point target reaches the actual native switch")
+                }
                 try attachNativeAccessibilityEvidence(hierarchy, name: "voice-switch-\(Int(width))-\(size)")
                 try attachCompositedNativeScreenshot(of: host.view, name: "voice-switch-\(Int(width))-\(size)")
 

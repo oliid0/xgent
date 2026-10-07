@@ -251,25 +251,18 @@ function ContextUsageIndicator(props: {
           </Text>
           <ProgressBar
             label={usageLabel}
+            isLabelHidden
             value={ringPercent}
             max={100}
             variant={progressVariant}
-            hasValueLabel
-            formatValueLabel={() => `${percent}%`}
           />
           {canOfferCompaction ? (
             <Text type="supporting" color="secondary">
               {t("chat.manualCompactDescription")}
             </Text>
           ) : null}
-          <HStack gap={2} hAlign="end">
-            <Button
-              label={t("chat.cancel")}
-              variant="ghost"
-              size="sm"
-              onClick={() => setDetailsOpen(false)}
-            />
-            {canOfferCompaction ? (
+          {canOfferCompaction ? (
+            <HStack gap={2} hAlign="end">
               <Button
                 label={t("chat.manualCompactConfirm")}
                 variant="primary"
@@ -280,8 +273,8 @@ function ContextUsageIndicator(props: {
                   props.onManualCompact?.();
                 }}
               />
-            ) : null}
-          </HStack>
+            </HStack>
+          ) : null}
         </VStack>
       }
     >

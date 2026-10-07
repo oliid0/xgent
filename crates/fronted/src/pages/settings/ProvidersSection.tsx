@@ -39,6 +39,7 @@ import {
   Globe,
   GripVertical,
   List,
+  MoreHorizontal,
   OpenaiChatgptIcon,
   Pencil,
   Plus,
@@ -1506,54 +1507,14 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                               className="group hover:bg-accent/30"
                             >
                               <AstryxStack
-                                direction={isCompact ? "vertical" : "horizontal"}
+                                direction="horizontal"
                                 className="settings-provider-model-row"
                                 gap={2}
                                 padding={3}
                                 width="100%"
                                 vAlign="center"
                               >
-                                <StackItem size="fill">
-                                  <HStack gap={2} vAlign="start" width="100%">
-                                    {modelBulkMode ? (
-                                      <CheckboxInput
-                                        label={model.id}
-                                        isLabelHidden
-                                        value={modelBulkSelection.has(model.id)}
-                                        size={isCompact ? "md" : "sm"}
-                                        onChange={() => toggleModelBulkSelection(model.id)}
-                                      />
-                                    ) : (
-                                      <DialogSwitch
-                                        checked={activeModels.has(model.id)}
-                                        onCheckedChange={() => toggleModel(model.id)}
-                                        ariaLabel={model.id}
-                                      />
-                                    )}
-                                    <StackItem size="fill">
-                                      <VStack className="settings-provider-model-name" gap={1}>
-                                        <AstryxText
-                                          as="span"
-                                          type="body"
-                                          weight="medium"
-                                          textWrap="wrap"
-                                          className="settings-provider-model-label"
-                                        >
-                                          {model.id}
-                                        </AstryxText>
-                                        <Text
-                                          className="settings-provider-model-limits"
-                                          type="supporting"
-                                          hasTabularNumbers
-                                        >
-                                          {formatTokenCount(model.contextWindow)} ctx ·{" "}
-                                          {formatTokenCount(model.maxOutputToken)} out
-                                        </Text>
-                                      </VStack>
-                                    </StackItem>
-                                  </HStack>
-                                </StackItem>
-                                <HStack gap={1} wrap="wrap" hAlign="end">
+                                <StackItem>
                                   <DropdownMenu
                                     button={{
                                       label: `${t("settings.reorderModel")}: ${model.id}`,
@@ -1579,35 +1540,82 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                                       },
                                     ]}
                                   />
-                                  <Button
-                                    label={t("settings.modelSettings")}
-                                    type="button"
-                                    variant="ghost"
-                                    size={isCompact ? "lg" : "md"}
-                                    isIconOnly
-                                    icon={
-                                      <Icon
-                                        icon={Pencil}
-                                        size="sm"
-                                        color={isEditingModel ? "accent" : "inherit"}
+                                </StackItem>
+                                <StackItem size="fill">
+                                  <HStack gap={2} vAlign="start" width="100%">
+                                    {modelBulkMode ? (
+                                      <CheckboxInput
+                                        label={model.id}
+                                        isLabelHidden
+                                        value={modelBulkSelection.has(model.id)}
+                                        size={isCompact ? "md" : "sm"}
+                                        onChange={() => toggleModelBulkSelection(model.id)}
                                       />
-                                    }
-                                    onClick={() => openModelSettings(model.id)}
-                                    tooltip={t("settings.modelSettings")}
-                                    aria-label={t("settings.modelSettings")}
+                                    ) : (
+                                      <DialogSwitch
+                                        checked={activeModels.has(model.id)}
+                                        onCheckedChange={() => toggleModel(model.id)}
+                                        ariaLabel={model.id}
+                                      />
+                                    )}
+                                    <StackItem size="fill">
+                                      <VStack className="settings-provider-model-name" gap={1}>
+                                        <AstryxText
+                                          as="span"
+                                          type="body"
+                                          weight="medium"
+                                          maxLines={1}
+                                          className="settings-provider-model-label"
+                                        >
+                                          {model.id}
+                                        </AstryxText>
+                                        <Text
+                                          className="settings-provider-model-limits"
+                                          type="supporting"
+                                          hasTabularNumbers
+                                        >
+                                          {formatTokenCount(model.contextWindow)} ctx ·{" "}
+                                          {formatTokenCount(model.maxOutputToken)} out
+                                        </Text>
+                                      </VStack>
+                                    </StackItem>
+                                  </HStack>
+                                </StackItem>
+                                <StackItem>
+                                  <DropdownMenu
+                                    button={{
+                                      label: `${t("settings.modelSettings")}: ${model.id}`,
+                                      variant: "ghost",
+                                      size: isCompact ? "lg" : "md",
+                                      isIconOnly: true,
+                                      icon: (
+                                        <Icon icon={MoreHorizontal} size="sm" color="inherit" />
+                                      ),
+                                    }}
+                                    alignment="end"
+                                    items={[
+                                      {
+                                        id: "edit",
+                                        label: t("settings.modelSettings"),
+                                        icon: (
+                                          <Icon
+                                            icon={Pencil}
+                                            size="sm"
+                                            color={isEditingModel ? "accent" : "inherit"}
+                                          />
+                                        ),
+                                        onClick: () => openModelSettings(model.id),
+                                      },
+                                      {
+                                        id: "delete",
+                                        label: t("settings.delete"),
+                                        icon: <Icon icon={Trash2} size="sm" color="inherit" />,
+                                        variant: "destructive",
+                                        onClick: () => removeModel(model.id),
+                                      },
+                                    ]}
                                   />
-                                  <Button
-                                    label={t("settings.delete")}
-                                    type="button"
-                                    variant="ghost"
-                                    size={isCompact ? "lg" : "md"}
-                                    isIconOnly
-                                    icon={<Icon icon={Trash2} size="sm" color="inherit" />}
-                                    onClick={() => removeModel(model.id)}
-                                    tooltip={t("settings.delete")}
-                                    aria-label={t("settings.delete")}
-                                  />
-                                </HStack>
+                                </StackItem>
                               </AstryxStack>
 
                               {isEditingModel && editingModel ? (
@@ -2984,6 +2992,7 @@ function ProviderList(props: {
   usage: ReturnType<typeof useProviderUsage>;
 }) {
   const { t } = useLocale();
+  const isCompact = useMediaQuery("(max-width: 768px), (pointer: coarse) and (hover: none)");
   const {
     type,
     isActive,
@@ -3157,13 +3166,15 @@ function ProviderList(props: {
           className="settings-provider-list-actions"
           gap={2}
           vAlign="center"
-          wrap="wrap"
           style={{ minWidth: 0, maxWidth: "100%" }}
         >
           <AstryxNativeButton
             label={t("settings.addProvider")}
             variant="primary"
             size="lg"
+            isIconOnly={isCompact}
+            icon={<Icon icon={Plus} size="sm" color="inherit" />}
+            tooltip={t("settings.addProvider")}
             onClick={onAdd}
           />
           {thirdPartyImportEnabled ? (
@@ -3172,7 +3183,8 @@ function ProviderList(props: {
                 label: t("settings.thirdPartySync"),
                 variant: "secondary",
                 size: "lg",
-                width: "100%",
+                isIconOnly: isCompact,
+                icon: <Icon icon={RefreshCw} size="sm" color="inherit" />,
                 isLoading: thirdPartyImporting,
                 isDisabled: thirdPartyImporting,
               }}
@@ -3255,81 +3267,82 @@ function ProviderList(props: {
                       ) : null}
                     </>
                   }
+                  reorder={
+                    <IconButton
+                      label={`${t("settings.reorderProvider")}: ${provider.name}`}
+                      variant="ghost"
+                      size="lg"
+                      isDisabled={filtered.length < 2}
+                      style={{ touchAction: "none" }}
+                      icon={<Icon icon={GripVertical} size="sm" color="inherit" />}
+                      onClick={(event) => event.stopPropagation()}
+                      onPointerDown={(event) => {
+                        event.stopPropagation();
+                        if (
+                          event.button === 0 &&
+                          filtered.length > 1 &&
+                          draggingPointerRef.current === null
+                        ) {
+                          event.currentTarget.setPointerCapture(event.pointerId);
+                          draggingPointerRef.current = event.pointerId;
+                          setPreviewProviderOrder(filtered.map((item) => item.id));
+                          setDraggingProviderId(provider.id);
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (reorderProviderByKeyboard(provider.id, event.key)) {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }
+                      }}
+                    />
+                  }
                   actions={
-                    <>
-                      <IconButton
-                        label={`${t("settings.reorderProvider")}: ${provider.name}`}
-                        variant="ghost"
-                        size="lg"
-                        isDisabled={filtered.length < 2}
-                        style={{ touchAction: "none" }}
-                        icon={<Icon icon={GripVertical} size="sm" color="inherit" />}
-                        onClick={(event) => event.stopPropagation()}
-                        onPointerDown={(event) => {
-                          event.stopPropagation();
-                          if (
-                            event.button === 0 &&
-                            filtered.length > 1 &&
-                            draggingPointerRef.current === null
-                          ) {
-                            event.currentTarget.setPointerCapture(event.pointerId);
-                            draggingPointerRef.current = event.pointerId;
-                            setPreviewProviderOrder(filtered.map((item) => item.id));
-                            setDraggingProviderId(provider.id);
-                          }
-                        }}
-                        onKeyDown={(event) => {
-                          if (reorderProviderByKeyboard(provider.id, event.key)) {
-                            event.preventDefault();
-                            event.stopPropagation();
-                          }
-                        }}
-                      />
-                      {provider.usageQuery?.enabled ? (
-                        <IconButton
-                          label={t("settings.usage.refresh")}
-                          tooltip={t("settings.usage.refresh")}
-                          variant="ghost"
-                          size="lg"
-                          icon={<Icon icon={RefreshCw} size="sm" color="inherit" />}
-                          isLoading={usageState.loading}
-                          isDisabled={usageState.loading}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void props.usage.refresh(provider.id);
+                    <ConfirmDeletePopover
+                      name={provider.name}
+                      onConfirm={() => onDelete(provider.id)}
+                    >
+                      {(open) => (
+                        <DropdownMenu
+                          button={{
+                            label: `${t("settings.providerMore")}: ${provider.name}`,
+                            variant: "ghost",
+                            size: "lg",
+                            isIconOnly: true,
+                            icon: <Icon icon={MoreHorizontal} size="sm" color="inherit" />,
                           }}
+                          alignment="end"
+                          items={[
+                            ...(provider.usageQuery?.enabled
+                              ? [
+                                  {
+                                    id: "refresh",
+                                    label: t("settings.usage.refresh"),
+                                    icon: <Icon icon={RefreshCw} size="sm" color="inherit" />,
+                                    isDisabled: usageState.loading,
+                                    onClick: () => {
+                                      void props.usage.refresh(provider.id);
+                                    },
+                                  },
+                                ]
+                              : []),
+                            {
+                              id: "edit",
+                              label: t("settings.edit"),
+                              icon: <Icon icon={Pencil} size="sm" color="inherit" />,
+                              onClick: () => onEdit(provider),
+                            },
+                            {
+                              id: "delete",
+                              label: t("settings.delete"),
+                              icon: <Icon icon={Trash2} size="sm" color="inherit" />,
+                              onClick: open,
+                              variant: "destructive",
+                            },
+                          ]}
                         />
-                      ) : null}
-                      <IconButton
-                        label={t("settings.edit")}
-                        tooltip={t("settings.edit")}
-                        variant="ghost"
-                        size="lg"
-                        icon={<Icon icon={Pencil} size="sm" color="inherit" />}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onEdit(provider);
-                        }}
-                      />
-                      <ConfirmDeletePopover
-                        name={provider.name}
-                        onConfirm={() => onDelete(provider.id)}
-                      >
-                        {(open) => (
-                          <IconButton
-                            label={t("settings.delete")}
-                            tooltip={t("settings.delete")}
-                            variant="ghost"
-                            size="lg"
-                            icon={<Icon icon={Trash2} size="sm" color="inherit" />}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              open();
-                            }}
-                          />
-                        )}
-                      </ConfirmDeletePopover>
-                    </>
+                      )}
+                    </ConfirmDeletePopover>
                   }
                   onEdit={() => onEdit(provider)}
                 />

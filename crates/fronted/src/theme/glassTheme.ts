@@ -17,6 +17,13 @@ const floatingSurface = {
     "inset 0 1px 0 var(--astryx-theme-xgent-glass-highlight), inset 0 -1px 0 var(--astryx-theme-xgent-glass-edge), var(--shadow-med)",
 };
 
+// Action text must keep its contrast over arbitrary HTML, images and video.
+const readableFloatingSurface = {
+  ...floatingSurface,
+  backgroundColor: "var(--color-background-popover)",
+  color: "var(--color-text-primary)",
+};
+
 export const glassTheme = defineTheme({
   name: "xgent-glass",
   extends: neutralTheme,
@@ -54,9 +61,9 @@ export const glassTheme = defineTheme({
       },
     },
     "bottom-sheet": { base: floatingSurface },
-    "dropdown-menu": { base: floatingSurface },
-    popover: { base: floatingSurface },
-    "popover-surface": { base: floatingSurface },
-    "selector-popup": { base: floatingSurface },
+    "dropdown-menu": { base: readableFloatingSurface },
+    popover: { base: readableFloatingSurface },
+    "popover-surface": { base: readableFloatingSurface },
+    "selector-popup": { base: readableFloatingSurface },
   },
 });

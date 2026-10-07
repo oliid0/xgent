@@ -756,16 +756,11 @@ function McpRegistryPreviewDrawer(props: {
       aria-label={t("mcpHub.storePreviewTitle")}
       purpose="info"
       variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "min(var(--xgent-drawer-width), 40dvw)"}
+      width={isCompact ? "100dvw" : "var(--xgent-settings-dialog-width)"}
+      maxHeight="var(--xgent-settings-dialog-height)"
       padding={0}
       style={{
-        marginInlineStart: "auto",
-        marginInlineEnd: 0,
-        blockSize: "var(--xgent-viewport-height)",
-        maxBlockSize: "var(--xgent-viewport-height)",
-        ...(isCompact
-          ? {}
-          : { borderRadius: "var(--radius-container) 0 0 var(--radius-container)" }),
+        blockSize: isCompact ? "100dvh" : "var(--xgent-settings-dialog-height)",
       }}
     >
       <Layout

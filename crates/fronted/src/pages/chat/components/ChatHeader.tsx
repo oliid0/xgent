@@ -49,10 +49,10 @@ export const ChatHeader = memo(function ChatHeader(props: {
           className="xgent-mobile-chat-toolbar w-full"
           startContent={
             <HStack gap={1} vAlign="center" hAlign="start">
-              {!sidebarOpen && !macOsTauri ? (
+              {!macOsTauri ? (
                 <IconButton
-                  label={t("tooltip.openSidebar")}
-                  tooltip={t("tooltip.openSidebar")}
+                  label={t(sidebarOpen ? "tooltip.closeSidebar" : "tooltip.openSidebar")}
+                  tooltip={t(sidebarOpen ? "tooltip.closeSidebar" : "tooltip.openSidebar")}
                   icon={<MobileMenu size={20} />}
                   variant="secondary"
                   size="lg"
@@ -74,18 +74,7 @@ export const ChatHeader = memo(function ChatHeader(props: {
           align="center"
           style={{ gridTemplateColumns: "minmax(0, 1fr) auto" }}
         >
-          <HStack gap={1} vAlign="center" hAlign="start">
-            {!sidebarOpen ? (
-              <IconButton
-                label={t("tooltip.openSidebar")}
-                tooltip={t("tooltip.openSidebar")}
-                icon={<MobileMenu size={20} />}
-                variant="ghost"
-                size="lg"
-                onClick={onOpenSidebar}
-              />
-            ) : null}
-          </HStack>
+          <HStack gap={1} vAlign="center" hAlign="start"></HStack>
 
           <HStack gap={1} vAlign="center" hAlign="end" style={{ minWidth: "max-content" }}>
             {trailingActions}

@@ -11,6 +11,7 @@ struct XgentProviderModelRow: View {
     private var selection: XgentNode? { node.children?.first }
     private var limits: XgentNode? { node.children?.first { $0.id.hasPrefix("model-limits:") } }
     private var actions: XgentNode? { node.children?.first { $0.kind == .menu } }
+    private var reorder: XgentNode? { node.children?.first { $0.id.hasPrefix("model-reorder:") } }
 
     @ViewBuilder private var modelControl: some View {
         if let selection {
@@ -58,20 +59,17 @@ struct XgentProviderModelRow: View {
     }
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 16) {
-                modelControl.frame(minWidth: 220)
-                limitsLabel.fixedSize(horizontal: true, vertical: true)
-                menu
+        HStack(alignment: .center, spacing: 8) {
+            if let reorder {
+                XgentNativeMenu(node: reorder, document: document, model: model)
+                    .accessibilityIdentifier(reorder.id).fixedSize()
             }
             VStack(alignment: .leading, spacing: 4) {
-                modelControl
-                HStack(alignment: .top, spacing: 12) {
-                    limitsLabel
-                    Spacer(minLength: 4)
-                    menu
-                }
+                modelControl.lineLimit(1).truncationMode(.tail)
+                limitsLabel.lineLimit(2)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            menu.fixedSize()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)

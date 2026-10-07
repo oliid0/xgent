@@ -1,6 +1,7 @@
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button as AstryxButton } from "@astryxdesign/core/Button";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import {
@@ -1274,6 +1275,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
             <VStack gap={0} width="100%">
               <Toolbar
                 label={t("workspaceFilePreview.title")}
+                className="workspace-preview-toolbar"
                 size="sm"
                 startContent={
                   <HStack gap={2} vAlign="center">
@@ -1289,7 +1291,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                   </HStack>
                 }
                 endContent={
-                  <HStack gap={1} vAlign="center">
+                  <HStack gap={1} vAlign="center" wrap="wrap">
                     {preview?.text !== null && preview?.text !== undefined ? (
                       <IconButton
                         label={
@@ -1844,19 +1846,17 @@ function ImagePreviewToolButton(props: {
   children: ReactNode;
 }) {
   const { label, disabled, onClick, children } = props;
+  const touch = useMediaQuery("(pointer: coarse)");
   return (
-    <AstryxButton
+    <IconButton
       variant="ghost"
       label={label}
-      type="button"
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40 pointer-coarse:h-11 pointer-coarse:w-11"
+      size={touch ? "lg" : "sm"}
       tooltip={label}
-      aria-label={label}
+      icon={children}
       isDisabled={disabled}
       onClick={onClick}
-    >
-      {children}
-    </AstryxButton>
+    />
   );
 }
 

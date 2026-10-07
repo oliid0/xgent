@@ -1,5 +1,4 @@
 import Foundation
-import Flow
 import SwiftUI
 
 private struct XgentProviderRowHeights: PreferenceKey {
@@ -83,6 +82,11 @@ struct XgentProviderListView: View {
 
     @ViewBuilder private func rowContent(_ row: XgentNode) -> some View {
         XgentProviderRowLayout(layoutDirection: layoutDirection) {
+            if let actions = row.children?.first(where: { $0.id.hasPrefix("provider-list-actions:") }) {
+                if rows.count > 1, let id = row.value?.text {
+                    reorderMenu(actions).draggable(id)
+                } else { reorderMenu(actions) }
+            }
             if let title = row.children?.first(where: { $0.kind == .navigationRow }) {
                 Button { model.send(title, in: document) } label: {
                     VStack(alignment: .leading, spacing: 4) {
@@ -93,11 +97,13 @@ struct XgentProviderListView: View {
                                     .padding(.top, 3).accessibilityHidden(true)
                             }
                             Text(title.label ?? "").modifier(XgentControlTypography(node: title))
+                                .lineLimit(1).truncationMode(.tail)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         if let description = title.text, !description.isEmpty {
                             Text(description).font(supportingFont).foregroundStyle(.secondary)
+                                .lineLimit(2).truncationMode(.tail)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(.leading, 28)
                         }
@@ -125,16 +131,10 @@ struct XgentProviderListView: View {
                 .disabled(title.disabled == true || model.isBusy(title, in: document))
                 .accessibilityIdentifier(title.id)
             }
-            HFlow(horizontalAlignment: .trailing, verticalAlignment: .center,
-                  horizontalSpacing: 4, verticalSpacing: 4) {
-                if let actions = row.children?.first(where: { $0.kind == .menu }) {
-                    if rows.count > 1, let id = row.value?.text {
-                        reorderMenu(actions).draggable(id)
-                    } else { reorderMenu(actions) }
-                }
-                ForEach((row.children ?? []).filter { $0.kind == .iconButton }) { action in
-                    XgentIconButton(node: action, document: document, model: model)
-                }
+            if let actions = row.children?.first(where: { $0.id.hasPrefix("provider-more:") }) {
+                XgentNativeMenu(node: actions, document: document, model: model)
+                    .accessibilityIdentifier(actions.id)
+                    .fixedSize()
             }
             .disabled(node.disabled == true || model.isBusy(node, in: document))
         }

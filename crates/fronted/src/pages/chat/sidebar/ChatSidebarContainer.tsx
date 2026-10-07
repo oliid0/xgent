@@ -5,7 +5,6 @@ import type { SectionId } from "../../settings/types";
 // ChatPage), the conversation-rename UI state, the delete flow, and the
 // error-code → i18n mapping for every frontend target.
 
-import { Button as AstryxButton } from "@astryxdesign/core/Button";
 import { Fragment, useCallback, useMemo, useState } from "react";
 import { ChatHistorySidebar } from "../../../components/chat/ChatHistorySidebar";
 import type { WorkspaceToolTarget } from "../../../components/project-tools/workspaceToolsModel";
@@ -258,18 +257,6 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
 
   return (
     <Fragment>
-      <AstryxButton
-        variant="ghost"
-        label={t("sidebar.closeSidebar")}
-        type="button"
-        aria-label={t("sidebar.closeSidebar")}
-        onClick={props.onCloseSidebar}
-        className={
-          props.isOpen
-            ? "fixed inset-0 z-40 bg-black/25 opacity-100 backdrop-blur-[1px] transition-opacity duration-200 md:hidden"
-            : "pointer-events-none fixed inset-0 z-40 bg-black/25 opacity-0 transition-opacity duration-200 md:hidden"
-        }
-      />
       <WorkspaceSearchPalette
         open={searchOpen}
         onOpenChange={setSearchOpen}
