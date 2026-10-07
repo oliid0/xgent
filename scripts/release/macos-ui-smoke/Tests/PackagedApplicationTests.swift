@@ -1,4 +1,6 @@
 import XCTest
+import AppKit
+import ApplicationServices
 
 final class PackagedApplicationTests: XCTestCase {
     private var testedApp: XCUIApplication?
@@ -25,6 +27,7 @@ final class PackagedApplicationTests: XCTestCase {
         assertWindowToolbar(window)
         record(app, name: "macos-packaged-chat")
         XCTAssertEqual(window.webViews.count, 0, "The covered execution host must be excluded from native accessibility")
+        if !draft.isHittable { recordComposerHit(draft, applicationPath: path) }
         XCTAssertTrue(draft.isHittable, "The composer must remain reachable")
         click(draft)
         draft.typeText("xgent native settings smoke")
@@ -85,6 +88,32 @@ final class PackagedApplicationTests: XCTestCase {
         XCTAssertTrue(draft.isHittable, "Closing settings must restore the actual composer")
         assertWindowToolbar(window)
         record(app, name: "macos-packaged-chat-narrow")
+    }
+
+    private func recordComposerHit(_ draft: XCUIElement, applicationPath: String) {
+        var evidence = ["draft enabled=\(draft.isEnabled), frame=\(draft.frame)",
+                        "AX client trusted=\(AXIsProcessTrusted())"]
+        if let identifier = Bundle(url: URL(fileURLWithPath: applicationPath))?.bundleIdentifier,
+           let running = NSRunningApplication.runningApplications(withBundleIdentifier: identifier).first {
+            let application = AXUIElementCreateApplication(running.processIdentifier)
+            // AX and XCTest both use top-left screen coordinates. Query the
+            // actual packaged process, keeping the failed input assertion intact.
+            for fraction in [0.1, 0.5, 0.9] {
+                var hit: AXUIElement?
+                let status = AXUIElementCopyElementAtPosition(application,
+                    Float(draft.frame.minX + draft.frame.width * fraction), Float(draft.frame.midY), &hit)
+                evidence.append("hit \(fraction): status=\(status.rawValue)")
+                if let hit {
+                    for attribute in [kAXRoleAttribute, kAXIdentifierAttribute] {
+                        var value: CFTypeRef?
+                        let result = AXUIElementCopyAttributeValue(hit, attribute as CFString, &value)
+                        evidence.append("\(attribute): status=\(result.rawValue), value=\(value as? String ?? "")")
+                    }
+                }
+            }
+        }
+        let attachment = XCTAttachment(string: evidence.joined(separator: "\n"))
+        attachment.name = "macos-composer-hit"; attachment.lifetime = .keepAlways; add(attachment)
     }
 
     private func assertWindowToolbar(_ window: XCUIElement) {
