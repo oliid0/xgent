@@ -320,13 +320,14 @@ struct XgentIOSComposer: View {
     private var queue: XgentNode? { node.child(id: "queued-turns") }
     private var suggestions: XgentNode? { node.child(id: "composer-suggestions") }
     private var input: XgentNode? { node.child(id: "draft") }
+    private var attachments: XgentNode? { node.child(id: "composer-attachments") }
     private var actions: XgentNode? { node.child(id: "composer-actions") }
     private var feedback: [XgentNode] {
         (node.children ?? []).filter { ["voice-error", "voice-partial"].contains($0.id) }
     }
     private var supporting: [XgentNode] {
         (node.children ?? []).filter {
-            !["queued-turns", "activity-strip", "draft", "composer-actions", "voice-error", "voice-partial", "composer-suggestions"].contains($0.id)
+            !["queued-turns", "activity-strip", "draft", "composer-actions", "voice-error", "voice-partial", "composer-suggestions", "composer-attachments"].contains($0.id)
         }
     }
 
@@ -341,6 +342,7 @@ struct XgentIOSComposer: View {
                     XgentIOSNodes(nodes: activity.children ?? [], document: document, model: model, parentAxis: .horizontal)
                 }
             }
+            if let attachments { XgentIOSNode(node: attachments, document: document, model: model) }
             if let input { XgentIOSNode(node: input, document: document, model: model) }
             XgentIOSNodes(nodes: feedback, document: document, model: model, parentAxis: .vertical)
             if !supporting.isEmpty {

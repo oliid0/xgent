@@ -953,7 +953,12 @@ struct XgentIOSNode: View {
     }
 
     @ViewBuilder private var mediaPreview: some View {
-        if let mimeType = node.language,
+        if node.variant == "composer-image" {
+            XgentDataImage(encoded: model.value(node, in: document).text, maximumPixelSize: 512,
+                           contentMode: .fit, label: node.label ?? "Image", retryable: true) {
+                Color.secondary.opacity(0.06)
+            }.clipShape(RoundedRectangle(cornerRadius: 16))
+        } else if let mimeType = node.language,
            mimeType.hasPrefix("audio/") || mimeType.hasPrefix("video/"), let data = mediaData {
             XgentIOSAVPreview(data: data, mimeType: mimeType, label: node.label ?? "Media preview")
         } else if node.language == "application/pdf", let data = mediaData {

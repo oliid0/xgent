@@ -89,6 +89,7 @@ import {
 } from "./nativeWorkspaceActions";
 import type { NativeWorkspaceEditorSessions } from "./nativeWorkspaceEditorSessions";
 import type { PresentationHandler, PresentationNode, PresentationValue } from "./types";
+import { useNativeComposerImages } from "./useNativeComposerImages";
 
 const NativeDesktopTrajectory = lazy(() => import("./NativeDesktopTrajectory"));
 
@@ -206,6 +207,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
     };
   }, [updateRequest]);
   const [composer] = useState(createNativeComposerStore);
+  const composerImages = useNativeComposerImages(props.uploads, props.uploadWorkdir);
   const [mentionSearch] = useState(createNativeMentionSearch);
   useSyncExternalStore(composer.subscribe, composer.getSnapshot, composer.getSnapshot);
   const mentionFiles = useSyncExternalStore(
@@ -997,6 +999,52 @@ export function NativeChatPage(props: NativeChatPageProps) {
                 ]
               : []),
             ...(mentionMenu ? [mentionMenu] : []),
+            ...(props.uploads.some((upload) => upload.kind === "image")
+              ? [
+                  {
+                    id: "composer-attachments",
+                    kind: "HStack" as const,
+                    wrap: true,
+                    children: props.uploads
+                      .filter((upload) => upload.kind === "image")
+                      .map((upload): PresentationNode => {
+                        const preview = composerImages[upload.relativePath];
+                        return {
+                          id: `upload-card:${upload.relativePath}`,
+                          kind: "VStack",
+                          width: 160,
+                          children: [
+                            preview?.source
+                              ? {
+                                  id: `upload-image:${upload.relativePath}`,
+                                  kind: "MediaPreview",
+                                  variant: "composer-image",
+                                  label: upload.fileName,
+                                  value: preview.source,
+                                  height: 120,
+                                }
+                              : {
+                                  id: `upload-image:${upload.relativePath}`,
+                                  kind: preview?.error ? "Banner" : "StatusDot",
+                                  status: preview?.error ? "error" : "running",
+                                  text: preview?.error,
+                                  label: preview?.error ?? t("chat.image.loading"),
+                                },
+                            {
+                              ...button(
+                                `upload:${upload.relativePath}`,
+                                `× ${upload.fileName}`,
+                                () => props.onRemoveUpload(upload.relativePath),
+                              ),
+                              disabled: props.inputDisabled,
+                              maxLines: 1,
+                            },
+                          ],
+                        };
+                      }),
+                  },
+                ]
+              : []),
             {
               id: "draft",
               kind: "ComposerInput",
@@ -1060,11 +1108,13 @@ export function NativeChatPage(props: NativeChatPageProps) {
                     },
                   ]
                 : []),
-            ...props.uploads.map((upload) =>
-              button(`upload:${upload.relativePath}`, `× ${upload.fileName}`, () =>
-                props.onRemoveUpload(upload.relativePath),
+            ...props.uploads
+              .filter((upload) => upload.kind !== "image")
+              .map((upload) =>
+                button(`upload:${upload.relativePath}`, `× ${upload.fileName}`, () =>
+                  props.onRemoveUpload(upload.relativePath),
+                ),
               ),
-            ),
             {
               id: "composer-actions",
               kind: "HStack",

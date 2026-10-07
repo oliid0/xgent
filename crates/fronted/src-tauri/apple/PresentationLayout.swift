@@ -439,7 +439,12 @@ extension XgentNodeView {
     }
 
     @ViewBuilder var nativeMediaPreview: some View {
-        if let mimeType = node.language,
+        if node.variant == "composer-image" {
+            XgentDataImage(encoded: model.value(node, in: document).text, maximumPixelSize: 512,
+                           contentMode: .fit, label: node.label ?? "Image", retryable: true) {
+                Color.secondary.opacity(0.06)
+            }.clipShape(RoundedRectangle(cornerRadius: 16))
+        } else if let mimeType = node.language,
            mimeType.hasPrefix("audio/") || mimeType.hasPrefix("video/"), let data = mediaData {
             XgentAVPreview(data: data, mimeType: mimeType, label: node.label ?? "Media preview")
         } else if node.language == "application/pdf", let data = mediaData {
@@ -571,9 +576,18 @@ extension XgentNodeView {
     }
 
     var composer: some View {
-        VStack(alignment: .leading, spacing: CGFloat(presentationTheme.spacing.sm)) { children }
+        VStack(alignment: .leading, spacing: CGFloat(presentationTheme.spacing.sm)) {
+            ForEach((node.children ?? []).filter { $0.variant != "composer-suggestions" }) { child in
+                XgentNodeView(node: child, document: document, model: model)
+            }
+        }
             .padding(CGFloat(presentationTheme.spacing.md))
             .modifier(XgentGlassSurface(radius: CGFloat(presentationTheme.radius.chat), floating: true))
+            .overlay(alignment: .top) {
+                if let suggestions = node.child(id: "composer-suggestions") {
+                    XgentComposerSuggestions(node: suggestions, document: document, model: model, floatsAboveInput: true)
+                }
+            }
             .padding(.horizontal, CGFloat(presentationTheme.spacing.md))
             .padding(.bottom, CGFloat(presentationTheme.spacing.sm))
     }
