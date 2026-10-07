@@ -359,6 +359,10 @@ jobs:
       - name: Export native screenshots
         if: ${{ always() }}
         run: |
+          mkdir -p "$RUNNER_TEMP/native-crashes"
+          find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 \
+            \( -iname '*xctest*' -o -iname '*XgentNativeTestHost*' \) \
+            -exec cp {} "$RUNNER_TEMP/native-crashes/" \; || true
           if [ -d "$RUNNER_TEMP/native-macos.xcresult" ]; then
             xcrun xcresulttool export attachments --path "$RUNNER_TEMP/native-macos.xcresult" \
               --output-path "$RUNNER_TEMP/native-desktop-screenshots"
@@ -380,5 +384,6 @@ jobs:
             ${{ runner.temp }}/native-computer-use-symbols.txt
             ${{ runner.temp }}/native-screenshots
             ${{ runner.temp }}/native-desktop-screenshots
+            ${{ runner.temp }}/native-crashes
           retention-days: 3
           if-no-files-found: error

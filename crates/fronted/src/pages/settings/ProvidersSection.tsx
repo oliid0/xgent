@@ -3255,17 +3255,15 @@ function ProviderList(props: {
                   name={provider.name}
                   icon={<ProviderBrandIcon type={type} />}
                   isSelected={draggingProviderId === provider.id}
-                  description={
-                    <>
-                      <span>{details.connection}</span>
-                      {details.usage ? <span>{details.usage}</span> : null}
-                      {provider.useSystemProxy ? (
-                        <HStack as="span" gap={1} vAlign="center" wrap="wrap">
-                          <Icon icon={Waypoints} size="sm" color="secondary" />
-                          {t("settings.providerUseSystemProxy")}
-                        </HStack>
-                      ) : null}
-                    </>
+                  connection={details.connection}
+                  usage={details.usage}
+                  proxy={
+                    provider.useSystemProxy ? (
+                      <HStack as="span" gap={1} vAlign="center" wrap="wrap">
+                        <Icon icon={Waypoints} size="sm" color="secondary" />
+                        {t("settings.providerUseSystemProxy")}
+                      </HStack>
+                    ) : null
                   }
                   reorder={
                     <IconButton

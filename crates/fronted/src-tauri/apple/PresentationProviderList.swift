@@ -117,6 +117,12 @@ struct XgentProviderListView: View {
                                 }
                                 .font(supportingFont).foregroundStyle(.secondary)
                                 .padding(.leading, 28)
+                            } else if child.kind == .text {
+                                Text(child.text ?? child.label ?? "")
+                                    .font(supportingFont).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding(.leading, 28)
+                                    .accessibilityIdentifier(child.id)
                             } else {
                                 XgentNodeView(node: child, document: document, model: model)
                                     .padding(.leading, 28)

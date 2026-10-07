@@ -4465,6 +4465,11 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   width: 100%;
   min-width: 0;
 }
+.settings-provider-usage,
+.settings-provider-proxy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .settings-provider-brand[fill]:not([fill="none"]),
 .settings-provider-brand [fill]:not([fill="none"]) {
   fill: currentColor;

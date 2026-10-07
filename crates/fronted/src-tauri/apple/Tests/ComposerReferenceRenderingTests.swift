@@ -51,7 +51,11 @@ final class ComposerReferenceRenderingTests: XCTestCase {
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 240, height: 220),
             styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
-        defer { model.invalidate(); window.close() }
+        defer {
+            print("composer-long-paste: teardown begin")
+            model.invalidate(); window.close()
+            print("composer-long-paste: teardown complete")
+        }
         host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(220))
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
         let field = try XCTUnwrap(descendants(host).compactMap { $0 as? XgentComposerNativeTextView }.first)
@@ -59,7 +63,9 @@ final class ComposerReferenceRenderingTests: XCTestCase {
         let originalLength = field.string.utf16.count
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString(source, forType: .string)
         #endif
+        print("composer-long-paste: paste begin")
         field.paste(nil); try await Task.sleep(for: .milliseconds(120))
+        print("composer-long-paste: paste complete")
         let edit = try XCTUnwrap(actions.last { $0.action == "references" })
         let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(edit.value.text.utf8)) as? [String: Any])
         XCTAssertEqual(payload["text"] as? String, "😀 /review /review tail " + expected)
@@ -82,15 +88,21 @@ final class ComposerReferenceRenderingTests: XCTestCase {
         #endif
         let undo = try XCTUnwrap(field.undoManager)
         XCTAssertTrue(undo.canUndo)
+        print("composer-long-paste: undo begin, groups=\(undo.groupingLevel)")
         undo.undo(); try await Task.sleep(for: .milliseconds(120))
+        print("composer-long-paste: undo complete, canRedo=\(undo.canRedo)")
         let restored = try XCTUnwrap(actions.last { $0.action == "references" })
         let restoredPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(restored.value.text.utf8)) as? [String: Any])
         XCTAssertEqual(restoredPayload["text"] as? String, "😀 /review /review tail")
         XCTAssertEqual((restoredPayload["pastes"] as? [[String: Any]])?.count, 0)
+        XCTAssertTrue(undo.canRedo, "Undo must preserve the pasted card's redo record")
+        print("composer-long-paste: redo begin, groups=\(undo.groupingLevel)")
         undo.redo(); try await Task.sleep(for: .milliseconds(120))
+        print("composer-long-paste: redo complete")
         let redone = try XCTUnwrap(actions.last { $0.action == "references" })
         let redonePayload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(redone.value.text.utf8)) as? [String: Any])
         XCTAssertEqual((redonePayload["pastes"] as? [[String: Any]])?.first?["id"] as? String, id)
+        print("composer-long-paste: assertions complete")
     }
 
     @MainActor func testActualInlineCardsCopyDeleteAndUndoTheirOriginalReferences() async throws {

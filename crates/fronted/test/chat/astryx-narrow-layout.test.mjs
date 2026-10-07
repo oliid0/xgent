@@ -241,10 +241,9 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
     }, React.createElement(vendor["@astryxdesign/core/List"].List, { className: "settings-provider-list", density: "compact", hasDividers: true }, React.createElement(ProviderSettingsRow, {
       id: "long-provider", name: "A provider with a very long multilingual name 用户自定义供应商",
       icon: React.createElement(vendor["@astryxdesign/core/Icon"].Icon, { className: "settings-provider-brand", icon: icons.ClaudeIcon, size: "sm" }),
-      description: React.createElement(React.Fragment, null,
-        React.createElement("span", null, "https://example.com/" + "long-provider-endpoint/".repeat(5) + " · 3 " + t("settings.activeModels")),
-        React.createElement("span", null, "An actual quota service error with a long diagnostic https://example.com/" + "long-quota-diagnostic/".repeat(3)),
-        React.createElement("span", { className: "settings-provider-proxy" }, React.createElement(vendor["@astryxdesign/core/Icon"].Icon, { icon: icons.Waypoints, size: "sm" }), t("settings.providerUseSystemProxy"))),
+      connection: "https://example.com/" + "long-provider-endpoint/".repeat(5) + " · 3 " + t("settings.activeModels"),
+      usage: "An actual quota service error with a long diagnostic https://example.com/" + "long-quota-diagnostic/".repeat(3),
+      proxy: React.createElement("span", null, React.createElement(vendor["@astryxdesign/core/Icon"].Icon, { icon: icons.Waypoints, size: "sm" }), t("settings.providerUseSystemProxy")),
       reorder: React.createElement(vendor["@astryxdesign/core/IconButton"].IconButton, { label: t("settings.reorderProvider"), size: "lg", variant: "ghost", icon: React.createElement(vendor["@astryxdesign/core/Icon"].Icon, { icon: icons.GripVertical, size: "sm" }), onClick: noop }),
       actions: React.createElement(vendor["@astryxdesign/core/MoreMenu"].MoreMenu, { label: t("settings.providerMore"), size: "lg", items: ["settings.usage.refresh", "settings.edit", "settings.delete"].map(key => ({ id: key, label: t(key), onClick: noop })) }),
       isSelected: false, onEdit: noop,
@@ -416,6 +415,12 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
     for (const section of document.querySelectorAll('.fixture-provider-details')) {
       const bounds = section.getBoundingClientRect();
       const row = section.querySelector('.settings-provider-row');
+      const detailBounds = section.querySelector('.settings-provider-description').getBoundingClientRect();
+      for (const selector of ['.settings-provider-usage', '.settings-provider-proxy']) {
+        const detail = section.querySelector(selector);
+        const box = detail?.getBoundingClientRect();
+        if (!box || box.height <= 0 || box.top < detailBounds.top - 1 || box.bottom > detailBounds.bottom + 1 || box.bottom > row.getBoundingClientRect().bottom + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,providerDetailHidden:selector});
+      }
       for (const element of section.querySelectorAll('.settings-provider-name, .settings-provider-name .astryx-text, .settings-provider-description, .settings-provider-description .astryx-text, button')) {
         const box = element.getBoundingClientRect();
         if (box.width <= 0 || box.left < bounds.left - 1 || box.right > bounds.right + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,providerOverflow:element.className,text:element.textContent});

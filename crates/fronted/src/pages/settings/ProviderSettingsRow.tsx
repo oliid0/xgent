@@ -8,7 +8,9 @@ export function ProviderSettingsRow(props: {
   id: string;
   name: string;
   icon: ReactNode;
-  description: ReactNode;
+  connection: string;
+  usage?: string;
+  proxy?: ReactNode;
   reorder: ReactNode;
   actions: ReactNode;
   isSelected: boolean;
@@ -33,8 +35,14 @@ export function ProviderSettingsRow(props: {
       description={
         <VStack as="span" className="settings-provider-description" gap={1}>
           <Text as="span" type="supporting" maxLines={2} wordBreak="break-all">
-            {props.description}
+            {props.connection}
           </Text>
+          {props.usage ? (
+            <Text as="span" type="supporting" className="settings-provider-usage">
+              {props.usage}
+            </Text>
+          ) : null}
+          {props.proxy ? <span className="settings-provider-proxy">{props.proxy}</span> : null}
         </VStack>
       }
       endContent={
