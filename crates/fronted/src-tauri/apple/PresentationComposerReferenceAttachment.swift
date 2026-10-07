@@ -83,16 +83,23 @@ private final class XgentComposerReferenceHostingView: NSHostingView<XgentCompos
 
 private struct XgentComposerReferenceBadge: View {
     let attachment: XgentComposerReferenceAttachment
+    @Environment(\.colorScheme) private var colorScheme
+    private var isFile: Bool { ["folder", "doc"].contains(attachment.reference.icon) }
+    private var referenceColor: Color {
+        isFile ? Color(xgentHex: colorScheme == .dark ? "#93c5fd" : "#1d4ed8")
+            : Color(xgentHex: attachment.palette.text)
+    }
     var body: some View {
         HStack(spacing: 5) {
             Image(systemName: attachment.reference.icon).imageScale(.small)
             Text(attachment.reference.label).lineLimit(1).truncationMode(.middle)
         }
         .font(XgentFonts.body(attachment.fontFamily, size: attachment.fontSize))
-        .foregroundStyle(Color(xgentHex: attachment.palette.text))
+        .foregroundStyle(referenceColor)
         .padding(.horizontal, 7)
         .frame(width: attachment.badgeSize.width, height: attachment.badgeSize.height)
-        .background(Color(xgentHex: attachment.palette.muted), in: RoundedRectangle(cornerRadius: 7))
+        .background(isFile ? referenceColor.opacity(0.1) : Color(xgentHex: attachment.palette.muted),
+                    in: RoundedRectangle(cornerRadius: 7))
         .overlay { RoundedRectangle(cornerRadius: 7).stroke(Color(xgentHex: attachment.palette.border), lineWidth: 0.5) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(attachment.reference.label)

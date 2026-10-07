@@ -1,6 +1,6 @@
 import { Button } from "@astryxdesign/core/Button";
 import { Carousel } from "@astryxdesign/core/Carousel";
-import { ChatComposer, ChatComposerDrawer, ChatSendButton } from "@astryxdesign/core/Chat";
+import { ChatComposer, ChatSendButton } from "@astryxdesign/core/Chat";
 import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { Heading } from "@astryxdesign/core/Heading";
@@ -973,9 +973,15 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           onDrop={handleWorkspaceDrop}
           data-expanded={isComposerExpanded ? "true" : "false"}
           style={isComposerExpanded ? { minHeight: 0, flex: 1 } : undefined}
-          drawer={
-            pendingUploadedFiles.length > 0 ? (
-              <ChatComposerDrawer>
+          input={
+            <VStack
+              width="100%"
+              minHeight={isComposerExpanded ? 0 : undefined}
+              className="xgent-chat-composer-input"
+              data-expand-control={showComposerExpandControl || isComposerExpanded}
+              style={{ position: "relative", ...(isComposerExpanded ? { flex: 1 } : {}) }}
+            >
+              {pendingUploadedFiles.length > 0 ? (
                 <VStack gap={2} width="100%">
                   {imageUploads.length > 0 ? (
                     <Carousel
@@ -1015,17 +1021,7 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
                     </HStack>
                   ) : null}
                 </VStack>
-              </ChatComposerDrawer>
-            ) : undefined
-          }
-          input={
-            <VStack
-              width="100%"
-              minHeight={isComposerExpanded ? 0 : undefined}
-              className="xgent-chat-composer-input"
-              data-expand-control={showComposerExpandControl || isComposerExpanded}
-              style={{ position: "relative", ...(isComposerExpanded ? { flex: 1 } : {}) }}
-            >
+              ) : undefined}
               <MentionComposer
                 ref={composerRef}
                 onSend={handleComposerSend}
