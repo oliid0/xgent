@@ -236,10 +236,10 @@ test("iOS app target links vendored libgit2 system dependencies", () => {
 test("iOS release prepares host tools and every target before Tauri initialization", () => {
   const ios = jobSource("ios", "publish");
   const macos = jobSource("macos", "windows");
-  assert.match(workflow, /DEVELOPER_DIR: \/Applications\/Xcode_26\.3\.app\/Contents\/Developer/);
+  assert.match(workflow, /DEVELOPER_DIR: \/Applications\/Xcode_26\.4\.1\.app\/Contents\/Developer/);
   assert.match(macos, /runner: macos-26-intel/);
   assert.match(macos, /runner: macos-26/);
-  assert.match(ios, /runs-on: macos-15-intel/);
+  assert.match(ios, /runs-on: macos-26-intel/);
   assert.match(
     ios,
     /targets: aarch64-apple-ios,x86_64-apple-ios,aarch64-apple-ios-sim/,
@@ -402,7 +402,7 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(androidInteractions, /"Install base environment"\}, scroll=True\)/);
   assert.match(androidInteractions, /Run command/);
   assert.match(android, /xgent-android-launch-evidence/);
-  assert.match(ios, /runs-on: macos-15-intel/);
+  assert.match(ios, /runs-on: macos-26-intel/);
   assert.match(ios, /xcodebuild build -project "\$project" -scheme xgent_iOS/);
   assert.match(ios, /pnpm tauri ios build --ci --no-sign --open[\s\S]*--target/);
   assert.match(ios, /--config '\{"build":\{"beforeBuildCommand":null\}\}' --target/);

@@ -38,7 +38,7 @@ final class MobileProviderEditorLayoutTests: XCTestCase {
                 let window = UIWindow(frame: CGRect(x: 0, y: 0, width: width, height: 844))
                 window.rootViewController = host; window.makeKeyAndVisible()
                 defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
-                host.view.layoutIfNeeded(); try await Task.sleep(nanoseconds: 200_000_000)
+                host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(200))
                 let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
                 let elements = hierarchy.flattenToElements()
                 var frames: [CGRect] = []

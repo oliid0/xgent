@@ -62,7 +62,7 @@ final class ComposerClipboardTests: XCTestCase {
         defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
         host.view.layoutIfNeeded()
         func descendants(_ view: UIView) -> [UIView] { [view] + view.subviews.flatMap { descendants($0) } }
-        try await Task.sleep(nanoseconds: 160_000_000)
+        try await Task.sleep(for: .milliseconds(160))
         let field = try XCTUnwrap(descendants(host.view).compactMap { $0 as? XgentComposerNativeTextView }.first)
         UIPasteboard.general.setData(png, forPasteboardType: UTType.png.identifier)
         #else
@@ -73,14 +73,14 @@ final class ComposerClipboardTests: XCTestCase {
         defer { model.invalidate(); window.close() }
         host.layoutSubtreeIfNeeded()
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
-        try await Task.sleep(nanoseconds: 160_000_000)
+        try await Task.sleep(for: .milliseconds(160))
         let field = try XCTUnwrap(descendants(host).compactMap { $0 as? XgentComposerNativeTextView }.first)
         NSPasteboard.general.clearContents(); NSPasteboard.general.setData(png, forType: .png)
         #endif
         field.paste(nil)
         let deadline = ContinuousClock.now + .seconds(3)
         while !actions.contains(where: { $0.action == "import" }), ContinuousClock.now < deadline {
-            try await Task.sleep(nanoseconds: 20_000_000)
+            try await Task.sleep(for: .milliseconds(20))
         }
         let action = try XCTUnwrap(actions.first { $0.action == "import" })
         let files = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(action.value.text.utf8)) as? [[String: String]])

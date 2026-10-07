@@ -646,7 +646,7 @@ final class XgentPresentationModel: ObservableObject {
         numberCommitBatches[event.requestId] = batch
         numberCommitCount = numberCommitBatches.count
         batch.timeout = Task { [weak self, weak batch] in
-            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            try? await Task.sleep(for: .seconds(10))
             guard !Task.isCancelled else { return }
             batch?.finish(false)
             self?.error = "The numeric field could not finish committing."
@@ -682,7 +682,7 @@ final class XgentPresentationModel: ObservableObject {
                 let query = XgentCodeHighlightQuery(surface: document.surface, node: node.id, action: action, kind: node.kind.rawValue, continuation: continuation, diagram: diagram)
                 codeHighlightQueries[id] = query
                 query.timeout = Task { [weak self] in
-                    try? await Task.sleep(nanoseconds: 10_000_000_000)
+                    try? await Task.sleep(for: .seconds(10))
                     guard !Task.isCancelled else { return }
                     self?.codeHighlightQueries.removeValue(forKey: id)?.finish(nil)
                 }

@@ -113,14 +113,14 @@ private struct XgentMermaidSurface: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("xgent-mermaid-diagram")
         .task(id: "\(scheme == .dark):\(retry):\(source)") {
-            try? await Task.sleep(nanoseconds: 120_000_000)
+            try? await Task.sleep(for: .milliseconds(120))
             guard !Task.isCancelled else { return }
             await state.load(source: source, dark: scheme == .dark, query: renderDiagram)
         }
         .onChange(of: source) { _, _ in copied = false }
         .task(id: copied) {
             guard copied else { return }
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else { return }; copied = false
         }
         #if os(iOS)

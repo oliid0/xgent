@@ -40,7 +40,7 @@ final class OtherSettingsRenderingTests: XCTestCase {
                 let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 780))
                 window.rootViewController = host; window.makeKeyAndVisible()
                 defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
-                host.view.layoutIfNeeded(); try await Task.sleep(nanoseconds: 150_000_000)
+                host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(150))
                 let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
                 let elements = hierarchy.flattenToElements()
                 let heading = try XCTUnwrap(elements.first { $0.identifier == "other:\(area):heading" })
@@ -61,7 +61,7 @@ final class OtherSettingsRenderingTests: XCTestCase {
                                       styleMask: [.titled], backing: .buffered, defer: false)
                 window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
                 defer { model.invalidate(); window.close() }
-                host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds: 150_000_000)
+                host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(150))
                 let elements = nativeMacAccessibilityTree(window)
                 let heading = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "other:\(area):heading" })
                 let button = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "other:\(area):add" })
@@ -71,7 +71,7 @@ final class OtherSettingsRenderingTests: XCTestCase {
                     XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX + 15)
                     XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX - 15)
                 }
-                XCTAssertTrue(button.accessibilityPerformPress()); try await Task.sleep(nanoseconds: 40_000_000)
+                XCTAssertTrue(button.accessibilityPerformPress()); try await Task.sleep(for: .milliseconds(40))
                 XCTAssertEqual(actions.last?.action, "add")
                 #endif
             }

@@ -68,10 +68,10 @@ final class MobileSettingsDrawerTests: XCTestCase {
             window.makeKeyAndVisible()
             defer { host.dismiss(animated: false); model.invalidate(); window.isHidden = true; window.rootViewController = nil }
             host.view.layoutIfNeeded()
-            try await Task.sleep(nanoseconds: 100_000_000)
+            try await Task.sleep(for: .milliseconds(100))
             model.update(try document(nodes: indexNodes))
             try await waitFor("theme", in: window)
-            try await Task.sleep(nanoseconds: 250_000_000)
+            try await Task.sleep(for: .milliseconds(250))
             let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: window)
             let elements = hierarchy.flattenToElements()
             XCTAssertFalse(elements.contains { $0.identifier == "presentation-sheet-title" },
@@ -105,7 +105,7 @@ final class MobileSettingsDrawerTests: XCTestCase {
                 scroll.setContentOffset(CGPoint(x: 0,
                     y: max(0, scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom)),
                     animated: false)
-                try await Task.sleep(nanoseconds: 150_000_000)
+                try await Task.sleep(for: .milliseconds(150))
                 window.layoutIfNeeded()
             }
             let scrolled = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: window)
@@ -172,7 +172,7 @@ final class MobileSettingsDrawerTests: XCTestCase {
         while ContinuousClock.now < deadline {
             let elements = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: view).flattenToElements()
             if elements.contains(where: { $0.identifier == id }) { return }
-            try await Task.sleep(nanoseconds: 50_000_000)
+            try await Task.sleep(for: .milliseconds(50))
         }
         XCTFail("The mounted native drawer did not show \(id)")
     }

@@ -33,7 +33,7 @@ final class ContextUsageRenderingTests: XCTestCase {
             window.rootViewController = host; window.makeKeyAndVisible()
             defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
             host.view.layoutIfNeeded()
-            try await Task.sleep(nanoseconds: 120_000_000)
+            try await Task.sleep(for: .milliseconds(120))
             func scrolls(_ view: UIView) -> [UIScrollView] {
                 (view as? UIScrollView).map { [$0] } ?? view.subviews.flatMap { scrolls($0) }
             }
@@ -41,7 +41,7 @@ final class ContextUsageRenderingTests: XCTestCase {
                 scroll.setContentOffset(CGPoint(x: 0, y: max(0, scroll.contentSize.height - scroll.bounds.height)), animated: false)
             }
             host.view.layoutIfNeeded()
-            try await Task.sleep(nanoseconds: 60_000_000)
+            try await Task.sleep(for: .milliseconds(60))
             let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
             let elements = hierarchy.flattenToElements()
             var frames: [CGRect] = []
@@ -64,7 +64,7 @@ final class ContextUsageRenderingTests: XCTestCase {
             window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
             defer { model.invalidate(); window.close() }
             host.layoutSubtreeIfNeeded()
-            try await Task.sleep(nanoseconds: 160_000_000)
+            try await Task.sleep(for: .milliseconds(160))
             func scrolls(_ view: NSView) -> [NSScrollView] {
                 (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap { scrolls($0) }
             }
@@ -75,7 +75,7 @@ final class ContextUsageRenderingTests: XCTestCase {
                 scroll.reflectScrolledClipView(scroll.contentView)
             }
             host.layoutSubtreeIfNeeded()
-            try await Task.sleep(nanoseconds: 60_000_000)
+            try await Task.sleep(for: .milliseconds(60))
             let elements = nativeMacAccessibilityTree(window)
             XCTAssertFalse(elements.contains { $0.accessibilityIdentifier() == "context-cancel" })
             let confirm = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "context-confirm" })
@@ -83,11 +83,11 @@ final class ContextUsageRenderingTests: XCTestCase {
             XCTAssertLessThanOrEqual(confirm.accessibilityFrame().width, 280)
             XCTAssertTrue(actions.isEmpty, "Reading context details must not compact")
             XCTAssertTrue(confirm.accessibilityPerformPress())
-            try await Task.sleep(nanoseconds: 80_000_000)
+            try await Task.sleep(for: .milliseconds(80))
             XCTAssertEqual(actions.last?.action, "compact-current-conversation")
             XCTAssertEqual(closed, 1)
             model.update(try fixture(disabled: true, revision: 2))
-            try await Task.sleep(nanoseconds: 100_000_000)
+            try await Task.sleep(for: .milliseconds(100))
             let disabled = try XCTUnwrap(nativeMacAccessibilityTree(window).first {
                 $0.accessibilityIdentifier() == "context-confirm"
             })

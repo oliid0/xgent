@@ -113,12 +113,12 @@ final class WindowChromeTests: XCTestCase {
             defer { xgentNativeUIReset(pointer); window.orderOut(nil); window.contentView = nil }
             transport.loadHTMLString("<script>window.nativeActions=[];window.addEventListener('xgent:native-action',e=>{e.preventDefault();window.nativeActions.push(e.detail)});</script>", baseURL: nil)
             let deadline = ContinuousClock.now + .seconds(10)
-            while transport.isLoading, ContinuousClock.now < deadline { try await Task.sleep(nanoseconds: 50_000_000) }
+            while transport.isLoading, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(50)) }
             XCTAssertFalse(transport.isLoading)
             // Encode the same DTO through the public C bridge used by Tauri.
             XCTAssertEqual(try publish(rootPayload(), to: pointer), 0)
             container.layoutSubtreeIfNeeded()
-            try await Task.sleep(nanoseconds: 300_000_000)
+            try await Task.sleep(for: .milliseconds(300))
             let toolbar = try XCTUnwrap(window.toolbar)
             XCTAssertFalse(toolbar === originalToolbar)
             XCTAssertEqual(window.toolbarStyle, .unified)
@@ -152,7 +152,7 @@ final class WindowChromeTests: XCTestCase {
             var received: [[String: Any]] = []
             let actionDeadline = ContinuousClock.now + .seconds(5)
             repeat {
-                try await Task.sleep(nanoseconds: 50_000_000)
+                try await Task.sleep(for: .milliseconds(50))
                 received = (try await transport.evaluateJavaScript("window.nativeActions")) as? [[String: Any]] ?? []
             } while received.isEmpty && ContinuousClock.now < actionDeadline
             XCTAssertEqual(received.count, 1)

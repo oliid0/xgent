@@ -53,7 +53,7 @@ final class MobileProviderCategoryLayoutTests: XCTestCase {
                             window.frame = CGRect(x: 0, y: 0, width: width, height: 844)
                             host.view.frame = window.bounds
                             host.view.setNeedsLayout(); host.view.layoutIfNeeded()
-                            try await Task.sleep(nanoseconds: 250_000_000)
+                            try await Task.sleep(for: .milliseconds(250))
                             let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
                             let elements = hierarchy.flattenToElements()
                             let tabs = elements.filter { $0.identifier == "provider-vendor:\(selected)" }

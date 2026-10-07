@@ -21,12 +21,12 @@ final class DesktopSettingsRenderingTests: XCTestCase {
             window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
             defer { model.invalidate(); window.close() }
             host.layoutSubtreeIfNeeded()
-            try await Task.sleep(nanoseconds: 120_000_000)
+            try await Task.sleep(for: .milliseconds(120))
             model.update(try fixture(section: .appearance))
             let deadline = ContinuousClock.now + .seconds(3)
             while !nativeMacAccessibilityTree(window).contains(where: { $0.accessibilityIdentifier() == "settings-close" }),
-                  ContinuousClock.now < deadline { try await Task.sleep(nanoseconds: 60_000_000) }
-            try await Task.sleep(nanoseconds: 120_000_000)
+                  ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(60)) }
+            try await Task.sleep(for: .milliseconds(120))
             XCTAssertTrue(window.sheets.isEmpty, "PC settings must be an in-window dialog, not a system sheet")
             let elements = nativeMacAccessibilityTree(window)
             let expected = width < 792 ? "settings-navigation-menu" : "desktop-nav:system"
@@ -64,14 +64,14 @@ final class DesktopSettingsRenderingTests: XCTestCase {
             if width == 1040 {
                 window.setContentSize(CGSize(width: 1600, height: 1000))
                 host.layoutSubtreeIfNeeded()
-                try await Task.sleep(nanoseconds: 160_000_000)
+                try await Task.sleep(for: .milliseconds(160))
                 XCTAssertEqual(backdrop.dialogSize.width / host.bounds.width, 0.866, accuracy: 0.002,
                     "An already-open settings dialog must follow window resizing")
                 XCTAssertEqual(backdrop.dialogSize.height / host.bounds.height, 0.866, accuracy: 0.002)
                 XCTAssertGreaterThan(backdrop.dialogSize.width, 1000)
                 window.setContentSize(CGSize(width: width, height: 720))
                 host.layoutSubtreeIfNeeded()
-                try await Task.sleep(nanoseconds: 160_000_000)
+                try await Task.sleep(for: .milliseconds(160))
             }
             // Avoid the resizable window's corner, which AppKit handles before
             // content hit testing. This is in the dialog's 16-point left gutter.
@@ -99,7 +99,7 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                 window.sendEvent(release)
             }
             let actionDeadline = ContinuousClock.now + .seconds(3)
-            while actions.isEmpty && ContinuousClock.now < actionDeadline { try await Task.sleep(nanoseconds: 50_000_000) }
+            while actions.isEmpty && ContinuousClock.now < actionDeadline { try await Task.sleep(for: .milliseconds(50)) }
             XCTAssertEqual(actions.last?.action, "close", "A real click outside settings must use its close callback")
         }
     }

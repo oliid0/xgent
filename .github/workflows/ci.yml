@@ -202,7 +202,8 @@ jobs:
       matrix:
         platform: [macos, ios, device]
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      # 26.4.1 fixes Swift async stack-allocation crashes seen in native XCTest.
+      DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
     defaults:
       run:
         working-directory: crates/fronted/src-tauri/apple

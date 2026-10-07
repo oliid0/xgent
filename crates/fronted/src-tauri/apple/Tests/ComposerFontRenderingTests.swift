@@ -39,7 +39,7 @@ final class ComposerFontRenderingTests: XCTestCase {
             let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 620))
             window.rootViewController = host; window.makeKeyAndVisible()
             defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
-            host.view.layoutIfNeeded(); try await Task.sleep(nanoseconds: 180_000_000)
+            host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(180))
             func descendants(_ view: UIView) -> [UIView] { [view] + view.subviews.flatMap { descendants($0) } }
             let views = descendants(host.view)
             let composer = try XCTUnwrap(views.compactMap { $0 as? UITextView }.first { $0.text == "Font sample" })
@@ -52,7 +52,7 @@ final class ComposerFontRenderingTests: XCTestCase {
                 styleMask: [.titled], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
             defer { model.invalidate(); window.close() }
-            host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds: 180_000_000)
+            host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(180))
             func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
             let views = descendants(host)
             let fields = views.compactMap { $0 as? NSTextField }

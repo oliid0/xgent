@@ -20,7 +20,7 @@ final class TextInputCommitRenderingTests: XCTestCase {
             window.rootViewController = controller; window.makeKeyAndVisible()
             defer { window.isHidden = true; window.rootViewController = nil; model.invalidate() }
             controller.view.layoutIfNeeded()
-            try await Task.sleep(nanoseconds: 150_000_000)
+            try await Task.sleep(for: .milliseconds(150))
             let field = try XCTUnwrap(findField(controller.view, id: "parameter"))
             XCTAssertEqual(field.keyboardType, keyboard)
             XCTAssertFalse(field.isSecureTextEntry)
@@ -42,20 +42,20 @@ final class TextInputCommitRenderingTests: XCTestCase {
         window.rootViewController = controller; window.makeKeyAndVisible()
         defer { window.isHidden = true; window.rootViewController = nil; model.invalidate() }
         controller.view.layoutIfNeeded()
-        try await Task.sleep(nanoseconds: 150_000_000)
+        try await Task.sleep(for: .milliseconds(150))
         let field = try XCTUnwrap(findField(controller.view))
         XCTAssertTrue(field.isSecureTextEntry)
         XCTAssertTrue(field.becomeFirstResponder())
         field.text = "first secret"
         field.sendActions(for: .editingChanged)
         field.resignFirstResponder()
-        try await Task.sleep(nanoseconds: 50_000_000)
+        try await Task.sleep(for: .milliseconds(50))
         XCTAssertEqual(events.filter { $0.action == "commit" }.map(\.value), [.string("first secret")])
         XCTAssertTrue(field.becomeFirstResponder())
         field.text = "last secret"
         field.sendActions(for: .editingChanged)
         XCTAssertTrue(field.delegate?.textFieldShouldReturn?(field) ?? false)
-        try await Task.sleep(nanoseconds: 50_000_000)
+        try await Task.sleep(for: .milliseconds(50))
         XCTAssertEqual(events.filter { $0.action == "commit" }.map(\.value), [.string("first secret"), .string("last secret")])
     }
 

@@ -61,7 +61,7 @@ final class MarkdownMathTests: XCTestCase {
                     }
                     #endif
                 }
-                try await Task.sleep(nanoseconds: 100_000_000)
+                try await Task.sleep(for: .milliseconds(100))
                 let proseSnapshot = await capture()
                 let proseAttachment = XCTAttachment(image: proseSnapshot)
                 proseAttachment.name = "native-inline-math-prose-\(Int(width))-\(size)"
@@ -73,7 +73,7 @@ final class MarkdownMathTests: XCTestCase {
                 var ink = try mathInkPixels(screenshot)
                 let deadline = ContinuousClock.now + .seconds(3)
                 while ink <= proseInk * 6 / 5 && ContinuousClock.now < deadline {
-                    try await Task.sleep(nanoseconds: 60_000_000)
+                    try await Task.sleep(for: .milliseconds(60))
                     screenshot = await capture()
                     ink = try mathInkPixels(screenshot)
                 }
@@ -184,7 +184,7 @@ final class MarkdownMathTests: XCTestCase {
                 var labels: [String] = []
                 let deadline = ContinuousClock.now + .seconds(3)
                 repeat {
-                    try await Task.sleep(nanoseconds: 60_000_000)
+                    try await Task.sleep(for: .milliseconds(60))
                     #if os(iOS)
                     let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: native)
                     labels = hierarchy.flattenToElements().compactMap(\.label)
@@ -196,7 +196,7 @@ final class MarkdownMathTests: XCTestCase {
                 XCTAssertTrue(labels.contains(where: { $0.contains("y^2") }), "A ready formula must appear in the real first paragraph, not only in a separate raster test")
                 // The provider callback precedes MarkdownUI publishing its
                 // image dictionary. Capture the next rendered frame too.
-                try await Task.sleep(nanoseconds: 100_000_000)
+                try await Task.sleep(for: .milliseconds(100))
                 let snapshot = await withCheckedContinuation { continuation in
                     strategy.snapshot(native).run { continuation.resume(returning: $0) }
                 }

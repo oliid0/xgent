@@ -23,7 +23,7 @@ final class PresentationTransportTests: XCTestCase {
         transport.loadHTMLString("<button id='covered'>Covered transport</button>", baseURL: nil)
         let deadline = ContinuousClock.now + .seconds(10)
         while transport.isLoading, ContinuousClock.now < deadline {
-            try await Task.sleep(nanoseconds: 50_000_000)
+            try await Task.sleep(for: .milliseconds(50))
         }
         XCTAssertFalse(transport.isLoading)
         _ = try await transport.evaluateJavaScript("""
@@ -44,7 +44,7 @@ final class PresentationTransportTests: XCTestCase {
         }
         XCTAssertEqual(status, 0)
         container.layoutSubtreeIfNeeded()
-        try await Task.sleep(nanoseconds: 250_000_000)
+        try await Task.sleep(for: .milliseconds(250))
         let native = try XCTUnwrap(container.subviews.first { $0 !== transport })
         let children = try XCTUnwrap(container.accessibilityChildren())
         XCTAssertTrue(children.contains { ($0 as? NSView) === native },
@@ -65,7 +65,7 @@ final class PresentationTransportTests: XCTestCase {
         var nativeElements = nativeMacAccessibilityTree(native)
         while !nativeElements.contains(where: { $0.accessibilityIdentifier() == "native-action" }),
               ContinuousClock.now < renderDeadline {
-            try await Task.sleep(nanoseconds: 50_000_000)
+            try await Task.sleep(for: .milliseconds(50))
             native.layoutSubtreeIfNeeded()
             nativeElements = nativeMacAccessibilityTree(native)
         }
@@ -104,7 +104,7 @@ final class PresentationTransportTests: XCTestCase {
         if let release = NSApp.nextEvent(matching: .leftMouseUp, until: Date(), inMode: .default, dequeue: true) {
             window.sendEvent(release)
         }
-        try await Task.sleep(nanoseconds: 100_000_000)
+        try await Task.sleep(for: .milliseconds(100))
         let editor = try XCTUnwrap(window.firstResponder as? NSTextView,
                                   "Clicking the composer must focus its actual native field editor")
         XCTAssertTrue(editor.isEditable)
@@ -116,13 +116,13 @@ final class PresentationTransportTests: XCTestCase {
                 modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
                 characters: "x", charactersIgnoringModifiers: "x", isARepeat: false, keyCode: 7)))
         }
-        try await Task.sleep(nanoseconds: 100_000_000)
+        try await Task.sleep(for: .milliseconds(100))
         XCTAssertEqual(editor.string, "Draftx", "Physical keyboard input must edit the native composer")
         let draftDeadline = ContinuousClock.now + .seconds(3)
         var edited: [String: Any]?
         while edited == nil, ContinuousClock.now < draftDeadline {
             edited = try await transport.evaluateJavaScript("window.nativeActions.find(action => action.action === 'edit') ?? null") as? [String: Any]
-            if edited == nil { try await Task.sleep(nanoseconds: 50_000_000) }
+            if edited == nil { try await Task.sleep(for: .milliseconds(50)) }
         }
         XCTAssertEqual(try XCTUnwrap(edited)["value"] as? String, "Draftx",
                        "The clicked and typed draft must reach the shared execution host")
@@ -133,7 +133,7 @@ final class PresentationTransportTests: XCTestCase {
         var emitted: [String: Any]?
         while emitted == nil, ContinuousClock.now < actionDeadline {
             emitted = try await transport.evaluateJavaScript("window.nativeActions.find(action => action.action === 'send') ?? null") as? [String: Any]
-            if emitted == nil { try await Task.sleep(nanoseconds: 50_000_000) }
+            if emitted == nil { try await Task.sleep(for: .milliseconds(50)) }
         }
         let delivered = try XCTUnwrap(emitted)
         XCTAssertEqual(delivered["surface"] as? String, "page")

@@ -40,7 +40,7 @@ final class SelectionPickerRenderingTests: XCTestCase {
                 window.makeKeyAndVisible()
                 defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
                 host.view.layoutIfNeeded()
-                try await Task.sleep(nanoseconds: 200_000_000)
+                try await Task.sleep(for: .milliseconds(200))
                 let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: window)
                 let selection = try XCTUnwrap(hierarchy.flattenToElements().first {
                     $0.identifier == "memory-organizer-model" && $0.traits.contains(.button)
@@ -81,7 +81,7 @@ final class SelectionPickerRenderingTests: XCTestCase {
                 window.rootViewController = host; window.makeKeyAndVisible()
                 defer { window.isHidden = true; window.rootViewController = nil; model.invalidate() }
                 host.view.layoutIfNeeded()
-                try await Task.sleep(nanoseconds: 200_000_000)
+                try await Task.sleep(for: .milliseconds(200))
                 let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
                 let elements = hierarchy.flattenToElements()
                 let field = try XCTUnwrap(elements.first { $0.identifier == "font:search" })
@@ -107,7 +107,7 @@ final class SelectionPickerRenderingTests: XCTestCase {
                 window.contentView = host
                 window.makeKeyAndOrderFront(nil)
                 defer { model.invalidate(); window.close() }
-                try await Task.sleep(nanoseconds: 200_000_000)
+                try await Task.sleep(for: .milliseconds(200))
                 host.layoutSubtreeIfNeeded()
                 XCTAssertLessThanOrEqual(host.fittingSize.width, width + 1)
                 let elements = nativeMacAccessibilityTree(host)
@@ -139,7 +139,7 @@ final class SelectionPickerRenderingTests: XCTestCase {
                 #if os(macOS)
                 XCTAssertTrue(choice.isAccessibilityEnabled())
                 XCTAssertTrue(choice.accessibilityPerformPress())
-                try await Task.sleep(nanoseconds: 100_000_000)
+                try await Task.sleep(for: .milliseconds(100))
                 XCTAssertEqual(actions.last?.action, "select")
                 XCTAssertEqual(actions.last?.value, .string("font-1"))
                 #endif

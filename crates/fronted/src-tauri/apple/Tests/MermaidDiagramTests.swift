@@ -127,7 +127,7 @@ final class MermaidDiagramTests: XCTestCase {
                 var ready = false
                 let deadline = ContinuousClock.now + .seconds(3)
                 repeat {
-                    try await Task.sleep(nanoseconds: 60_000_000)
+                    try await Task.sleep(for: .milliseconds(60))
                     #if os(iOS)
                     let elements = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: native).flattenToElements()
                     ready = elements.contains { $0.identifier == "xgent-diagram-fullscreen" && !$0.traits.contains(.notEnabled) }
@@ -159,7 +159,7 @@ final class MermaidDiagramTests: XCTestCase {
                 let fullscreen = try XCTUnwrap(nativeMacAccessibilityTree(native).first { $0.accessibilityIdentifier() == "xgent-diagram-fullscreen" })
                 XCTAssertTrue(fullscreen.accessibilityPerformPress())
                 let sheetDeadline = ContinuousClock.now + .seconds(3)
-                while window.sheets.isEmpty && ContinuousClock.now < sheetDeadline { try await Task.sleep(nanoseconds: 60_000_000) }
+                while window.sheets.isEmpty && ContinuousClock.now < sheetDeadline { try await Task.sleep(for: .milliseconds(60)) }
                 let sheet = try XCTUnwrap(window.sheets.first)
                 let close = try XCTUnwrap(nativeMacAccessibilityTree(sheet).first { $0.accessibilityLabel() == XgentDiagramLabels.fallback.close })
                 XCTAssertTrue(close.accessibilityPerformPress())

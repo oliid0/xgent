@@ -25,7 +25,7 @@ final class SSHHostRenderingTests: XCTestCase {
             let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 720))
             window.rootViewController = host; window.makeKeyAndVisible()
             defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
-            host.view.layoutIfNeeded(); try await Task.sleep(nanoseconds: 160_000_000)
+            host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(160))
             let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
             let elements = hierarchy.flattenToElements()
             var frames: [CGRect] = []
@@ -43,7 +43,7 @@ final class SSHHostRenderingTests: XCTestCase {
             let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 720), styleMask: [.titled], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
             defer { model.invalidate(); window.close() }
-            host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds: 160_000_000)
+            host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(160))
             let elements = nativeMacAccessibilityTree(window)
             var frames: [CGRect] = []
             for id in ["host:edit", "host:reset-known-host", "host:delete"] {
@@ -53,7 +53,7 @@ final class SSHHostRenderingTests: XCTestCase {
                 XCTAssertFalse(frames.contains { $0.intersects(frame) }); frames.append(frame)
             }
             let reset = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "host:reset-known-host" })
-            XCTAssertTrue(reset.accessibilityPerformPress()); try await Task.sleep(nanoseconds: 60_000_000)
+            XCTAssertTrue(reset.accessibilityPerformPress()); try await Task.sleep(for: .milliseconds(60))
             XCTAssertEqual(actions.last?.action, "reset-known-host")
             #endif
         }

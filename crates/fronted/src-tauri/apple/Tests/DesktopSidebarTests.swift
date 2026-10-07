@@ -64,12 +64,12 @@ final class DesktopSidebarTests: XCTestCase {
                 XCTAssertEqual(actions.last?.action, "update")
                 XCTAssertGreaterThanOrEqual(soul.accessibilityFrame().height, 40)
                 XCTAssertTrue(soul.accessibilityPerformPress())
-                try await Task.sleep(nanoseconds: 150_000_000)
+                try await Task.sleep(for: .milliseconds(150))
                 let preset = try XCTUnwrap(NSApp.windows.flatMap { nativeMacAccessibilityTree($0) }
                     .first { $0.accessibilityIdentifier() == "sidebar-soul:selected" })
                 XCTAssertGreaterThanOrEqual(preset.accessibilityFrame().height, 40)
                 XCTAssertTrue(preset.accessibilityPerformPress())
-                try await Task.sleep(nanoseconds: 80_000_000)
+                try await Task.sleep(for: .milliseconds(80))
                 XCTAssertEqual(actions.last?.action, "select-soul")
                 let strategy = Snapshotting<NSView, NSImage>.image(size: CGSize(width: width, height: 760))
                 let image = await withCheckedContinuation { continuation in

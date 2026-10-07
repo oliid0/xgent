@@ -125,7 +125,7 @@ jobs:
       - release-metadata
       - release-preflight
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
       XGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
       XGENT_IS_PRERELEASE: ${{ needs.release-metadata.outputs.is_prerelease }}
       XGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
@@ -839,12 +839,13 @@ jobs:
     # Auxiliary a-Shell dash/FFmpeg assets contain arm64 device and x86_64
     # simulator slices. Run the complete shell smoke on the supported simulator;
     # ci.yml separately renders the native SwiftUI package on Apple Silicon.
-    runs-on: macos-15-intel
+    # Xcode 26.4.1 requires macOS 26.2+, while a-Shell smoke needs x86_64.
+    runs-on: macos-26-intel
     needs:
       - release-metadata
       - release-preflight
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
       XGENT_APP_VERSION: ${{ needs.release-metadata.outputs.app_version }}
       XGENT_RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
     steps:
@@ -923,8 +924,7 @@ jobs:
           xcodegen --version
           pod --version
           # Tauri invokes Xcode build scripts that resolve the SDK through the
-          # system selection. The Intel image otherwise supplies iOS 18.5 from
-          # its default Xcode even when DEVELOPER_DIR points at Xcode 26.3.
+          # system selection. Keep it aligned with the pinned compiler/SDK.
           sudo xcode-select --switch "$DEVELOPER_DIR"
           xcode-select -p
           xcodebuild -version

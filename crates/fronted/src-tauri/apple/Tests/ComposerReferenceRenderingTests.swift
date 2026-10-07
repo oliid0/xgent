@@ -40,7 +40,7 @@ final class ComposerReferenceRenderingTests: XCTestCase {
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 240, height: 220))
         window.rootViewController = host; window.makeKeyAndVisible()
         defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
-        host.view.layoutIfNeeded(); try await Task.sleep(nanoseconds: 220_000_000)
+        host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(220))
         func descendants(_ view: UIView) -> [UIView] { [view] + view.subviews.flatMap { descendants($0) } }
         let field = try XCTUnwrap(descendants(host.view).compactMap { $0 as? XgentComposerNativeTextView }.first)
         field.selectedRange = NSRange(location: field.attributedText.length, length: 0)
@@ -52,14 +52,14 @@ final class ComposerReferenceRenderingTests: XCTestCase {
             styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
         defer { model.invalidate(); window.close() }
-        host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds: 220_000_000)
+        host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(220))
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
         let field = try XCTUnwrap(descendants(host).compactMap { $0 as? XgentComposerNativeTextView }.first)
         field.setSelectedRange(NSRange(location: field.string.utf16.count, length: 0))
         let originalLength = field.string.utf16.count
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString(source, forType: .string)
         #endif
-        field.paste(nil); try await Task.sleep(nanoseconds: 120_000_000)
+        field.paste(nil); try await Task.sleep(for: .milliseconds(120))
         let edit = try XCTUnwrap(actions.last { $0.action == "references" })
         let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(edit.value.text.utf8)) as? [String: Any])
         XCTAssertEqual(payload["text"] as? String, "😀 /review /review tail " + expected)
@@ -82,12 +82,12 @@ final class ComposerReferenceRenderingTests: XCTestCase {
         #endif
         let undo = try XCTUnwrap(field.undoManager)
         XCTAssertTrue(undo.canUndo)
-        undo.undo(); try await Task.sleep(nanoseconds: 120_000_000)
+        undo.undo(); try await Task.sleep(for: .milliseconds(120))
         let restored = try XCTUnwrap(actions.last { $0.action == "references" })
         let restoredPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(restored.value.text.utf8)) as? [String: Any])
         XCTAssertEqual(restoredPayload["text"] as? String, "😀 /review /review tail")
         XCTAssertEqual((restoredPayload["pastes"] as? [[String: Any]])?.count, 0)
-        undo.redo(); try await Task.sleep(nanoseconds: 120_000_000)
+        undo.redo(); try await Task.sleep(for: .milliseconds(120))
         let redone = try XCTUnwrap(actions.last { $0.action == "references" })
         let redonePayload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(redone.value.text.utf8)) as? [String: Any])
         XCTAssertEqual((redonePayload["pastes"] as? [[String: Any]])?.first?["id"] as? String, id)
@@ -104,7 +104,7 @@ final class ComposerReferenceRenderingTests: XCTestCase {
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 240, height: 220))
         window.rootViewController = host; window.makeKeyAndVisible()
         defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
-        host.view.layoutIfNeeded(); try await Task.sleep(nanoseconds: 220_000_000)
+        host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(220))
         func descendants(_ view: UIView) -> [UIView] { [view] + view.subviews.flatMap { descendants($0) } }
         let field = try XCTUnwrap(descendants(host.view).compactMap { $0 as? XgentComposerNativeTextView }.first)
         let value = try XCTUnwrap(field.attributedText)
@@ -117,7 +117,7 @@ final class ComposerReferenceRenderingTests: XCTestCase {
             styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
         defer { model.invalidate(); window.close() }
-        host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds: 220_000_000)
+        host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(220))
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
         let field = try XCTUnwrap(descendants(host).compactMap { $0 as? XgentComposerNativeTextView }.first)
         let value = field.attributedString()
@@ -143,7 +143,7 @@ final class ComposerReferenceRenderingTests: XCTestCase {
         // Copying exports the real prompt, while editing deletes one native unit.
         // Both displayed cards have the same label; their identities differ.
         field.cut(nil)
-        try await Task.sleep(nanoseconds: 120_000_000)
+        try await Task.sleep(for: .milliseconds(120))
         let edit = try XCTUnwrap(actions.last { $0.action == "references" })
         let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(edit.value.text.utf8)) as? [String: Any])
         XCTAssertEqual(payload["text"] as? String, "😀  /review tail")
@@ -155,7 +155,7 @@ final class ComposerReferenceRenderingTests: XCTestCase {
             "The optimistic draft must contain prompt text rather than serialized JSON")
         let undo = try XCTUnwrap(field.undoManager)
         XCTAssertTrue(undo.canUndo, "Native deletion must retain its real attributed undo record")
-        undo.undo(); try await Task.sleep(nanoseconds: 120_000_000)
+        undo.undo(); try await Task.sleep(for: .milliseconds(120))
         let restored = try XCTUnwrap(actions.last { $0.action == "references" })
         let restoredPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(restored.value.text.utf8)) as? [String: Any])
         XCTAssertEqual(restoredPayload["text"] as? String, initial.text)
@@ -181,7 +181,7 @@ final class ComposerReferenceRenderingTests: XCTestCase {
                 let window = UIWindow(frame: CGRect(x: 0, y: 0, width: width, height: 220))
                 window.rootViewController = host; window.makeKeyAndVisible()
                 defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
-                host.view.layoutIfNeeded(); try await Task.sleep(nanoseconds: 160_000_000)
+                host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(160))
                 func descendants(_ view: UIView) -> [UIView] { [view] + view.subviews.flatMap { descendants($0) } }
                 let field = try XCTUnwrap(descendants(host.view).compactMap { $0 as? XgentComposerNativeTextView }.first)
                 let value = try XCTUnwrap(field.attributedText)
@@ -191,7 +191,7 @@ final class ComposerReferenceRenderingTests: XCTestCase {
                     styleMask: [.titled], backing: .buffered, defer: false)
                 window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
                 defer { model.invalidate(); window.close() }
-                host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds: 160_000_000)
+                host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(160))
                 func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
                 let field = try XCTUnwrap(descendants(host).compactMap { $0 as? XgentComposerNativeTextView }.first)
                 let value = field.attributedString()

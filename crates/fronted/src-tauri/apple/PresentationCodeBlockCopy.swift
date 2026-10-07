@@ -36,7 +36,7 @@ struct XgentCodeBlockCopy: View {
         .accessibilityIdentifier("xgent-code-copy")
         .task(id: generation) {
             guard copied else { return }
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else { return }
             copied = false
         }

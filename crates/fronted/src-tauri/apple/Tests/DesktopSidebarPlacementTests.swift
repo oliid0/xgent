@@ -91,7 +91,7 @@ final class DesktopSidebarPlacementTests: XCTestCase {
                 revision += 1
                 model.update(try sidebar(revision: revision))
                 window.setContentSize(CGSize(width: width, height: 844))
-                host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds: 250_000_000)
+                host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(250))
                 let bounds = window.convertToScreen(host.convert(host.bounds, to: nil))
                 XCTAssertEqual(bounds.width, width, accuracy: 1,
                     "Content minimums must not force the host outside the requested window")
@@ -126,14 +126,14 @@ final class DesktopSidebarPlacementTests: XCTestCase {
                     let backdrop = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "xgent-sidebar-dismiss-backdrop" })
                     let count = actions.count
                     XCTAssertTrue(backdrop.accessibilityPerformPress())
-                    try await Task.sleep(nanoseconds: 50_000_000)
+                    try await Task.sleep(for: .milliseconds(50))
                     XCTAssertEqual(actions.count, count + 1)
                     XCTAssertEqual(actions.last?.surface, "sidebar")
                     XCTAssertEqual(actions.last?.action, "close")
                 }
                 revision += 1
                 model.update(try sidebar(revision: revision, removed: true))
-                host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds: 150_000_000)
+                host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(150))
                 let current = nativeMacAccessibilityTree(host)
                 let visibleAction = panelMode == "closed" ? "main-action" : "panel-action"
                 let active = try XCTUnwrap(current.first { $0.accessibilityIdentifier() == visibleAction && $0.isAccessibilityEnabled() })
@@ -173,12 +173,12 @@ final class DesktopSidebarPlacementTests: XCTestCase {
                 styleMask: [.borderless], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
             defer { model.invalidate(); window.close() }
-            host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds: 250_000_000)
+            host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(250))
             model.update(try conversation("conversation:a", revision: 2))
-            host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds: 100_000_000)
+            host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(100))
             XCTAssertTrue(actions.isEmpty, "Output revisions must not dismiss an open sidebar")
             model.update(try conversation("conversation:b", revision: 3))
-            host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds: 150_000_000)
+            host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(150))
             if width == 320 {
                 XCTAssertEqual(actions.count, 1)
                 XCTAssertEqual(actions.first?.surface, "sidebar")

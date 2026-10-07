@@ -25,7 +25,7 @@ final class WorkspaceSearchRenderingTests: XCTestCase {
             let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 620))
             window.rootViewController = host; window.makeKeyAndVisible()
             defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
-            host.view.layoutIfNeeded(); try await Task.sleep(nanoseconds: 180_000_000)
+            host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(180))
             let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
             let elements = hierarchy.flattenToElements()
             try attachNativeAccessibilityEvidence(hierarchy, name: "workspace-search-before-checks-320-\(size)")
@@ -45,7 +45,7 @@ final class WorkspaceSearchRenderingTests: XCTestCase {
             }
             let input = try XCTUnwrap(fields(host.view).first)
             XCTAssertTrue(input.becomeFirstResponder()); input.insertText("report")
-            try await Task.sleep(nanoseconds: 80_000_000)
+            try await Task.sleep(for: .milliseconds(80))
             XCTAssertEqual(actions.last?.action, "search-query")
             XCTAssertEqual(actions.last?.value.text, "report")
             #else
@@ -54,7 +54,7 @@ final class WorkspaceSearchRenderingTests: XCTestCase {
                                   styleMask: [.titled], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
             defer { model.invalidate(); window.close() }
-            host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds: 180_000_000)
+            host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(180))
             let elements = nativeMacAccessibilityTree(window)
             // Keep real diagnostics even when a required native element is missing.
             try attachNativeAccessibilityEvidence(elements.map { ["id": $0.accessibilityIdentifier() ?? "", "label": $0.accessibilityLabel() ?? "",
@@ -71,7 +71,7 @@ final class WorkspaceSearchRenderingTests: XCTestCase {
             for frame in [query.accessibilityFrame(), first.accessibilityFrame()] {
                 XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX - 1); XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX + 1)
             }
-            XCTAssertTrue(first.accessibilityPerformPress()); try await Task.sleep(nanoseconds: 60_000_000)
+            XCTAssertTrue(first.accessibilityPerformPress()); try await Task.sleep(for: .milliseconds(60))
             XCTAssertEqual(actions.last?.action, "result:0")
             try attachNativeAccessibilityEvidence(elements.map { ["id": $0.accessibilityIdentifier() ?? "", "label": $0.accessibilityLabel() ?? ""] },
                 name: "workspace-search-320-\(size)")
@@ -93,7 +93,7 @@ final class WorkspaceSearchRenderingTests: XCTestCase {
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
         defer { model.invalidate(); window.close() }
-        host.layoutSubtreeIfNeeded(); try await Task.sleep(nanoseconds: 200_000_000)
+        host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(200))
         XCTAssertNotNil(window.firstResponder as? NSTextView, "Search must focus the native field editor")
         func press(_ code: UInt16, _ characters: String) throws {
             for type in [NSEvent.EventType.keyDown, .keyUp] {
@@ -102,10 +102,10 @@ final class WorkspaceSearchRenderingTests: XCTestCase {
                     isARepeat: false, keyCode: code)))
             }
         }
-        try press(125, "\u{f701}"); try await Task.sleep(nanoseconds: 50_000_000)
-        try press(125, "\u{f701}"); try await Task.sleep(nanoseconds: 50_000_000)
+        try press(125, "\u{f701}"); try await Task.sleep(for: .milliseconds(50))
+        try press(125, "\u{f701}"); try await Task.sleep(for: .milliseconds(50))
         XCTAssertTrue(actions.isEmpty, "Arrows select locally without executing a result")
-        try press(36, "\r"); try await Task.sleep(nanoseconds: 100_000_000)
+        try press(36, "\r"); try await Task.sleep(for: .milliseconds(100))
         XCTAssertEqual(actions.last?.action, "result:1")
     }
     #endif

@@ -29,7 +29,7 @@ final class MobileSwitchInteractionTests: XCTestCase {
                 let window = UIWindow(frame: CGRect(x: 0, y: 0, width: width, height: 780))
                 window.rootViewController = host; window.makeKeyAndVisible()
                 defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
-                host.view.layoutIfNeeded(); try await Task.sleep(nanoseconds: 200_000_000)
+                host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(200))
 
                 let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
                 let identified = hierarchy.flattenToElements().filter { $0.identifier == "voice-enabled" }
@@ -54,14 +54,14 @@ final class MobileSwitchInteractionTests: XCTestCase {
                 try attachCompositedNativeScreenshot(of: host.view, name: "voice-switch-\(Int(width))-\(size)")
 
                 control.setOn(true, animated: false); control.sendActions(for: .valueChanged)
-                try await Task.sleep(nanoseconds: 50_000_000)
+                try await Task.sleep(for: .milliseconds(50))
                 XCTAssertEqual(actions.count, 1)
                 XCTAssertEqual(actions.last?.action, "voice-enabled")
                 XCTAssertEqual(actions.last?.value, .bool(true))
                 XCTAssertEqual(model.value(try XCTUnwrap(document.node(id: "voice-enabled")), in: document), .bool(true))
                 model.invalidate()
                 control.setOn(false, animated: false); control.sendActions(for: .valueChanged)
-                try await Task.sleep(nanoseconds: 50_000_000)
+                try await Task.sleep(for: .milliseconds(50))
                 XCTAssertEqual(actions.count, 1, "A retired native switch must not write to shared settings")
             }
         }

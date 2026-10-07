@@ -12,19 +12,19 @@ final class ComposerKeyboardRenderingTests: XCTestCase {
         var actions: [XgentAction] = []; model.actionSink = { actions.append($0) }
         let window = show(document, model: model)
         defer { model.invalidate(); window.close() }
-        try await Task.sleep(nanoseconds: 220_000_000)
+        try await Task.sleep(for: .milliseconds(220))
         let editor = try XCTUnwrap(window.firstResponder as? NSTextView)
         editor.setSelectedRange(NSRange(location: editor.string.utf16.count, length: 0))
         try press(36, "\r", modifiers: .shift, in: window)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        try await Task.sleep(for: .milliseconds(100))
         XCTAssertTrue(editor.string.hasSuffix("\n"), "Shift+Return inserts a real newline")
         XCTAssertFalse(actions.contains { $0.action == "submit" || $0.action == "steer" })
-        try press(36, "\r", in: window); try await Task.sleep(nanoseconds: 100_000_000)
+        try press(36, "\r", in: window); try await Task.sleep(for: .milliseconds(100))
         let submit = try XCTUnwrap(actions.last { $0.action == "submit" })
         XCTAssertEqual(submit.value.text, editor.string)
         model.complete(.init(surface: document.surface, requestId: submit.requestId, ok: true, error: nil))
         try press(36, "\r", modifiers: .command, in: window)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        try await Task.sleep(for: .milliseconds(100))
         XCTAssertEqual(actions.last?.action, "steer")
         XCTAssertEqual(actions.last?.value.text, editor.string)
     }
@@ -36,19 +36,19 @@ final class ComposerKeyboardRenderingTests: XCTestCase {
         var actions: [XgentAction] = []; model.actionSink = { actions.append($0) }
         let window = show(document, model: model)
         defer { model.invalidate(); window.close() }
-        try await Task.sleep(nanoseconds: 220_000_000)
+        try await Task.sleep(for: .milliseconds(220))
         let editor = try XCTUnwrap(window.firstResponder as? NSTextView)
         editor.setSelectedRange(NSRange(location: 1, length: 0))
         // Explicit caret placement reports its selection asynchronously. Finish
         // that setup before measuring the actions caused by the physical arrow.
-        try await Task.sleep(nanoseconds: 100_000_000)
+        try await Task.sleep(for: .milliseconds(100))
         let count = actions.count
         try press(125, "\u{f701}", in: window)
-        try await Task.sleep(nanoseconds: 60_000_000)
+        try await Task.sleep(for: .milliseconds(60))
         XCTAssertEqual(actions.count, count, "Arrow keys select locally; unexpected actions: \(actions.dropFirst(count).map(\.action))")
-        try press(48, "\t", in: window); try await Task.sleep(nanoseconds: 100_000_000)
+        try press(48, "\t", in: window); try await Task.sleep(for: .milliseconds(100))
         XCTAssertEqual(actions.last?.action, "mention:1")
-        try press(53, "\u{1b}", in: window); try await Task.sleep(nanoseconds: 100_000_000)
+        try press(53, "\u{1b}", in: window); try await Task.sleep(for: .milliseconds(100))
         XCTAssertEqual(actions.last?.action, "dismiss-menu")
         XCTAssertFalse(actions.contains { $0.action == "submit" || $0.action == "steer" })
     }
@@ -59,11 +59,11 @@ final class ComposerKeyboardRenderingTests: XCTestCase {
         var actions: [XgentAction] = []; model.actionSink = { actions.append($0) }
         let window = show(document, model: model)
         defer { model.invalidate(); window.close() }
-        try await Task.sleep(nanoseconds: 220_000_000)
+        try await Task.sleep(for: .milliseconds(220))
         let editor = try XCTUnwrap(window.firstResponder as? NSTextView)
         editor.setMarkedText("拼音", selectedRange: NSRange(location: 2, length: 0), replacementRange: editor.selectedRange())
         XCTAssertTrue(editor.hasMarkedText())
-        try press(36, "\r", in: window); try await Task.sleep(nanoseconds: 50_000_000)
+        try press(36, "\r", in: window); try await Task.sleep(for: .milliseconds(50))
         XCTAssertFalse(actions.contains { $0.action == "submit" || $0.action == "steer" })
     }
 
@@ -78,12 +78,12 @@ final class ComposerKeyboardRenderingTests: XCTestCase {
         }
         let window = show(document, model: model)
         defer { model.invalidate(); window.close() }
-        try await Task.sleep(nanoseconds: 220_000_000)
+        try await Task.sleep(for: .milliseconds(220))
         let editor = try XCTUnwrap(window.firstResponder as? NSTextView)
         editor.setSelectedRange(NSRange(location: editor.string.utf16.count, length: 0))
-        try await Task.sleep(nanoseconds: 60_000_000)
+        try await Task.sleep(for: .milliseconds(60))
         try press(126, "\u{f700}", in: window)
-        try await Task.sleep(nanoseconds: 60_000_000)
+        try await Task.sleep(for: .milliseconds(60))
         let previous = try XCTUnwrap(actions.last { $0.action == "history-prev" })
         let caret = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(previous.value.text.utf8)) as? [String: Any])
         XCTAssertEqual(caret["text"] as? String, "a😀z")
@@ -91,29 +91,29 @@ final class ComposerKeyboardRenderingTests: XCTestCase {
         XCTAssertEqual(caret["length"] as? Int, 0)
         let count = actions.filter { $0.action.hasPrefix("history-") }.count
         try press(126, "\u{f700}", modifiers: .shift, in: window)
-        try await Task.sleep(nanoseconds: 60_000_000)
+        try await Task.sleep(for: .milliseconds(60))
         XCTAssertEqual(actions.filter { $0.action.hasPrefix("history-") }.count, count)
         editor.setSelectedRange(NSRange(location: 0, length: 1))
         try press(126, "\u{f700}", in: window)
-        try await Task.sleep(nanoseconds: 60_000_000)
+        try await Task.sleep(for: .milliseconds(60))
         XCTAssertEqual(actions.filter { $0.action.hasPrefix("history-") }.count, count)
 
         let multiline = try fixture(menu: false, history: true, text: "first\nlast", revision: 2)
         model.update(multiline)
-        try await Task.sleep(nanoseconds: 100_000_000)
+        try await Task.sleep(for: .milliseconds(100))
         editor.setSelectedRange(NSRange(location: 8, length: 0))
         try press(126, "\u{f700}", in: window)
-        try await Task.sleep(nanoseconds: 60_000_000)
+        try await Task.sleep(for: .milliseconds(60))
         XCTAssertEqual(actions.filter { $0.action.hasPrefix("history-") }.count, count,
             "Up inside the second logical line remains ordinary caret movement")
         editor.setSelectedRange(NSRange(location: 0, length: 0))
         try press(125, "\u{f701}", in: window)
-        try await Task.sleep(nanoseconds: 60_000_000)
+        try await Task.sleep(for: .milliseconds(60))
         XCTAssertEqual(actions.filter { $0.action.hasPrefix("history-") }.count, count,
             "Down inside the first logical line remains ordinary caret movement")
         editor.setSelectedRange(NSRange(location: editor.string.utf16.count, length: 0))
         try press(125, "\u{f701}", in: window)
-        try await Task.sleep(nanoseconds: 60_000_000)
+        try await Task.sleep(for: .milliseconds(60))
         XCTAssertEqual(actions.last { $0.action.hasPrefix("history-") }?.action, "history-next")
         XCTAssertFalse(actions.contains { $0.action == "submit" || $0.action == "steer" })
     }
@@ -129,7 +129,7 @@ final class ComposerKeyboardRenderingTests: XCTestCase {
         }
         let window = show(document, model: model)
         defer { model.invalidate(); window.close() }
-        try await Task.sleep(nanoseconds: 220_000_000)
+        try await Task.sleep(for: .milliseconds(220))
         let editor = try XCTUnwrap(window.firstResponder as? NSTextView)
         for (location, code, characters, expected) in [
             (3, UInt16(124), "\u{f703}", "right"),
@@ -138,9 +138,9 @@ final class ComposerKeyboardRenderingTests: XCTestCase {
             (3, UInt16(117), "\u{f728}", "delete"),
         ] {
             editor.setSelectedRange(NSRange(location: location, length: 0))
-            try await Task.sleep(nanoseconds: 60_000_000)
+            try await Task.sleep(for: .milliseconds(60))
             try press(code, characters, in: window)
-            try await Task.sleep(nanoseconds: 60_000_000)
+            try await Task.sleep(for: .milliseconds(60))
             let action = try XCTUnwrap(actions.last { $0.action.hasPrefix("atomic-") })
             XCTAssertEqual(action.action, "atomic-\(expected)")
             let value = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(action.value.text.utf8)) as? [String: Any])
@@ -151,11 +151,11 @@ final class ComposerKeyboardRenderingTests: XCTestCase {
         let count = actions.filter { $0.action.hasPrefix("atomic-") }.count
         editor.setSelectedRange(NSRange(location: 10, length: 0))
         try press(123, "\u{f702}", modifiers: .shift, in: window)
-        try await Task.sleep(nanoseconds: 60_000_000)
+        try await Task.sleep(for: .milliseconds(60))
         XCTAssertEqual(actions.filter { $0.action.hasPrefix("atomic-") }.count, count)
         editor.setSelectedRange(NSRange(location: 13, length: 0))
         try press(123, "\u{f702}", in: window)
-        try await Task.sleep(nanoseconds: 60_000_000)
+        try await Task.sleep(for: .milliseconds(60))
         XCTAssertEqual(actions.filter { $0.action.hasPrefix("atomic-") }.count, count)
         XCTAssertFalse(actions.contains { $0.action == "submit" || $0.action == "steer" })
     }
