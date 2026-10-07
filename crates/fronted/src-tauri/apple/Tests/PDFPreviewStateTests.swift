@@ -44,6 +44,11 @@ final class PDFPreviewStateTests: XCTestCase {
         XCTAssertEqual(page.rotation, 90)
         XCTAssertFalse(view.autoScales)
         XCTAssertEqual(view.scaleFactor, 1.4, accuracy: 0.001)
+        let remounted = PDFView(frame: view.frame)
+        coordinator.load(Data(data), into: remounted)
+        XCTAssertEqual(remounted.document?.pageCount, 2,
+            "A retained editor session must load the same bytes into a newly mounted PDFView")
+        XCTAssertTrue(coordinator.view === remounted)
         coordinator.load(try fixture(pages: 1), into: view)
         XCTAssertFalse(view.document === document)
         XCTAssertEqual(view.document?.pageCount, 1)
@@ -59,6 +64,10 @@ final class PDFPreviewStateTests: XCTestCase {
         XCTAssertTrue(page.string?.contains("Original selectable text") == true)
         let original = PDFAnnotation(bounds: CGRect(x: 10, y: 10, width: 25, height: 25), forType: .text, withProperties: nil)
         original.contents = "Existing note"; page.addAnnotation(original)
+        // PDFKit also installs the text note's associated Popup annotation.
+        // Preserve the complete original set, including that related object.
+        let originals = page.annotations
+        XCTAssertTrue(originals.contains(where: { $0 === original }))
         let selection = try XCTUnwrap(page.selection(for: CGRect(x: 25, y: 65, width: 250, height: 30)))
         view.currentSelection = selection
         let highlights = coordinator.selectedHighlights(color: "pink")
@@ -71,15 +80,19 @@ final class PDFPreviewStateTests: XCTestCase {
         XCTAssertGreaterThan(rectangle[3], 5)
         coordinator.show(highlights, in: view)
         XCTAssertTrue(view.document === document)
-        XCTAssertEqual(page.annotations.count, 1 + highlights.flatMap(\.rects).count)
-        let draft = try XCTUnwrap(page.annotations.first(where: { $0 !== original }))
+        XCTAssertEqual(page.annotations.count, originals.count + highlights.flatMap(\.rects).count)
+        let draft = try XCTUnwrap(page.annotations.first(where: { candidate in
+            !originals.contains(where: { $0 === candidate })
+        }))
         XCTAssertEqual(draft.type, "Highlight")
         XCTAssertEqual(draft.quadrilateralPoints?.count, 4)
         coordinator.show(highlights, in: view)
         XCTAssertTrue(page.annotations.contains(where: { $0 === draft }))
         coordinator.show([], in: view)
-        XCTAssertEqual(page.annotations.count, 1)
-        XCTAssertTrue(page.annotations.first === original)
+        XCTAssertEqual(page.annotations.count, originals.count)
+        for annotation in originals {
+            XCTAssertTrue(page.annotations.contains(where: { $0 === annotation }))
+        }
         view.clearSelection()
         XCTAssertTrue(coordinator.selectedHighlights(color: "yellow").isEmpty)
     }

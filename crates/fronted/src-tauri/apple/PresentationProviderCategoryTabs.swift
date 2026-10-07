@@ -37,7 +37,6 @@ struct XgentProviderCategoryTabs: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.layoutDirection) private var layoutDirection
     @ScaledMetric(relativeTo: .body) private var bodyScale = 1.0
-    @State private var scrollTarget: String?
 
     private var options: [XgentOption] { node.options ?? [] }
     private var selected: String { model.value(node, in: document).text }
@@ -68,21 +67,16 @@ struct XgentProviderCategoryTabs: View {
 
     var body: some View {
         GeometryReader { geometry in
-            ScrollView(.horizontal) {
-                LazyHStack(alignment: .center, spacing: 4) {
+            XgentProviderCategoryScroll(selected: selected) {
+                HStack(alignment: .center, spacing: 4) {
                     ForEach(options) { option in tab(option, viewportWidth: geometry.size.width).id(option.value) }
                 }
                 .scrollTargetLayout()
             }
             .frame(width: geometry.size.width, height: rowHeight)
-            .clipped()
-            .scrollIndicators(.hidden)
-            // Target-aware lazy layout preserves the bound category when the
-            // viewport changes; a yielded proxy command can use stale frames.
-            .scrollPosition(id: $scrollTarget, anchor: .center)
-            .onChange(of: "\(selected):\(geometry.size.width):\(dynamicTypeSize):\(theme.fontScale):\(layoutDirection)", initial: true) {
-                scrollTarget = selected
-            }
+            // Reset the viewport AND its initial scroll target on layout changes.
+            // Writing the same ID to an existing binding does not scroll again.
+            .id("\(geometry.size.width):\(dynamicTypeSize):\(theme.fontFamily):\(theme.fontScale):\(layoutDirection)")
             .focusable()
             .modifier(XgentTabKeyNavigation(
                 ids: options.filter { $0.disabled != true }.map(\.value), current: selected,
@@ -135,5 +129,25 @@ struct XgentProviderCategoryTabs: View {
               options.contains(where: { $0.value == value && $0.disabled != true }) else { return false }
         model.send(node, in: document, value: .string(value), editing: true)
         return true
+    }
+}
+
+private struct XgentProviderCategoryScroll<Content: View>: View {
+    let selected: String
+    let content: Content
+    @State private var scrollTarget: String?
+
+    init(selected: String, @ViewBuilder content: () -> Content) {
+        self.selected = selected
+        self.content = content()
+        _scrollTarget = State(initialValue: selected)
+    }
+
+    var body: some View {
+        ScrollView(.horizontal) { content }
+            .scrollIndicators(.hidden)
+            .scrollPosition(id: $scrollTarget, anchor: .center)
+            .clipped()
+            .onChange(of: selected) { scrollTarget = selected }
     }
 }

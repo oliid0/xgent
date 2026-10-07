@@ -52,12 +52,12 @@ final class PackagedApplicationTests: XCTestCase {
                 navigation = app.menuItems[navigationID].firstMatch
             }
             XCTAssertTrue(navigation.waitForExistence(timeout: 15))
-            let label = navigation.label
             click(navigation)
-            // The actual shared page may expand a short navigation label,
-            // for example Shortcuts -> Global shortcuts in both frontends.
-            let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS[c] %@", label), object: title)
-            XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 15), .completed, "The shared settings action must change the visible section")
+            // NSMenuItem exposes its title differently from an inline Button.
+            // Verify the selected shared route, independent of that AX label.
+            let detail = window.descendants(matching: .any)["settings-detail:" + navigationID].firstMatch
+            XCTAssertTrue(detail.waitForExistence(timeout: 15), "The shared settings action must change the visible section: \(section)")
+            XCTAssertFalse(title.label.isEmpty, "Every settings page must have a visible heading")
             XCTAssertGreaterThan(title.frame.width, 0)
             XCTAssertGreaterThan(title.frame.height, 0)
             XCTAssertTrue(window.frame.contains(title.frame), "The selected settings title must stay inside the actual window")

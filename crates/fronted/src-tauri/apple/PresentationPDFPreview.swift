@@ -34,7 +34,7 @@ struct XgentPDFPreview {
         @Published var hasSelection = false
         @Published var invalidDocument = false
         func load(_ data: Data, into view: PDFView) {
-            guard loadedData != data else { return }
+            guard loadedData != data || self.view !== view else { return }
             loadedData = data
             self.view = view
             displayedHighlights = []

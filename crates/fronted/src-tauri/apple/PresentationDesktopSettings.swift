@@ -157,6 +157,8 @@ struct XgentDesktopSettingsLayout: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("settings-detail:\(navigation.first { $0.selected == true }?.id ?? "")")
         }
     }
 }

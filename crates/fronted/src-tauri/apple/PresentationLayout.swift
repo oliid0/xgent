@@ -640,14 +640,16 @@ struct XgentRootLayout: View {
                 panelVisible: panelEnabled && model.workspaceState.visible && panel?.workspacePanel != nil,
                 panelExpanded: model.workspaceState.expanded)
             let drawerVisible = sidebar != nil && root != nil && !placement.inline
-            XgentDesktopWorkspaceLayout(model: model, minimumMainWidth: placement.minimumMainWidth,
+            ZStack(alignment: .leading) {
+                XgentDesktopWorkspaceLayout(model: model, minimumMainWidth: placement.minimumMainWidth,
                                        enabled: panelEnabled) {
-                desktopMain(placement: placement)
-            }
-            .disabled(drawerVisible)
-            .allowsHitTesting(!drawerVisible)
-            .accessibilityHidden(drawerVisible)
-            .overlay(alignment: .leading) {
+                    desktopMain(placement: placement)
+                }
+                .disabled(drawerVisible)
+                .allowsHitTesting(!drawerVisible)
+                .accessibilityHidden(drawerVisible)
+                // The drawer is a sibling of the disabled workspace. AppKit
+                // must not resolve its controls through a disabled base view.
                 if drawerVisible, let sidebar {
                     ZStack(alignment: .leading) {
                         Button { model.dismiss(sidebar) } label: {

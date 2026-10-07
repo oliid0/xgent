@@ -121,6 +121,28 @@ final class DesktopSidebarPlacementTests: XCTestCase {
                 if !placement.inline {
                     XCTAssertFalse(elements.contains { ["main-action", "panel-action"].contains($0.accessibilityIdentifier() ?? "") && $0.isAccessibilityEnabled() },
                         "A drawer must hide and disable the covered pane's controls")
+                    XCTAssertTrue(settings.isAccessibilityEnabled())
+                    let settingsFrame = settings.accessibilityFrame()
+                    let screenPoint = NSPoint(x: settingsFrame.midX, y: settingsFrame.midY)
+                    let hit = try XCTUnwrap(window.accessibilityHitTest(screenPoint) as? NSObject)
+                    XCTAssertEqual(NativeMacAccessibilityElement(object: hit).accessibilityIdentifier(), "settings",
+                        "The open drawer must expose its settings button to pointer hit testing")
+                    let point = window.convertPoint(fromScreen: screenPoint)
+                    let click = try [NSEvent.EventType.leftMouseDown, .leftMouseUp].enumerated().map { index, type in
+                        try XCTUnwrap(NSEvent.mouseEvent(with: type, location: point,
+                            modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                            windowNumber: window.windowNumber, context: nil, eventNumber: index + 1,
+                            clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+                    }
+                    let beforeClick = actions.count
+                    NSApp.postEvent(click[1], atStart: true)
+                    window.sendEvent(click[0])
+                    if let release = NSApp.nextEvent(matching: .leftMouseUp, until: Date(), inMode: .default, dequeue: true) {
+                        window.sendEvent(release)
+                    }
+                    try await Task.sleep(for: .milliseconds(100))
+                    XCTAssertEqual(actions.count, beforeClick + 1)
+                    XCTAssertEqual(actions.last?.action, "settings", "A real pointer click must open settings from the drawer")
                     let backdrop = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "xgent-sidebar-dismiss-backdrop" })
                     let count = actions.count
                     XCTAssertTrue(backdrop.accessibilityPerformPress())
