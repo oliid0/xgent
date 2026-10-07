@@ -12,6 +12,9 @@ import AppKit
 
 final class SkillsHubRenderingTests: XCTestCase {
     @MainActor func testInstalledAndPreviewLayoutsAtNarrowAndLargeTextSizes() async throws {
+        #if os(macOS)
+        let accessibility = try NativeMacAccessibilitySession(); defer { accessibility.restore() }
+        #endif
         #if os(iOS)
         let widths: [CGFloat] = [320, 430]
         #else
@@ -23,6 +26,7 @@ final class SkillsHubRenderingTests: XCTestCase {
                     let document = try fixture(preview: preview)
                     let model = XgentPresentationModel()
                     model.update(document)
+                    var actions: [XgentAction] = []; model.actionSink = { actions.append($0) }
                     let content = VStack {
                         #if os(iOS)
                         XgentIOSNodes(nodes: document.nodes, document: document, model: model)
@@ -37,34 +41,76 @@ final class SkillsHubRenderingTests: XCTestCase {
                     let window = UIWindow(frame: CGRect(x: 0, y: 0, width: width, height: 920))
                     window.rootViewController = host
                     window.makeKeyAndVisible()
-                    defer { window.isHidden = true; window.rootViewController = nil }
+                    defer { host.dismiss(animated: false); model.invalidate(); window.isHidden = true; window.rootViewController = nil }
                     host.view.layoutIfNeeded()
                     try await Task.sleep(nanoseconds: 150_000_000)
+                    if preview {
+                        for _ in 0..<20 {
+                            if let presented = host.presentedViewController, !presented.isBeingPresented { break }
+                            try await Task.sleep(nanoseconds: 100_000_000)
+                        }
+                        let presented = try XCTUnwrap(host.presentedViewController)
+                        XCTAssertFalse(presented.isBeingPresented, "Capture the completed sheet presentation")
+                    }
                     // A native sheet is presented beside the hosting view.
                     // Inspect the window so the real preview controls are
                     // included, as they are for the user and VoiceOver.
-                    let elements = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: window).flattenToElements()
+                    let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: window)
+                    let elements = hierarchy.flattenToElements()
                     let field = try XCTUnwrap(elements.first { $0.identifier == (preview ? "preview-close" : "skill-enabled") })
                     XCTAssertLessThanOrEqual(field.shape.bezierPath.bounds.maxX, width + 1)
                     XCTAssertGreaterThanOrEqual(field.shape.bezierPath.bounds.minX, -1)
-                    let strategy = Snapshotting<UIView, UIImage>.image(size: CGSize(width: width, height: 920))
-                    let image = await withCheckedContinuation { continuation in
-                        strategy.snapshot(window).run { continuation.resume(returning: $0) }
+                    let name = "skills-\(preview ? "preview" : "installed")-\(Int(width))-\(textSize)"
+                    try attachNativeAccessibilityEvidence(hierarchy, name: name)
+                    // SnapshotTesting's UIView strategy reparents its input.
+                    // A mounted UIWindow must be captured in place instead.
+                    try attachCompositedNativeScreenshot(of: window, name: name)
+                    if preview {
+                        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                            host.dismiss(animated: false) { continuation.resume() }
+                        }
                     }
                     #else
                     let host = NSHostingView(rootView: content)
-                    host.frame = CGRect(x: 0, y: 0, width: width, height: 920)
-                    host.layoutSubtreeIfNeeded()
-                    XCTAssertLessThanOrEqual(host.fittingSize.width, width + 1)
-                    let strategy = Snapshotting<NSView, NSImage>.image(size: CGSize(width: width, height: 920))
-                    let image = await withCheckedContinuation { continuation in
-                        strategy.snapshot(host).run { continuation.resume(returning: $0) }
+                    let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: 920),
+                                          styleMask: [.titled], backing: .buffered, defer: false)
+                    window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
+                    defer {
+                        if let sheet = window.attachedSheet { window.endSheet(sheet) }
+                        model.invalidate(); window.close()
                     }
-                    #endif
+                    host.layoutSubtreeIfNeeded()
+                    try await Task.sleep(nanoseconds: 150_000_000)
+                    if preview {
+                        for _ in 0..<20 {
+                            if let sheet = window.attachedSheet,
+                               nativeMacAccessibilityTree(sheet).contains(where: { $0.accessibilityIdentifier() == "preview-close" }) { break }
+                            try await Task.sleep(nanoseconds: 100_000_000)
+                        }
+                    }
+                    let visibleWindow: NSWindow
+                    if preview { visibleWindow = try XCTUnwrap(window.attachedSheet) } else { visibleWindow = window }
+                    let visibleView = try XCTUnwrap(visibleWindow.contentView)
+                    let field = try XCTUnwrap(nativeMacAccessibilityTree(visibleWindow).first {
+                        $0.accessibilityIdentifier() == (preview ? "preview-close" : "skill-enabled")
+                    })
+                    let bounds = visibleWindow.convertToScreen(visibleView.convert(visibleView.bounds, to: nil))
+                    XCTAssertGreaterThanOrEqual(field.accessibilityFrame().minX, bounds.minX - 1)
+                    XCTAssertLessThanOrEqual(field.accessibilityFrame().maxX, bounds.maxX + 1)
+                    XCTAssertLessThanOrEqual(host.fittingSize.width, width + 1)
+                    let strategy = Snapshotting<NSView, NSImage>.image(size: visibleView.bounds.size)
+                    let image = await withCheckedContinuation { continuation in
+                        strategy.snapshot(visibleView).run { continuation.resume(returning: $0) }
+                    }
                     let attachment = XCTAttachment(image: image)
                     attachment.name = "skills-\(preview ? "preview" : "installed")-\(Int(width))-\(textSize)"
                     attachment.lifetime = .keepAlways
                     add(attachment)
+                    if preview {
+                        XCTAssertTrue(field.accessibilityPerformPress())
+                        XCTAssertEqual(actions.last?.action, "close")
+                    }
+                    #endif
                     model.invalidate()
                 }
             }
