@@ -76,7 +76,7 @@ fn main() {
 // before Xcode links the final app, not from a later application source phase.
 fn link_native_ui(manifest_dir: &std::path::Path) {
     use std::process::Command;
-    let sources = manifest_dir.join("native/apple-ui");
+    let sources = manifest_dir.join("apple");
     println!("cargo:rerun-if-changed={}", sources.display());
     let output = std::path::PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
     let target = std::env::var("TARGET").expect("Rust target");
@@ -133,7 +133,7 @@ fn link_native_ui(manifest_dir: &std::path::Path) {
     assert!(std::path::Path::new(binary_path.trim()).join("libXgentNativeUI.a").is_file(),
         "SwiftPM did not produce the native UI static archive");
     let status = Command::new("python3").arg(&resource_helper)
-        .arg("copy").arg(binary_path.trim()).arg(manifest_dir.join("native/apple-ui-bundles"))
+        .arg("copy").arg(binary_path.trim()).arg(manifest_dir.join("apple-bundles"))
         .status().expect("stage native UI resource bundles");
     assert!(status.success(), "native UI resource staging failed");
     println!("cargo:rustc-link-search=native={}", binary_path.trim());
@@ -169,7 +169,7 @@ fn link_native_ui(manifest_dir: &std::path::Path) {
 // separately distributed driver. This runs only as part of the macOS app build.
 fn link_computer_use(manifest_dir: &std::path::Path) {
     use std::process::Command;
-    let sources = manifest_dir.join("native/computer-use/macos");
+    let sources = manifest_dir.join("../../computer-use/macos");
     println!("cargo:rerun-if-changed={}", sources.display());
     let output = std::path::PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
     let sdk = Command::new("xcrun").args(["--sdk", "macosx", "--show-sdk-path"])

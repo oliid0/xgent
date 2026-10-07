@@ -208,7 +208,7 @@ targets:
         script: |
           set -euo pipefail
           python3 "$PROJECT_DIR/../../../../../scripts/release/prepare-apple-ui-resources.py" copy \
-            "$PROJECT_DIR/../../native/apple-ui-bundles" \
+            "$PROJECT_DIR/../../apple-bundles" \
             "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
           python3 "$PROJECT_DIR/../../../../../scripts/release/prepare-apple-ui-resources.py" verify-ios \
             "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"

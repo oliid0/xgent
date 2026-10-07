@@ -48,7 +48,7 @@ test("native provider details retain endpoints and active models beside quota er
     assert.equal(f.nodes().find(node => node.id === "provider:a").text, details.connection);
     assert.equal(f.nodes().find(node => node.id === "provider-list-usage:a").text, details.usage);
     assert.match(details.usage, /remaining: 0 credits/);
-    assert.equal(f.nodes().find(node => node.id === "provider:a").icon, "sun.max");
+    assert.equal(f.nodes().find(node => node.id === "provider:a").icon, "xgent.provider.claude_code");
     const row = f.nodes().find(node => node.id === "provider-list-row:a");
     assert.ok(row.children.find(node => node.id === "provider-list-actions:a"), "Ordering has a separate leading control");
     const menu = row.children.find(node => node.id === "provider-more:a");

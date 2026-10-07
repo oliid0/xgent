@@ -14,11 +14,11 @@ const vendors: { value: ProviderId; label: string }[] = [
   { value: "deepseek", label: "DeepSeek" },
 ];
 const vendorIcons: Record<ProviderId, string> = {
-  claude_code: "sun.max",
-  codex: "cpu",
-  gemini: "sparkles",
-  xai: "bolt",
-  deepseek: "arrow.triangle.branch",
+  claude_code: "xgent.provider.claude_code",
+  codex: "xgent.provider.codex",
+  gemini: "xgent.provider.gemini",
+  xai: "xgent.provider.xai",
+  deepseek: "xgent.provider.deepseek",
 };
 type Usage = {
   configuration: string;

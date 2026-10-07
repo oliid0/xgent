@@ -3,24 +3,24 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { checkNativeContracts, validateNativeContracts } from "../../../../scripts/check-native-ui.mjs";
 
-const nativeViewSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationView.swift", import.meta.url), "utf8");
-const nativeLayoutSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationLayout.swift", import.meta.url), "utf8");
-const nativeMobileSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationMobile.swift", import.meta.url), "utf8");
-const nativeMobileNodeSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationMobileNode.swift", import.meta.url), "utf8");
-const nativeDesktopSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationDesktopContent.swift", import.meta.url), "utf8");
-const nativeSettingsSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationDesktopSettings.swift", import.meta.url), "utf8");
-const nativeMobileSettingsSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationMobileSettings.swift", import.meta.url), "utf8");
-const nativeWindowSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationWindowChrome.swift", import.meta.url), "utf8");
-const nativeHostSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationHost.swift", import.meta.url), "utf8");
-const nativePanelSource = readFileSync(new URL("../../src-tauri/native/apple-ui/PresentationWorkspacePanel.swift", import.meta.url), "utf8");
+const nativeViewSource = readFileSync(new URL("../../src-tauri/apple/PresentationView.swift", import.meta.url), "utf8");
+const nativeLayoutSource = readFileSync(new URL("../../src-tauri/apple/PresentationLayout.swift", import.meta.url), "utf8");
+const nativeMobileSource = readFileSync(new URL("../../src-tauri/apple/PresentationMobile.swift", import.meta.url), "utf8");
+const nativeMobileNodeSource = readFileSync(new URL("../../src-tauri/apple/PresentationMobileNode.swift", import.meta.url), "utf8");
+const nativeDesktopSource = readFileSync(new URL("../../src-tauri/apple/PresentationDesktopContent.swift", import.meta.url), "utf8");
+const nativeSettingsSource = readFileSync(new URL("../../src-tauri/apple/PresentationDesktopSettings.swift", import.meta.url), "utf8");
+const nativeMobileSettingsSource = readFileSync(new URL("../../src-tauri/apple/PresentationMobileSettings.swift", import.meta.url), "utf8");
+const nativeWindowSource = readFileSync(new URL("../../src-tauri/apple/PresentationWindowChrome.swift", import.meta.url), "utf8");
+const nativeHostSource = readFileSync(new URL("../../src-tauri/apple/PresentationHost.swift", import.meta.url), "utf8");
+const nativePanelSource = readFileSync(new URL("../../src-tauri/apple/PresentationWorkspacePanel.swift", import.meta.url), "utf8");
 
 function contracts() {
   const read = path => readFileSync(new URL(path, import.meta.url), "utf8");
   return {
     protocol: read("../../src/presentation/protocol.ts"),
-    swiftProtocol: read("../../src-tauri/native/apple-ui/PresentationProtocol.swift"),
+    swiftProtocol: read("../../src-tauri/apple/PresentationProtocol.swift"),
     types: read("../../src/presentation/types.ts"),
-    model: read("../../src-tauri/native/apple-ui/PresentationModel.swift"),
+    model: read("../../src-tauri/apple/PresentationModel.swift"),
   };
 }
 

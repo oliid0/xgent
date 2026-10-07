@@ -4,7 +4,7 @@ import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 const { resolveNumberInputCommit } = await import(new URL("../../node_modules/@astryxdesign/core/dist/NumberInput/numberInputCommit.js", import.meta.url));
-const cases = JSON.parse(readFileSync(new URL("../../src-tauri/native/apple-ui/Tests/Fixtures/number-input.json", import.meta.url), "utf8"));
+const cases = JSON.parse(readFileSync(new URL("../../src-tauri/apple/Tests/Fixtures/number-input.json", import.meta.url), "utf8"));
 const loader = createTsModuleLoader();
 const { presentationControls } = loader.loadModule("src/presentation/controls.ts");
 const { validatePresentationDocument } = loader.loadModule("src/presentation/validateDocument.ts");

@@ -46,11 +46,11 @@ export function checkNativeContracts() {
   const read = relative => readFileSync(path.join(frontend, relative), "utf8");
   const result = validateNativeContracts({
     protocol: read("src/presentation/protocol.ts"),
-    swiftProtocol: read("src-tauri/native/apple-ui/PresentationProtocol.swift"),
+    swiftProtocol: read("src-tauri/apple/PresentationProtocol.swift"),
     types: read("src/presentation/types.ts"),
-    model: read("src-tauri/native/apple-ui/PresentationModel.swift"),
+    model: read("src-tauri/apple/PresentationModel.swift"),
   });
-  for (const retired of ["presentation/astryx-swiftui.json", "src-tauri/native/apple-ui/PresentationComponents.generated.swift"]) {
+  for (const retired of ["presentation/astryx-swiftui.json", "src-tauri/apple/PresentationComponents.generated.swift"]) {
     if (existsSync(path.join(frontend, retired))) throw new Error(`Retired UI generation must stay removed: ${retired}`);
   }
   return result;
