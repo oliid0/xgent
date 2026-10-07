@@ -81,26 +81,6 @@ private struct XgentIOSNodeFrame: ViewModifier {
     }
 }
 
-private struct XgentIOSPDFPreview: UIViewRepresentable {
-    let data: Data
-
-    func makeUIView(context: Context) -> PDFView {
-        let view = PDFView()
-        view.autoScales = true
-        view.displayMode = .singlePageContinuous
-        view.displayDirection = .vertical
-        view.document = PDFDocument(data: data)
-        return view
-    }
-
-    func updateUIView(_ view: PDFView, context: Context) {
-        if view.document?.dataRepresentation() != data {
-            view.document = PDFDocument(data: data)
-            view.autoScales = true
-        }
-    }
-}
-
 private struct XgentIOSAVPreview: View {
     let data: Data
     let mimeType: String
@@ -954,9 +934,13 @@ struct XgentIOSNode: View {
            mimeType.hasPrefix("audio/") || mimeType.hasPrefix("video/"), let data = mediaData {
             XgentIOSAVPreview(data: data, mimeType: mimeType, label: node.label ?? "Media preview")
         } else if node.language == "application/pdf", let data = mediaData {
-            XgentIOSPDFPreview(data: data)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityLabel(node.label ?? "PDF document")
+            if node.variant == "workspace-pdf-editor" {
+                XgentPDFEditor(data: data, node: node, document: document, model: model)
+            } else {
+                XgentPDFPreview(data: data)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityLabel(node.label ?? "PDF document")
+            }
         } else if let mimeType = node.language,
                   !mimeType.hasPrefix("image/"), let data = mediaData {
             XgentQuickLookPreview(data: data, mimeType: mimeType, label: node.label ?? "Document")

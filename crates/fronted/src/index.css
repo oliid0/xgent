@@ -4041,6 +4041,79 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   height: auto;
   margin-inline: auto;
 }
+/* PDF.js text geometry: this is a document rendering layer, not theme styling. */
+.workspace-pdf-page {
+  position: relative;
+  margin-inline: auto;
+}
+.workspace-pdf-page canvas {
+  max-width: none;
+  margin: 0;
+}
+.workspace-pdf-highlights {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+.workspace-pdf-highlights span {
+  position: absolute;
+}
+.workspace-pdf-text {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  letter-spacing: normal;
+  word-spacing: normal;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+}
+.workspace-pdf-text :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.workspace-pdf-text > :not(.markedContent),
+.workspace-pdf-text .markedContent span:not(.markedContent) {
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.workspace-pdf-text .markedContent {
+  display: contents;
+}
+.workspace-pdf-text[data-main-rotation="90"] {
+  transform: rotate(90deg) translateY(-100%);
+}
+.workspace-pdf-text[data-main-rotation="180"] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+.workspace-pdf-text[data-main-rotation="270"] {
+  transform: rotate(270deg) translateX(-100%);
+}
+.workspace-pdf-text span[role="img"] {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.workspace-pdf-text ::selection {
+  background: rgb(0 100 255 / 25%);
+  color: transparent;
+}
 .generated-file-cards {
   width: 100%;
 }

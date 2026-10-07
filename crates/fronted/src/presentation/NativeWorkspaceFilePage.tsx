@@ -30,6 +30,13 @@ import {
   workspacePathExtension,
 } from "../components/workspace-editor/workspaceImagePreview";
 import {
+  isEditablePdf,
+  type PdfHighlight,
+  parsePdfHighlights,
+  remainingPdfHighlights,
+  writePdfHighlights,
+} from "../components/workspace-editor/workspacePdfHighlights";
+import {
   isEditablePresentation,
   type PresentationTextEdits,
   presentationHasEdits,
@@ -116,13 +123,21 @@ type LoadedFile = {
   cells?: SpreadsheetEdits;
   texts?: PresentationTextEdits;
   rotation?: ImageRotationDraft;
+  highlights?: PdfHighlight[];
 };
 
 type PendingConfirmation = "close" | "reload" | null;
 
 type FileDraft = Pick<
   LoadedFile,
-  "content" | "savedContent" | "mtimeMs" | "contentHash" | "cells" | "texts" | "rotation"
+  | "content"
+  | "savedContent"
+  | "mtimeMs"
+  | "contentHash"
+  | "cells"
+  | "texts"
+  | "rotation"
+  | "highlights"
 >;
 type FileDraftCache = {
   finds: Map<string, NativeWorkspaceFind>;
@@ -157,6 +172,7 @@ function isFileDirty(file: FileDraft | null | undefined) {
     (file.content !== file.savedContent ||
       spreadsheetHasEdits(file.cells) ||
       presentationHasEdits(file.texts) ||
+      !!file.highlights?.length ||
       hasImageRotationDraft(file.rotation))
   );
 }
@@ -171,6 +187,7 @@ function acknowledgedDraft(
     savedContent: snapshot.content,
     cells: remainingSpreadsheetEdits(current.cells, snapshot.cells),
     texts: remainingPresentationEdits(current.texts, snapshot.texts),
+    highlights: remainingPdfHighlights(current.highlights, snapshot.highlights),
     rotation: remainingImageRotation(current.rotation, snapshot.rotation),
     mtimeMs: response.mtimeMs,
     contentHash: response.contentHash,
@@ -409,6 +426,7 @@ function NativeWorkspaceFileSession(
             contentHash: value.contentHash,
             cells: value.cells,
             texts: value.texts,
+            highlights: value.highlights,
             rotation: value.rotation,
           });
         } else {
@@ -551,6 +569,7 @@ function NativeWorkspaceFileSession(
             !draft ||
             (!spreadsheetHasEdits(draft.cells) &&
               !presentationHasEdits(draft.texts) &&
+              !draft.highlights?.length &&
               !hasImageRotationDraft(draft.rotation) &&
               draft.content === file.content)
           )
@@ -721,6 +740,19 @@ function NativeWorkspaceFileSession(
               format,
               normalizeImageRotation(snapshot.rotation.angle - snapshot.rotation.saved),
             ),
+          );
+          response = await invokeFs<WriteDocumentResponse>("fs_write_binary", {
+            workdir: snapshot.request.workdir,
+            path: snapshot.path,
+            content_base64: binaryData,
+            expected_mtime_ms: snapshot.mtimeMs,
+            expected_content_hash: snapshot.contentHash,
+          });
+        } else if (snapshot.highlights?.length) {
+          if (!snapshot.data || !isEditablePdf(snapshot.path, snapshot.mimeType))
+            throw new Error(t("workspaceEditor.saveFailed"));
+          binaryData = previewBytesBase64(
+            await writePdfHighlights(previewBytes(snapshot.data), snapshot.highlights),
           );
           response = await invokeFs<WriteDocumentResponse>("fs_write_binary", {
             workdir: snapshot.request.workdir,
@@ -960,6 +992,7 @@ function NativeWorkspaceFileSession(
         content: current.savedContent,
         cells: undefined,
         texts: undefined,
+        highlights: undefined,
         rotation: current.rotation
           ? { ...current.rotation, angle: current.rotation.saved }
           : undefined,
@@ -1350,6 +1383,72 @@ function NativeWorkspaceFileSession(
                   ],
             }
       : null;
+  const editablePdf =
+    !!loaded && loaded.mode === "preview" && isEditablePdf(loaded.path, loaded.mimeType);
+  const pdfNode: PresentationNode | null =
+    editablePdf && loaded?.data
+      ? {
+          id: "workspace-file-pdf",
+          kind: "MediaPreview",
+          variant: "workspace-pdf-editor",
+          label: basename(loaded.path),
+          language: loaded.mimeType,
+          value: loaded.data,
+          text: JSON.stringify({
+            highlights: loaded.highlights ?? [],
+            labels: {
+              color: t("workspaceFilePreview.pdfColor"),
+              yellow: t("workspaceFilePreview.pdfYellow"),
+              green: t("workspaceFilePreview.pdfGreen"),
+              pink: t("workspaceFilePreview.pdfPink"),
+              highlight: t("workspaceFilePreview.pdfHighlight"),
+              undo: t("workspaceEditor.context.undo"),
+              invalid: t("workspaceFilePreview.renderFailed"),
+            },
+          }),
+          fill: true,
+          disabled: loading || saving,
+          children: [
+            {
+              id: "workspace-file-pdf-highlight",
+              kind: "Button",
+              label: t("workspaceFilePreview.pdfHighlight"),
+              disabled: loading || saving,
+              action: bind(
+                `workspace-file-pdf:${draftKey}`,
+                (value) => {
+                  const current = loadedRef.current;
+                  if (
+                    !current ||
+                    current !== loaded ||
+                    loadingRef.current ||
+                    savingRef.current ||
+                    !isEditablePdf(current.path, current.mimeType)
+                  )
+                    return false;
+                  if (value === "undo") {
+                    if (!current.highlights?.length) return false;
+                    setLoaded({ ...current, highlights: current.highlights.slice(0, -1) });
+                  } else {
+                    const incoming = parsePdfHighlights(value);
+                    if (!incoming || (current.highlights?.length ?? 0) + incoming.length > 512)
+                      return false;
+                    const ids = new Set(current.highlights?.map((entry) => entry.id));
+                    if (incoming.some((entry) => ids.has(entry.id))) return false;
+                    setLoaded({
+                      ...current,
+                      highlights: [...(current.highlights ?? []), ...incoming],
+                    });
+                  }
+                  return true;
+                },
+                (value) => value === "undo" || !!parsePdfHighlights(value),
+                !loading && !saving,
+              ),
+            },
+          ],
+        }
+      : null;
   const contentNode: PresentationNode =
     loading && !loaded
       ? {
@@ -1383,7 +1482,8 @@ function NativeWorkspaceFileSession(
                   fill: true,
                 }
               : mediaPreview && loaded?.data
-                ? (imageNode ?? {
+                ? (pdfNode ??
+                  imageNode ?? {
                     id: "workspace-file-media",
                     kind: loaded.mimeType === "text/html" ? "HTMLPreview" : "MediaPreview",
                     label: basename(loaded.path),
@@ -1543,7 +1643,11 @@ function NativeWorkspaceFileSession(
                   },
                 ]
               : []),
-            ...(canEdit || canEditSpreadsheet || presentationBytes || loaded?.rotation?.editable
+            ...(canEdit ||
+            canEditSpreadsheet ||
+            presentationBytes ||
+            editablePdf ||
+            loaded?.rotation?.editable
               ? [
                   button(
                     "workspace-file-save",

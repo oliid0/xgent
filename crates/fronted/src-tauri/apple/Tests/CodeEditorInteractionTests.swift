@@ -1,4 +1,5 @@
 #if os(iOS)
+import CodeEditorView
 import Foundation
 import SwiftUI
 import UIKit
@@ -12,6 +13,40 @@ private final class CodeActionRecorder {
 }
 
 final class CodeEditorInteractionTests: XCTestCase {
+    @MainActor func testReferenceWaitsForInitialNativeTextAndDoesNotReplayAfterTyping() async throws {
+        let controller = UIViewController()
+        let input = UITextView(frame: CGRect(x: 0, y: 0, width: 390, height: 180))
+        input.font = .monospacedSystemFont(ofSize: 17, weight: .regular)
+        controller.view.addSubview(input)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = controller; window.makeKeyAndVisible()
+        let state = XgentCodeRevealState()
+        defer { state.cancel(); window.isHidden = true; window.rootViewController = nil }
+        let content = (1...100).map { "let line\($0) = \($0)" }.joined(separator: "\n") + "\nlet result = 1"
+        let location = try XCTUnwrap(XgentCodeLocation.decode(#"{"request":"initial","line":101}"#))
+        var position = CodeEditor.Position()
+        let binding = Binding(get: { position }, set: { position = $0 })
+        state.schedule(location, text: content, position: binding, to: input)
+        try await settle()
+        XCTAssertEqual(input.text, "")
+        XCTAssertEqual(input.selectedRange, .zero)
+        // Match the package's delayed updateUIView population after an early
+        // introspection callback; no second schedule or layout callback.
+        input.text = content
+        input.layoutIfNeeded()
+        try await settle()
+        XCTAssertEqual(input.selectedRange, location.range(in: content))
+        XCTAssertGreaterThan(input.contentOffset.y, 0)
+        XCTAssertEqual(position.selections, [input.selectedRange])
+        input.selectedRange = NSRange(location: input.text.utf16.count, length: 0)
+        XCTAssertTrue(input.becomeFirstResponder())
+        input.insertText(" // Later")
+        let caret = input.selectedRange
+        state.schedule(location, text: input.text, position: binding, to: input)
+        try await settle()
+        XCTAssertEqual(input.selectedRange, caret)
+    }
+
     @MainActor func testNativeEditingCommandsUseTheMountedCodeEditorAndRetireWithItsWindow() async throws {
         let model = XgentPresentationModel(), bridge = CodeActionRecorder()
         model.actionSink = bridge.record

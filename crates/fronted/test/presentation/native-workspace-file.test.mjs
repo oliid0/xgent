@@ -1510,10 +1510,35 @@ test("native PDF previews omit standalone notes and synthetic note actions on bo
       const original = disk.data;
       assert.equal(h.node("workspace-file-view-mode"), undefined);
       assert.equal(h.node("workspace-file-annotation-text"), undefined);
-      assert.equal(h.node("workspace-file-save"), undefined);
+      assert.equal(h.node("workspace-file-save").disabled, true);
       assert.equal((await h.dispatch("workspace-file-annotation-text", "Unused note")).ok, false);
       assert.equal(disk.data, original);
       assert.equal(h.calls.some(([command]) => command === "fs_write_binary"), false);
+    } finally { h.unmount(); }
+  }
+});
+
+test("native inline PDF selection writes the original PDF on both form factors and rejects retired actions", async () => {
+  for (const compact of [true, false]) {
+    const { h, disk } = await openAnnotatedDocument({ format: "pdf", compact });
+    try {
+      const mark = { id: "native", color: "pink", pageIndex: 1, rects: [[30, 40, 100, 18]] };
+      const pdf = h.node("workspace-file-pdf");
+      const action = h.node("workspace-file-pdf-highlight").action;
+      assert.equal(pdf.variant, "workspace-pdf-editor");
+      assert.equal((await h.dispatch(action, JSON.stringify([mark]))).ok, true);
+      assert.equal(h.node("workspace-file-save").disabled, false);
+      assert.equal((await h.dispatch("workspace-file-save")).ok, true);
+      const written = h.calls.find(([command]) => command === "fs_write_binary")[1];
+      assert.equal(written.expected_content_hash, "initial");
+      assert.equal(written.expected_mtime_ms, 10);
+      assert.equal((await PDFDocument.load(Buffer.from(disk.data, "base64"))).getPage(1).node.Annots().size(), 1);
+      assert.equal(JSON.parse(h.node("workspace-file-pdf").text).highlights.length, 0);
+      await h.dispatch(action, JSON.stringify([{ ...mark, id: "undo" }]));
+      await h.dispatch(h.node("workspace-file-pdf-highlight").action, "undo");
+      assert.equal(h.node("workspace-file-save").disabled, true);
+      h.props.previewRequest = { ...h.props.previewRequest, path: "b.txt", id: 3 }; h.render(); await h.flush();
+      assert.equal((await h.dispatch(action, JSON.stringify([mark]))).ok, false);
     } finally { h.unmount(); }
   }
 });

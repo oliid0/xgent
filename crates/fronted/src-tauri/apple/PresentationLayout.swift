@@ -87,48 +87,6 @@ private struct XgentAVPreview: View {
     }
 }
 
-#if os(iOS)
-private struct XgentPDFPreview: UIViewRepresentable {
-    let data: Data
-
-    func makeUIView(context: Context) -> PDFView {
-        let view = PDFView()
-        view.autoScales = true
-        view.displayMode = .singlePageContinuous
-        view.displayDirection = .vertical
-        view.document = PDFDocument(data: data)
-        return view
-    }
-
-    func updateUIView(_ view: PDFView, context: Context) {
-        if view.document?.dataRepresentation() != data {
-            view.document = PDFDocument(data: data)
-            view.autoScales = true
-        }
-    }
-}
-#else
-private struct XgentPDFPreview: NSViewRepresentable {
-    let data: Data
-
-    func makeNSView(context: Context) -> PDFView {
-        let view = PDFView()
-        view.autoScales = true
-        view.displayMode = .singlePageContinuous
-        view.displayDirection = .vertical
-        view.document = PDFDocument(data: data)
-        return view
-    }
-
-    func updateNSView(_ view: PDFView, context: Context) {
-        if view.document?.dataRepresentation() != data {
-            view.document = PDFDocument(data: data)
-            view.autoScales = true
-        }
-    }
-}
-#endif
-
 // Handwritten native content for desktop conversations, files and tool panels.
 extension XgentNodeView {
     private var palette: XgentPalette { presentationTheme.palette(for: colorScheme) }
@@ -448,9 +406,13 @@ extension XgentNodeView {
            mimeType.hasPrefix("audio/") || mimeType.hasPrefix("video/"), let data = mediaData {
             XgentAVPreview(data: data, mimeType: mimeType, label: node.label ?? "Media preview")
         } else if node.language == "application/pdf", let data = mediaData {
-            XgentPDFPreview(data: data)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityLabel(node.label ?? "PDF document")
+            if node.variant == "workspace-pdf-editor" {
+                XgentPDFEditor(data: data, node: node, document: document, model: model)
+            } else {
+                XgentPDFPreview(data: data)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityLabel(node.label ?? "PDF document")
+            }
         } else if !model.value(node, in: document).text.isEmpty {
             if let mimeType = node.language,
                !mimeType.hasPrefix("image/"), let data = mediaData {

@@ -1,4 +1,5 @@
 import type { ImageRotationDraft } from "./workspaceImageOperations";
+import type { PdfHighlight } from "./workspacePdfHighlights";
 export type PreviewDraft = {
   contentHash: string;
   mtimeMs: number;
@@ -7,6 +8,7 @@ export type PreviewDraft = {
   cells: Record<string, Record<string, string>>;
   texts?: Record<string, string>;
   rotation?: ImageRotationDraft;
+  highlights?: PdfHighlight[];
 };
 
 // Keep only unsaved text/cell edits. File bytes, canvases and Office DOM never live here.

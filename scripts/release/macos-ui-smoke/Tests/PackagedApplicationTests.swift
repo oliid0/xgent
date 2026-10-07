@@ -32,22 +32,41 @@ final class PackagedApplicationTests: XCTestCase {
         let settings = window.buttons["settings"].firstMatch
         if !settings.exists { click(window.buttons["xgent-window-left"].firstMatch) }
         click(settings)
-        let title = window.staticTexts["settings-detail-title"].firstMatch
+        // Headings retain their semantic traits. Resolve the actual identifier
+        // across AX element types rather than requiring a plain StaticText.
+        let title = window.descendants(matching: .any)["settings-detail-title"].firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 30))
         let sections = ["system", "providers", "shortcuts", "backup", "computerUse", "toolPermissions",
                         "voice", "soul", "memory", "other", "access", "about"]
         for section in sections {
-            let navigation = window.buttons["desktop-nav:" + section].firstMatch
-            if navigation.exists && !navigation.isHittable {
+            let navigationID = "desktop-nav:" + section
+            var navigation = window.buttons[navigationID].firstMatch
+            let inline = navigation.exists
+            if inline && !navigation.isHittable {
                 window.scrollViews.containing(.button, identifier: "desktop-nav:" + section).firstMatch.scroll(byDeltaX: 0, deltaY: -200)
             }
+            if !inline {
+                // The actual 871-point CI window has a 755-point settings
+                // dialog, which correctly uses the compact navigation menu.
+                click(window.descendants(matching: .any)["settings-navigation-menu"].firstMatch)
+                navigation = app.menuItems[navigationID].firstMatch
+            }
+            XCTAssertTrue(navigation.waitForExistence(timeout: 15))
+            let label = navigation.label
             click(navigation)
             // The actual shared page may expand a short navigation label,
             // for example Shortcuts -> Global shortcuts in both frontends.
-            let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS[c] %@", navigation.label), object: title)
+            let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS[c] %@", label), object: title)
             XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 15), .completed, "The shared settings action must change the visible section")
             XCTAssertGreaterThan(title.frame.width, 0)
-            XCTAssertGreaterThan(title.frame.minX, navigation.frame.maxX, "Settings content must not overlap navigation")
+            XCTAssertGreaterThan(title.frame.height, 0)
+            XCTAssertTrue(window.frame.contains(title.frame), "The selected settings title must stay inside the actual window")
+            if inline {
+                XCTAssertGreaterThan(title.frame.minX, navigation.frame.maxX, "Settings content must not overlap navigation")
+            } else {
+                let menu = window.descendants(matching: .any)["settings-navigation-menu"].firstMatch
+                XCTAssertFalse(title.frame.intersects(menu.frame), "Compact navigation must not overlap the settings title")
+            }
             let rows = sections.map { window.buttons["desktop-nav:" + $0].firstMatch }.filter { $0.exists && $0.isHittable }.map(\.frame).sorted { $0.minY < $1.minY }
             for (previous, next) in zip(rows, rows.dropFirst()) {
                 XCTAssertLessThanOrEqual(previous.maxY, next.minY + 1, "Navigation rows must not overlap")

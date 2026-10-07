@@ -66,6 +66,13 @@ import {
   type WorkspacePreviewKind,
 } from "./workspaceImagePreview";
 import {
+  isEditablePdf,
+  type PdfHighlight,
+  remainingPdfHighlights,
+  validPdfHighlights,
+  writePdfHighlights,
+} from "./workspacePdfHighlights";
+import {
   isEditablePresentation,
   type PresentationTextEdits,
   presentationHasEdits,
@@ -267,6 +274,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
   openRef.current = isOpen;
   const spreadsheetSaveToken = useRef<object | null>(null);
   const presentationSaveToken = useRef<object | null>(null);
+  const pdfSaveToken = useRef<object | null>(null);
   const imageSaveToken = useRef<object | null>(null);
   const sourceSaveToken = useRef<object | null>(null);
   const sourceCopyToken = useRef<object | null>(null);
@@ -329,6 +337,12 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     Record<string, Record<string, string>>
   >({});
   const spreadsheetEditsRef = useRef<Record<string, Record<string, string>>>({});
+  const [pdfHighlights, setPdfHighlightsState] = useState<PdfHighlight[]>([]);
+  const pdfHighlightsRef = useRef(pdfHighlights);
+  const setPdfHighlights = useCallback((next: PdfHighlight[]) => {
+    pdfHighlightsRef.current = next;
+    setPdfHighlightsState(next);
+  }, []);
   const [presentationEdits, setPresentationEditsState] = useState<PresentationTextEdits>({});
   const presentationEditsRef = useRef<PresentationTextEdits>({});
   const setPresentationEdits = useCallback((next: PresentationTextEdits) => {
@@ -350,6 +364,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     sourceDraft !== sourceSaved ||
     Object.values(spreadsheetEdits).some((edits) => Object.keys(edits).length > 0) ||
     presentationHasEdits(presentationEdits) ||
+    pdfHighlights.length > 0 ||
     hasImageRotationDraft(imageRotation);
   useEffect(() => {
     props.onDirtyChange?.(dirty);
@@ -370,6 +385,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     setSourceSaved(next?.text ?? "");
     setSpreadsheetEdits({});
     setPresentationEdits({});
+    setPdfHighlights([]);
     setImageRotation({
       angle: 0,
       saved: 0,
@@ -429,6 +445,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       requestRef.current = request;
       spreadsheetSaveToken.current = null;
       presentationSaveToken.current = null;
+      pdfSaveToken.current = null;
       imageSaveToken.current = null;
       sourceSaveToken.current = null;
       setPendingImageNavigation(null);
@@ -480,6 +497,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
           setSourceSaved(draft.savedSource);
           setSpreadsheetEdits(draft.cells);
           setPresentationEdits(draft.texts ?? {});
+          setPdfHighlights(draft.highlights ?? []);
           if (draft.rotation) setImageRotation(draft.rotation);
           if (draft.contentHash !== loaded.contentHash) {
             // Retain the original version guard; saves must reject external modifications.
@@ -627,6 +645,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       savedSource: sourceSaved,
       cells: spreadsheetEdits,
       texts: presentationEdits,
+      highlights: pdfHighlights,
       rotation: imageRotation,
     });
   }, [
@@ -638,6 +657,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     sourceSaved,
     spreadsheetEdits,
     presentationEdits,
+    pdfHighlights,
     imageRotation,
   ]);
 
@@ -1006,6 +1026,92 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     }
   }, [preview, activePreviewRequest, setPresentationEdits, setSourceSaving, t]);
 
+  const savePdf = useCallback(async () => {
+    const snapshot = previewRef.current;
+    const request = requestRef.current;
+    const written = pdfHighlightsRef.current;
+    if (
+      !mountedRef.current ||
+      !openRef.current ||
+      snapshot !== preview ||
+      request !== activePreviewRequest ||
+      !request ||
+      !snapshot ||
+      snapshot.kind !== "pdf" ||
+      !isEditablePdf(snapshot.path, snapshot.mimeType) ||
+      !written.length ||
+      sourceSavingRef.current
+    )
+      return;
+    const key = previewDraftKey(request);
+    if (previewPendingWrites.has(key)) return;
+    const sequence = loadSequenceRef.current;
+    const current = () =>
+      mountedRef.current &&
+      openRef.current &&
+      loadSequenceRef.current === sequence &&
+      previewRef.current === snapshot;
+    const token = {};
+    pdfSaveToken.current = token;
+    let finish = () => {};
+    previewPendingWrites.set(
+      key,
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    setSourceSaving(true);
+    setError(null);
+    try {
+      const output = await writePdfHighlights(snapshot.bytes, written);
+      const response = await invokeFs<{
+        mtimeMs: number;
+        contentHash: string;
+        bytesWritten: number;
+      }>("fs_write_binary", {
+        workdir: request.workdir,
+        path: snapshot.path,
+        content_base64: bytesToBase64(output),
+        expected_mtime_ms: snapshot.mtimeMs,
+        expected_content_hash: snapshot.contentHash,
+      });
+      const cached = previewDrafts.get(key);
+      if (cached)
+        previewDrafts.set(key, {
+          ...cached,
+          highlights: remainingPdfHighlights(cached.highlights, written),
+          mtimeMs: response.mtimeMs,
+          contentHash: response.contentHash,
+        });
+      if (!current()) return;
+      const next = {
+        ...snapshot,
+        bytes: output,
+        data: bytesToBase64(output),
+        mtimeMs: response.mtimeMs,
+        contentHash: response.contentHash,
+        sizeBytes: response.bytesWritten,
+        blobUrl: URL.createObjectURL(
+          new Blob([bytesToArrayBuffer(output)], { type: snapshot.mimeType }),
+        ),
+      };
+      if (previewBlobUrlRef.current) URL.revokeObjectURL(previewBlobUrlRef.current);
+      previewBlobUrlRef.current = next.blobUrl;
+      previewRef.current = next;
+      setPreview(next);
+      setPdfHighlights(remainingPdfHighlights(pdfHighlightsRef.current, written));
+    } catch (saveError) {
+      if (current()) setError(toMessage(saveError, t("workspaceEditor.saveFailed")));
+    } finally {
+      previewPendingWrites.delete(key);
+      finish();
+      if (pdfSaveToken.current === token) {
+        pdfSaveToken.current = null;
+        if (mountedRef.current) setSourceSaving(false);
+      }
+    }
+  }, [preview, activePreviewRequest, setPdfHighlights, setSourceSaving, t]);
+
   const editImageRotation = useCallback(() => {
     if (
       !mountedRef.current ||
@@ -1289,6 +1395,18 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                         onClick={() => void savePresentation()}
                       />
                     ) : null}
+                    {preview && isEditablePdf(preview.path, preview.mimeType) ? (
+                      <IconButton
+                        label={t("workspaceEditor.save")}
+                        tooltip={t("workspaceEditor.save")}
+                        icon={<Icon icon={Save} size="sm" color="inherit" />}
+                        variant="ghost"
+                        size="sm"
+                        isLoading={sourceSaving}
+                        isDisabled={!pdfHighlights.length || sourceSaving}
+                        onClick={() => void savePdf()}
+                      />
+                    ) : null}
                     {canOpenExternal && activePreviewRequest ? (
                       <OpenWithMenu
                         workdir={activePreviewRequest.workdir}
@@ -1469,6 +1587,40 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                     imageRotation={imageRotation}
                     onRotateImage={editImageRotation}
                     imageSaving={sourceSaving}
+                    pdfHighlights={pdfHighlights}
+                    pdfEditable={isEditablePdf(preview.path, preview.mimeType)}
+                    pdfDisabled={loading || sourceSaving}
+                    onPdfHighlightsChange={(next) => {
+                      if (
+                        !mountedRef.current ||
+                        !openRef.current ||
+                        previewRef.current !== preview ||
+                        loading ||
+                        sourceSavingRef.current ||
+                        !activePreviewRequest ||
+                        (next.length > 0 && !validPdfHighlights(next)) ||
+                        !isEditablePdf(preview.path, preview.mimeType)
+                      )
+                        return;
+                      setPdfHighlights(next);
+                      // Retain an edit before a close/file-switch can retire this render.
+                      const key = previewDraftKey(activePreviewRequest);
+                      const cached = previewDrafts.get(key);
+                      const nextDraft = {
+                        ...cached,
+                        contentHash: preview.contentHash,
+                        mtimeMs: preview.mtimeMs,
+                        source: sourceDraft,
+                        savedSource: sourceSaved,
+                        cells: spreadsheetEditsRef.current,
+                        texts: presentationEditsRef.current,
+                        highlights: next,
+                        rotation: imageRotationRef.current,
+                      };
+                      if (next.length || dirty || previewPendingWrites.has(key))
+                        previewDrafts.set(key, nextDraft);
+                      else previewDrafts.delete(key);
+                    }}
                     onRenderError={setRenderError}
                   />
                 ) : loading ? (
@@ -1553,6 +1705,10 @@ function PreviewBody(props: {
   imageRotation: ImageRotationDraft;
   onRotateImage: () => void;
   imageSaving: boolean;
+  pdfHighlights: PdfHighlight[];
+  pdfEditable: boolean;
+  pdfDisabled: boolean;
+  onPdfHighlightsChange: (highlights: PdfHighlight[]) => void;
   onRenderError: (message: string | null) => void;
 }) {
   const {
@@ -1622,7 +1778,16 @@ function PreviewBody(props: {
   }
 
   if (preview.kind === "pdf") {
-    return <WorkspacePdfPreview bytes={preview.bytes} title={basename(preview.path)} />;
+    return (
+      <WorkspacePdfPreview
+        bytes={preview.bytes}
+        title={basename(preview.path)}
+        highlights={props.pdfHighlights}
+        editable={props.pdfEditable}
+        disabled={props.pdfDisabled}
+        onHighlightsChange={props.onPdfHighlightsChange}
+      />
+    );
   }
   if (preview.kind === "presentation") {
     return <WorkspacePresentationPreview bytes={preview.bytes} />;

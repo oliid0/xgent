@@ -86,6 +86,7 @@ struct XgentNativeMenuItems: View {
                     } else { Text(child.label ?? child.text ?? "") }
                 }
                 .disabled(child.action == nil || child.disabled == true || model.isBusy(child, in: document))
+                .accessibilityIdentifier(child.id)
             }
         }
     }

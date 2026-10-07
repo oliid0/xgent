@@ -3,14 +3,14 @@ import SwiftUI
 import SwiftUIIntrospect
 #if os(iOS)
 import UIKit
-private typealias XgentRevealTextView = UITextView
+typealias XgentRevealTextView = UITextView
 #else
 import AppKit
-private typealias XgentRevealTextView = NSTextView
+typealias XgentRevealTextView = NSTextView
 #endif
 
 @MainActor
-private final class XgentCodeRevealState: ObservableObject {
+final class XgentCodeRevealState: ObservableObject {
     private var lastRequest: String?
     var session: XgentCodeSessionIdentity?
     var store: XgentCodeSessionStore?
@@ -21,6 +21,10 @@ private final class XgentCodeRevealState: ObservableObject {
     private var text = ""
     private var position: Binding<CodeEditor.Position>?
     private var pending = false
+    private var storageObserver: NSObjectProtocol?
+    deinit {
+        if let storageObserver { NotificationCenter.default.removeObserver(storageObserver) }
+    }
     private func consumed(_ request: String) -> Bool {
         lastRequest == request || (session.flatMap { session in store.map { $0.revealed(request, session: session) } } ?? false)
     }
@@ -34,6 +38,25 @@ private final class XgentCodeRevealState: ObservableObject {
     }
 
     func schedule(_ location: XgentCodeLocation?, text: String, position: Binding<CodeEditor.Position>, to view: XgentRevealTextView) {
+        if self.view !== view {
+            if let storageObserver { NotificationCenter.default.removeObserver(storageObserver) }
+            #if os(iOS)
+            let storage: NSTextStorage? = view.textStorage
+            #else
+            let storage = view.textStorage
+            #endif
+            if let storage {
+                // CodeEditorView installs its initial text in updateUIView,
+                // after introspection can already resolve an empty input.
+                // Resume asynchronously after the real editing batch; never
+                // modify TextKit while its notification is being delivered.
+                storageObserver = NotificationCenter.default.addObserver(
+                    forName: NSTextStorage.didProcessEditingNotification, object: storage, queue: .main
+                ) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.resume() }
+                }
+            } else { storageObserver = nil }
+        }
         self.location = location; self.text = text; self.position = position; self.view = view
         // Introspection can resolve the retained input before it has its real
         // frame. Retry from that input's layout, not only the SwiftUI overlay.
@@ -56,6 +79,8 @@ private final class XgentCodeRevealState: ObservableObject {
     }
     func cancel() {
         generation += 1
+        if let storageObserver { NotificationCenter.default.removeObserver(storageObserver) }
+        storageObserver = nil
         (view as? XgentCodeNativeTextView)?.onRevealReady = nil
         pending = false; view = nil
     }

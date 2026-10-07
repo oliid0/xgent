@@ -37,6 +37,7 @@ struct XgentProviderCategoryTabs: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.layoutDirection) private var layoutDirection
     @ScaledMetric(relativeTo: .body) private var bodyScale = 1.0
+    @State private var scrollTarget: String?
 
     private var options: [XgentOption] { node.options ?? [] }
     private var selected: String { model.value(node, in: document).text }
@@ -67,29 +68,20 @@ struct XgentProviderCategoryTabs: View {
 
     var body: some View {
         GeometryReader { geometry in
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal) {
-                    HStack(alignment: .center, spacing: 4) {
-                        ForEach(options) { option in tab(option, viewportWidth: geometry.size.width).id(option.value) }
-                    }
-                    .onGeometryChange(for: CGSize.self) { $0.size } action: { _ in
-                        // Width proposals can arrive before the resized strip
-                        // has laid out. Reveal again when its actual size is
-                        // available, without reacting to scrolling offsets.
-                        proxy.scrollTo(selected, anchor: .center)
-                    }
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .center, spacing: 4) {
+                    ForEach(options) { option in tab(option, viewportWidth: geometry.size.width).id(option.value) }
                 }
-                .frame(width: geometry.size.width, height: rowHeight)
-                .clipped()
-                .scrollIndicators(.hidden)
-                .task(id: "\(selected):\(geometry.size.width):\(dynamicTypeSize):\(theme.fontScale):\(layoutDirection)") {
-                    // Scroll directly to the actual button after layout. A
-                    // scrollPosition binding can keep its initial offset when
-                    // a non-lazy strip changes width or accessibility size.
-                    await Task.yield()
-                    guard !Task.isCancelled else { return }
-                    proxy.scrollTo(selected, anchor: .center)
-                }
+                .scrollTargetLayout()
+            }
+            .frame(width: geometry.size.width, height: rowHeight)
+            .clipped()
+            .scrollIndicators(.hidden)
+            // Target-aware lazy layout preserves the bound category when the
+            // viewport changes; a yielded proxy command can use stale frames.
+            .scrollPosition(id: $scrollTarget, anchor: .center)
+            .onChange(of: "\(selected):\(geometry.size.width):\(dynamicTypeSize):\(theme.fontScale):\(layoutDirection)", initial: true) {
+                scrollTarget = selected
             }
             .focusable()
             .modifier(XgentTabKeyNavigation(
