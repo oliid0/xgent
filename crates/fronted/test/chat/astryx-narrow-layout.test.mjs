@@ -201,6 +201,9 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
   const vendorCss = readFileSync(new URL("../../node_modules/@astryxdesign/core/dist/astryx.css", import.meta.url), "utf8");
   const reset = readFileSync(new URL(import.meta.resolve("@astryxdesign/core/reset.css")), "utf8");
   const themeCss = generateThemeCSS(xgentCompactTheme);
+  const builtCss = process.env.XGENT_RENDERED_STYLESHEET
+    ? readFileSync(process.env.XGENT_RENDERED_STYLESHEET, "utf8")
+    : null;
   const sections = [];
   const providerEditors = Object.fromEntries(["general", "model", "request", "usage"].map(panel => [panel, providerEditorForPanel(panel)]));
   for (const locale of ["en-US", "zh-CN"]) {
@@ -348,12 +351,12 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
     width: "var(--xgent-settings-dialog-width)", maxHeight: "var(--xgent-settings-dialog-height)",
     style: { height: "var(--xgent-settings-dialog-height)" },
   }, "Settings"));
-  const html = `<!doctype html><html data-theme="light" data-astryx-theme="${xgentCompactTheme.name}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${reset}\n${vendorCss}\n@layer reset {${themeCss.prose}}\n@layer astryx-theme {${themeCss.component}}\n${css}
+  const html = `<!doctype html><html data-theme="light" data-astryx-theme="${xgentCompactTheme.name}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${builtCss ?? `${reset}\n${vendorCss}\n${css}`}\n@layer reset {${themeCss.prose}}\n@layer astryx-theme {${themeCss.component}}
   :root { --spacing-1:4px; --spacing-2:8px; --size-element-sm:32px; --size-element-md:40px; --size-element-lg:44px; }
   body { margin:0; } .fixture, .fixture-settings-index, .fixture-system-details, .fixture-backup-details, .fixture-permissions-details, .fixture-memory-details { margin:16px; border:1px solid black; }
   #result { display:none; } .fixture .settings-control-row { font-size:inherit; }
-  .workspace-project-row, .chat-history-row { display:grid; min-width:0; grid-template-columns:minmax(0,1fr) auto; }
-  @layer utilities { .opacity-0 {opacity:0;} .chat-history-row:hover .sidebar-row-actions, .chat-history-row:focus-within .sidebar-row-actions {opacity:1;} .max-w-16 {max-width:64px;} }
+  ${builtCss ? "" : `.workspace-project-row, .chat-history-row { display:grid; min-width:0; grid-template-columns:minmax(0,1fr) auto; }
+  @layer utilities { .opacity-0 {opacity:0;} .chat-history-row:hover .sidebar-row-actions, .chat-history-row:focus-within .sidebar-row-actions {opacity:1;} .max-w-16 {max-width:64px;} }`}
   .workspace-project-row .astryx-more-menu { flex-shrink:0; }
   .fixture * { box-sizing:border-box; } .fixture .astryx-text { font-size:inherit; }
   .fixture-system-details .astryx-text[data-type="body"] { font-size:calc(var(--text-body-size) * var(--zone-font-scale)); }
@@ -677,6 +680,9 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       const result = JSON.parse(await imageBrowserCompletion(annotationBrowser, pathToFileURL(file).href, viewportDirectory, {
         viewport: { width, height: 844, mobile: width <= 390 },
         interact: async send => {
+          // The desktop-row fixture needs a mouse. Touch emulation correctly
+          // disables Tailwind's @media (hover:hover) rules on mobile viewports.
+          await send("Emulation.setTouchEmulationEnabled", { enabled: false });
           await send("DOM.enable"); await send("CSS.enable");
           const root = (await send("DOM.getDocument")).root.nodeId;
           const rows = (await send("DOM.querySelectorAll", { nodeId: root, selector: ".fixture-desktop-sidebar .chat-history-row" })).nodeIds;
@@ -700,7 +706,10 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
           }
           await send("Runtime.evaluate", { expression: `document.querySelector('.fixture-desktop-sidebar button').focus()` });
           for (const nodeId of rows) await send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: [] });
+          await new Promise(resolve => setTimeout(resolve, 200));
           const focused = await measure(); assert.equal(focused[0].width, before[0].width);
+          assert.equal(focused[0].actions, "1", "Keyboard focus must reveal actions");
+          await send("Emulation.setTouchEmulationEnabled", { enabled: width <= 390 });
           const reveal = await send("Runtime.evaluate", { returnByValue: true, expression: `JSON.stringify([...document.querySelectorAll('.fixture-sidebar-reveal')].map(section => {
             const nav=section.querySelector('aside').getBoundingClientRect(), page=section.querySelector('.chat-workspace-main').getBoundingClientRect(), parent=section.getBoundingClientRect();
             return {drawer:nav.width,pageWidth:page.width,offset:page.left-parent.left,viewport:parent.width,modal:!!section.querySelector('dialog')};
