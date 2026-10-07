@@ -21,8 +21,16 @@ struct XgentBrowserLayout: View {
         VStack(spacing: 0) {
             ForEach(node.children ?? []) { item in
                 if item.variant == "browser-empty" {
-                    VStack { Spacer(minLength: 0); content(item); Spacer(minLength: 0) }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if (item.children ?? []).contains(where: { $0.variant == "browser-new-tab-tools" }) {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 12) {
+                                ForEach(item.children ?? []) { content($0) }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        VStack { Spacer(minLength: 0); content(item); Spacer(minLength: 0) }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 } else { content(item) }
                 if item.variant == "browser-navigation" { Divider() }
             }
@@ -39,6 +47,13 @@ struct XgentBrowserLayout: View {
                     shortcut("browser-new", key: "t", modifiers: .command)
                     shortcut("browser-close-tab", key: "w", modifiers: .command)
                     shortcut("browser-reload", key: "r", modifiers: .command)
+                    if document.mode == .panel {
+                        Button {
+                            guard model.workspaceState.visible, model.workspaceState.selectedSurface == document.surface else { return }
+                            model.workspaceState.expanded.toggle()
+                        } label: { EmptyView() }
+                        .keyboardShortcut(KeyEquivalent(Character(String(UnicodeScalar(Int(NSEvent.SpecialKey.f11.rawValue))!))), modifiers: [])
+                    }
                     shortcut("browser-devtools", key: KeyEquivalent(Character(String(UnicodeScalar(Int(NSEvent.SpecialKey.f12.rawValue))!))), modifiers: [])
                 }.frame(width: 0, height: 0).clipped().accessibilityHidden(true)
             }

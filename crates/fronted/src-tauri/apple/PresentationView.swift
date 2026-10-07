@@ -283,10 +283,9 @@ private struct XgentNodeControlModifier: ViewModifier {
            node.variant == "memory-project" || node.kind == .colorInput ||
            node.kind == .spreadsheetGrid || node.variant == "workspace-file-layout" ||
            node.variant == "workspace-file-toolbar" || node.variant == "workspace-file-sheets" ||
-           node.variant == "workspace-file-metadata" || node.variant == "workspace-file-annotations" ||
+           node.variant == "workspace-file-metadata" ||
            node.variant == "provider-vendor-tabs" ||
-           node.variant == "workspace-image-preview" ||
-           node.variant == "document-annotation" || node.variant == "document-annotation-page" {
+           node.variant == "workspace-image-preview" {
             // Selection and the menu retain their own accessibility identities.
             content.controlSize(controlSize)
                 .disabled(node.disabled == true || busy)

@@ -16,6 +16,60 @@ private struct WorkspaceMainProbe: NSViewRepresentable {
 }
 
 final class WorkspacePanelRenderingTests: XCTestCase {
+    @MainActor func testPanelAndDockHeadersRemainUsableWithInstalledWindowChrome() async throws {
+        let accessibility = try NativeMacAccessibilitySession()
+        defer { accessibility.restore() }
+        let model = XgentPresentationModel()
+        defer { model.invalidate() }
+        let rootPayload: [String: Any] = ["version": 1, "surface": "chat", "revision": 1, "mode": "root",
+            "title": "Chat", "formFactor": "desktop", "nodes": [["id": "chat", "kind": "ChatLayout", "children": [
+                ["id": "workspace-panel-actions", "kind": "Menu", "label": "Tools", "children": [
+                    ["id": "workspace-new-browser", "kind": "Button", "label": "New browser tab", "action": "new-browser"]]]]]]]
+        let chat = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: rootPayload))
+        try chat.validate()
+        model.update(chat)
+        model.update(try panel("browser", nodes: [["id": "browser-tab-items", "kind": "VStack", "children": [
+            ["id": "browser-tab:first", "kind": "Button", "label": "First website", "selected": true, "action": "first"],
+            ["id": "browser-tab:second", "kind": "Button", "label": "Second website", "action": "second"]]]]))
+        model.update(try panel("terminal", nodes: [
+            ["id": "terminal-session", "kind": "Selector", "label": "Shell", "value": "shell-one", "action": "select-shell",
+             "options": [["value": "shell-one", "label": "System shell"], ["value": "shell-two", "label": "Second shell"]]],
+            ["id": "terminal-new", "kind": "Button", "label": "New terminal", "action": "new-terminal"]]))
+        model.workspaceState.dock("terminal")
+        model.windowChromeInstalled = true
+        var actions: [XgentAction] = []
+        model.actionSink = { action in
+            actions.append(action)
+            model.complete(XgentActionResult(surface: action.surface, requestId: action.requestId, ok: true, error: nil))
+        }
+        let layout = XgentDesktopWorkspaceLayout(model: model, minimumMainWidth: 440, enabled: true) { WorkspaceMainProbe() }
+            .environment(\.accessibilityEnabled, true)
+            .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: .light))
+        let host = NSHostingView(rootView: layout)
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 960, height: 720), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        defer { window.close() }
+        try await Task.sleep(for: .milliseconds(200))
+        host.layoutSubtreeIfNeeded()
+        let elements = nativeMacAccessibilityTree(window)
+        for id in ["xgent-workspace-tab:browser:browser-tab:first", "xgent-workspace-tab:browser:browser-tab:second",
+                   "xgent-workspace-tab:terminal:shell-one", "xgent-workspace-tab:terminal:shell-two"] {
+            XCTAssertNotNil(elements.first { $0.accessibilityIdentifier() == id }, id)
+        }
+        for (id, action) in [("xgent-workspace-panel-add", "new-browser"), ("xgent-workspace-panel-dock-add", "new-terminal")] {
+            let button = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == id && $0.accessibilityRole() == .button }, id)
+            let bounds = window.convertToScreen(host.convert(host.bounds, to: nil))
+            let frame = button.accessibilityFrame()
+            XCTAssertGreaterThan(frame.width, 0, id)
+            XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX - 1, id)
+            XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX + 1, id)
+            XCTAssertTrue(button.accessibilityPerformPress(), id)
+            XCTAssertEqual(actions.last?.action, action)
+        }
+    }
+
     @MainActor
     func testDockFitsBothWidthsAndHidesTheBrowserViewportWhenAnotherPanelOpens() async throws {
         for width in [CGFloat(640), CGFloat(1280)] {

@@ -1,4 +1,3 @@
-#if os(iOS)
 import SwiftUI
 
 struct XgentIOSComposerActions: View {
@@ -6,8 +5,8 @@ struct XgentIOSComposerActions: View {
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
 
-    private var modelControls: [XgentNode] { nodes.filter { ["model", "context-usage"].contains($0.id) } }
-    private var controls: [XgentNode] { nodes.filter { !["model", "context-usage"].contains($0.id) } }
+    private var modelControls: [XgentNode] { nodes.filter { ["model", "context-usage", "runtime-reasoning"].contains($0.id) } }
+    private var controls: [XgentNode] { nodes.filter { !["model", "context-usage", "runtime-reasoning"].contains($0.id) } }
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
@@ -29,7 +28,7 @@ struct XgentIOSComposerActions: View {
     private var separateMode: some View {
         VStack(alignment: .leading, spacing: 6) {
             if let safety = controls.first(where: { $0.id == "command-safety" }) {
-                XgentIOSNode(node: safety, document: document, model: model, parentAxis: .horizontal)
+                control(safety)
                     .fixedSize(horizontal: false, vertical: true)
             }
             actionRow(controls.filter { $0.id != "command-safety" })
@@ -42,18 +41,25 @@ struct XgentIOSComposerActions: View {
                 if child.id == "context-usage" {
                     XgentContextUsage(node: child, document: document, model: model)
                 } else if child.id == "model" {
-                    XgentIOSNode(node: child, document: document, model: model, parentAxis: .horizontal)
+                    control(child)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else if child.id == "command-safety" {
                     // An inline candidate must budget for the actual mode text;
                     // separateMode permits long labels to wrap at narrow widths.
-                    XgentIOSNode(node: child, document: document, model: model, parentAxis: .horizontal)
+                    control(child)
                         .fixedSize(horizontal: true, vertical: true)
                 } else {
-                    XgentIOSNode(node: child, document: document, model: model, parentAxis: .horizontal)
+                    control(child)
                 }
             }
         }
     }
+
+    @ViewBuilder private func control(_ child: XgentNode) -> some View {
+        #if os(iOS)
+        XgentIOSNode(node: child, document: document, model: model, parentAxis: .horizontal)
+        #else
+        XgentNodeView(node: child, document: document, model: model)
+        #endif
+    }
 }
-#endif

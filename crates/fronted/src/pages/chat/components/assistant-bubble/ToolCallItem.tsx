@@ -68,6 +68,7 @@ const TOOL_NAME_KEYS: Record<string, string> = {
   SshManager: "chat.tool.name.ssh",
   TodoWrite: "chat.tool.name.todo",
   Write: "chat.tool.name.write",
+  OfficeCreate: "settings.builtinTool.office_create.name",
 };
 
 const TOOL_ACTION_KEYS: Record<string, string> = {

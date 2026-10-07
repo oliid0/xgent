@@ -559,7 +559,12 @@ export function ToolResultDisplay({
     );
   }
 
-  if (kind === "read_word" || kind === "read_spreadsheet" || kind === "read_archive") {
+  if (
+    kind === "read_word" ||
+    kind === "read_spreadsheet" ||
+    kind === "read_presentation" ||
+    kind === "read_archive"
+  ) {
     const details = result.details as ReadDocumentResultDetails;
     return (
       <AstryxStack direction="vertical" className="space-y-2">

@@ -587,6 +587,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "chat.upload.photos": "照片",
     "chat.upload.files": "文件",
     "chat.composer.addMention": "添加提及",
+    "chat.composer.filesAndFolders": "工作空间文件与文件夹",
     "chat.composer.addMentionDesc": "提及文件、目录、技能或代码",
     "chat.composer.addCommand": "使用命令",
     "chat.composer.addCommandDesc": "打开斜杠命令菜单",
@@ -1705,6 +1706,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "browser.maximize": "在主聊天区最大化",
     "browser.restoreSidePanel": "恢复右侧分屏",
     "browser.newTab": "新建标签页",
+    "workspaceFilePreview.slide": "幻灯片",
     "chat.work.integration": "{provider} 集成",
     "chat.work.integrationCommands": "{provider} 集成与命令",
     "chat.work.calls": "{count} 次调用",
@@ -2093,6 +2095,11 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.builtinTool.image.detail":
       "将项目内的图片文件加载为可视内容供模型理解，常用于查看截图、设计稿或图表。只读操作。",
     "settings.builtinTool.write.name": "写入文件",
+    "browser.tools": "工具",
+    "settings.builtinTool.office_create.name": "生成 Office 文档",
+    "settings.builtinTool.office_create.desc": "直接生成可编辑的文稿、表格与演示文稿",
+    "settings.builtinTool.office_create.detail":
+      "在可写工作区生成 DOCX、XLSX 和 PPTX，不覆盖已有文件。操作使用文件权限和任务检查点，并显示在工作记录中。",
     "settings.builtinTool.write.desc": "创建新文件或覆盖已有文件",
     "settings.builtinTool.write.detail":
       "在项目目录内创建新文件，或整体覆盖已有文件内容。属于写入操作，会实际改动磁盘上的文件，请留意模型的写入意图。",
@@ -3630,6 +3637,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "chat.upload.photos": "Photos",
     "chat.upload.files": "Files",
     "chat.composer.addMention": "Add a mention",
+    "chat.composer.filesAndFolders": "Workspace files and folders",
     "chat.composer.addMentionDesc": "Mention files, folders, skills, or code",
     "chat.composer.addCommand": "Use a command",
     "chat.composer.addCommandDesc": "Open the slash command menu",
@@ -4795,6 +4803,7 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "browser.maximize": "Maximize in chat area",
     "browser.restoreSidePanel": "Restore side panel",
     "browser.newTab": "New tab",
+    "workspaceFilePreview.slide": "Slide",
     "chat.work.integration": "{provider} integration",
     "chat.work.integrationCommands": "{provider} integration and commands",
     "chat.work.calls": "{count} calls",
@@ -5207,6 +5216,12 @@ export const translations: Record<ResolvedLocale, Record<string, string>> = {
     "settings.builtinTool.image.detail":
       "Loads image files from the project as visual content the model can understand — handy for screenshots, design mockups, and charts. Read-only.",
     "settings.builtinTool.write.name": "Write File",
+    "browser.tools": "Tools",
+    "settings.builtinTool.office_create.name": "Create Office document",
+    "settings.builtinTool.office_create.desc":
+      "Generate editable documents, spreadsheets and presentations",
+    "settings.builtinTool.office_create.detail":
+      "Create DOCX, XLSX and PPTX in writable workspaces without replacing existing files. Uses file permissions and task checkpoints, and appears in the work record.",
     "settings.builtinTool.write.desc": "Create new files or overwrite existing ones",
     "settings.builtinTool.write.detail":
       "Creates new files or fully overwrites existing ones inside the project directory. A write operation that changes files on disk — review the model's intent when it writes.",

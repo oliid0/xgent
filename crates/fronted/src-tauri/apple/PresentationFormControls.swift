@@ -124,9 +124,14 @@ struct XgentSelector: View {
 
     private var isStacked: Bool { node.variant == "searchable-stacked-selector" }
     private var usesValueRow: Bool { isSettingsRow && !isStacked }
+    private var isComposer: Bool { ["composer-model", "composer-reasoning", "composer-repository"].contains(node.variant ?? "") }
 
     private var selectedLabel: String {
-        node.options?.first { $0.value == model.value(node, in: document).text }?.label ?? node.text ?? ""
+        if node.variant == "composer-repository" { return node.label ?? "" }
+        if isComposer {
+            return node.options?.first { $0.value == model.value(node, in: document).text }?.displayLabel ?? node.label ?? ""
+        }
+        return node.options?.first { $0.value == model.value(node, in: document).text }?.label ?? node.text ?? ""
     }
 
     private var selectionLabel: some View {
@@ -136,16 +141,17 @@ struct XgentSelector: View {
             } else if isStacked, let icon = node.icon {
                 Image(systemName: icon).frame(width: 16).accessibilityHidden(true)
             }
-            Text(selectedLabel).fixedSize(horizontal: false, vertical: true)
-            if !usesValueRow && !["composer-command-safety", "sidebar-work-mode"].contains(node.variant ?? "") { Spacer(minLength: 8) }
-            Image(systemName: "chevron.up.chevron.down").font(.caption).accessibilityHidden(true)
+            Text(selectedLabel).lineLimit(isComposer ? 1 : nil)
+                .truncationMode(.middle).fixedSize(horizontal: false, vertical: true)
+            if !usesValueRow && !isComposer && !["composer-command-safety", "sidebar-work-mode"].contains(node.variant ?? "") { Spacer(minLength: 8) }
+            Image(systemName: isComposer ? "chevron.down" : "chevron.up.chevron.down").font(.caption).accessibilityHidden(true)
         }
         .modifier(XgentSelectorSurface(node: node, isSettingsRow: usesValueRow))
         .environment(\.xgentSettingsRow, usesValueRow)
     }
 
     @ViewBuilder private var control: some View {
-        if ["searchable-selector", "searchable-stacked-selector"].contains(node.variant ?? "") {
+        if ["searchable-selector", "searchable-stacked-selector", "composer-model"].contains(node.variant ?? "") {
             Button { pickerOpen = true } label: { selectionLabel }
                 .modifier(XgentSelectionPresentation(node: node, document: document, model: model, isPresented: $pickerOpen))
         } else { menu }
@@ -179,7 +185,7 @@ struct XgentSelector: View {
         Group {
             if usesValueRow && showsLabel {
                 XgentSettingsValueRow(node: node) { accessibleControl }
-            } else if ["composer-command-safety", "sidebar-work-mode"].contains(node.variant ?? "") {
+            } else if isComposer || ["composer-command-safety", "sidebar-work-mode"].contains(node.variant ?? "") {
                 accessibleControl
             } else {
                 VStack(alignment: .leading, spacing: 8) {
@@ -208,7 +214,7 @@ private struct XgentSelectorSurface: ViewModifier {
         if node.variant == "sidebar-work-mode" {
             content.font(.title2.weight(.bold)).foregroundStyle(.primary)
                 .frame(minHeight: 44).contentShape(Rectangle())
-        } else if node.variant == "composer-command-safety" {
+        } else if ["composer-command-safety", "composer-model", "composer-reasoning", "composer-repository"].contains(node.variant ?? "") {
             content.font(.subheadline).foregroundStyle(.secondary)
                 .frame(minHeight: 44).contentShape(Rectangle())
         } else {

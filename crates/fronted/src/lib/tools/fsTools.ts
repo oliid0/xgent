@@ -7,6 +7,8 @@ import type {
 } from "@earendil-works/pi-ai";
 import { invoke } from "@xgent/runtime";
 import { type TProperties, Type } from "typebox";
+import type { OfficeDocument } from "../office/createOfficeDocument";
+import { officeDocumentSchema } from "../office/officeDocumentSchema";
 import type { AdditionalProjectRoot } from "./additionalProjectRoots";
 import {
   type BuiltinToolBundle,
@@ -83,7 +85,7 @@ type SystemListSkillFilesResponse = {
 };
 
 type ReadCommandResponse = {
-  kind: "text" | "image" | "pdf" | "notebook" | "word" | "spreadsheet" | "archive";
+  kind: "text" | "image" | "pdf" | "notebook" | "word" | "spreadsheet" | "presentation" | "archive";
   path: string;
   content?: string | null;
   truncated?: boolean | null;
@@ -566,6 +568,16 @@ export function createFsTools(params: {
     },
   };
 
+  const toolOfficeCreate: Tool = {
+    name: "OfficeCreate",
+    description:
+      "Create an editable DOCX, XLSX or PPTX document directly in the workspace or writable configured root. No Shell, Skill, external executable or download is needed. The path extension must match document.format. DOCX supports paragraphs, headings, bold text and tables; XLSX supports named sheets, typed cells and formula objects (without invented cached calculation results); PPTX supports native editable text/rectangles and speaker notes on 13.333 x 7.5 inch slides. Existing paths are never overwritten. After success use Read to inspect or PreviewFile to open the actual saved file.",
+    parameters: strictToolParameters({
+      path: Type.String({ description: "New file path including .docx, .xlsx or .pptx filename" }),
+      document: officeDocumentSchema,
+    }),
+  };
+
   const toolEdit: Tool = {
     name: "Edit",
     description:
@@ -714,6 +726,7 @@ export function createFsTools(params: {
     toolRead,
     toolImage,
     toolWrite,
+    toolOfficeCreate,
     toolEdit,
     toolDelete,
     toolList,
@@ -726,6 +739,7 @@ export function createFsTools(params: {
     Image: ["path", "paths", "url", "urls", "base64", "base64s", "mimeType", "source", "sources"],
     // "mode" is legacy tolerance: no longer in the schema, silently ignored.
     Write: ["path", "content", "mode"],
+    OfficeCreate: ["path", "document"],
     Edit: ["path", "old_string", "new_string", "expected_replacements", "replace_all"],
     Delete: ["path"],
     List: ["path", "depth", "offset", "max_results"],
@@ -947,20 +961,29 @@ export function createFsTools(params: {
       };
     }
 
-    if (res.kind === "word" || res.kind === "spreadsheet" || res.kind === "archive") {
+    if (
+      res.kind === "word" ||
+      res.kind === "spreadsheet" ||
+      res.kind === "presentation" ||
+      res.kind === "archive"
+    ) {
       const label =
         res.kind === "word"
           ? "Word document"
           : res.kind === "spreadsheet"
             ? "spreadsheet"
-            : "archive";
+            : res.kind === "presentation"
+              ? "presentation"
+              : "archive";
       const details: ReadDocumentResultDetails = {
         kind:
           res.kind === "word"
             ? "read_word"
             : res.kind === "spreadsheet"
               ? "read_spreadsheet"
-              : "read_archive",
+              : res.kind === "presentation"
+                ? "read_presentation"
+                : "read_archive",
         ...pathDetails(resolved, res.fileId),
         truncated: Boolean(res.truncated),
         mimeType: typeof res.mimeType === "string" ? res.mimeType : undefined,
@@ -1499,6 +1522,70 @@ export function createFsTools(params: {
     };
   }
 
+  async function execOfficeCreate(
+    args: ToolArguments,
+    signal?: AbortSignal,
+  ): Promise<ToolOk<WriteResultDetails>> {
+    if (signal?.aborted) throw new Error("Cancelled");
+    const resolved = await pathResolver.resolvePath(args.path, {
+      label: "OfficeCreate.path",
+      intent: "write",
+      required: true,
+    });
+    const path = backendPath(resolved);
+    const document = args.document as OfficeDocument;
+    if (
+      !path ||
+      !document ||
+      !["docx", "xlsx", "pptx"].includes(document.format) ||
+      !path.toLowerCase().endsWith(`.${document.format}`)
+    )
+      throw new Error("OfficeCreate.path extension must match document.format");
+    const status = await readPathStatus("OfficeCreate", resolved, path);
+    if (status.exists)
+      throw new Error("OfficeCreate never overwrites an existing path; choose a new filename");
+    const { createOfficeDocument } = await import("../office/createOfficeDocument");
+    const bytes = await createOfficeDocument(document);
+    if (signal?.aborted) throw new Error("Cancelled");
+    // Bound conversion chunks to avoid argument-stack overflow on large documents.
+    let binary = "";
+    for (let start = 0; start < bytes.length; start += 8192)
+      binary += String.fromCharCode(...bytes.subarray(start, start + 8192));
+    const saved = await invokeFsToolCommand<
+      Omit<WriteCommandResponse, "mode" | "existedBefore" | "totalLines">
+    >({
+      toolName: "OfficeCreate",
+      resolved,
+      command: "fs_create_office_document",
+      args: {
+        workdir: resolved.root,
+        path,
+        content_base64: btoa(binary),
+        ...(checkpointCtx ? { checkpoint: checkpointCtx } : {}),
+      },
+    });
+    fileState.clear(statePathKey(resolved, saved.fileId));
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Editable ${document.format.toUpperCase()} created at: ${formatResolvedTarget(resolved)} (${saved.bytesWritten} bytes). Use Read to inspect its saved contents.`,
+        },
+      ],
+      details: {
+        kind: "write",
+        ...pathDetails(resolved, saved.fileId),
+        mode: "rewrite",
+        existedBefore: false,
+        bytesWritten: saved.bytesWritten,
+        mtimeMs: saved.mtimeMs,
+        contentHash: saved.contentHash,
+        totalLines: 0,
+        preview: previewSnippet(JSON.stringify(document)),
+      },
+    };
+  }
+
   async function execEdit(
     args: ToolArguments,
     signal?: AbortSignal,
@@ -1902,6 +1989,9 @@ export function createFsTools(params: {
         case "Write":
           result = await execWrite(toolCall.arguments, signal);
           break;
+        case "OfficeCreate":
+          result = await execOfficeCreate(toolCall.arguments, signal);
+          break;
         case "Edit":
           result = await execEdit(toolCall.arguments, signal);
           break;
@@ -1983,6 +2073,10 @@ export function createFsTools(params: {
           isReadOnly: false,
           displayCategory: "file",
         },
+      ],
+      [
+        "OfficeCreate",
+        { groupId: "fs", kind: "write", isReadOnly: false, displayCategory: "file" },
       ],
       [
         "Edit",

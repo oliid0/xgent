@@ -426,6 +426,7 @@ final class BrowserAutomationPlugin: Plugin {
         trigger("openTab", data: ["sessionId": sessionId, "url": url.absoluteString])
     }
 
+    @MainActor
     fileprivate func pageDidStart(sessionId: String, navigation: WKNavigation?) {
         guard let session = sessions[sessionId] else { return }
         session.loading = true

@@ -2,6 +2,30 @@ import XCTest
 @testable import XgentNativeUI
 
 final class WorkspacePanelTests: XCTestCase {
+    func testExpansionRequestsDoNotReplayAndBatchedKeysPreserveToggleParity() {
+        var state = XgentWorkspacePanelState()
+        func browser(_ request: Int) -> XgentWorkspacePanelIdentity {
+            .init(surface: "browser", focusRequest: 0, expandRequest: request)
+        }
+        state.synchronize([browser(5)])
+        XCTAssertFalse(state.expanded, "A newly mounted document cannot replay previously consumed keys")
+        state.synchronize([browser(6)]); XCTAssertTrue(state.expanded)
+        state.synchronize([browser(6)]); XCTAssertTrue(state.expanded)
+        state.synchronize([browser(8)]); XCTAssertTrue(state.expanded, "Two batched presses must cancel each other")
+        state.synchronize([browser(7)]); XCTAssertTrue(state.expanded, "An older counter must not lower the consumed maximum")
+        state.synchronize([browser(9)]); XCTAssertFalse(state.expanded)
+        state.visible = false
+        state.synchronize([browser(10)]); XCTAssertFalse(state.expanded)
+        state.visible = true
+        state.synchronize([browser(10)]); XCTAssertFalse(state.expanded, "A key consumed while hidden cannot replay on return")
+        let terminal = XgentWorkspacePanelIdentity(surface: "terminal", focusRequest: 0)
+        state.synchronize([browser(10), terminal]); XCTAssertEqual(state.selectedSurface, "terminal")
+        state.synchronize([browser(11), terminal]); XCTAssertFalse(state.expanded)
+        state.select("browser"); state.synchronize([browser(11), terminal]); XCTAssertFalse(state.expanded)
+        state.synchronize([]); state.synchronize([browser(11)])
+        XCTAssertFalse(state.expanded, "Closing and reopening retires the old shortcut sequence")
+    }
+
     func testOutputUpdatesPreserveSelectionButUserRequestsReopenThePanel() {
         var state = XgentWorkspacePanelState()
         let browser = XgentWorkspacePanelIdentity(surface: "browser", focusRequest: 0)

@@ -17,6 +17,7 @@ use thiserror::Error;
 use zip::ZipArchive;
 
 use super::checkpoint::{capture_pre_image, CheckpointCtx, PreImage};
+use super::docx_text::{patch_word_text, read_word_text};
 use super::edit_match::{apply_edit_replacements, find_edit_matches};
 use crate::runtime::platform::expand_tilde_path;
 use crate::services::skills::skills_root_dir;
@@ -1431,7 +1432,10 @@ fn read_local_preview_file(target: PathBuf, logical_path: String) -> Result<Read
         }
     })?;
     let extracted_content = match extension_lower(&target).as_deref() {
-        Some("docx") => Some(build_docx_window(&bytes).map_err(FsError::Other)?.0),
+        Some("docx") => {
+            let (content, truncated) = build_docx_window(&bytes).map_err(FsError::Other)?;
+            if truncated { None } else { Some(content) }
+        }
         Some("pptx") => Some(build_pptx_window(&bytes).map_err(FsError::Other)?.0),
         _ => None,
     };
@@ -1796,73 +1800,19 @@ fn build_docx_window(bytes: &[u8]) -> Result<(String, bool), String> {
     else {
         return Err("Word document does not contain word/document.xml".to_string());
     };
-    let text = extract_xml_text(&xml, true);
+    let text = if zip_truncated {
+        extract_xml_text(&xml, true)
+    } else {
+        read_word_text(&xml)?
+    };
     let (content, byte_truncated) = truncate_text_to_byte_limit(&text, READ_MAX_TEXT_BYTES);
     Ok((content, zip_truncated || byte_truncated))
 }
 
-fn is_word_paragraph_start(xml: &str, index: usize) -> bool {
-    xml[index..].starts_with("<w:p")
-        && xml[index + 4..]
-            .chars()
-            .next()
-            .is_some_and(|character| character == '>' || character.is_whitespace())
-}
-
-fn word_text_paragraphs(xml: &str) -> Vec<(usize, usize)> {
-    let mut paragraphs = Vec::new();
-    let mut cursor = 0usize;
-    while cursor < xml.len() {
-        let Some(relative) = xml[cursor..].find("<w:p") else {
-            break;
-        };
-        let start = cursor + relative;
-        if !is_word_paragraph_start(xml, start) {
-            cursor = start + 4;
-            continue;
-        }
-        let Some(end_relative) = xml[start..].find("</w:p>") else {
-            break;
-        };
-        let end = start + end_relative + "</w:p>".len();
-        if xml[start..end].contains("<w:t") {
-            paragraphs.push((start, end));
-        }
-        cursor = end;
-    }
-    paragraphs
-}
-
-fn rewrite_word_paragraph(paragraph: &str, replacement: &str) -> Result<String, String> {
-    let mut output = String::with_capacity(paragraph.len() + replacement.len());
-    let mut cursor = 0usize;
-    let mut replaced = false;
-    while let Some(relative) = paragraph[cursor..].find("<w:t") {
-        let start = cursor + relative;
-        let Some(open_end_relative) = paragraph[start..].find('>') else {
-            return Err("Malformed Word text element".to_string());
-        };
-        let body_start = start + open_end_relative + 1;
-        let Some(close_relative) = paragraph[body_start..].find("</w:t>") else {
-            return Err("Malformed Word text element".to_string());
-        };
-        let close = body_start + close_relative;
-        output.push_str(&paragraph[cursor..body_start]);
-        if !replaced {
-            output.push_str(&quick_xml::escape::escape(replacement));
-            replaced = true;
-        }
-        output.push_str("</w:t>");
-        cursor = close + "</w:t>".len();
-    }
-    output.push_str(&paragraph[cursor..]);
-    if !replaced {
-        return Err("Word paragraph does not contain an editable text node".to_string());
-    }
-    Ok(output)
-}
-
 fn rewrite_docx_text(bytes: &[u8], content: &str) -> Result<Vec<u8>, String> {
+    if build_docx_window(bytes)?.1 {
+        return Err("Word text exceeds the complete-read limit and cannot be safely edited".to_string());
+    }
     let mut archive = open_zip_archive(bytes, "Word document")?;
     let document_xml = {
         let mut document = archive
@@ -1874,31 +1824,7 @@ fn rewrite_docx_text(bytes: &[u8], content: &str) -> Result<Vec<u8>, String> {
             .map_err(|error| format!("Failed to read Word document text: {error}"))?;
         xml
     };
-    let paragraphs = word_text_paragraphs(&document_xml);
-    let replacements = if content.is_empty() {
-        vec![""; paragraphs.len()]
-    } else {
-        content
-            .split('\n')
-            .map(|line| line.trim_end_matches('\r'))
-            .collect::<Vec<_>>()
-    };
-    if replacements.len() != paragraphs.len() {
-        return Err(format!(
-            "Document structure changed: expected {} paragraph lines, received {}. Edit paragraph text without adding or removing lines.",
-            paragraphs.len(),
-            replacements.len()
-        ));
-    }
-
-    let mut rewritten_xml = String::with_capacity(document_xml.len() + content.len());
-    let mut cursor = 0usize;
-    for ((start, end), replacement) in paragraphs.into_iter().zip(replacements) {
-        rewritten_xml.push_str(&document_xml[cursor..start]);
-        rewritten_xml.push_str(&rewrite_word_paragraph(&document_xml[start..end], replacement)?);
-        cursor = end;
-    }
-    rewritten_xml.push_str(&document_xml[cursor..]);
+    let rewritten_xml = patch_word_text(&document_xml, content)?;
 
     let mut output = zip::ZipWriter::new(Cursor::new(Vec::new()));
     for index in 0..archive.len() {
@@ -3443,6 +3369,71 @@ pub async fn fs_write_binary(
         })
     })
     .await
+}
+
+// Office creation uses an exclusive new-file open: no observed or raced-in
+// file can be overwritten. Existing binary writers retain their version guards.
+fn fs_create_office_document_sync(
+    workdir: String,
+    path: String,
+    content_base64: String,
+    checkpoint: Option<CheckpointCtx>,
+) -> Result<WriteBinaryResponse, FsCommandError> {
+    let scoped = resolve_scoped_fs_path(&workdir, &path)?;
+    let main_part = match extension_lower(Path::new(&scoped.relative_path)).as_deref() {
+        Some("docx") => "word/document.xml",
+        Some("xlsx") => "xl/workbook.xml",
+        Some("pptx") => "ppt/presentation.xml",
+        _ => return Err(FsError::Other("Office creation requires .docx, .xlsx or .pptx".to_string()).into()),
+    };
+    if content_base64.len() > READ_MAX_PREVIEW_BYTES * 4 / 3 + 4 {
+        return Err(FsError::TooLarge { path: scoped.logical_path,
+            message: "Office document exceeds the binary save limit".to_string() }.into());
+    }
+    let bytes = BASE64_STANDARD.decode(content_base64.as_bytes())
+        .map_err(|error| FsError::Other(format!("Office content is not valid base64: {error}")))?;
+    if bytes.len() > READ_MAX_PREVIEW_BYTES {
+        return Err(FsError::TooLarge { path: scoped.logical_path,
+            message: "Office document exceeds the binary save limit".to_string() }.into());
+    }
+    let mut archive = ZipArchive::new(Cursor::new(&bytes))
+        .map_err(|error| FsError::Other(format!("Office content is not an OOXML package: {error}")))?;
+    for part in ["[Content_Types].xml", "_rels/.rels", main_part] {
+        let entry = archive.by_name(part)
+            .map_err(|_| FsError::Other(format!("Office package is missing {part}")))?;
+        if entry.is_dir() || entry.size() == 0 || entry.size() > MAX_ZIP_XML_ENTRY_BYTES as u64 {
+            return Err(FsError::Other(format!("Office package has an invalid {part}")).into());
+        }
+    }
+    drop(archive);
+    let raw_target = scoped.root.join(&scoped.relative_path);
+    let parent = ensure_parent_dir(&scoped.root, &raw_target)?;
+    let name = raw_target.file_name()
+        .ok_or_else(|| FsError::Other("Office path must name a file".to_string()))?;
+    let target = parent.join(name);
+    let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&target)
+        .map_err(FsError::Io)?;
+    capture_pre_image(checkpoint.as_ref(), &scoped.root,
+        &checkpoint_rel(&scoped.root, &target, &scoped.relative_path), PreImage::Missing);
+    if let Err(error) = file.write_all(&bytes).and_then(|_| file.sync_all()) {
+        drop(file);
+        let _ = fs::remove_file(&target);
+        return Err(FsError::Io(error).into());
+    }
+    drop(file);
+    let canonical = fs::canonicalize(&target).map_err(FsError::Io)?;
+    let metadata = fs::metadata(&canonical).map_err(FsError::Io)?;
+    Ok(WriteBinaryResponse { path: scoped.logical_path, bytes_written: bytes.len(),
+        mtime_ms: metadata_mtime_ms(&metadata), content_hash: hash_bytes(&bytes),
+        file_id: Some(file_identity(&metadata, &canonical)) })
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn fs_create_office_document(
+    workdir: String, path: String, content_base64: String, checkpoint: Option<CheckpointCtx>,
+) -> Result<WriteBinaryResponse, FsCommandError> {
+    run_blocking_fs("fs_create_office_document", move ||
+        fs_create_office_document_sync(workdir, path, content_base64, checkpoint)).await
 }
 
 /// Import a device-selected file into an existing workspace folder without
@@ -5255,6 +5246,44 @@ mod tests {
         fs::create_dir_all(workdir.join(".git")).expect("create fake .git");
     }
 
+    #[test]
+    fn office_creation_saves_each_format_and_rejects_existing_paths() {
+        let workdir = unique_test_workdir("office-create");
+        fs::create_dir_all(&workdir).expect("workspace");
+        for (extension, part) in [("docx", "word/document.xml"),
+            ("xlsx", "xl/workbook.xml"), ("pptx", "ppt/presentation.xml")] {
+            let bytes = build_test_zip(&[("[Content_Types].xml", "<Types/>"),
+                ("_rels/.rels", "<Relationships/>"), (part, "<document/>")]);
+            let path = format!("reports/output.{extension}");
+            let response = fs_create_office_document_sync(workdir.display().to_string(), path.clone(),
+                BASE64_STANDARD.encode(&bytes), None).expect("create Office document");
+            assert_eq!(fs::read(workdir.join(&path)).expect("read saved file"), bytes);
+            assert_eq!(response.bytes_written, bytes.len());
+            assert_eq!(response.content_hash, hash_bytes(&bytes));
+            assert!(response.file_id.is_some());
+            assert!(fs_create_office_document_sync(workdir.display().to_string(), path.clone(),
+                BASE64_STANDARD.encode(&bytes), None).is_err());
+            assert_eq!(fs::read(workdir.join(path)).expect("preserved existing file"), bytes);
+        }
+        fs::remove_dir_all(workdir).expect("cleanup test workspace");
+    }
+
+    #[test]
+    fn office_creation_rejects_invalid_packages_and_traversal_before_creating_parents() {
+        let workdir = unique_test_workdir("office-invalid");
+        fs::create_dir_all(&workdir).expect("workspace");
+        let invalid = build_test_zip(&[("[Content_Types].xml", "<Types/>")]);
+        for path in ["reports/bad.docx", "reports/bad.xlsx", "reports/bad.pptx", "reports/bad.txt", "../escape.docx"] {
+            assert!(fs_create_office_document_sync(workdir.display().to_string(), path.to_string(),
+                BASE64_STANDARD.encode(&invalid), None).is_err());
+        }
+        assert!(!workdir.join("reports").exists());
+        assert!(fs_create_office_document_sync(workdir.display().to_string(), "reports/bad.docx".to_string(),
+            "not base64!".to_string(), None).is_err());
+        assert!(!workdir.join("reports").exists());
+        fs::remove_dir_all(workdir).expect("cleanup test workspace");
+    }
+
     fn list_test_entries(workdir: &Path, show_hidden: Option<bool>) -> Vec<ListEntry> {
         fs_list_sync(
             workdir.display().to_string(),
@@ -5773,6 +5802,43 @@ mod tests {
             "keep &bogus; text"
         );
         assert_eq!(decode_xml_entities("no entities"), "no entities");
+    }
+
+    #[test]
+    fn docx_package_text_edits_preserve_unmodeled_parts_and_run_styles() {
+        let document = r#"<w:document xmlns:w="w" xmlns:r="r"><w:body><w:p><w:r><w:t>plain </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>bold</w:t></w:r><w:hyperlink r:id="link"><w:r><w:t> suffix</w:t></w:r></w:hyperlink></w:p><w:p/></w:body></w:document>"#;
+        let parts = [
+            ("word/document.xml", document),
+            ("word/styles.xml", "<styles>original style data</styles>"),
+            ("word/_rels/document.xml.rels", "<Relationships>link target</Relationships>"),
+            ("word/media/image.svg", "<svg>retained picture</svg>"),
+            ("customXml/item1.xml", "<custom>unknown extension</custom>"),
+        ];
+        let original = build_test_zip(&parts);
+        let baseline = build_docx_window(&original).unwrap();
+        assert_eq!(baseline, ("plain bold suffix\n".to_string(), false));
+        let no_op = rewrite_docx_text(&original, &baseline.0).unwrap();
+        let mut unchanged = open_zip_archive(&no_op, "Word document").unwrap();
+        assert_eq!(read_zip_entry_text(&mut unchanged, "word/document.xml", MAX_ZIP_XML_ENTRY_BYTES).unwrap().unwrap().0, document);
+        let edited = rewrite_docx_text(&original, "plain bold changed suffix\n").unwrap();
+        assert_eq!(build_docx_window(&edited).unwrap().0, "plain bold changed suffix\n");
+        let mut archive = open_zip_archive(&edited, "Word document").unwrap();
+        for (name, content) in &parts[1..] {
+            assert_eq!(read_zip_entry_text(&mut archive, name, MAX_ZIP_XML_ENTRY_BYTES).unwrap().unwrap().0, *content);
+        }
+        let xml = read_zip_entry_text(&mut archive, "word/document.xml", MAX_ZIP_XML_ENTRY_BYTES).unwrap().unwrap().0;
+        assert!(xml.contains("<w:r><w:t>plain </w:t></w:r>"));
+        assert!(xml.contains("<w:rPr><w:b/></w:rPr>"));
+        assert!(xml.contains("<w:hyperlink r:id=\"link\"><w:r><w:t> suffix</w:t></w:r></w:hyperlink>"));
+    }
+
+    #[test]
+    fn docx_truncated_single_paragraph_cannot_overwrite_unseen_text() {
+        let text = "x".repeat(READ_MAX_TEXT_BYTES + 1);
+        let xml = format!("<w:document xmlns:w=\"w\"><w:body><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:body></w:document>");
+        let original = build_test_zip(&[("word/document.xml", &xml)]);
+        assert!(build_docx_window(&original).unwrap().1);
+        assert!(rewrite_docx_text(&original, "edited visible text").is_err());
     }
 
     #[test]

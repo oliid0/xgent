@@ -96,6 +96,14 @@ export const BUILTIN_TOOL_CATALOG: readonly BuiltinToolCatalogEntry[] = [
     runtimeScopes: CHAT_AND_CRON,
   },
   {
+    id: "office_create",
+    toolName: "OfficeCreate",
+    icon: "filePen",
+    categoryId: "fs",
+    isReadOnly: false,
+    runtimeScopes: CHAT_AND_CRON,
+  },
+  {
     id: "edit",
     toolName: "Edit",
     icon: "pencil",

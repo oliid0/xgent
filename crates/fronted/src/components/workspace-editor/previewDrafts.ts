@@ -4,9 +4,8 @@ export type PreviewDraft = {
   mtimeMs: number;
   source: string;
   savedSource: string;
-  annotation: string;
-  annotationPage: number;
   cells: Record<string, Record<string, string>>;
+  texts?: Record<string, string>;
   rotation?: ImageRotationDraft;
 };
 

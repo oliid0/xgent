@@ -29,18 +29,16 @@ test("tab keyboard navigation wraps and respects RTL", () => {
 });
 
 
-test("simultaneous side browser and bottom terminal have distinct tab relationships and real mode-specific menus", () => {
-  const menus = [];
+test("side and bottom plus buttons create the correct session and respect mode/availability", () => {
+  const buttons = [];
   const require = createRequire(import.meta.url);
   const box = props => createElement("div", { id: props.id, role: props.role, "aria-label": props["aria-label"], children: props.children });
   const { RightSidebar } = createTsModuleLoader({ mocks: {
     react: require("react"),
     "react/jsx-runtime": require("react/jsx-runtime"),
-    "./rightSidebar.css": {},
-    "@astryxdesign/core/DropdownMenu": { DropdownMenu: props => { menus.push(props); return null; } },
     "@astryxdesign/core/EmptyState": { EmptyState: () => null },
     "@astryxdesign/core/Icon": { Icon: () => null },
-    "@astryxdesign/core/IconButton": { IconButton: () => null },
+    "@astryxdesign/core/IconButton": { IconButton: props => { buttons.push(props); return null; } },
     "@astryxdesign/core/Layout": { HStack: box, VStack: box, StackItem: box },
     "../../../components/icons": Object.fromEntries(["FileText", "GitBranch", "Globe", "Maximize2", "MessageSquare", "Minimize2", "PanelRightClose", "Plus", "Terminal", "X"].map(name => [name, () => null])),
     "../../../i18n": { useLocale: () => ({ t: key => key }) },
@@ -54,10 +52,22 @@ test("simultaneous side browser and bottom terminal have distinct tab relationsh
   const controls = [...markup.matchAll(/aria-controls="([^"]+)"/g)].map(match => match[1]);
   assert.equal(controls.length, 2); assert.equal(new Set(controls).size, 2);
   for (const id of controls) assert.ok(markup.includes(`id="${id}" role="tabpanel"`));
-  assert.equal(menus[0].items.length, 5);
-  for (const action of menus[0].items) action.onClick();
-  assert.deepEqual(calls, ["browser", "review", "files", "terminal", "chat"]);
-  menus.length = 0;
+  buttons.find(button => button.label === "browser.newTab").onClick();
+  buttons.find(button => button.label === "projectTools.newTerminal").onClick();
+  assert.deepEqual(calls, ["browser", "terminal"]);
+  buttons.length = 0;
   renderToStaticMarkup(createElement(RightSidebar, { ...props, tabs: [], activeTabId: null, agentToolsEnabled: false }));
-  assert.equal(menus[0].items.length, 1); assert.equal(menus[0].items[0].label, "browser.title");
+  buttons.find(button => button.label === "browser.newTab").onClick();
+  assert.deepEqual(calls, ["browser", "terminal", "browser"]);
+  for (const disabled of [{ agentToolsEnabled: false }, { terminalDisabled: true }]) {
+    buttons.length = 0;
+    renderToStaticMarkup(createElement(RightSidebar, { ...props, ...disabled, tabs: [], activeTabId: null, terminalIsDocked: true }));
+    const add = buttons.find(button => button.label === "projectTools.newTerminal");
+    assert.equal(add.isDisabled, true); add.onClick();
+  }
+  buttons.length = 0;
+  renderToStaticMarkup(createElement(RightSidebar, { ...props, tabs: [], activeTabId: null, browserDisabled: true }));
+  const add = buttons.find(button => button.label === "browser.newTab");
+  assert.equal(add.isDisabled, true); add.onClick();
+  assert.deepEqual(calls, ["browser", "terminal", "browser"]);
 });

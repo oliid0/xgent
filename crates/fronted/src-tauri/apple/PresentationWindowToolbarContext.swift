@@ -10,20 +10,46 @@ struct XgentWindowToolbarTab: Identifiable {
     let action: XgentNode?
     let value: XgentValue
     let editor: Bool
+    var closeAction: XgentNode? = nil
 
-    @MainActor func select(_ model: XgentPresentationModel) {
+    @MainActor @discardableResult func select(_ model: XgentPresentationModel) -> Bool {
         guard !model.documents.contains(where: { $0.mode == .sheet || $0.mode == .alert }),
               model.documents.last(where: { $0.mode == .root })?.nodes.contains(where: { $0.kind == .chatLayout }) == true,
-              let current = model.documents.first(where: { $0.surface == document.surface }), current.mode == .panel else { return }
+              let current = model.documents.first(where: { $0.surface == document.surface }), current.mode == .panel else { return false }
         if let action {
             guard let control = current.node(id: action.id), control.action == action.action,
                   control.kind == action.kind, control.disabled != true,
-                  !model.isBusy(action, in: current) else { return }
+                  !model.isBusy(action, in: current) else { return false }
         }
         model.workspaceState.select(document.surface)
-        guard let action else { return }
+        guard let action else { return true }
         if editor { XgentWorkspaceTabAction.send(action, document: document, model: model) }
         else { model.send(action, in: document, value: value) }
+        return true
+    }
+
+    @MainActor @discardableResult func close(_ model: XgentPresentationModel) -> Bool {
+        guard !model.documents.contains(where: { $0.mode == .sheet || $0.mode == .alert }),
+              model.documents.last(where: { $0.mode == .root })?.nodes.contains(where: { $0.kind == .chatLayout }) == true,
+              let current = model.documents.first(where: { $0.surface == document.surface }), current.mode == .panel else { return false }
+        if let closeAction {
+            guard let control = current.node(id: closeAction.id), control.action == closeAction.action,
+                  control.kind == closeAction.kind, control.disabled != true, !model.isBusy(control, in: current) else { return false }
+            if editor { XgentWorkspaceTabAction.send(control, document: current, model: model) }
+            else { model.send(control, in: current) }
+            return true
+        }
+        // A terminal option owns an existing session, so only its current end action may close it.
+        if action?.id == "terminal-session" {
+            guard current.node(id: "terminal-session")?.value == value,
+                  let end = current.node(id: "terminal-end"), end.disabled != true,
+                  !model.isBusy(end, in: current) else { return false }
+            model.send(end, in: current)
+            return true
+        }
+        guard action == nil, current.dismissAction != nil, !model.isDismissing(current) else { return false }
+        model.dismiss(current)
+        return true
     }
 }
 
@@ -81,20 +107,25 @@ struct XgentWindowToolbarContext {
         return true
     }
     var tabs: [XgentWindowToolbarTab] {
-        panels.flatMap { document -> [XgentWindowToolbarTab] in
-            let selected = document.surface == selectedPanel?.surface
+        tabs(in: panels, selectedSurface: selectedPanel?.surface)
+    }
+    func tabs(in documents: [XgentDocument], selectedSurface: String?) -> [XgentWindowToolbarTab] {
+        documents.flatMap { document -> [XgentWindowToolbarTab] in
+            let selected = document.surface == selectedSurface
             if let browsers = document.node(id: "browser-tab-items")?.children, !browsers.isEmpty {
                 return browsers.map {
                     XgentWindowToolbarTab(document: document, id: "\(document.surface):\($0.id)",
                         title: $0.label ?? document.title, subtitle: $0.text ?? "",
-                        selected: selected && $0.selected == true, action: $0, value: .null, editor: false)
+                        selected: selected && $0.selected == true, action: $0, value: .null, editor: false,
+                        closeAction: $0.children?.first { $0.id.hasPrefix("browser-tab-close:") })
                 }
             }
             if let editors = document.node(id: "workspace-editor-tabs")?.children, !editors.isEmpty {
                 return editors.map {
                     XgentWindowToolbarTab(document: document, id: "\(document.surface):\($0.id)",
                         title: $0.label ?? document.title, subtitle: $0.text ?? "",
-                        selected: selected && $0.selected == true, action: $0.children?.first, value: .null, editor: true)
+                        selected: selected && $0.selected == true, action: $0.children?.first, value: .null, editor: true,
+                        closeAction: ($0.children?.count ?? 0) > 1 ? $0.children?.last : nil)
                 }
             }
             if let sessions = document.node(id: "terminal-session"), let options = sessions.options, !options.isEmpty {

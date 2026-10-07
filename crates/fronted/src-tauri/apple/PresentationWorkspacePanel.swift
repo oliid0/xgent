@@ -101,8 +101,9 @@ struct XgentDesktopWorkspaceLayout<Main: View>: View {
     }
 
     private func panel(_ document: XgentDocument, controls: XgentWorkspacePanelControls, canSplit: Bool, inDock: Bool = false) -> some View {
-        VStack(spacing: 0) {
-            if !model.windowChromeInstalled || inDock || controls.dockLabel != nil {
+        let tabs = XgentWindowToolbarContext(model: model).tabs(in: inDock ? [document] : panels, selectedSurface: document.surface)
+        let selectedTab = tabs.first { $0.selected }
+        return VStack(spacing: 0) {
                 HStack(spacing: 4) {
                     if !inDock {
                         control(controls.returnLabel, icon: "arrow.left", id: "return") { model.workspaceState.visible = false }
@@ -110,40 +111,30 @@ struct XgentDesktopWorkspaceLayout<Main: View>: View {
                     ScrollViewReader { proxy in
                         ScrollView(.horizontal) {
                             HStack(spacing: 4) {
-                                ForEach(inDock ? [document] : panels) { tab in
-                                    XgentWorkspacePanelTab(document: tab, selected: tab.surface == document.surface,
-                                                           select: {
-                                        model.workspaceState.select(tab.surface)
+                                ForEach(tabs) { tab in
+                                    XgentWorkspacePanelTab(tab: tab, select: {
+                                        tab.select(model)
                                         tabStripFocused = true
                                     }, model: model)
-                                    .id(tab.surface)
+                                    .id(tab.id)
                                 }
                             }
                         }
                         .scrollIndicators(.hidden)
                         .focusable()
                         .focused($tabStripFocused)
-                        .modifier(XgentTabKeyNavigation(ids: (inDock ? [document] : panels).map(\.surface), current: document.surface,
-                            select: { model.workspaceState.select($0); return true }, close: {
-                                guard document.dismissAction != nil, !model.isDismissing(document) else { return false }
-                                model.dismiss(document)
-                                return true
-                            }))
-                        .onAppear { proxy.scrollTo(document.surface) }
-                        .onChange(of: document.surface) { _, id in proxy.scrollTo(id) }
+                        .modifier(XgentTabKeyNavigation(ids: tabs.map(\.id), current: selectedTab?.id,
+                            select: { id in tabs.first { $0.id == id }?.select(model) ?? false },
+                            close: { selectedTab?.close(model) ?? false }))
+                        .onAppear { if let selectedTab { proxy.scrollTo(selectedTab.id) } }
+                        .onChange(of: selectedTab?.id) { _, id in if let id { proxy.scrollTo(id) } }
                     }
-                    if let mainDocument, let menu = mainDocument.node(id: "workspace-panel-actions") {
-                        Menu {
-                            XgentNativeMenuItems(nodes: menu.children ?? [], document: mainDocument, model: model)
-                        } label: {
-                            Image(systemName: menu.icon ?? "plus").frame(width: 28, height: 28)
+                    if let owner = inDock ? document : mainDocument,
+                       let add = owner.node(id: inDock ? "terminal-new" : "workspace-new-browser") {
+                        control(add.label ?? "", icon: "plus", id: inDock ? "dock-add" : "add") {
+                            model.send(add, in: owner)
                         }
-                        .menuStyle(.button)
-                        .menuIndicator(.hidden)
-                        .buttonStyle(.plain)
-                        .help(menu.label ?? "")
-                        .accessibilityLabel(menu.accessibilityLabel ?? menu.label ?? "")
-                        .accessibilityIdentifier(inDock ? "xgent-workspace-panel-dock-add" : "xgent-workspace-panel-add")
+                        .disabled(add.disabled == true || model.isBusy(add, in: owner))
                     }
                     if let label = inDock ? controls.undockLabel : controls.dockLabel {
                         control(label, icon: "terminal", id: inDock ? "undock" : "dock") {
@@ -164,7 +155,6 @@ struct XgentDesktopWorkspaceLayout<Main: View>: View {
                 }
                 .padding(6)
                 Divider()
-            }
             XgentNodeChildren(nodes: document.nodes, document: document, model: model)
                 .id(document.surface)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

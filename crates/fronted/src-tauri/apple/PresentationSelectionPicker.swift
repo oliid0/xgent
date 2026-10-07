@@ -12,6 +12,10 @@ struct XgentSelectionPicker: View {
     private var currentDocument: XgentDocument? { model.documents.first { $0.surface == document.surface } }
     private var currentNode: XgentNode? { currentDocument?.node(id: node.id) }
     private var source: XgentNode { currentNode ?? node }
+    private var searchLabel: String {
+        source.children?.first { $0.id == "\(source.id):search" }?.label
+            ?? source.children?.first?.label ?? source.text ?? source.label ?? ""
+    }
     private var options: [XgentOption] {
         let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return (source.options ?? []).filter { search.isEmpty || $0.label.localizedStandardContains(search) }
@@ -36,7 +40,7 @@ struct XgentSelectionPicker: View {
             }
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").accessibilityHidden(true)
-                TextField(source.children?.first?.label ?? source.label ?? "", text: $query)
+                TextField(searchLabel, text: $query)
                     .textFieldStyle(.plain)
                     .focused($queryFocused)
                     #if os(iOS)
@@ -45,7 +49,7 @@ struct XgentSelectionPicker: View {
                     .submitLabel(.search)
                     #endif
                     .accessibilityIdentifier("\(node.id):search")
-                    .accessibilityLabel(source.children?.first?.label ?? source.label ?? "")
+                    .accessibilityLabel(searchLabel)
                 if !query.isEmpty {
                     Button {
                         query = ""
@@ -66,7 +70,13 @@ struct XgentSelectionPicker: View {
                         isPresented = false
                     } label: {
                         HStack(spacing: 12) {
-                            Text(option.label).fixedSize(horizontal: false, vertical: true)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(node.variant == "composer-model" ? option.displayLabel : option.label)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if node.variant == "composer-model", let group = option.groupLabel, !group.isEmpty {
+                                    Text(group).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
                             Spacer(minLength: 8)
                             if option.value == model.value(source, in: currentDocument ?? document).text {
                                 Image(systemName: "checkmark").accessibilityHidden(true)
@@ -118,7 +128,7 @@ struct XgentSelectionPresentation: ViewModifier {
                 .presentationDragIndicator(.hidden)
         }
         #else
-        content.popover(isPresented: $isPresented) {
+        content.popover(isPresented: $isPresented, arrowEdge: node.variant == "composer-model" ? .bottom : nil) {
             XgentSelectionPicker(node: node, document: document, model: model, isPresented: $isPresented)
                 .frame(width: 360, height: 420)
         }

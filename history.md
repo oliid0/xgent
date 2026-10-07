@@ -1,35 +1,33 @@
 # Current objective
-Repair Apple CI/Release and align functional settings/sidebar/chat behavior and Astryx/SwiftUI visuals across platforms. No local build/dev/Cargo. Finish coherent fixes and non-Cargo checks before one push; avoid frequent CI.
+Repair cross-platform builds and shared Astryx/SwiftUI behavior. User now authorizes one combined push/build after local verification. No local build/dev/Cargo. Goal remains active until remote build/runtime evidence and outstanding parity work are complete.
 
-## Completed
-- Apple UI moved to src-tauri/apple; macOS CUA moved to crates/computer-use/macos; native directory and old build/workflow references removed.
-- Provider diagnostics, RTL/selection, installed glyphs and mounted Skills sheets fixed; narrow/large-font Astryx screenshots inspected.
-- macOS long-paste crash fixed at overlapping AppKit/custom undo ownership; physical paste/copy/undo/redo/teardown pass in CI #328.
-- Composer images inside input, blue inline file/folder references and floating suggestions. Work grouping shares verified MCP identity/common intent, real details and status between both UIs.
-- Functional browser landing actions, real copy/open/navigation, Review/Files shared data, rounded address controls. Bottom terminal uses real PTY/SwiftTerm sessions, bounds/resizing and keeps chat/browser above.
-- XChat hides/guards agent workspace tools and panels while retaining the browser. System PowerShell banner/profile restored and PTY creation moved off the main thread; startup speed remains unmeasured.
-- Removed geometry persistence/plugin; cleanup targets only exact obsolete geometry files and numeric migration copies. Unified .xgent storage, iOS sandbox migration and CUA preferences; Android retains its OS app directory.
+## Current group
+- Last pushed: ce68898a. CI #331 failed macOS mounted replacement undo assertions; Release #145 failed iOS actor isolation and packaged macOS sidebar layout. Windows/Linux/Android package+smoke passed.
+- Restored iOS browser pageDidStart MainActor. macOS composer rejects infinite/max/window-exceeding TextKit size probes; actual host/measurement regressions added. Undo/redo focuses the real editor; mounted history assertions retained.
+- Composer: above-plus bounded menu, real file/folder and selectable installed Skills, runtime toggles, shared branch:repository/init Git state, responsive native model/context/reasoning controls. Shared hooks reject retired/disabled/XChat operations.
+- Browser: actual new-tab tools through Astryx Grid/Stack/Button and SwiftUI; normal navigation retained with native chrome. Right plus creates browser tab; bottom plus creates terminal. Both panel headers expose real sessions and session-specific closure/keyboard selection. Stale controls recheck availability, mode, workspace and session.
+- F11/F12 use current conversation/session ownership; typed panel expansion requests avoid replay.
+- CSS correction: preserve theme files/imports/config. Only sidebar component rules and minimal browser alignment moved into index.css; no separate browserStartPage.css/rightSidebar.css.
+- Office uses source packages (docx 9.9.0, pptxgenjs 4.0.1, existing JSZip/SheetJS), no third-party executable or Skill. OfficeCreate enters existing agent work process with scoped write permission/checkpoint/version metadata/no-overwrite behavior and real editable DOCX/XLSX/PPTX output.
+- Rust Office creation validates package/limits and uses exclusive create_new. Backend registration and paired-host restrictions wired. Native creation/DOCX tests included in CI; execution pending.
+- DOCX text edits preserve runs/styles/unmodeled ZIP parts, reject truncated text. GenOffice surgical text-patch informed Rust adaptation; source attribution remains in code. Not a full layout editor.
+- XLSX cell/formula edits round trip; uncached formulas and formula-only trailing columns now display.
+- PPTX actual existing text runs edit/save through the shared ZIP/DOM engine in both UIs, preserving formatting and unrelated parts. Exact path/MIME, file/request ownership, stale reads, version conflicts, newer drafts and intentional empty titles guarded.
+- Latest user cancels standalone annotation UI completely: removed both note/page views, legacy recovery/state/save paths, shared annotation engine and Apple adapters/tests. Replacement tests confirm PDF/Office previews expose no synthetic note writes. Existing file contents remain intact.
+- yy GenOffice PPTX edit-text, OfficeCLI OpenXML Set navigation and open-design editable-output fidelity/CJK tests reviewed; executable-based integration rejected.
 
-## Current coherent repair group
-- Apple compilation: replace inaccessible iOS-file-private child helper with direct children lookup.
-- Cron editor: preserve explicit JSON .null in XgentValue optional decoding while keeping absent values nil. Regression checks clearable/required/missing numbers and action acknowledgements.
-- iOS Shell smoke verifies real stdout, localized numeric exits, explicit exit 7 followed by success, no profile stderr, Python, stdin/EOF/cancellation. Release #144 disproved the previous sentinel key: exact procargs string pointer is 0x1b1ff, pointing to **_DASH_LOGIN_SHELL** (leading underscore), not the substring at 0x1b200. Simulator/device pinned archive SHA256 9a30ac6b... both contain the full underscored key; virtual environment key corrected before ios_fork. Runtime archive checksum also matches Package.swift; real execution awaits CI.
-- Both composer UIs cancel/suppress old agent-directory autocomplete in XChat; Astryx also rejects workspace-reference drags. Explicit user uploads remain; native image/mention root matches conversation-scoped uploads.
-- Android mobile actions use installed Astryx 0.6.3 modal scrollable BottomSheet, verified with MCP/CLI/source, preserving live routes/XChat filtering. Release #144 confirms Shell navigation, base installation and real file preview now pass. Smoke records tap geometry and XML/screenshots; uploads include every captured XML.
+## Evidence / verification
+- Earlier full non-Cargo suite: 2012/2012 passed; browser/panel follow-up 75/75; spreadsheet 12/12; direct Office engine/tool/mobile 12/12.
+- Pre-cleanup full non-Cargo suite: 2027/2027 passed, 535.9 s, no skipped/cancelled tests. PPTX browser engine 3/3; targeted native reader/edit/save/MIME 5/5; shared file saves 10/10.
+- Final after annotation cleanup: full non-Cargo suite 2012/2012 passed, 421.5 s, exit 0, no skipped/cancelled tests; TypeScript check, lint (689 files), native contract (55 kinds/46 properties) and diff whitespace pass. Ready for combined push.
+- No local Cargo/Swift/Kotlin compile or application build/dev. Remote native/runtime verification pending.
+- Source scheme removed; ignored downloaded OfficeCLI executable is unreferenced. Automatic approval review rejected its deletion; no bypass attempted. User-deleted license files and notice generation remain removed.
 
-## Verification / CI
-- CI #328 (7bf5d2bb): all jobs success. Prior coherent 48-file group c8f8d53b pushed once; its clean non-Cargo suite passed 1986/1986.
-- CI #329 (c8f8d53b): frontend/Rust/guards pass; Apple compilation fails at the child lookup fixed above.
-- c30301d0 group: 1987 non-Cargo tests, 56 focused mobile/native and 13 release-workflow regressions passed; check/lint/native/architecture/diff passed. Cron JSON null fix passes real iOS settings/detail routes and preference relaunch in Release #144.
-- Head c30301d0: CI #330 finishes with macOS/device/frontend/Rust passing; iOS fails one of 223 tests when a fixed 500 ms delay expires before its editable find input mounts. Release #144 builds all platforms; Windows/Linux pass. Packaged macOS composer passes, then sidebar toggling causes AppKit constraint recursion/infinite width. iOS Shell still reads host profile; previous virtual sentinel fix is insufficient. Android Shell navigation/install/file preview now passes; UIAutomator loses its root while real package installation is busy. Artifacts inspected; no additional push yet.
+## Remaining / decisions
+- Stage reviewed group, one combined commit/push, then GitHub MCP CI + unsigned/non-publishing Release with smoke enabled; inspect actual macOS sidebar/input/iOS Shell evidence.
+- User-specified OfficeCLI src/officecli and GenOffice packages inspected directly: IDocumentHandler Get/Query/Set and cell mutation cleanup; DOCX text anchors; PPTX element/run patch and ZIP gates; XLSX original-package mutation planner. Node/.NET I/O needs the shared Rust/runtime boundary; these are references for richer editing beyond this verified group.
+- Browser extensions APIs researched but not integrated. Full Office layout/style editing, legacy DOC edits and inline PDF color/highlight not implemented. Standalone note UI will not return.
+- Complex multi-app task completion parity, all settings/detail parity and 90% visual similarity still unverified; do not claim goal completion.
+- Terminal system shell/profile/banner and shared dock are implemented; startup speed remains unmeasured.
 
-## Remaining
-Track CI and unsigned/non-publishing Release including real native input/dock/menu/Shell flows to complete success. Continue detailed settings/sidebar/preview parity audit, extension integration and complex multi-app task evidence; 90% visual similarity and equivalent task completion are not independently established. No fake extension-install controls.
-
-## Browser parity and runtime repair (ready for one push)
-- Desktop popup events previously reached only Astryx; mobile lacked tab routing. Shared controller now owns one listener across both UIs, validates active conversation/HTTP destination and retires late registrations; pending popups preserve manual tab/conversation selection. iOS WKUIDelegate and Android user-gesture WebViewTransport route real URLs through native events/ACL; temporary Android views retire on destination/timeout/closure/renderer loss. APIs verified with Apple/Android docs and GitHub examples.
-
-- Fixed-frame macOS host disables content-derived sizing constraints before view load, following Apple docs. Public C bridge regression opens/removes sidebar and crosses drawer/inline widths including failed 871-point case, asserting finite pinned bounds. Failing find test awaits editable input with two-second deadline/host evidence and retains replacement/undo/stale assertions. Android installer retries null roots only within original readiness/output deadlines, limits adb calls to remaining time and requires fresh XML; ordinary snapshots retain four attempts.
-- Final local verification: **1992/1992 non-Cargo tests pass** (543.4 s), no failures/cancellations/skips; 19 focused popup/Android regressions pass. check/lint (685 files), native protocol (55 kinds/46 properties), architecture and diff checks pass. No local builds/dev/Cargo. Push once, then CI and unsigned/non-publishing Release must confirm actual native runtime success.
-
-Touched: shared/native browser popup routing and event ACL; browser regression explicitly checks manual tab selection during pending popup; Apple presentation host/sidebar and mounted find regressions; iOS sentinel; Android installer snapshot/transient recovery test; history. Prior group touched layout/model/number tests, composers/mode regression, mobile menu and release smoke.
+Touched: shared/native composers and hooks; browser/session/panel views/controllers/tests; Apple sizing/undo/host regressions; iOS actor; shared Office engines/tools/previews/drafts/tests; Rust scoped Office/DOCX writers; CI test steps; package/lock; i18n/index.css/history.

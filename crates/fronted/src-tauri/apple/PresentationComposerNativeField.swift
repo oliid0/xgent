@@ -72,6 +72,7 @@ struct XgentComposerNativeField: NSViewRepresentable {
     private var appliedSelection = 0
     private var style = ""
     private var width: CGFloat = 320
+    private var measuredHeight: CGFloat = 44
     private let contentStorage: NSTextContentStorage
 
     init(_ configuration: XgentComposerFieldConfiguration) {
@@ -219,6 +220,18 @@ struct XgentComposerNativeField: NSViewRepresentable {
     }
 
     func size(width proposed: CGFloat) -> CGSize {
+        // Split views probe an unbounded maximum during layout. That proposal
+        // is not an actual viewport: writing it into TextKit's native frame
+        // creates infinite AppKit geometry and repeated constraint passes.
+        #if os(macOS)
+        let viewportWidth = view.window?.contentView?.bounds.width
+        #else
+        let viewportWidth = view.window?.bounds.width
+        #endif
+        guard proposed.isFinite, proposed < CGFloat.greatestFiniteMagnitude,
+              viewportWidth.map({ !$0.isFinite || $0 <= 0 || proposed <= $0 }) ?? true else {
+            return CGSize(width: width, height: measuredHeight)
+        }
         let nextWidth = max(44, proposed)
         if width != nextWidth {
             updating = true; width = nextWidth
@@ -240,7 +253,8 @@ struct XgentComposerNativeField: NSViewRepresentable {
         view.frame.size.height = measured
         let minimum = line + 16
         #endif
-        return CGSize(width: nextWidth, height: max(minimum, min(line * 6 + 16, measured)))
+        measuredHeight = max(minimum, min(line * 6 + 16, measured))
+        return CGSize(width: nextWidth, height: measuredHeight)
     }
 
     private func changed() {

@@ -2,6 +2,7 @@ import Foundation
 
 struct XgentWorkspacePanelControls: Decodable {
     let focusRequest: Int
+    let expandRequest: Int?
     let openLabel: String
     let returnLabel: String
     let expandLabel: String
@@ -13,6 +14,7 @@ struct XgentWorkspacePanelControls: Decodable {
 
     var isValid: Bool {
         (0...9_007_199_254_740_991).contains(focusRequest) &&
+        (expandRequest.map { (0...9_007_199_254_740_991).contains($0) } ?? true) &&
         ((dockLabel == nil && undockLabel == nil) ||
          [dockLabel, undockLabel].allSatisfy { $0.map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false }) &&
         (closeTabLabel.map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? true) &&
@@ -25,6 +27,7 @@ struct XgentWorkspacePanelControls: Decodable {
 struct XgentWorkspacePanelIdentity: Equatable {
     let surface: String
     let focusRequest: Int
+    var expandRequest: Int = 0
 }
 
 /// Selection and sizing are presentation state; sessions remain owned by the shared controllers.
@@ -32,12 +35,17 @@ struct XgentWorkspacePanelState {
     private(set) var selectedSurface: String?
     private(set) var dockedSurface: String?
     private var known: [String: Int] = [:]
+    private var knownExpansions: [String: Int] = [:]
     private var order: [String] = []
     var visible = true
     var expanded = false
 
     mutating func synchronize(_ panels: [XgentWorkspacePanelIdentity]) {
         let requested = panels.last { known[$0.surface] != $0.focusRequest }
+        let previousExpansions = knownExpansions
+        knownExpansions = Dictionary(uniqueKeysWithValues: panels.map {
+            ($0.surface, max(previousExpansions[$0.surface] ?? 0, $0.expandRequest))
+        })
         known = Dictionary(uniqueKeysWithValues: panels.map { ($0.surface, $0.focusRequest) })
         if let dockedSurface, !panels.contains(where: { $0.surface == dockedSurface }) {
             self.dockedSurface = nil
@@ -53,6 +61,11 @@ struct XgentWorkspacePanelState {
             } else { selectedSurface = panels.first { $0.surface != dockedSurface }?.surface }
         }
         order = panels.map(\.surface)
+        if visible, let selected = panels.first(where: { $0.surface == selectedSurface && $0.surface != dockedSurface }),
+           let previous = previousExpansions[selected.surface], selected.expandRequest > previous,
+           (selected.expandRequest - previous) % 2 == 1 {
+            expanded.toggle()
+        }
         if panels.isEmpty { expanded = false }
     }
 

@@ -1,18 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import JSZip from "jszip";
 import { read, utils, write } from "xlsx";
-import { editSpreadsheetInBrowser } from "../helpers/document-annotation-browser.mjs";
+import { editPresentationInBrowser, editSpreadsheetInBrowser, presentationFixture, readPresentationInBrowser } from "../helpers/document-annotation-browser.mjs";
 import { rotateImageInBrowser } from "../helpers/document-annotation-browser.mjs";
 import { imageFixture, pngPixels } from "../helpers/image-fixture.mjs";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 import { createReactHookHarness } from "../helpers/react-hook-harness.mjs";
 
-async function harness(image = false) {
+async function harness(image = false, presentation = false) {
   const hooks = createReactHookHarness(), calls = [], options = {};
   const workbook = utils.book_new();
   utils.book_append_sheet(workbook, utils.aoa_to_sheet([["First"], ["Old baseline"]]), "Report");
   utils.book_append_sheet(workbook, utils.aoa_to_sheet([["Other"]]), "Second");
-  const disk = { data: Buffer.from(image ? imageFixture() : write(workbook, { type: "array", bookType: "xlsx" })).toString("base64"), contentHash: "initial", mtimeMs: 10 };
+  const disk = { data: Buffer.from(presentation ? await presentationFixture(JSZip) : image ? imageFixture() : write(workbook, { type: "array", bookType: "xlsx" })).toString("base64"), contentHash: "initial", mtimeMs: 10 };
   const previous = globalThis.window;
   globalThis.window = { setTimeout, clearTimeout, atob, btoa, requestAnimationFrame: callback => setTimeout(callback, 0), cancelAnimationFrame: clearTimeout, confirm: () => true };
   const translate = key => key;
@@ -27,12 +28,17 @@ async function harness(image = false) {
     "../../lib/system/clipboardText": { writeClipboardText: async () => true },
     "../../lib/tools/fsBackend": { invokeFs: async (command, args) => {
       calls.push([command, args]);
-      if (command.startsWith("fs_read")) return { ...disk, path: args.path, mimeType: options.mimeType ?? (image ? "image/png" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"), sizeBytes: Buffer.from(disk.data, "base64").length, content: null };
+      if (command.startsWith("fs_read")) return { ...disk, path: args.path, mimeType: options.mimeType ?? (presentation ? "application/vnd.openxmlformats-officedocument.presentationml.presentation" : image ? "image/png" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"), sizeBytes: Buffer.from(disk.data, "base64").length, content: null };
       return options.write ? options.write(args) : saveBinary(args);
     } },
     "./workspaceSpreadsheet": {
       ...createTsModuleLoader().loadModule("src/components/workspace-editor/workspaceSpreadsheet.ts"),
       writeSpreadsheetEdits: editSpreadsheetInBrowser,
+    },
+    "./workspacePresentationText": {
+      ...createTsModuleLoader().loadModule("src/components/workspace-editor/workspacePresentationText.ts"),
+      readPresentationText: readPresentationInBrowser,
+      writePresentationText: editPresentationInBrowser,
     },
     "./workspaceImageOperations": {
       ...createTsModuleLoader().loadModule("src/components/workspace-editor/workspaceImageOperations.ts"),
@@ -41,13 +47,13 @@ async function harness(image = false) {
     "../chat/fileTypeIcons": { getFileTypeIcon: () => "FileIcon" }, "../icons": {}, "../MacOsTitleBarSpacer": {},
     "docx-preview": {}, "./OpenWithMenu": {}, "./WorkspaceMarkdownPreview": {}, "./WorkspacePdfPreview": {}, "./WorkspacePresentationPreview": {},
   };
-  for (const name of ["Banner", "Button", "EmptyState", "Icon", "IconButton", "NumberInput", "Layout", "Spinner", "Stack", "TabList", "Text", "TextArea", "Toolbar"]) {
+  for (const name of ["Banner", "Button", "EmptyState", "Icon", "IconButton", "NumberInput", "Layout", "Spinner", "Stack", "TabList", "Text", "TextArea", "TextInput", "Toolbar"]) {
     mocks[`@astryxdesign/core/${name}`] = Object.fromEntries([name, "HStack", "VStack", "Layout", "LayoutContent", "LayoutHeader", "LayoutFooter", "StackItem", "Tab", "TabList", "Heading", "Text"].map(exportName => [exportName, exportName]));
   }
   const loader = createTsModuleLoader({ mocks });
   const { WorkspaceFilePreviewOverlay } = loader.loadModule("src/components/workspace-editor/WorkspaceFilePreviewOverlay.tsx");
   const { previewDrafts, previewPendingWrites, previewDraftKey } = loader.loadModule("src/components/workspace-editor/previewDrafts.ts");
-  const props = { isOpen: true, openRequest: { id: 1, projectPathKey: "/project", ownerId: "owner", workdir: "/project", path: image ? "a.png" : "a.xlsx", ...(image ? { imagePaths: ["a.png", "b.png"] } : {}) }, presentation: "side", width: 500, onClose() {} };
+  const props = { isOpen: true, openRequest: { id: 1, projectPathKey: "/project", ownerId: "owner", workdir: "/project", path: presentation ? "a.pptx" : image ? "a.png" : "a.xlsx", ...(image ? { imagePaths: ["a.png", "b.png"] } : {}) }, presentation: "side", width: 500, onClose() {} };
   const render = () => hooks.render(() => WorkspaceFilePreviewOverlay(props));
   const elements = element => {
     if (!element || typeof element !== "object") return [];
@@ -58,6 +64,8 @@ async function harness(image = false) {
   const controls = () => ({
     grid: find(element => typeof element.props?.onSpreadsheetCellChange === "function"),
     save: find(element => element.type === "IconButton" && element.props.label === "workspaceEditor.save"),
+    tabs: find(element => element.type === "TabList"),
+    title: find(element => element.type === "TextInput"),
   });
   const flush = async () => { await new Promise(resolve => setTimeout(resolve, 20)); return render(); };
   async function waitFor(predicate) {
@@ -65,9 +73,29 @@ async function harness(image = false) {
     throw new Error(`Workspace preview did not reach the expected async state: ${find(element => element.type === "Banner")?.props.description ?? "no error banner"}`);
   }
   const unmount = () => { hooks.unmount(); if (previous === undefined) delete globalThis.window; else globalThis.window = previous; };
-  render(); await waitFor(() => !!controls().grid);
+  render(); await waitFor(() => presentation ? !!controls().tabs : !!controls().grid);
+  if (presentation) { controls().tabs.props.onChange("presentation"); await waitFor(() => !!controls().title); }
   return { props, options, disk, calls, render, controls, flush, waitFor, find, saveBinary, previewDrafts, previewPendingWrites, previewDraftKey, unmount };
 }
+
+test("shared PPTX edits save actual titles, preserve newer text and retire closed controls", async () => {
+  const h = await harness(false, true), wait = Promise.withResolvers();
+  try {
+    h.options.write = async args => { await wait.promise; return h.saveBinary(args); };
+    const old = h.controls(); old.title.props.onChange("Written title"); old.save.props.onClick(); old.save.props.onClick();
+    await h.waitFor(() => h.calls.some(([command]) => command === "fs_write_binary"));
+    h.controls().title.props.onChange(""); h.render(); wait.resolve();
+    await h.waitFor(() => !h.previewPendingWrites.size && !!h.controls().title);
+    assert.equal((await readPresentationInBrowser(Buffer.from(h.disk.data, "base64")))[0].text, "Written title");
+    assert.equal(h.controls().title.props.value, "");
+    assert.equal(h.calls.filter(([command]) => command === "fs_write_binary").length, 1);
+    assert.equal(h.calls.at(-1)[1].expected_content_hash, "initial");
+    const current = h.controls(); h.props.isOpen = false; h.render();
+    current.title.props.onChange("Retired title"); current.save.props.onClick(); await h.flush();
+    assert.equal(h.calls.filter(([command]) => command === "fs_write_binary").length, 1);
+    assert.deepEqual(Object.values(h.previewDrafts.get(h.previewDraftKey(h.props.openRequest)).texts), [""]);
+  } finally { wait.resolve(); h.unmount(); }
+});
 
 test("shared XLSX save reads immediate cell edits and rejects duplicate clicks", async () => {
   const h = await harness();

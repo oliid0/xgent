@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { read, utils, write } from "xlsx";
-import { PDFDocument, PDFName } from "pdf-lib";
+import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
-import { annotationBrowser, annotateInBrowser, editSpreadsheetInBrowser, presentationFixture } from "../helpers/document-annotation-browser.mjs";
+import { editPresentationInBrowser, editSpreadsheetInBrowser, presentationFixture, readPresentationInBrowser } from "../helpers/document-annotation-browser.mjs";
 import { rotateImageInBrowser } from "../helpers/document-annotation-browser.mjs";
 import { imageFixture, pngPixels } from "../helpers/image-fixture.mjs";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
@@ -33,6 +34,10 @@ function harness(options = {}) {
     },
   };
   const loader = createTsModuleLoader({ mocks: {
+    ...(options.presentation ? { [fileURLToPath(new URL("../../src/components/workspace-editor/workspacePresentationText.ts", import.meta.url))]: {
+      ...createTsModuleLoader().loadModule("src/components/workspace-editor/workspacePresentationText.ts"),
+      ...options.presentation,
+    } } : {}),
     "@xgent/runtime": { invoke: async (command, args) => {
       calls.push([command, { ...args }]);
       return options.invoke ? options.invoke(command, args) : { stdout: "Output", stderr: "", exitCode: 0 };
@@ -45,7 +50,6 @@ function harness(options = {}) {
       ...createTsModuleLoader().loadModule("src/components/workspace-editor/workspaceSpreadsheet.ts"),
       writeSpreadsheetEdits: editSpreadsheetInBrowser,
     },
-    ...(options.annotate ? { "../components/workspace-editor/documentAnnotations": { annotateDocument: options.annotate } } : {}),
     react: {
       useState(initial) {
         const owner = frame;
@@ -1251,7 +1255,7 @@ async function openAnnotatedDocument(options = {}) {
   const disk = { data: Buffer.from(bytes).toString("base64"), contentHash: "initial", mtimeMs: 10 };
   const path = `report.${format}`;
   const mimeType = options.mimeType ?? (format === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.presentationml.presentation");
-  const h = harness({ compact: options.compact, ...(format === "pptx" ? { annotate: annotateInBrowser } : {}),
+  const h = harness({ compact: options.compact, presentation: options.presentation,
     read: (_command, args) => args.path === path
       ? { ...readResult(path, ""), content: null, mimeType, ...disk }
       : readResult(args.path, "Second") });
@@ -1265,7 +1269,53 @@ async function openAnnotatedDocument(options = {}) {
   return { h, disk, saveBinary };
 }
 
-const notePayload = (text, page) => JSON.stringify({ text, page });
+test("native PPTX titles edit and save with version guards on both form factors", async () => {
+  const fields = await readPresentationInBrowser(await presentationFixture(JSZip));
+  for (const compact of [true, false]) {
+    const { h, disk } = await openAnnotatedDocument({ format: "pptx", compact, presentation: {
+      readPresentationText: async () => fields, writePresentationText: editPresentationInBrowser,
+    } });
+    try {
+      await h.flush();
+      await h.dispatch("workspace-file-view-mode", "presentation");
+      const input = h.node(`workspace-file-pptx:${fields[0].id}`);
+      assert.equal(input.value, fields[0].text);
+      await h.dispatch(input.action, "Edited title"); h.render();
+      assert.ok(h.node("workspace-file-unsaved"));
+      assert.equal((await h.dispatch("workspace-file-save")).ok, true);
+      assert.equal(h.node("workspace-file-error"), undefined);
+      const written = h.calls.find(([command]) => command === "fs_write_binary")[1];
+      assert.equal(written.expected_content_hash, "initial"); assert.equal(written.expected_mtime_ms, 10);
+      assert.equal((await readPresentationInBrowser(Buffer.from(disk.data, "base64")))[0].text, "Edited title");
+      assert.equal(h.node("workspace-file-unsaved"), undefined);
+      await h.dispatch("workspace-file-view-mode", "preview"); h.render();
+      assert.equal((await h.dispatch(input.action, "Retired input")).ok, false);
+    } finally { h.unmount(); }
+  }
+});
+
+test("native PPTX saves retain newer drafts and write failures preserve pending titles", async () => {
+  const fields = await readPresentationInBrowser(await presentationFixture(JSZip));
+  const { h, disk, saveBinary } = await openAnnotatedDocument({ format: "pptx", presentation: {
+    readPresentationText: async () => fields, writePresentationText: editPresentationInBrowser,
+  } });
+  const started = Promise.withResolvers(), release = Promise.withResolvers();
+  try {
+    await h.flush(); await h.dispatch("workspace-file-view-mode", "presentation"); h.render();
+    const action = h.node(`workspace-file-pptx:${fields[0].id}`).action;
+    await h.dispatch(action, "First save"); h.render();
+    h.options.write = async (command, args) => { started.resolve(); await release.promise; return saveBinary(command, args); };
+    const saving = h.dispatch("workspace-file-save"); await started.promise; h.render();
+    await h.dispatch(action, ""); h.render(); release.resolve(); await saving; h.render();
+    assert.equal((await readPresentationInBrowser(Buffer.from(disk.data, "base64")))[0].text, "First save");
+    assert.equal(h.node(`workspace-file-pptx:${fields[0].id}`).value, "");
+    assert.ok(h.node("workspace-file-unsaved"));
+    h.options.write = async () => { throw { code: "stale_file" }; };
+    await h.dispatch("workspace-file-save"); h.render();
+    assert.ok(h.node("workspace-file-error")); assert.ok(h.node("workspace-file-unsaved"));
+    assert.equal(h.node(`workspace-file-pptx:${fields[0].id}`).value, "");
+  } finally { release.resolve(); h.unmount(); }
+});
 
 async function openImage(options = {}) {
   const disk = new Map(["a.png", "b.png"].map(path => [path, { data: imageFixture().toString("base64"), contentHash: "initial", mtimeMs: 10 }]));
@@ -1431,132 +1481,39 @@ test("retired native discovery cannot populate a new file and mobile omits deskt
     assert.equal(mobile.calls.filter(([command]) => command === "fs_file_applications").length, 0);
   } finally { mobile.unmount(); }
 });
-async function pdfNotes(data, page) {
-  const document = await PDFDocument.load(Buffer.from(data, "base64"));
-  const notes = document.getPage(page - 1).node.Annots();
-  return notes ? Array.from({ length: notes.size() }, (_, index) => document.context.lookup(notes.get(index)).get(PDFName.of("Contents")).decodeText()) : [];
-}
-
-test("native PDF annotations save the current Unicode note and selected page on both Apple form factors", async () => {
-  for (const compact of [true, false]) {
-    const { h, disk } = await openAnnotatedDocument({ compact });
-    assert.equal(h.node("workspace-file-media").kind, "MediaPreview");
-    await h.dispatch("workspace-file-view-mode", "annotations"); h.render();
-    assert.equal(h.node("workspace-file-annotation-text").kind, "TextArea");
-    assert.equal(h.node("workspace-file-annotation-page").kind, "NumberInput");
-    await h.dispatch("workspace-file-annotation-text", "Old note");
-    await h.dispatch("workspace-file-save", notePayload("当前中文备注 😀\nSecond line", 2)); h.render();
-    assert.deepEqual(await pdfNotes(disk.data, 1), []);
-    assert.deepEqual(await pdfNotes(disk.data, 2), ["当前中文备注 😀\nSecond line"]);
-    assert.equal(h.calls.at(-1)[0], "fs_write_binary");
-    assert.equal(h.calls.at(-1)[1].expected_content_hash, "initial");
-    assert.equal(h.node("workspace-file-annotation-text").value, "");
-    assert.equal(h.node("workspace-file-unsaved"), undefined);
-    await h.dispatch("workspace-file-view-mode", "preview");
-    assert.equal(h.node("workspace-file-media").value, disk.data); h.unmount();
-  }
-});
-
-test("native annotations retain later text and page edits while a real binary write is pending", async () => {
-  const { h, disk, saveBinary } = await openAnnotatedDocument();
-  const wait = Promise.withResolvers();
-  h.options.write = async (command, args) => { await wait.promise; return saveBinary(command, args); };
-  await h.dispatch("workspace-file-view-mode", "annotations"); h.render();
-  await h.dispatch("workspace-file-annotation-text", "First note"); h.render();
-  const saving = h.dispatch("workspace-file-save"); await h.flush();
-  assert.equal(h.calls.at(-1)[0], "fs_write_binary");
-  await h.dispatch("workspace-file-annotation-page", 2);
-  await h.dispatch("workspace-file-annotation-text", "Second note"); h.render();
-  assert.equal((await h.dispatch("workspace-file-save")).ok, false);
-  wait.resolve(); await saving; h.render();
-  assert.equal(h.node("workspace-file-annotation-page").value, 2);
-  assert.equal(h.node("workspace-file-annotation-text").value, "Second note");
-  assert.ok(h.node("workspace-file-unsaved"));
-  h.options.write = saveBinary; await h.dispatch("workspace-file-save"); h.render();
-  assert.equal(h.calls.at(-1)[1].expected_content_hash, "written");
-  assert.deepEqual(await pdfNotes(disk.data, 1), ["First note"]);
-  assert.deepEqual(await pdfNotes(disk.data, 2), ["Second note"]); h.unmount();
-});
-
-test("native annotation draft recovery waits for background saves and carries the updated guard", async () => {
-  const { h, saveBinary } = await openAnnotatedDocument(); const first = h.props.previewRequest;
-  const wait = Promise.withResolvers();
-  h.options.write = async (command, args) => { await wait.promise; return saveBinary(command, args); };
-  await h.dispatch("workspace-file-view-mode", "annotations"); h.render();
-  await h.dispatch("workspace-file-annotation-text", "Written note"); h.render();
-  const saving = h.dispatch("workspace-file-save"); await h.flush();
-  await h.dispatch("workspace-file-annotation-text", "Later note");
-  const retired = h.surface;
-  h.props.previewRequest = { ...first, id: 3, path: "b.txt" }; h.render(); await h.flush();
-  assert.equal((await h.dispatch("workspace-file-annotation-text", "Retired note", retired)).ok, false);
-  h.props.previewRequest = { ...first, id: 4 }; h.render(); await h.flush();
-  assert.ok(h.node("workspace-file-loading"));
-  wait.resolve(); await saving; await h.flush();
-  await h.dispatch("workspace-file-view-mode", "annotations"); h.render();
-  assert.equal(h.node("workspace-file-annotation-text").value, "Later note");
-  assert.equal(h.node("workspace-file-error"), undefined);
-  h.options.write = saveBinary; await h.dispatch("workspace-file-save"); h.render();
-  assert.equal(h.calls.at(-1)[1].expected_content_hash, "written"); h.unmount();
-});
-
-test("native annotation limits and actual PDF page bounds prevent malformed writes", async () => {
-  const { h } = await openAnnotatedDocument();
-  await h.dispatch("workspace-file-view-mode", "annotations"); h.render();
-  for (const value of [0, -1, 1.5, Infinity, "2"]) assert.equal((await h.dispatch("workspace-file-annotation-page", value)).ok, false);
-  assert.equal((await h.dispatch("workspace-file-annotation-text", "X".repeat(12001))).ok, false);
-  assert.equal((await h.dispatch("workspace-file-save", notePayload("Note", -1))).ok, false);
-  assert.equal((await h.dispatch("workspace-file-save", "not JSON")).ok, false);
-  await h.dispatch("workspace-file-annotation-text", "Outside page"); h.render();
-  await h.dispatch("workspace-file-annotation-page", 3); h.render();
-  await h.dispatch("workspace-file-save"); h.render();
-  assert.match(h.node("workspace-file-error").label, /outside/);
-  assert.equal(h.calls.some(([command]) => command === "fs_write_binary"), false);
-  assert.equal(h.node("workspace-file-annotation-text").value, "Outside page"); h.unmount();
-});
-
-test("native annotation close confirmation preserves conflicts and a cancelled confirmation cannot save", async () => {
-  const { h } = await openAnnotatedDocument();
-  await h.dispatch("workspace-file-view-mode", "annotations"); h.render();
-  await h.dispatch("workspace-file-annotation-text", "Unsaved");
-  await h.dispatch("workspace-file-close"); h.render();
-  await h.dispatch("workspace-file-confirm-cancel");
-  await h.dispatch("workspace-file-confirm-save", notePayload("Cancelled note", 1)); h.render();
-  assert.equal(h.calls.some(([command]) => command === "fs_write_binary"), false);
-  h.options.write = async () => { throw { code: "stale_file" }; };
-  await h.dispatch("workspace-file-close"); h.render();
-  await h.dispatch("workspace-file-confirm-save", notePayload("Actual note", 2)); h.render();
-  assert.equal(h.closed, 0);
-  assert.equal(h.node("workspace-file-error").label, "workspaceEditor.conflictMessage");
-  assert.equal(h.node("workspace-file-annotation-text").value, "Actual note");
-  await h.dispatch("workspace-file-confirm-discard"); assert.equal(h.closed, 1); h.unmount();
-});
-
-test("native annotation save-and-close writes its current payload before dismissal", async () => {
-  const { h, disk } = await openAnnotatedDocument();
-  await h.dispatch("workspace-file-view-mode", "annotations"); h.render();
-  await h.dispatch("workspace-file-annotation-text", "Dirty");
-  await h.dispatch("workspace-file-close"); h.render();
-  await h.dispatch("workspace-file-confirm-save", notePayload("Saved before close", 2)); h.render();
-  assert.equal(h.closed, 1);
-  assert.deepEqual(await pdfNotes(disk.data, 2), ["Saved before close"]); h.unmount();
-});
-
-test("native PPTX annotations write an editable shape through the real shared XML implementation", { skip: !annotationBrowser }, async () => {
+test("native Office previews omit annotation controls and reject synthetic annotation saves", async () => {
   const { h, disk } = await openAnnotatedDocument({ format: "pptx" });
-  await h.dispatch("workspace-file-view-mode", "annotations"); h.render();
-  await h.dispatch("workspace-file-save", notePayload("原生幻灯片批注", 2)); h.render();
-  const zip = await JSZip.loadAsync(Buffer.from(disk.data, "base64"));
-  assert.match(await zip.file("ppt/slides/slide2.xml").async("string"), /原生幻灯片批注/);
-  assert.match(await zip.file("ppt/slides/slide2.xml").async("string"), /txBox="1"/);
-  assert.doesNotMatch(await zip.file("ppt/slides/slide1.xml").async("string"), /原生幻灯片批注/);
-  assert.equal(h.calls.at(-1)[0], "fs_write_binary");
-  assert.equal(h.node("workspace-file-unsaved"), undefined); h.unmount();
+  try {
+    const original = disk.data;
+    assert.deepEqual(h.node("workspace-file-view-mode").options.map(option => option.value), ["preview", "presentation"]);
+    assert.equal(h.node("workspace-file-save").disabled, true);
+    assert.equal((await h.dispatch("workspace-file-view-mode", "annotations")).ok, false);
+    assert.equal((await h.dispatch("workspace-file-save", JSON.stringify({ text: "Unrequested note", page: 2 }))).ok, false);
+    assert.equal(disk.data, original);
+    assert.equal(h.calls.some(([command]) => command === "fs_write_binary"), false);
+  } finally { h.unmount(); }
 });
 
 test("converted or unsupported document MIME types do not expose a writer for the original Office path", async () => {
   const { h } = await openAnnotatedDocument({ format: "pptx", mimeType: "application/pdf" });
   assert.equal(h.node("workspace-file-view-mode"), undefined);
   assert.equal(h.node("workspace-file-save"), undefined);
-  assert.equal((await h.dispatch("workspace-file-save", notePayload("Do not overwrite PPTX with PDF", 1))).ok, false);
+  assert.equal((await h.dispatch("workspace-file-save", JSON.stringify({ text: "Do not overwrite PPTX with PDF", page: 1 }))).ok, false);
   h.unmount();
+});
+
+
+test("native PDF previews omit standalone notes and synthetic note actions on both form factors", async () => {
+  for (const compact of [true, false]) {
+    const { h, disk } = await openAnnotatedDocument({ format: "pdf", compact });
+    try {
+      const original = disk.data;
+      assert.equal(h.node("workspace-file-view-mode"), undefined);
+      assert.equal(h.node("workspace-file-annotation-text"), undefined);
+      assert.equal(h.node("workspace-file-save"), undefined);
+      assert.equal((await h.dispatch("workspace-file-annotation-text", "Unused note")).ok, false);
+      assert.equal(disk.data, original);
+      assert.equal(h.calls.some(([command]) => command === "fs_write_binary"), false);
+    } finally { h.unmount(); }
+  }
 });

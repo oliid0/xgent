@@ -14,7 +14,9 @@ export function groupWorkTools(items: readonly ToolTraceItem[]) {
     const step = workToolStep(item);
     const integration = workToolIntegration(item);
     const key =
-      ["Read", "Write", "Edit", "Delete", "List", "Glob", "Grep"].includes(item.toolCall.name) &&
+      ["Read", "Write", "OfficeCreate", "Edit", "Delete", "List", "Glob", "Grep"].includes(
+        item.toolCall.name,
+      ) &&
       typeof path === "string" &&
       path.trim()
         ? JSON.stringify([item.toolCall.name, path, step])

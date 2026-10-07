@@ -1,6 +1,5 @@
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
-import { Button } from "@astryxdesign/core/Button";
 import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
@@ -18,7 +17,7 @@ import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
-import { isTauriRuntime, listen } from "@xgent/runtime";
+import { isTauriRuntime } from "@xgent/runtime";
 import {
   type FormEvent,
   useCallback,
@@ -33,12 +32,9 @@ import {
   ArrowLeft,
   Copy,
   ExternalLink,
-  FileText,
-  GitBranch,
   Globe,
   Lock,
   Maximize2,
-  MessageSquare,
   Minimize2,
   MoreHorizontal,
   Plus,
@@ -56,6 +52,7 @@ import {
 } from "../../../lib/browser/browserSessionController";
 import { useCompactViewport } from "../../../lib/responsive/compactViewport";
 import { isNativeMobileRuntime } from "../../../lib/runtimePlatform";
+import { BrowserStartPage, type BrowserTools } from "./BrowserStartPage";
 
 function hostname(url: string) {
   try {
@@ -253,14 +250,6 @@ function BrowserAddressBar(props: { compact: boolean }) {
   );
 }
 
-type BrowserTools = {
-  onNewTerminal?: () => void;
-  onOpenReview?: () => void;
-  onOpenFiles?: () => void;
-  onNewSideChat?: () => void;
-  toolsDisabled?: boolean;
-};
-
 function BrowserViewportSlot(props: BrowserTools) {
   const { t } = useLocale();
   const slotRef = useRef<HTMLDivElement>(null);
@@ -346,30 +335,7 @@ function BrowserViewportSlot(props: BrowserTools) {
           description={t("browser.remoteHostDescription")}
         />
       ) : blank ? (
-        <VStack width="100%" gap={4} padding={4} style={{ overflowY: "auto" }}>
-          <Text type="supporting" color="secondary">
-            {t("browser.startBrowsingDescription")}
-          </Text>
-          <HStack width="100%" gap={2} wrap="wrap">
-            {[
-              { run: props.onOpenReview, label: t("sidebar.gitReview"), icon: GitBranch },
-              { run: props.onNewTerminal, label: t("sidebar.terminal"), icon: Terminal },
-              { run: props.onOpenFiles, label: t("sidebar.myFiles"), icon: FileText },
-              { run: props.onNewSideChat, label: t("chat.split.toolbar"), icon: MessageSquare },
-            ]
-              .filter((tool) => tool.run)
-              .map((tool) => (
-                <Button
-                  key={tool.label}
-                  label={tool.label}
-                  icon={<Icon icon={tool.icon} size="sm" />}
-                  variant="secondary"
-                  onClick={tool.run}
-                  isDisabled={props.toolsDisabled}
-                />
-              ))}
-          </HStack>
-        </VStack>
+        <BrowserStartPage {...props} />
       ) : !activeSessionId ? (
         <Spinner size="lg" label={t("browser.preparing")} />
       ) : null}
@@ -400,30 +366,23 @@ export function BrowserPanel(
   }, [state.panelOpen]);
   useEffect(() => {
     if (!state.panelOpen || !isTauriRuntime() || isNativeMobileRuntime()) return;
-    const shortcut = (key: string) => {
-      if (key === "F11")
-        props.onPresentationChange(props.presentation === "fullscreen" ? "side" : "fullscreen");
-      if (key === "F12")
-        void browserSessionController.action("open_devtools").catch(() => undefined);
-    };
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "F11" && event.key !== "F12") return;
       event.preventDefault();
-      shortcut(event.key);
+      browserSessionController.handleShortcut(event.key);
     };
     window.addEventListener("keydown", onKey);
-    const subscriptions = [
-      listen<{ sessionId: string; key: string }>("browser-shortcut", ({ payload }) => {
-        if (payload.sessionId === browserSessionController.getSnapshot().activeSessionId)
-          shortcut(payload.key);
-      }),
-    ];
     return () => {
       window.removeEventListener("keydown", onKey);
-      for (const subscription of subscriptions)
-        void subscription.then((unlisten) => unlisten()).catch(() => undefined);
     };
-  }, [state.panelOpen, props.presentation, props.onPresentationChange]);
+  }, [state.panelOpen]);
+  const consumedExpansion = useRef(state.panelExpandRequest);
+  useEffect(() => {
+    const count = state.panelExpandRequest - consumedExpansion.current;
+    consumedExpansion.current = state.panelExpandRequest;
+    if (state.panelOpen && count > 0 && count % 2 === 1)
+      props.onPresentationChange(props.presentation === "fullscreen" ? "side" : "fullscreen");
+  }, [state.panelExpandRequest, state.panelOpen, props.presentation, props.onPresentationChange]);
   if (!state.panelOpen || (compact && state.panelOpenSource !== "user")) return null;
 
   const panel = (

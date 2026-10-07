@@ -6,6 +6,28 @@ import XCTest
 @testable import XgentNativeUI
 
 final class WindowChromeTests: XCTestCase {
+    @MainActor func testSessionClosureTargetsAnUnselectedBrowserAndRejectsRetiredControls() throws {
+        let model = XgentPresentationModel()
+        defer { model.invalidate() }
+        model.update(try document("chat", nodes: [["id": "chat", "kind": "ChatLayout", "children": []]]))
+        let nodes: [[String: Any]] = [["id": "browser-tab-items", "kind": "VStack", "children": [
+            ["id": "browser-tab:a", "kind": "Button", "label": "Active", "selected": true, "action": "select-a"],
+            ["id": "browser-tab:b", "kind": "Button", "label": "Other", "action": "select-b", "children": [
+                ["id": "browser-tab-close:b", "kind": "IconButton", "label": "Close Other", "action": "close-b"]]]]]]
+        model.update(try document("browser", mode: "panel", nodes: nodes))
+        var actions: [XgentAction] = []
+        model.actionSink = { actions.append($0) }
+        let tab = try XCTUnwrap(XgentWindowToolbarContext(model: model).tabs.last)
+        XCTAssertFalse(tab.selected)
+        XCTAssertTrue(tab.close(model))
+        XCTAssertEqual(actions.map(\.action), ["close-b"])
+        XCTAssertEqual(actions.first?.surface, "browser")
+        model.update(try document("browser", mode: "panel", revision: 2, nodes: []))
+        XCTAssertFalse(tab.close(model))
+        XCTAssertFalse(tab.select(model))
+        XCTAssertEqual(actions.count, 1)
+    }
+
     @MainActor func testWindowContextSharesPanelSelectionAndKeepsWebsiteTitlesAndURLs() throws {
         let model = XgentPresentationModel()
         defer { model.invalidate() }
@@ -228,7 +250,9 @@ final class WindowChromeTests: XCTestCase {
                 ["id": "window-forward", "kind": "IconButton", "label": "Forward", "icon": "arrow.right", "action": "forward"],
                 ["id": "sidebar", "kind": "IconButton", "label": "Show sidebar", "icon": "sidebar.leading", "action": "sidebar"],
                 ["id": "window-right-sidebar", "kind": "IconButton", "label": "Show tools", "icon": "sidebar.trailing", "action": "tools"]]],
-            ["id": "content", "kind": "Text", "text": "Visible conversation content"]]]]]
+            ["id": "content", "kind": "Text", "text": "Visible conversation content"],
+            ["id": "composer", "kind": "Composer", "children": [
+                ["id": "draft", "kind": "ComposerInput", "label": "Message", "value": "Native draft", "action": "draft"]]]]]]]
     }
     @MainActor private func publish(_ payload: [String: Any], to pointer: UnsafeMutableRawPointer) throws -> Int32 {
         let json = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: payload), encoding: .utf8))

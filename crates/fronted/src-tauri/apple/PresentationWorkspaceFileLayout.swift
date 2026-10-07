@@ -48,9 +48,7 @@ struct XgentWorkspaceFileLayout: View {
                           (XgentImageRotationDraft.relative(in: document, model: model) ?? 0) != 0 else { return }
                     model.send(item, in: document, value: .number(angle)); return
                 }
-                let draft = item.variant == "workspace-file-save" ? XgentDocumentAnnotationDraft.current(in: document, model: model) : nil
-                if let draft, !draft.canSave { return }
-                model.send(item, in: document, value: draft?.encoded.map(XgentValue.string) ?? .null)
+                model.send(item, in: document)
             } label: { EmptyView() }
                 .keyboardShortcut(key, modifiers: modifiers)
                 .disabled(item.disabled == true || model.isBusy(item, in: document))

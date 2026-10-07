@@ -142,6 +142,7 @@ function harness(overrides = {}, options = {}) {
   const pendingEffects = [];
   let cursor = 0;
   let mounted = false;
+  const translate = key => key;
   const loader = createTsModuleLoader({ mocks: {
     ...(options.invoke ? { "@tauri-apps/api/core": { invoke: options.invoke } } : {}),
     ...(options.fsInvoke ? { "../lib/tools/fsBackend": { invokeFs: options.fsInvoke } } : {}),
@@ -161,6 +162,14 @@ function harness(overrides = {}, options = {}) {
         return states[index];
       },
       useMemo: (create) => create(),
+      useCallback(callback, dependencies) {
+        const index = cursor++;
+        const previous = states[index];
+        if (!previous || !dependencies.every((item, i) => Object.is(item, previous.dependencies[i]))) {
+          states[index] = { dependencies, callback };
+        }
+        return states[index].callback;
+      },
       useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
       useEffect(effect, dependencies) {
         if (!options.effects) return;
@@ -176,7 +185,8 @@ function harness(overrides = {}, options = {}) {
       },
       useLayoutEffect(effect) { if (!mounted) cleanups.push(effect()); },
     },
-    "../i18n": { useLocale: () => ({ t: (key) => key }) },
+    "../i18n": { useLocale: () => ({ t: translate }) },
+    "../../../i18n": { useLocale: () => ({ t: translate }) },
     "../lib/runtimePlatform": { isNativeMobileRuntime: () => mobile },
     "../lib/soul": { useSoul: () => options.soul ?? { loading: false, saving: false, activeId: "default",
       presets: [{ id: "default", metadata: { name: "XGent" } }], select: async () => {} } },
@@ -246,6 +256,58 @@ function harness(overrides = {}, options = {}) {
     unmount: () => { for (const cleanup of cleanups) cleanup?.(); registry.remove("chat"); },
   };
 }
+
+test("native plus lists actual installed Skills and inserts the selected rich reference", async () => {
+  const skills = ["review", "slides"].map(name => ({ name, description: `Use ${name}`, baseDir: `/skills/${name}`, skillFile: `/skills/${name}/SKILL.md` }));
+  const selected = [];
+  const h = harness({ enabledSkills: [skills[0]], availableSkills: skills,
+    onSelectSkill: skill => { selected.push(skill.name); return true; } });
+  try {
+    const composer = h.render().nodes[0].children.find(node => node.id === "composer");
+    const footer = composer.children.find(node => node.id === "composer-actions");
+    const attach = footer.children.find(node => node.id === "attach");
+    assert.equal(attach.variant, "composer-add");
+    const listed = attach.children.find(node => node.id === "composer-skills").children;
+    assert.deepEqual(listed.map(node => node.label), ["review", "slides"]);
+    assert.equal((await h.dispatch(listed[1].action)).ok, true);
+    assert.deepEqual(h.props.composerRef.current.getDraft().skillMentions, [skills[1]]);
+    assert.deepEqual(selected, ["slides"]);
+    assert.equal(footer.children.find(node => node.id === "model").variant, "composer-model");
+    assert.equal(footer.children.find(node => node.id === "model").children.find(node => node.id === "model:search").label, "chat.searchModel");
+    assert.ok(footer.children.some(node => node.id === "runtime-reasoning"));
+    assert.equal(attach.children.some(node => node.id === "runtime-reasoning"), false);
+    h.props.inputDisabled = true; h.render();
+    assert.equal((await h.dispatch(listed[0].action)).ok, false);
+  } finally { h.unmount(); }
+});
+
+test("a rejected installed Skill selection does not insert a reference", async () => {
+  const skill = { name: "slides", description: "Slides", baseDir: "/skills/slides", skillFile: "/skills/slides/SKILL.md" };
+  const h = harness({ availableSkills: [skill], enabledSkills: [], onSelectSkill: () => false });
+  try {
+    const document = h.render();
+    const find = nodes => nodes.flatMap(node => [node, ...find(node.children ?? [])]);
+    const choice = find(document.nodes).find(node => node.id === `composer-skill:${skill.skillFile}`);
+    await h.dispatch(choice.action);
+    assert.deepEqual(h.props.composerRef.current.getDraft().skillMentions, []);
+  } finally { h.unmount(); }
+});
+
+test("XChat plus retains runtime options while denying workspace file and repository access", async () => {
+  let queries = 0;
+  const h = harness({ gitClient: { branches: async () => { queries++; throw Error("workspace leaked"); } } });
+  try {
+    h.props.settings.system.executionMode = "text";
+    const composer = h.render().nodes[0].children.find(node => node.id === "composer");
+    const attach = composer.children.find(node => node.id === "composer-actions").children.find(node => node.id === "attach");
+    const reference = attach.children.find(node => node.id === "composer-workspace-reference");
+    assert.equal(reference.disabled, true);
+    assert.equal((await h.dispatch(reference.action)).ok, false);
+    assert.equal(attach.children.some(node => node.id.startsWith("composer-git")), false);
+    assert.ok(attach.children.some(node => node.id === "runtime-web-search"));
+    assert.equal(queries, 0);
+  } finally { h.unmount(); }
+});
 
 test("native edits reach the shared composer used by send and conversation draft restoration", async () => {
   const sent = [];
@@ -1378,6 +1440,7 @@ test("desktop workspace add menu opens shared browser, terminal, side conversati
   const opened = [];
   const h = harness({
     onOpenBrowser: () => opened.push("browser"), onOpenTerminal: () => opened.push("terminal"),
+    onNewBrowser: () => opened.push("new-browser"),
     onNewSideConversation: () => opened.push("side-chat"), onOpenGitReview: () => opened.push("git"),
     onOpenRemote: () => opened.push("ssh"),
   });
@@ -1385,10 +1448,10 @@ test("desktop workspace add menu opens shared browser, terminal, side conversati
     const menu = h.render().nodes[0].children.find(node => node.id === "workspace-panel-actions");
     assert.equal(menu.kind, "Menu");
     assert.deepEqual(menu.children.map(node => node.id), [
-      "workspace-open-browser", "workspace-open-terminal", "workspace-new-chat", "workspace-open-git", "workspace-open-ssh",
+      "workspace-open-browser", "workspace-new-browser", "workspace-open-terminal", "workspace-new-chat", "workspace-open-git", "workspace-open-ssh",
     ]);
     for (const node of menu.children) assert.equal((await h.dispatch(node.action)).ok, true);
-    assert.deepEqual(opened, ["browser", "terminal", "side-chat", "git", "ssh"]);
+    assert.deepEqual(opened, ["browser", "new-browser", "terminal", "side-chat", "git", "ssh"]);
     h.props.onNewSideConversation = undefined; h.render();
     assert.equal((await h.dispatch("workspace-new-chat")).ok, false);
   } finally { h.unmount(); }
@@ -1558,7 +1621,7 @@ test("empty native model selection stays in the footer and opens provider settin
   const composer = chat.children.find((node) => node.id === "composer");
   const footer = composer.children.find((node) => node.id === "composer-actions");
   const model = footer.children.find((node) => node.id === "model");
-  assert.equal(model.variant, "compact");
+  assert.equal(model.variant, "composer-model");
   assert.equal(model.disabled, true);
   assert.ok(model.label);
   assert.equal(composer.children.some((node) => node.id === "model"), false);

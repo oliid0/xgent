@@ -5,6 +5,7 @@ export function createNativeWorkspacePanel(
   t: (key: string) => string,
   compact: boolean,
   focusRequest = 0,
+  expandRequest?: number,
 ): Pick<PresentationDocument, "mode" | "workspacePanel"> {
   return compact
     ? { mode: "root" }
@@ -12,6 +13,7 @@ export function createNativeWorkspacePanel(
         mode: "panel",
         workspacePanel: {
           focusRequest,
+          ...(expandRequest === undefined ? {} : { expandRequest }),
           openLabel: t("chat.workspacePanel.open"),
           returnLabel: t("chat.workspacePanel.return"),
           expandLabel: t("chat.workspacePanel.expand"),

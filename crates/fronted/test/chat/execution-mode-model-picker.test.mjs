@@ -117,7 +117,7 @@ test("composer exposes the requested controls through Astryx slots", () => {
   assert.match(composerSource, /sendActions=\{/);
   assert.match(composerSource, /const usedTokens = Math\.max\(0, tokens \?\? 0\)/);
   assert.match(composerSource, /content=\{addMenuContent\}/);
-  assert.doesNotMatch(composerSource, /chat\.composer\.addMention[\s\S]*?insertText\("@"\)/);
+  assert.match(composerSource, /chat\.composer\.filesAndFolders/);
   assert.doesNotMatch(composerSource, /chat\.composer\.addCommand/);
 });
 
@@ -128,7 +128,8 @@ test("composer git repository uses an in-popover drill-in menu", () => {
   );
   assert.match(gitSource, /const \[showOperations, setShowOperations\]/);
   assert.match(gitSource, /label=\{repositoryMenuLabel\}/);
-  assert.match(gitSource, /endContent=\{<ChevronRight \/>\}/);
+  assert.doesNotMatch(gitSource, /ChevronRight/);
+  assert.match(gitSource, /<Switch/);
   assert.match(gitSource, /git\.branchSelector\.initRepository/);
   assert.match(gitSource, /git\.branchSelector\.refresh/);
   assert.doesNotMatch(gitSource, /<Popover/);

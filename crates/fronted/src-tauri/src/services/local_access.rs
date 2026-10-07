@@ -1288,6 +1288,7 @@ fn authorize_local_command(
 ) -> Result<(), String> {
     const FILE_WRITE_COMMANDS: &[&str] = &[
         "fs_write_text",
+        "fs_create_office_document",
         "fs_edit_text",
         "fs_delete",
         "fs_create_dir",
@@ -1750,6 +1751,10 @@ mod tests {
             .push("browser_automation".to_string());
         assert!(authorize_local_command("plugin:browser-automation|action", &config).is_err());
         assert!(authorize_local_command("terminal_create", &config).is_ok());
+
+        config.blocked_local_capabilities.push("file_write".to_string());
+        assert!(authorize_local_command("fs_create_office_document", &config).is_err());
+        assert!(authorize_local_command("fs_read_text", &config).is_ok());
 
         config.cloud_execution_enabled = true;
         assert!(authorize_local_command("cloud_task_start", &config).is_ok());

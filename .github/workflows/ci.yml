@@ -162,6 +162,15 @@ jobs:
           CARGO_TERM_COLOR: always
         run: cargo test --manifest-path crates/fronted/src-tauri/Cargo.toml -p tauri-plugin-mobile-execution status_preserves_environment_root --lib
 
+      - name: Test DOCX text preservation and package round trips
+        env:
+          CARGO_TERM_COLOR: always
+        run: cargo test --manifest-path crates/fronted/src-tauri/Cargo.toml docx --lib
+
+      - name: Test native Office creation and no-overwrite guards
+        env:
+          CARGO_TERM_COLOR: always
+        run: cargo test --manifest-path crates/fronted/src-tauri/Cargo.toml office_creation --lib
   architecture:
     name: Architecture Guard
     runs-on: ubuntu-latest

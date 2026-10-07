@@ -13,7 +13,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
 
 function browser(options = {}) {
   const hooks = createReactHookHarness(), calls = [];
-  const state = { panelOpen: true, panelOpenSource: "user", panelFocusRequest: 3, initializing: false, error: null,
+  const state = { panelOpen: true, panelOpenSource: "user", panelFocusRequest: 3, panelExpandRequest: 0, initializing: false, error: null,
     sessions: [{ sessionId: "one", url: options.url ?? "https://example.test", title: "Example" }, { sessionId: "two", url: "https://other.test", title: "Other" }],
     activeSessionId: "one", busySessionIds: [] };
   const controller = {
@@ -53,6 +53,20 @@ function browser(options = {}) {
   return { state, calls, render, action, nodes: () => flatten(render().document.nodes), unmount: () => hooks.unmount() };
 }
 
+test("native browser publishes the shared expansion counter and validates malformed requests", () => {
+  const h = browser();
+  try {
+    assert.equal(h.render().document.workspacePanel.expandRequest, 0);
+    h.state.panelExpandRequest = 3;
+    assert.equal(h.render().document.workspacePanel.expandRequest, 3);
+    h.state.panelExpandRequest = -1;
+    assert.throws(() => h.render(), /workspace panel/);
+  } finally { h.unmount(); }
+  const mobile = browser({ mobile: true });
+  try { assert.equal(mobile.render().document.workspacePanel, undefined); }
+  finally { mobile.unmount(); }
+});
+
 test("native browser uses the latest edit before a document rerender and Return carries the actual field draft", async () => {
   const h = browser();
   try {
@@ -74,6 +88,24 @@ test("native browser wires desktop history, reload, devtools and conversation ta
     assert.equal(h.nodes().find(node => node.id === "browser-tab-count").label, "2/16");
     h.action("browser-tab:two"); assert.equal(h.state.activeSessionId, "two");
     assert.equal(h.nodes().find(node => node.id === "browser-address:two").value, "https://other.test");
+  } finally { h.unmount(); }
+});
+
+test("closing a nonselected native tab targets that session and retired tab controls do nothing", async () => {
+  const h = browser();
+  try {
+    const published = h.render();
+    await h.action("browser-tab-close:two", null, published);
+    assert.deepEqual(h.calls, [["close-tab", "two"]]);
+    assert.equal(h.state.activeSessionId, "one");
+    h.state.sessions = h.state.sessions.filter(session => session.sessionId !== "two");
+    h.action("browser-tab:two", null, published);
+    await h.action("browser-tab-close:two", null, published);
+    assert.equal(h.state.activeSessionId, "one");
+    assert.deepEqual(h.calls, [["close-tab", "two"]]);
+    h.unmount();
+    await h.action("browser-tab-close:one", null, published);
+    assert.equal(h.calls.filter(call => call[0] === "close-tab").length, 1);
   } finally { h.unmount(); }
 });
 
@@ -251,5 +283,25 @@ test("native new-tab unavailable workspace actions and retired asynchronous fail
     const task = h.action("browser-copy_address"); h.state.activeSessionId = "two";
     pending.reject(Error("previous tab failure")); await task;
     assert.ok(!h.nodes().some(node => node.id === "browser-error-message"));
+  } finally { h.unmount(); }
+});
+
+test("retired new-tab tools cannot access an old workspace after mode or callback changes", async () => {
+  const selected = [];
+  const options = { url: "about:blank", tools: [{ id: "terminal", label: "Terminal", icon: "terminal", run: () => selected.push("old") }] };
+  const h = browser(options);
+  try {
+    const previous = h.render();
+    assert.equal(h.nodes().find(node => node.id === "browser-new-tab-tools").variant, "browser-new-tab-tools");
+    options.tools = []; h.render();
+    await h.action("browser-tool:terminal", null, previous);
+    assert.deepEqual(selected, []);
+    options.tools = [{ id: "terminal", label: "Terminal", icon: "terminal", run: () => selected.push("new") }];
+    h.render(); await h.action("browser-tool:terminal", null, previous);
+    assert.deepEqual(selected, []);
+    await h.action("browser-tool:terminal"); assert.deepEqual(selected, ["new"]);
+    options.tools[0].enabled = false; h.render();
+    await h.action("browser-tool:terminal", null, previous);
+    assert.deepEqual(selected, ["new"]);
   } finally { h.unmount(); }
 });

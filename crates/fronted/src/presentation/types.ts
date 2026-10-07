@@ -108,6 +108,7 @@ export type PresentationDocument = {
   mode: "root" | "sheet" | "alert" | "sidebar" | "panel" | "toast" | "status";
   workspacePanel?: {
     focusRequest: number;
+    expandRequest?: number;
     openLabel: string;
     returnLabel: string;
     expandLabel: string;

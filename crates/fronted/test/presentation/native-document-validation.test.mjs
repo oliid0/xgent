@@ -13,6 +13,14 @@ test("desktop panels require a valid focus token, translated controls and a real
   const panel = { ...document({ id: "content", kind: "Text", text: "Actual content" }),
     ...createNativeWorkspacePanel(key => key, false, 2), formFactor: "desktop", dismissAction: "close" };
   assert.doesNotThrow(() => validatePresentationDocument(panel, handlers));
+  for (const request of [0, 3, Number.MAX_SAFE_INTEGER]) {
+    assert.doesNotThrow(() => validatePresentationDocument({ ...panel,
+      ...createNativeWorkspacePanel(key => key, false, 2, request) }, handlers));
+  }
+  for (const expandRequest of [-1, 0.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1, "1", null]) {
+    assert.throws(() => validatePresentationDocument({ ...panel,
+      workspacePanel: { ...panel.workspacePanel, expandRequest } }, handlers), /workspace panel/);
+  }
   assert.equal(createNativeWorkspacePanel(key => key, true).mode, "root");
   assert.doesNotThrow(() => validatePresentationDocument({ ...panel, workspacePanel: {
     ...panel.workspacePanel, dockLabel: "Dock", undockLabel: "Restore" } }, handlers));

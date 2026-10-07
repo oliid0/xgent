@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
-function setup(action, openTabListener) {
+function setup(action, openTabListener, shortcutListener) {
   const sessions = new Map();
   let opens = 0;
   const client = {
@@ -21,12 +21,51 @@ function setup(action, openTabListener) {
   };
   const loader = createTsModuleLoader({ mocks: { "../browserAutomation": { localBrowserAutomationClient: client } } });
   const { BrowserSessionController } = loader.loadModule("src/lib/browser/browserSessionController.ts");
-  return { controller: new BrowserSessionController(client, openTabListener), client, opens: () => opens };
+  return { controller: new BrowserSessionController(client, openTabListener, shortcutListener), client, opens: () => opens };
 }
 
 const flushPopups = async () => {
   for (let index = 0; index < 3; index++) await new Promise(resolve => setImmediate(resolve));
 };
+
+test("shared browser shortcuts validate ownership, dispatch devtools once and retire their listener", async () => {
+  let callback, registrations = 0, cleanups = 0;
+  const actions = [];
+  const { controller, client } = setup(async (sessionId, action) => {
+    actions.push([sessionId, action]); return { sessionId, action };
+  }, undefined, async handler => { registrations++; callback = handler; return () => { cleanups++; }; });
+  controller.selectConversation("one"); const source = await controller.newSession();
+  const leaveWeb = controller.subscribe(() => {}), leaveNative = controller.subscribe(() => {});
+  controller.openPanel(source.sessionId, "user");
+  callback({ sessionId: source.sessionId, key: "F11" });
+  callback({ sessionId: source.sessionId, key: "F11" });
+  assert.equal(controller.getSnapshot().panelExpandRequest, 2);
+  callback({ sessionId: source.sessionId, key: "F12" }); await flushPopups();
+  assert.deepEqual(actions, [[source.sessionId, "open_devtools"]]); assert.equal(registrations, 1);
+  for (const request of [null, { key: "F11" }, { sessionId: "foreign", key: "F11" },
+    { sessionId: source.sessionId, key: "wrong" }]) callback(request);
+  controller.closePanel(); callback({ sessionId: source.sessionId, key: "F11" });
+  controller.selectConversation("two"); const other = await controller.newSession(); controller.openPanel(other.sessionId, "user");
+  callback({ sessionId: source.sessionId, key: "F12" }); await flushPopups();
+  assert.equal(controller.getSnapshot().panelExpandRequest, 2); assert.equal(actions.length, 1);
+  client.action = async () => { throw Error("Native devtools unavailable"); };
+  controller.handleShortcut("F12"); await flushPopups();
+  assert.match(controller.getSnapshot().error, /Native devtools unavailable/);
+  leaveWeb(); await flushPopups(); assert.equal(cleanups, 0);
+  leaveNative(); await flushPopups(); assert.equal(cleanups, 1);
+  callback({ sessionId: other.sessionId, key: "F11" }); assert.equal(controller.getSnapshot().panelExpandRequest, 2);
+});
+
+test("late browser shortcut registration cleans up without replaying a retired key", async () => {
+  let callback, resolveRegistration, cleanups = 0;
+  const { controller } = setup(undefined, undefined, handler => {
+    callback = handler; return new Promise(resolve => { resolveRegistration = () => resolve(() => { cleanups++; }); });
+  });
+  const source = await controller.newSession(); controller.openPanel(source.sessionId, "user");
+  const leave = controller.subscribe(() => {}); leave();
+  callback({ sessionId: source.sessionId, key: "F11" }); resolveRegistration(); await flushPopups();
+  assert.equal(controller.getSnapshot().panelExpandRequest, 0); assert.equal(cleanups, 1);
+});
 
 test("shared native popup listener creates one real tab with both presentation subscribers", async () => {
   let callback, registrations = 0, cleanups = 0;

@@ -4,227 +4,82 @@ import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Selector } from "@astryxdesign/core/Selector";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-import { ArrowLeft, ChevronRight, GitBranch, RefreshCw } from "../../../components/icons";
+import { useEffect, useState } from "react";
+import { ArrowLeft, GitBranch, RefreshCw } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
-import type {
-  GitBranch as GitBranchInfo,
-  GitClient,
-  GitDiscoveredRepository,
-  GitRepositoryState,
-} from "../../../lib/git/types";
-import { emptyGitRepositoryState, gitDiscoveredRepositoryLabel } from "../../../lib/git/types";
-import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/types";
-import { useWorkspaceInvalidation } from "../../../lib/workspace-activity/useWorkspaceInvalidation";
+import { useComposerGitRepository } from "../composer/useComposerGitRepository";
 
-const WORKSPACE_REPOSITORY_VALUE = "__workspace_repository__";
-
-function repositoryValue(repository: GitDiscoveredRepository) {
-  return repository.isWorkspaceRoot ? WORKSPACE_REPOSITORY_VALUE : repository.root;
-}
-
-function operationError(error: unknown, fallback: string) {
-  return error instanceof Error && error.message.trim() ? error.message : fallback;
-}
-
-function assertGitResult(
-  result: { ok: boolean; message?: string; stderr?: string },
-  fallback: string,
+export function ComposerGitRepositoryControl(
+  props: Parameters<typeof useComposerGitRepository>[0],
 ) {
-  if (result.ok) return;
-  throw new Error(result.message?.trim() || result.stderr?.trim() || fallback);
-}
-
-export function ComposerGitRepositoryControl(props: {
-  workdir: string;
-  gitClient?: GitClient | null;
-  workspaceActivityClient?: WorkspaceActivityClient | null;
-  isOpen: boolean;
-  isDisabled?: boolean;
-  canWrite?: boolean;
-  disabledMessage?: string;
-}) {
   const { t } = useLocale();
-  const [repositories, setRepositories] = useState<GitDiscoveredRepository[]>([]);
-  const [selectedRepository, setSelectedRepository] = useState(WORKSPACE_REPOSITORY_VALUE);
-  const [repositoryState, setRepositoryState] = useState<GitRepositoryState>(() =>
-    emptyGitRepositoryState(props.workdir),
-  );
-  const [branches, setBranches] = useState<GitBranchInfo[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isMutating, setIsMutating] = useState(false);
-  const [error, setError] = useState("");
   const [showOperations, setShowOperations] = useState(false);
-  const requestIdRef = useRef(0);
-  const selectedRepositoryRef = useRef(selectedRepository);
-  selectedRepositoryRef.current = selectedRepository;
-
-  const activeWorkdir =
-    selectedRepository === WORKSPACE_REPOSITORY_VALUE
-      ? props.workdir
-      : selectedRepository || props.workdir;
-
-  const refresh = useCallback(async () => {
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    if (!props.gitClient || !props.workdir.trim()) {
-      setRepositories([]);
-      setBranches([]);
-      setRepositoryState(emptyGitRepositoryState(props.workdir));
-      return;
-    }
-
-    setIsLoading(true);
-    setError("");
-    try {
-      const discovered = props.gitClient.discoverRepositories
-        ? await props.gitClient.discoverRepositories(props.workdir)
-        : { workdir: props.workdir, repositories: [] };
-      if (requestIdRef.current !== requestId) return;
-
-      const nextRepositories = discovered.repositories;
-      setRepositories(nextRepositories);
-      const currentSelection = selectedRepositoryRef.current;
-      const selectionStillExists = nextRepositories.some(
-        (repository) => repositoryValue(repository) === currentSelection,
-      );
-      const workspaceRepository = nextRepositories.find((repository) => repository.isWorkspaceRoot);
-      const fallbackRepository = workspaceRepository ?? nextRepositories[0];
-      const nextSelection = selectionStillExists
-        ? currentSelection
-        : fallbackRepository
-          ? repositoryValue(fallbackRepository)
-          : WORKSPACE_REPOSITORY_VALUE;
-      selectedRepositoryRef.current = nextSelection;
-      setSelectedRepository(nextSelection);
-
-      const targetWorkdir =
-        nextSelection === WORKSPACE_REPOSITORY_VALUE ? props.workdir : nextSelection;
-      const response = await props.gitClient.branches(targetWorkdir);
-      if (requestIdRef.current !== requestId) return;
-      setRepositoryState(response.state);
-      setBranches(response.branches);
-    } catch (loadError) {
-      if (requestIdRef.current !== requestId) return;
-      setRepositories([]);
-      setBranches([]);
-      setRepositoryState(emptyGitRepositoryState(props.workdir));
-      setError(operationError(loadError, t("git.branchSelector.operationFailed")));
-    } finally {
-      if (requestIdRef.current === requestId) setIsLoading(false);
-    }
-  }, [props.gitClient, props.workdir, t]);
-
   useEffect(() => {
-    selectedRepositoryRef.current = WORKSPACE_REPOSITORY_VALUE;
-    setSelectedRepository(WORKSPACE_REPOSITORY_VALUE);
-    setRepositories([]);
-    setBranches([]);
-    setRepositoryState(emptyGitRepositoryState(props.workdir));
-  }, [props.workdir]);
-
-  useEffect(() => {
-    if (props.isOpen) void refresh();
-  }, [props.isOpen, refresh]);
-
-  useEffect(() => {
-    if (!props.isOpen) setShowOperations(false);
-  }, [props.isOpen]);
-
-  useWorkspaceInvalidation({
-    client: props.gitClient ? props.workspaceActivityClient : null,
-    workdir: props.workdir,
-    active: props.isOpen,
-    onInvalidate: (hint) => {
-      if (hint.git) void refresh();
-    },
-  });
-
-  const repositoryOptions = useMemo(
-    () =>
-      repositories.map((repository) => ({
-        value: repositoryValue(repository),
-        label: gitDiscoveredRepositoryLabel(repository),
-        description: repository.relativePath || repository.root,
-      })),
-    [repositories],
-  );
-  const branchOptions = useMemo(
-    () =>
-      branches.map((branch) => ({
-        value: branch.fullName,
-        label: branch.name,
-        description: branch.kind === "remote" ? t("git.branchSelector.remoteBranches") : undefined,
-      })),
-    [branches, t],
-  );
-  const selectedBranch = branches.find((branch) => branch.current)?.fullName ?? "";
-  const selectedRepositoryLabel =
-    repositories.find((repository) => repositoryValue(repository) === selectedRepository)?.name ??
-    activeWorkdir.replace(/\\/g, "/").split("/").filter(Boolean).at(-1) ??
-    activeWorkdir;
-  const noRepository = repositoryState.status !== "ready";
-  const isDisabled = props.isDisabled || !props.gitClient || !props.workdir.trim();
-  const canWrite = props.canWrite ?? true;
-  const repositoryMenuLabel = noRepository
-    ? t("git.branchSelector.noRepoShort")
-    : selectedRepositoryLabel;
-  const repositoryMenuDescription = noRepository
-    ? t("git.branchSelector.initRepository")
-    : repositoryState.head || t("git.branchSelector.detached");
-
-  const switchBranch = async (value: string) => {
-    const branch = branches.find((candidate) => candidate.fullName === value);
-    if (!branch || branch.current || !props.gitClient || isDisabled || !canWrite) return;
-    setIsMutating(true);
-    setError("");
-    try {
-      const result = await props.gitClient.switchBranch(activeWorkdir, branch.name, branch.kind);
-      assertGitResult(result, t("git.branchSelector.operationFailed"));
-      await refresh();
-    } catch (switchError) {
-      setError(operationError(switchError, t("git.branchSelector.operationFailed")));
-    } finally {
-      setIsMutating(false);
-    }
-  };
-
-  const initializeRepository = async () => {
-    if (!props.gitClient || isDisabled || !canWrite) return;
-    setIsMutating(true);
-    setError("");
-    try {
-      const result = await props.gitClient.init(props.workdir, { branch: "main" });
-      assertGitResult(result, t("git.branchSelector.operationFailed"));
-      selectedRepositoryRef.current = WORKSPACE_REPOSITORY_VALUE;
-      setSelectedRepository(WORKSPACE_REPOSITORY_VALUE);
-      await refresh();
-    } catch (initError) {
-      setError(operationError(initError, t("git.branchSelector.operationFailed")));
-    } finally {
-      setIsMutating(false);
-    }
-  };
-
+    setShowOperations(false);
+  }, [props.isOpen, props.workdir]);
+  const {
+    repositoryOptions,
+    branchOptions,
+    selectedRepository,
+    selectedBranch,
+    repositoryMenuLabel,
+    repositoryMenuDescription,
+    noRepository,
+    isDisabled,
+    canWrite,
+    isLoading,
+    isMutating,
+    error,
+    selectRepository,
+    switchBranch,
+    initializeRepository,
+    refresh,
+  } = useComposerGitRepository(props);
   if (!showOperations) {
     return (
-      <List density="compact">
-        <ListItem
-          label={repositoryMenuLabel}
-          description={repositoryMenuDescription}
-          startContent={
-            <StatusDot
-              variant={error ? "error" : noRepository ? "warning" : "success"}
-              label={repositoryMenuDescription}
+      <VStack gap={2} width="100%">
+        <List density="compact">
+          <ListItem
+            label={repositoryMenuLabel}
+            description={repositoryMenuDescription}
+            startContent={
+              <StatusDot
+                variant={error ? "error" : noRepository ? "warning" : "success"}
+                label={repositoryMenuDescription}
+              />
+            }
+            endContent={
+              noRepository ? (
+                <Switch
+                  label={t("git.branchSelector.initRepository")}
+                  isLabelHidden
+                  value={false}
+                  onChange={(enabled) => {
+                    if (enabled) void initializeRepository();
+                  }}
+                  isDisabled={isDisabled || !canWrite || isLoading || isMutating || !!error}
+                />
+              ) : undefined
+            }
+            isDisabled={isDisabled || isLoading || isMutating}
+            onClick={noRepository ? undefined : () => setShowOperations(true)}
+          />
+        </List>
+        {error ? (
+          <>
+            <Banner status="error" title={error} collapsible={false} />
+            <IconButton
+              label={t("git.branchSelector.refresh")}
+              icon={<RefreshCw />}
+              variant="ghost"
+              isDisabled={isDisabled || isLoading || isMutating}
+              onClick={() => void refresh()}
             />
-          }
-          endContent={<ChevronRight />}
-          isDisabled={isDisabled}
-          onClick={() => setShowOperations(true)}
-        />
-      </List>
+          </>
+        ) : null}
+      </VStack>
     );
   }
 
@@ -247,11 +102,7 @@ export function ComposerGitRepositoryControl(props: {
           label={t("git.branchSelector.repositoryLabel")}
           options={repositoryOptions}
           value={selectedRepository}
-          onChange={(value) => {
-            selectedRepositoryRef.current = value;
-            setSelectedRepository(value);
-            void refresh();
-          }}
+          onChange={selectRepository}
           variant="input"
           size="sm"
           width="100%"

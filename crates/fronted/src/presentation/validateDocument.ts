@@ -80,6 +80,8 @@ export function validatePresentationDocument(
         )) ||
       !Number.isSafeInteger(panel.focusRequest) ||
       panel.focusRequest < 0 ||
+      (panel.expandRequest !== undefined &&
+        (!Number.isSafeInteger(panel.expandRequest) || panel.expandRequest < 0)) ||
       [
         panel.openLabel,
         panel.returnLabel,

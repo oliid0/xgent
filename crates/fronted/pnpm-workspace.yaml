@@ -4,5 +4,7 @@ allowBuilds:
   '@google/genai': true
   esbuild: true
   protobufjs: true
+minimumReleaseAgeExclude:
+  - docx@9.9.0
 patchedDependencies:
   '@astryxdesign/core@0.6.3': patches/@astryxdesign__core@0.6.3.patch

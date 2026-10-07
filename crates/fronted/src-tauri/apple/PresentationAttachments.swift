@@ -77,6 +77,7 @@ struct XgentAttachmentPicker: View {
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
     var controlSize: CGFloat = 44
+    @State private var addOpen = false
     @State private var pickingFiles = false
     @State private var pickingPhotos = false
     @State private var photos: [PhotosPickerItem] = []
@@ -91,15 +92,15 @@ struct XgentAttachmentPicker: View {
     #endif
 
     private func label(_ value: String, _ fallback: String) -> String {
-        node.options?.first { $0.value == value }?.label ?? fallback
+        source.options?.first { $0.value == value }?.label ?? fallback
     }
 
     private func includes(_ value: String) -> Bool {
-        node.options?.contains { $0.value == value } ?? true
+        source.options?.contains { $0.value == value } ?? true
     }
 
     private func disabled(_ value: String) -> Bool {
-        node.options?.first { $0.value == value }?.disabled == true
+        source.options?.first { $0.value == value }?.disabled == true
     }
 
     private var configurationPicker: Bool { node.variant == "mcp-config" }
@@ -108,11 +109,22 @@ struct XgentAttachmentPicker: View {
         configurationPicker ? [.json, .plainText, UTType(filenameExtension: "toml", conformingTo: .plainText) ?? .plainText] : [.item]
     }
 
-    var body: some View {
-        Menu {
+    private var currentDocument: XgentDocument { model.documents.first { $0.surface == document.surface } ?? document }
+    private var source: XgentNode { currentDocument.node(id: node.id) ?? node }
+
+    @ViewBuilder private func choiceLabel(_ option: String, fallback: String, icon: String) -> some View {
+        if node.variant == "composer-add" {
+            HStack {
+                Label(label(option, fallback), systemImage: icon)
+                Spacer(minLength: 0)
+            }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
+        } else { Label(label(option, fallback), systemImage: icon) }
+    }
+
+    @ViewBuilder private var pickerChoices: some View {
             #if os(iOS)
             if includes("camera") && UIImagePickerController.isSourceTypeAvailable(.camera) {
-                Button { requestCamera() } label: { Label(label("camera", "Camera"), systemImage: "camera") }
+                Button { requestCamera() } label: { choiceLabel("camera", fallback: "Camera", icon: "camera") }
                     .disabled(disabled("camera"))
             }
             #endif
@@ -121,7 +133,7 @@ struct XgentAttachmentPicker: View {
                     guard let owner = capture("photos") else { return }
                     photoOwner = owner
                     pickingPhotos = true
-                } label: { Label(label("photos", "Photos"), systemImage: "photo.on.rectangle") }
+                } label: { choiceLabel("photos", fallback: "Photos", icon: "photo.on.rectangle") }
                     .disabled(disabled("photos"))
             }
             if includes("files") {
@@ -129,14 +141,12 @@ struct XgentAttachmentPicker: View {
                     guard let owner = capture("files") else { return }
                     fileOwner = owner
                     pickingFiles = true
-                } label: { Label(label("files", "Files"), systemImage: "folder") }
+                } label: { choiceLabel("files", fallback: "Files", icon: "paperclip") }
                     .disabled(disabled("files"))
             }
-            if !(node.children ?? []).isEmpty {
-                Divider()
-                XgentNativeMenuItems(nodes: node.children ?? [], document: document, model: model)
-            }
-        } label: {
+    }
+
+    @ViewBuilder private var controlLabel: some View {
             if importing { ProgressView().frame(width: controlSize, height: controlSize) }
             else if singleFilePicker {
                 Label(node.label ?? "Import file", systemImage: configurationPicker ? "doc.badge.plus" : "key")
@@ -151,9 +161,46 @@ struct XgentAttachmentPicker: View {
                     .frame(width: controlSize, height: controlSize)
                     .contentShape(Circle())
             }
+    }
+
+    @ViewBuilder private var pickerControl: some View {
+        if node.variant == "composer-add" {
+            Button { addOpen.toggle() } label: { controlLabel }
+                .buttonStyle(.plain)
+                .popover(isPresented: $addOpen, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(source.label ?? "").font(.subheadline).foregroundStyle(.secondary)
+                                .accessibilityAddTraits(.isHeader)
+                            pickerChoices
+                            XgentComposerAddRows(nodes: source.children ?? [], document: currentDocument, model: model) { addOpen = false }
+                        }.buttonStyle(.plain).padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(minWidth: 260, idealWidth: 420, maxWidth: 420, maxHeight: 420)
+                    .environment(\.xgentSettingsRow, false)
+                    .modifier(XgentPresentationThemeModifier(theme: currentDocument.theme ?? .fallback,
+                        appearance: currentDocument.appearance))
+                    .preferredColorScheme(currentDocument.colorScheme)
+                    #if os(iOS)
+                    .presentationCompactAdaptation(.popover)
+                    #endif
+                }
+        } else {
+            Menu {
+                pickerChoices
+                if !(node.children ?? []).isEmpty {
+                    Divider()
+                    XgentNativeMenuItems(nodes: node.children ?? [], document: document, model: model)
+                }
+            } label: { controlLabel }
+                .menuStyle(.borderlessButton)
         }
-        .menuStyle(.borderlessButton).disabled(importing || node.disabled == true)
+    }
+
+    var body: some View {
+        pickerControl.disabled(importing || node.disabled == true)
         .accessibilityLabel(node.label ?? "Attach files")
+        .accessibilityIdentifier(node.id)
         .fileImporter(isPresented: $pickingFiles, allowedContentTypes: allowedFileTypes,
                       allowsMultipleSelection: !singleFilePicker,
                       onCompletion: { result in
@@ -200,6 +247,7 @@ struct XgentAttachmentPicker: View {
             }
         }
         .onChange(of: node.action) { _, _ in cancelSelection() }
+        .onDisappear { cancelSelection() }
         .onChange(of: node.disabled) { _, disabled in if disabled == true { cancelSelection() } }
         #if os(iOS)
         .fullScreenCover(isPresented: $takingPhoto, onDismiss: { cameraOwner = nil }) {
@@ -224,8 +272,9 @@ struct XgentAttachmentPicker: View {
         #if os(iOS)
         guard cameraOwner == nil else { return nil }
         #endif
-        let owner = XgentAttachmentOwner(node: node, document: document, option: option)
+        let owner = XgentAttachmentOwner(node: source, document: currentDocument, option: option)
         guard owner.isCurrent(in: model) else { return nil }
+        addOpen = false
         fileOwner = nil
         photoOwner = nil
         return owner
@@ -259,6 +308,7 @@ struct XgentAttachmentPicker: View {
     }
 
     private func cancelSelection() {
+        addOpen = false
         importTask?.cancel()
         importTask = nil
         importID = nil

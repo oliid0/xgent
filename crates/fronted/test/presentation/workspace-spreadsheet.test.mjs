@@ -9,6 +9,17 @@ const { buildSpreadsheetTable, boundedSpreadsheetText, parseSpreadsheetCellEdit,
   createTsModuleLoader().loadModule("src/components/workspace-editor/workspaceSpreadsheet.ts");
 const writeSpreadsheetEdits = editSpreadsheetInBrowser;
 
+test("shared Office output shows uncached formulas without inventing a calculated value", async () => {
+  const { createOfficeDocument } = createTsModuleLoader().loadModule("src/lib/office/createOfficeDocument.ts");
+  const bytes = await createOfficeDocument({ format: "xlsx", sheets: [{ name: "Data", rows: [[12, { formula: "=A1*2" }]] }] });
+  const table = buildSpreadsheetTable({ kind: "spreadsheet", bytes }, "Data", "Failed");
+  assert.equal(table.error, null);
+  assert.equal(table.rows[0].cells[0].value, "12");
+  assert.equal(table.rows[0].cells[1].value, "=A1*2");
+  const xml = await (await JSZip.loadAsync(bytes)).file("xl/worksheets/sheet1.xml").async("string");
+  assert.match(xml, /<f>A1\*2<\/f><\/c>/);
+});
+
 function workbookBytes() {
   const workbook = utils.book_new();
   const sheet = utils.aoa_to_sheet([["Name", "Total", "Formula"], ["First", 12.5, 25]]);

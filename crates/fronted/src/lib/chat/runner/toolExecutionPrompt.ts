@@ -28,12 +28,20 @@ export function buildToolsSuffix(
   const planModeActive = !allowAll && has(EXIT_PLAN_MODE_TOOL_NAME);
   const present = (...names: string[]) => names.filter(has);
 
-  const fileTools = ["Read", "Image", "Write", "Edit", "Delete", "List", "Grep", "Glob"].filter(
-    has,
-  );
+  const fileTools = [
+    "Read",
+    "Image",
+    "Write",
+    "OfficeCreate",
+    "Edit",
+    "Delete",
+    "List",
+    "Grep",
+    "Glob",
+  ].filter(has);
   const hasFileTool = fileTools.length > 0;
   const hasReadFamily = hasAny("Read", "List", "Grep", "Glob");
-  const canWrite = hasAny("Write", "Edit", "Delete");
+  const canWrite = hasAny("Write", "OfficeCreate", "Edit", "Delete");
   const processWaitTools = present("ProcessWait", "ProcessStop");
   const taskTools = present("TaskCreate", "TaskUpdate", "TaskList");
 
@@ -164,6 +172,11 @@ export function buildToolsSuffix(
     if (has("Write")) {
       lines.push(
         "- Write fully creates or overwrites one text file. The path must include the intended filename, not just a directory.",
+      );
+    }
+    if (has("OfficeCreate")) {
+      lines.push(
+        "- OfficeCreate generates editable DOCX/XLSX/PPTX directly, with structured document data. It needs no Shell, Skill, executable or installation. Use a new filename matching document.format; existing files are never replaced. Formula cells have no fabricated cached result. Inspect the saved document with Read and open it with PreviewFile when available. Use Write for plain-text files rather than writing text into an Office extension.",
       );
     }
     if (has("Edit")) {

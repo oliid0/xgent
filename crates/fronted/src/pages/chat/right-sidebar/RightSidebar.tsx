@@ -1,19 +1,10 @@
-import { DropdownMenu, type DropdownMenuOption } from "@astryxdesign/core/DropdownMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { type ReactNode, useEffect, useId, useRef } from "react";
-import { browserSessionController } from "../../../lib/browser/browserSessionController";
-import { tabForKey } from "./tabState";
-import "./rightSidebar.css";
-
 import {
-  FileText,
-  GitBranch,
-  Globe,
   Maximize2,
-  MessageSquare,
   Minimize2,
   PanelRightClose,
   Plus,
@@ -21,6 +12,7 @@ import {
   X,
 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
+import { tabForKey } from "./tabState";
 
 export type RightSidebarTab = {
   id: string;
@@ -60,51 +52,6 @@ export function RightSidebar(props: {
     const selected = stripRef.current?.querySelector('[aria-selected="true"]');
     selected?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
   }, [props.activeTabId, props.visible]);
-  const menuItems: DropdownMenuOption[] = [
-    {
-      label: t("browser.title"),
-      isDisabled: props.browserDisabled,
-      icon: <Icon icon={Globe} size="sm" color="inherit" />,
-      onClick: props.onNewBrowser,
-    },
-    ...(props.agentToolsEnabled !== false
-      ? [
-          ...(props.onOpenReview
-            ? [
-                {
-                  label: t("sidebar.gitReview"),
-                  icon: <Icon icon={GitBranch} size="sm" />,
-                  isDisabled: props.terminalDisabled,
-                  onClick: props.onOpenReview,
-                },
-              ]
-            : []),
-          ...(props.onOpenFiles
-            ? [
-                {
-                  label: t("sidebar.myFiles"),
-                  icon: <Icon icon={FileText} size="sm" />,
-                  isDisabled: props.terminalDisabled,
-                  onClick: props.onOpenFiles,
-                },
-              ]
-            : []),
-          {
-            label: t("sidebar.terminal"),
-            isDisabled: props.terminalDisabled,
-            icon: <Icon icon={Terminal} size="sm" color="inherit" />,
-            onClick: props.onNewTerminal,
-          },
-          {
-            label: t("chat.split.toolbar"),
-            description: t("chat.split.empty"),
-            icon: <Icon icon={MessageSquare} size="sm" color="inherit" />,
-            onClick: props.onNewSideChat,
-          },
-        ]
-      : []),
-  ];
-
   return (
     <VStack
       as="aside"
@@ -199,20 +146,23 @@ export function RightSidebar(props: {
               ))}
             </HStack>
           ) : null}
-          <DropdownMenu
-            button={{
-              label: t("chat.upload.add"),
-              tooltip: t("chat.upload.add"),
-              icon: <Icon icon={Plus} size="sm" color="inherit" />,
-              isIconOnly: true,
-              variant: "ghost",
-              size: "sm",
+          <IconButton
+            label={t(props.terminalIsDocked ? "projectTools.newTerminal" : "browser.newTab")}
+            tooltip={t(props.terminalIsDocked ? "projectTools.newTerminal" : "browser.newTab")}
+            icon={<Icon icon={Plus} size="sm" color="inherit" />}
+            variant="ghost"
+            size="sm"
+            isDisabled={
+              props.terminalIsDocked
+                ? props.agentToolsEnabled === false || props.terminalDisabled
+                : props.browserDisabled
+            }
+            onClick={() => {
+              if (props.terminalIsDocked) {
+                if (props.agentToolsEnabled !== false && !props.terminalDisabled)
+                  props.onNewTerminal();
+              } else if (!props.browserDisabled) props.onNewBrowser();
             }}
-            items={menuItems}
-            onOpenChange={browserSessionController.setSurfaceOccluded}
-            placement="below"
-            alignment="end"
-            hasChevron={false}
           />
         </HStack>
         {props.onDockTerminal ? (

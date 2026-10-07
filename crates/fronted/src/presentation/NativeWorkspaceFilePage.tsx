@@ -1,15 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  DOCUMENT_ANNOTATION_MAX_LENGTH,
-  DOCUMENT_ANNOTATION_MAX_PAGE,
-  type DocumentAnnotationDraft,
-  documentAnnotationFormat,
-  hasAnnotationDraft,
-  parseAnnotationDraft,
-  remainingAnnotationDraft,
-  validAnnotationPage,
-} from "../components/workspace-editor/documentAnnotationDraft";
-import { annotateDocument } from "../components/workspace-editor/documentAnnotations";
+import { usePresentationText } from "../components/workspace-editor/usePresentationText";
 import {
   useWorkspaceEditorExecution,
   type WorkspaceEditorExecution,
@@ -39,6 +29,14 @@ import {
   isWorkspaceEditablePreviewPath,
   workspacePathExtension,
 } from "../components/workspace-editor/workspaceImagePreview";
+import {
+  isEditablePresentation,
+  type PresentationTextEdits,
+  presentationHasEdits,
+  remainingPresentationEdits,
+  validPresentationText,
+  writePresentationText,
+} from "../components/workspace-editor/workspacePresentationText";
 import { parseWorkspaceSourceDraft } from "../components/workspace-editor/workspaceSourceDraft";
 import {
   buildSpreadsheetTable,
@@ -116,7 +114,7 @@ type LoadedFile = {
   sizeBytes: number;
   totalLines?: number;
   cells?: SpreadsheetEdits;
-  annotation?: DocumentAnnotationDraft;
+  texts?: PresentationTextEdits;
   rotation?: ImageRotationDraft;
 };
 
@@ -124,7 +122,7 @@ type PendingConfirmation = "close" | "reload" | null;
 
 type FileDraft = Pick<
   LoadedFile,
-  "content" | "savedContent" | "mtimeMs" | "contentHash" | "cells" | "annotation" | "rotation"
+  "content" | "savedContent" | "mtimeMs" | "contentHash" | "cells" | "texts" | "rotation"
 >;
 type FileDraftCache = {
   finds: Map<string, NativeWorkspaceFind>;
@@ -158,7 +156,7 @@ function isFileDirty(file: FileDraft | null | undefined) {
     !!file &&
     (file.content !== file.savedContent ||
       spreadsheetHasEdits(file.cells) ||
-      hasAnnotationDraft(file.annotation) ||
+      presentationHasEdits(file.texts) ||
       hasImageRotationDraft(file.rotation))
   );
 }
@@ -172,7 +170,7 @@ function acknowledgedDraft(
     ...current,
     savedContent: snapshot.content,
     cells: remainingSpreadsheetEdits(current.cells, snapshot.cells),
-    annotation: remainingAnnotationDraft(current.annotation, snapshot.annotation),
+    texts: remainingPresentationEdits(current.texts, snapshot.texts),
     rotation: remainingImageRotation(current.rotation, snapshot.rotation),
     mtimeMs: response.mtimeMs,
     contentHash: response.contentHash,
@@ -410,7 +408,7 @@ function NativeWorkspaceFileSession(
             mtimeMs: value.mtimeMs,
             contentHash: value.contentHash,
             cells: value.cells,
-            annotation: value.annotation,
+            texts: value.texts,
             rotation: value.rotation,
           });
         } else {
@@ -444,7 +442,15 @@ function NativeWorkspaceFileSession(
     confirmationRef.current = next;
     setConfirmationState(next);
   }, []);
-  const [previewMode, setPreviewMode] = useState<"preview" | "source" | "annotations">("preview");
+  const [previewMode, setPreviewMode] = useState<"preview" | "source" | "presentation">("preview");
+  const presentationBytes = useMemo(
+    () =>
+      loaded?.data && isEditablePresentation(loaded.path, loaded.mimeType)
+        ? previewBytes(loaded.data)
+        : null,
+    [loaded?.data, loaded?.path, loaded?.mimeType],
+  );
+  const presentationText = usePresentationText(presentationBytes);
   const [activeSheet, setActiveSheet] = useState("");
   const activeSheetRef = useRef("");
   const spreadsheet = useMemo(() => {
@@ -544,7 +550,7 @@ function NativeWorkspaceFileSession(
           if (
             !draft ||
             (!spreadsheetHasEdits(draft.cells) &&
-              !hasAnnotationDraft(draft.annotation) &&
+              !presentationHasEdits(draft.texts) &&
               !hasImageRotationDraft(draft.rotation) &&
               draft.content === file.content)
           )
@@ -657,11 +663,6 @@ function NativeWorkspaceFileSession(
     !!spreadsheet &&
     !spreadsheet.error;
   const canEdit = loaded?.mode === "editor" || editablePreview;
-  const annotationFormat =
-    loaded?.mode === "preview" && loaded.data
-      ? documentAnnotationFormat(loaded.path, loaded.mimeType)
-      : null;
-
   const save = useCallback(
     async (value: PresentationValue = null) => {
       if (savingRef.current || !mounted.current || loadingRef.current) return false;
@@ -686,16 +687,7 @@ function NativeWorkspaceFileSession(
           )
             return false;
           setLoaded({ ...current, content: source.content });
-        } else {
-          const annotation = parseAnnotationDraft(value);
-          if (
-            !annotation ||
-            !current?.data ||
-            !documentAnnotationFormat(current.path, current.mimeType)
-          )
-            return false;
-          setLoaded({ ...current, annotation });
-        }
+        } else return false;
       }
       const pendingWrite = draftCache.pendingWrites.get(draftKey);
       if (pendingWrite) {
@@ -737,17 +729,11 @@ function NativeWorkspaceFileSession(
             expected_mtime_ms: snapshot.mtimeMs,
             expected_content_hash: snapshot.contentHash,
           });
-        } else if (hasAnnotationDraft(snapshot.annotation)) {
-          const format = documentAnnotationFormat(snapshot.path, snapshot.mimeType);
-          if (!format || !snapshot.data || !snapshot.annotation)
+        } else if (presentationHasEdits(snapshot.texts)) {
+          if (!snapshot.data || workspacePathExtension(snapshot.path) !== "pptx")
             throw new Error(t("workspaceEditor.saveFailed"));
           binaryData = previewBytesBase64(
-            await annotateDocument(
-              previewBytes(snapshot.data),
-              format,
-              snapshot.annotation.page,
-              snapshot.annotation.text,
-            ),
+            await writePresentationText(previewBytes(snapshot.data), snapshot.texts ?? {}),
           );
           response = await invokeFs<WriteDocumentResponse>("fs_write_binary", {
             workdir: snapshot.request.workdir,
@@ -973,7 +959,7 @@ function NativeWorkspaceFileSession(
         ...current,
         content: current.savedContent,
         cells: undefined,
-        annotation: undefined,
+        texts: undefined,
         rotation: current.rotation
           ? { ...current.rotation, angle: current.rotation.saved }
           : undefined,
@@ -1068,9 +1054,7 @@ function NativeWorkspaceFileSession(
             "workspace-file-hide",
           ].includes(id)
         ? { variant: "workspace-source-action", current: dirty ? 1 : 0 }
-        : annotationFormat && (id === "workspace-file-save" || id === "workspace-file-confirm-save")
-          ? { variant: "workspace-file-save" }
-          : {}),
+        : {}),
     action: bind(
       actionID,
       run,
@@ -1092,10 +1076,7 @@ function NativeWorkspaceFileSession(
             "workspace-file-confirm-save",
             "workspace-file-image-save",
           ].includes(id) &&
-          validImageRotation(value)) ||
-        (!!annotationFormat &&
-          (id === "workspace-file-save" || id === "workspace-file-confirm-save") &&
-          !!parseAnnotationDraft(value)),
+          validImageRotation(value)),
       enabled,
     ),
   });
@@ -1150,7 +1131,9 @@ function NativeWorkspaceFileSession(
     loaded?.mode === "preview" &&
     (previewKind === "html" ||
       previewKind === "markdown" ||
-      (previewKind === "document" && workspacePathExtension(loaded.path) === "docx"));
+      (previewKind === "document" &&
+        workspacePathExtension(loaded.path) === "docx" &&
+        loaded.content !== null));
   const renderedPreview =
     formattedPreview && previewKind !== "document" && previewMode === "preview";
   const mediaPreview = Boolean(
@@ -1310,6 +1293,63 @@ function NativeWorkspaceFileSession(
           ],
         }
       : null;
+  const presentationEditorNode: PresentationNode | null =
+    presentationBytes && previewMode === "presentation"
+      ? presentationText.loading
+        ? {
+            id: "workspace-file-pptx-loading",
+            kind: "EmptyState",
+            icon: "hourglass",
+            label: t("workspaceFilePreview.loading"),
+          }
+        : presentationText.error
+          ? {
+              id: "workspace-file-pptx-error",
+              kind: "Banner",
+              status: "error",
+              label: presentationText.error,
+            }
+          : {
+              id: "workspace-file-pptx-texts",
+              kind: "VStack",
+              spacing: 12,
+              padding: 12,
+              children: presentationText.entries.length
+                ? presentationText.entries.map((field) => ({
+                    id: `workspace-file-pptx:${field.id}`,
+                    kind: "TextInput" as const,
+                    label: `${t("workspaceFilePreview.slide")} ${field.slide} · ${field.label}`,
+                    value: loaded?.texts?.[field.id] ?? field.text,
+                    disabled: !field.editable || loading,
+                    action: bind(
+                      `workspace-file-pptx:${field.id}`,
+                      (value) => {
+                        const current = loadedRef.current;
+                        if (
+                          !current ||
+                          current.data !== loaded?.data ||
+                          !validPresentationText(value)
+                        )
+                          return false;
+                        const texts = { ...current.texts };
+                        if (value === field.text) delete texts[field.id];
+                        else texts[field.id] = value;
+                        setLoaded({ ...current, texts });
+                        return true;
+                      },
+                      validPresentationText,
+                      field.editable && !loading,
+                    ),
+                  }))
+                : [
+                    {
+                      id: "workspace-file-pptx-empty",
+                      kind: "EmptyState",
+                      label: t("workspaceFilePreview.empty"),
+                    },
+                  ],
+            }
+      : null;
   const contentNode: PresentationNode =
     loading && !loaded
       ? {
@@ -1321,75 +1361,8 @@ function NativeWorkspaceFileSession(
               ? t("workspaceFilePreview.loading")
               : t("workspaceEditor.opening"),
         }
-      : annotationFormat && previewMode === "annotations" && loaded
-        ? {
-            id: "workspace-file-annotations",
-            kind: "VStack",
-            variant: "workspace-file-annotations",
-            fill: true,
-            padding: 12,
-            children: [
-              {
-                id: "workspace-file-annotation-help",
-                kind: "Text",
-                text: t(
-                  annotationFormat === "pdf"
-                    ? "workspaceFilePreview.pdfAnnotationHelp"
-                    : "workspaceFilePreview.slideAnnotationHelp",
-                ),
-                secondary: true,
-              },
-              {
-                id: "workspace-file-annotation-page",
-                kind: "NumberInput",
-                variant: "document-annotation-page",
-                label: t("workspaceFilePreview.annotationPage"),
-                minimum: 1,
-                maximum: DOCUMENT_ANNOTATION_MAX_PAGE,
-                step: 1,
-                value: loaded.annotation?.page ?? 1,
-                action: bind(
-                  "workspace-file-annotation-page",
-                  (value) => {
-                    if (!mounted.current || !validAnnotationPage(value)) return;
-                    setLoaded((current) =>
-                      current
-                        ? {
-                            ...current,
-                            annotation: { text: current.annotation?.text ?? "", page: value },
-                          }
-                        : current,
-                    );
-                  },
-                  validAnnotationPage,
-                ),
-              },
-              {
-                id: "workspace-file-annotation-text",
-                kind: "TextArea",
-                variant: "document-annotation",
-                label: t("workspaceFilePreview.annotations"),
-                value: loaded.annotation?.text ?? "",
-                fill: true,
-                action: bind(
-                  "workspace-file-annotation-text",
-                  (value) => {
-                    if (!mounted.current || typeof value !== "string") return;
-                    setLoaded((current) =>
-                      current
-                        ? {
-                            ...current,
-                            annotation: { page: current.annotation?.page ?? 1, text: value },
-                          }
-                        : current,
-                    );
-                  },
-                  (value) =>
-                    typeof value === "string" && value.length <= DOCUMENT_ANNOTATION_MAX_LENGTH,
-                ),
-              },
-            ],
-          }
+      : presentationEditorNode && previewMode === "presentation"
+        ? presentationEditorNode
         : spreadsheet?.error
           ? {
               id: "workspace-file-spreadsheet-error",
@@ -1570,7 +1543,7 @@ function NativeWorkspaceFileSession(
                   },
                 ]
               : []),
-            ...(canEdit || canEditSpreadsheet || annotationFormat || loaded?.rotation?.editable
+            ...(canEdit || canEditSpreadsheet || presentationBytes || loaded?.rotation?.editable
               ? [
                   button(
                     "workspace-file-save",
@@ -1579,8 +1552,7 @@ function NativeWorkspaceFileSession(
                     save,
                     ((canEdit && (loaded?.mode === "editor" || previewMode === "source")) ||
                       Boolean(dirty) ||
-                      !!loaded?.rotation?.editable ||
-                      (!!annotationFormat && previewMode === "annotations")) &&
+                      !!loaded?.rotation?.editable) &&
                       !loading &&
                       !saving &&
                       !pendingEditorWrite,
@@ -1719,7 +1691,7 @@ function NativeWorkspaceFileSession(
               },
             ]
           : []),
-        ...(formattedPreview || annotationFormat
+        ...(formattedPreview || presentationBytes
           ? [
               {
                 id: "workspace-file-view-mode",
@@ -1728,21 +1700,30 @@ function NativeWorkspaceFileSession(
                 value: previewMode,
                 options: [
                   { value: "preview", label: t("workspaceFilePreview.preview") },
-                  ...(formattedPreview
-                    ? [{ value: "source", label: t("workspaceFilePreview.source") }]
+                  ...(presentationBytes
+                    ? [{ value: "presentation", label: t("workspaceFilePreview.edit") }]
                     : []),
-                  ...(annotationFormat
-                    ? [{ value: "annotations", label: t("workspaceFilePreview.annotations") }]
+                  ...(formattedPreview
+                    ? [
+                        {
+                          value: "source",
+                          label: t(
+                            previewKind === "document"
+                              ? "workspaceFilePreview.edit"
+                              : "workspaceFilePreview.source",
+                          ),
+                        },
+                      ]
                     : []),
                 ],
                 padding: 10,
                 action: bind(
                   "workspace-file-view-mode",
-                  (value) => setPreviewMode(value as "preview" | "source" | "annotations"),
+                  (value) => setPreviewMode(value as "preview" | "source" | "presentation"),
                   (value) =>
                     value === "preview" ||
-                    (value === "source" && !!formattedPreview) ||
-                    (value === "annotations" && !!annotationFormat),
+                    (value === "presentation" && !!presentationBytes) ||
+                    (value === "source" && !!formattedPreview),
                 ),
               },
             ]

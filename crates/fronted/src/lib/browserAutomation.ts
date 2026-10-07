@@ -6,6 +6,16 @@ export type BrowserOpenTabListener = (
   handler: (request: BrowserOpenTabRequest) => void,
 ) => Promise<() => void | Promise<void>>;
 
+export type BrowserShortcutRequest = { sessionId: string; key: string };
+export type BrowserShortcutListener = (
+  handler: (request: BrowserShortcutRequest) => void,
+) => Promise<() => void | Promise<void>>;
+
+export const listenBrowserShortcuts: BrowserShortcutListener = async (handler) => {
+  if (!isTauriRuntime() || isNativeMobileRuntime()) return () => {};
+  return listen<BrowserShortcutRequest>("browser-shortcut", ({ payload }) => handler(payload));
+};
+
 export const listenBrowserOpenTabs: BrowserOpenTabListener = async (handler) => {
   if (!isTauriRuntime()) return () => {};
   if (isNativeMobileRuntime())

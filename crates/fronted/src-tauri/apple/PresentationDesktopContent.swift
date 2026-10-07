@@ -17,14 +17,14 @@ extension XgentNodeView {
             } else if node.variant == "workspace-editor-run-output" {
                 XgentWorkspaceRunOutput(node: node, document: document, model: model)
                     .id(node.value?.text ?? node.id)
-            } else if node.variant == "workspace-file-annotations" {
-                XgentDocumentAnnotationsEditor(node: node, document: document, model: model)
             } else if node.variant == "workspace-file-layout" {
                 XgentWorkspaceFileLayout(node: node, document: document, model: model)
             } else if node.variant == "terminal-rename-editor" {
                 XgentTerminalRenameEditor(node: node, document: document, model: model)
             } else if node.variant == "browser-navigation" {
                 XgentBrowserNavigation(node: node, document: document, model: model)
+            } else if node.variant == "browser-new-tab-tools" {
+                XgentBrowserStartTools(node: node, document: document, model: model)
             } else if node.variant == "browser-tabs" {
                 XgentBrowserTabs(node: node, document: document, model: model)
             } else if node.variant == "browser-header" {
@@ -119,7 +119,9 @@ extension XgentNodeView {
                 #endif
             }
         case .hStack:
-            if node.variant == "provider-category-toolbar" {
+            if node.id == "composer-actions" {
+                XgentIOSComposerActions(nodes: node.children ?? [], document: document, model: model)
+            } else if node.variant == "provider-category-toolbar" {
                 XgentProviderCategoryToolbar(node: node, document: document, model: model)
             } else if node.variant == "sidebar-section-heading" {
                 XgentSidebarSectionHeading(node: node, document: document, model: model)
@@ -160,8 +162,6 @@ extension XgentNodeView {
                 XgentWorkspaceBulkAction(node: node, document: document, model: model)
             } else if node.variant == "workspace-image-save" {
                 XgentWorkspaceImageSaveButton(node: node, document: document, model: model)
-            } else if node.variant == "workspace-file-save" {
-                XgentWorkspaceFileSaveButton(node: node, document: document, model: model)
             } else if node.variant == "question-option" {
                 XgentQuestionOptionButton(node: node, document: document, model: model)
             } else {
@@ -186,14 +186,10 @@ extension XgentNodeView {
             Text(node.text ?? "").foregroundStyle(.secondary)
             #endif
         case .textArea:
-            if node.variant == "document-annotation" {
-                XgentDocumentAnnotationText(node: node, document: document, model: model)
-            } else { nativeTextArea }
+            nativeTextArea
         case .numberInput:
             if node.variant == "workspace-image-rotation" {
                 XgentImageRotationButton(node: node, document: document, model: model)
-            } else if node.variant == "document-annotation-page" {
-                XgentDocumentAnnotationPage(node: node, document: document, model: model)
             } else { XgentNumberInput(node: node, document: document, model: model) }
         case .timeInput:
             XgentTimeInput(node: node, document: document, model: model)

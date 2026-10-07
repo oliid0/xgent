@@ -13,12 +13,12 @@ import {
   StackItem,
   VStack,
 } from "@astryxdesign/core/Layout";
-import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
 import { Text as AstryxText, Heading, Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { renderAsync } from "docx-preview";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -44,16 +44,9 @@ import {
   X,
 } from "../icons";
 import { MacOsTitleBarSpacer } from "../MacOsTitleBarSpacer";
-import {
-  boundedAnnotationText,
-  DOCUMENT_ANNOTATION_MAX_LENGTH,
-  DOCUMENT_ANNOTATION_MAX_PAGE,
-  documentAnnotationFormat,
-  remainingAnnotationDraft,
-} from "./documentAnnotationDraft";
-import { annotateDocument } from "./documentAnnotations";
 import { OpenWithMenu } from "./OpenWithMenu";
 import { previewDraftKey, previewDrafts, previewPendingWrites } from "./previewDrafts";
+import { usePresentationText } from "./usePresentationText";
 import { WorkspaceMarkdownPreview } from "./WorkspaceMarkdownPreview";
 import { WorkspacePdfPreview } from "./WorkspacePdfPreview";
 import { WorkspacePresentationPreview } from "./WorkspacePresentationPreview";
@@ -72,6 +65,14 @@ import {
   isWorkspaceEditablePreviewPath,
   type WorkspacePreviewKind,
 } from "./workspaceImagePreview";
+import {
+  isEditablePresentation,
+  type PresentationTextEdits,
+  presentationHasEdits,
+  remainingPresentationEdits,
+  validPresentationText,
+  writePresentationText,
+} from "./workspacePresentationText";
 import {
   boundedSpreadsheetText,
   buildSpreadsheetTable,
@@ -264,8 +265,8 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
   const mountedRef = useRef(false);
   const openRef = useRef(isOpen);
   openRef.current = isOpen;
-  const annotationSaveToken = useRef<object | null>(null);
   const spreadsheetSaveToken = useRef<object | null>(null);
+  const presentationSaveToken = useRef<object | null>(null);
   const imageSaveToken = useRef<object | null>(null);
   const sourceSaveToken = useRef<object | null>(null);
   const sourceCopyToken = useRef<object | null>(null);
@@ -324,33 +325,31 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     sourceSavingRef.current = next;
     setSourceSavingState(next);
   }, []);
-  const [annotationDraft, setAnnotationDraftState] = useState("");
-  const annotationDraftRef = useRef("");
-  const setAnnotationDraft = useCallback((next: string) => {
-    annotationDraftRef.current = next;
-    setAnnotationDraftState(next);
-  }, []);
-  const [annotationPage, setAnnotationPageState] = useState(1);
-  const annotationPageRef = useRef(1);
-  const setAnnotationPage = useCallback((next: number) => {
-    annotationPageRef.current = next;
-    setAnnotationPageState(next);
-  }, []);
-  const [annotationSaved, setAnnotationSaved] = useState("");
   const [spreadsheetEdits, setSpreadsheetEditsState] = useState<
     Record<string, Record<string, string>>
   >({});
   const spreadsheetEditsRef = useRef<Record<string, Record<string, string>>>({});
+  const [presentationEdits, setPresentationEditsState] = useState<PresentationTextEdits>({});
+  const presentationEditsRef = useRef<PresentationTextEdits>({});
+  const setPresentationEdits = useCallback((next: PresentationTextEdits) => {
+    presentationEditsRef.current = next;
+    setPresentationEditsState(next);
+  }, []);
+  const presentationText = usePresentationText(
+    preview?.kind === "presentation" && isEditablePresentation(preview.path, preview.mimeType)
+      ? preview.bytes
+      : null,
+  );
   const setSpreadsheetEdits = useCallback((next: Record<string, Record<string, string>>) => {
     spreadsheetEditsRef.current = next;
     setSpreadsheetEditsState(next);
   }, []);
-  const [activeTab, setActiveTab] = useState<"preview" | "source" | "annotations">("preview");
+  const [activeTab, setActiveTab] = useState<"preview" | "source" | "presentation">("preview");
   const [isVisible, setIsVisible] = useState(false);
   const dirty =
     sourceDraft !== sourceSaved ||
-    annotationDraft !== annotationSaved ||
     Object.values(spreadsheetEdits).some((edits) => Object.keys(edits).length > 0) ||
+    presentationHasEdits(presentationEdits) ||
     hasImageRotationDraft(imageRotation);
   useEffect(() => {
     props.onDirtyChange?.(dirty);
@@ -370,14 +369,12 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     setSourceDraft(next?.text ?? "");
     setSourceSaved(next?.text ?? "");
     setSpreadsheetEdits({});
+    setPresentationEdits({});
     setImageRotation({
       angle: 0,
       saved: 0,
       editable: !!next && !!imageRotationFormat(next.path, next.mimeType),
     });
-    setAnnotationDraft("");
-    setAnnotationSaved("");
-    setAnnotationPage(1);
     setPreview(next);
   }, []);
 
@@ -430,8 +427,8 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       const sequence = loadSequenceRef.current + 1;
       loadSequenceRef.current = sequence;
       requestRef.current = request;
-      annotationSaveToken.current = null;
       spreadsheetSaveToken.current = null;
+      presentationSaveToken.current = null;
       imageSaveToken.current = null;
       sourceSaveToken.current = null;
       setPendingImageNavigation(null);
@@ -481,9 +478,8 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
         if (draft) {
           setSourceDraft(draft.source);
           setSourceSaved(draft.savedSource);
-          setAnnotationDraft(draft.annotation);
-          setAnnotationPage(draft.annotationPage);
           setSpreadsheetEdits(draft.cells);
+          setPresentationEdits(draft.texts ?? {});
           if (draft.rotation) setImageRotation(draft.rotation);
           if (draft.contentHash !== loaded.contentHash) {
             // Retain the original version guard; saves must reject external modifications.
@@ -549,8 +545,6 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       preview?.text !== undefined,
   );
   const canOpenExternal = Boolean(activePreviewRequest && activePath);
-  const annotationFormat = preview ? documentAnnotationFormat(activePath, preview.mimeType) : null;
-  const canAnnotate = annotationFormat !== null;
   const canEditSpreadsheet =
     preview?.kind === "spreadsheet" && activePath.toLowerCase().endsWith(".xlsx");
   const spreadsheetHasEdits = Object.values(spreadsheetEdits).some(
@@ -598,8 +592,6 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
           mtimeMs: preview.mtimeMs,
           source: cached?.source ?? "",
           savedSource: cached?.savedSource ?? "",
-          annotation: cached?.annotation ?? "",
-          annotationPage: cached?.annotationPage ?? 1,
           cells: next,
         });
     },
@@ -621,37 +613,6 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     [preview, activePreviewRequest, spreadsheet, setActiveSheetName],
   );
 
-  const editAnnotation = useCallback(
-    (text: string, page: number) => {
-      if (
-        !mountedRef.current ||
-        !openRef.current ||
-        !preview ||
-        previewRef.current !== preview ||
-        !activePreviewRequest ||
-        requestRef.current !== activePreviewRequest
-      )
-        return;
-      setAnnotationDraft(text);
-      setAnnotationPage(page);
-      const key = previewDraftKey(activePreviewRequest);
-      const cached = previewDrafts.get(key);
-      if (!text) previewDrafts.delete(key);
-      else
-        previewDrafts.set(key, {
-          ...cached,
-          contentHash: preview.contentHash,
-          mtimeMs: preview.mtimeMs,
-          source: cached?.source ?? preview.text ?? "",
-          savedSource: cached?.savedSource ?? preview.text ?? "",
-          cells: cached?.cells ?? {},
-          annotation: text,
-          annotationPage: page,
-        });
-    },
-    [preview, activePreviewRequest, setAnnotationDraft, setAnnotationPage],
-  );
-
   useEffect(() => {
     if (!preview || !activePreviewRequest || loading) return;
     const key = previewDraftKey(activePreviewRequest);
@@ -664,9 +625,8 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       mtimeMs: preview.mtimeMs,
       source: sourceDraft,
       savedSource: sourceSaved,
-      annotation: annotationDraft,
-      annotationPage,
       cells: spreadsheetEdits,
+      texts: presentationEdits,
       rotation: imageRotation,
     });
   }, [
@@ -676,9 +636,8 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     dirty,
     sourceDraft,
     sourceSaved,
-    annotationDraft,
-    annotationPage,
     spreadsheetEdits,
+    presentationEdits,
     imageRotation,
   ]);
 
@@ -741,8 +700,6 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
           mtimeMs: preview.mtimeMs,
           source: value,
           savedSource: sourceSavedRef.current,
-          annotation: cached?.annotation ?? "",
-          annotationPage: cached?.annotationPage ?? 1,
           cells: cached?.cells ?? {},
         });
     },
@@ -963,20 +920,20 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     }
   }, [preview, activePreviewRequest, canEditSpreadsheet, setSpreadsheetEdits, setSourceSaving, t]);
 
-  const saveAnnotations = useCallback(async () => {
+  const savePresentation = useCallback(async () => {
     const snapshot = previewRef.current;
     const request = requestRef.current;
-    const format = snapshot ? documentAnnotationFormat(snapshot.path, snapshot.mimeType) : null;
-    const written = { text: annotationDraftRef.current, page: annotationPageRef.current };
+    const written = presentationEditsRef.current;
     if (
       !mountedRef.current ||
       !openRef.current ||
       snapshot !== preview ||
       request !== activePreviewRequest ||
-      !snapshot ||
       !request ||
-      !format ||
-      !written.text.trim() ||
+      !snapshot ||
+      snapshot.kind !== "presentation" ||
+      !isEditablePresentation(snapshot.path, snapshot.mimeType) ||
+      !presentationHasEdits(written) ||
       sourceSavingRef.current
     )
       return;
@@ -989,16 +946,18 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       loadSequenceRef.current === sequence &&
       previewRef.current === snapshot;
     const token = {};
-    annotationSaveToken.current = token;
+    presentationSaveToken.current = token;
     let finish = () => {};
-    const completion = new Promise<void>((resolve) => {
-      finish = resolve;
-    });
-    previewPendingWrites.set(key, completion);
+    previewPendingWrites.set(
+      key,
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+    );
     setSourceSaving(true);
     setError(null);
     try {
-      const output = await annotateDocument(snapshot.bytes, format, written.page, written.text);
+      const output = await writePresentationText(snapshot.bytes, written);
       const response = await invokeFs<{
         mtimeMs: number;
         contentHash: string;
@@ -1011,26 +970,14 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
         expected_content_hash: snapshot.contentHash,
       });
       const cached = previewDrafts.get(key);
-      if (cached) {
-        const remaining = remainingAnnotationDraft(
-          { text: cached.annotation, page: cached.annotationPage },
-          written,
-        )!;
-        if (!remaining.text) previewDrafts.delete(key);
-        else
-          previewDrafts.set(key, {
-            ...cached,
-            annotation: remaining.text,
-            annotationPage: remaining.page,
-            mtimeMs: response.mtimeMs,
-            contentHash: response.contentHash,
-          });
-      }
+      if (cached)
+        previewDrafts.set(key, {
+          ...cached,
+          texts: remainingPresentationEdits(cached.texts, written),
+          mtimeMs: response.mtimeMs,
+          contentHash: response.contentHash,
+        });
       if (!current()) return;
-      const remaining = remainingAnnotationDraft(
-        { text: annotationDraftRef.current, page: annotationPageRef.current },
-        written,
-      )!;
       const next = {
         ...snapshot,
         bytes: output,
@@ -1046,20 +993,18 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       previewBlobUrlRef.current = next.blobUrl;
       previewRef.current = next;
       setPreview(next);
-      setAnnotationDraft(remaining.text);
-      setAnnotationPage(remaining.page);
-      setAnnotationSaved("");
+      setPresentationEdits(remainingPresentationEdits(presentationEditsRef.current, written));
     } catch (saveError) {
       if (current()) setError(toMessage(saveError, t("workspaceEditor.saveFailed")));
     } finally {
       previewPendingWrites.delete(key);
       finish();
-      if (annotationSaveToken.current === token) {
-        annotationSaveToken.current = null;
+      if (presentationSaveToken.current === token) {
+        presentationSaveToken.current = null;
         if (mountedRef.current) setSourceSaving(false);
       }
     }
-  }, [preview, activePreviewRequest, setAnnotationDraft, setAnnotationPage, setSourceSaving, t]);
+  }, [preview, activePreviewRequest, setPresentationEdits, setSourceSaving, t]);
 
   const editImageRotation = useCallback(() => {
     if (
@@ -1087,8 +1032,6 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
         mtimeMs: preview.mtimeMs,
         source: "",
         savedSource: "",
-        annotation: "",
-        annotationPage: 1,
         cells: {},
         rotation: next,
       });
@@ -1334,7 +1277,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                         onClick={() => void saveSpreadsheet()}
                       />
                     ) : null}
-                    {canAnnotate && activeTab === "annotations" ? (
+                    {presentationText.bytes && activeTab === "presentation" ? (
                       <IconButton
                         label={t("workspaceEditor.save")}
                         tooltip={t("workspaceEditor.save")}
@@ -1342,8 +1285,8 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                         variant="ghost"
                         size="sm"
                         isLoading={sourceSaving}
-                        isDisabled={annotationDraft === annotationSaved || sourceSaving}
-                        onClick={() => void saveAnnotations()}
+                        isDisabled={!presentationHasEdits(presentationEdits) || sourceSaving}
+                        onClick={() => void savePresentation()}
                       />
                     ) : null}
                     {canOpenExternal && activePreviewRequest ? (
@@ -1412,7 +1355,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                   </HStack>
                 }
               />
-              {canShowSource || canAnnotate ? (
+              {canShowSource || presentationText.bytes ? (
                 <HStack width="100%" paddingInline={3}>
                   <TabList
                     value={activeTab}
@@ -1420,8 +1363,8 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                       setActiveTab(
                         value === "source"
                           ? "source"
-                          : value === "annotations"
-                            ? "annotations"
+                          : value === "presentation"
+                            ? "presentation"
                             : "preview",
                       )
                     }
@@ -1429,11 +1372,18 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                     overflow="auto"
                   >
                     <Tab value="preview" label={t("workspaceFilePreview.preview")} />
-                    {canShowSource ? (
-                      <Tab value="source" label={t("workspaceFilePreview.source")} />
+                    {presentationText.bytes ? (
+                      <Tab value="presentation" label={t("workspaceFilePreview.edit")} />
                     ) : null}
-                    {canAnnotate ? (
-                      <Tab value="annotations" label={t("workspaceFilePreview.annotations")} />
+                    {canShowSource ? (
+                      <Tab
+                        value="source"
+                        label={t(
+                          canEditDocument
+                            ? "workspaceFilePreview.edit"
+                            : "workspaceFilePreview.source",
+                        )}
+                      />
                     ) : null}
                   </TabList>
                 </HStack>
@@ -1453,39 +1403,40 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
             ) : null}
             <StackItem size="fill">
               <LayoutContent padding={0} className="xgent-workspace-file-preview-stage">
-                {preview && activeTab === "annotations" && canAnnotate ? (
-                  <VStack height="100%" minHeight={0} padding={3} gap={2}>
-                    <Text type="supporting" color="secondary">
-                      {t(
-                        annotationFormat === "pdf"
-                          ? "workspaceFilePreview.pdfAnnotationHelp"
-                          : "workspaceFilePreview.slideAnnotationHelp",
-                      )}
-                    </Text>
-                    <NumberInput
-                      label={t("workspaceFilePreview.annotationPage")}
-                      min={1}
-                      max={DOCUMENT_ANNOTATION_MAX_PAGE}
-                      step={1}
-                      isIntegerOnly
-                      isWheelEnabled={false}
-                      value={annotationPage}
-                      onChange={(page) => editAnnotation(annotationDraftRef.current, page)}
-                    />
-                    <TextArea
-                      label={t("workspaceFilePreview.annotations")}
-                      isLabelHidden
-                      value={annotationDraft}
-                      onChange={(value) =>
-                        editAnnotation(boundedAnnotationText(value), annotationPageRef.current)
-                      }
-                      rows={30}
-                      width="100%"
-                      className="h-full min-h-0 text-sm"
-                    />
-                    <Text type="supporting" color="secondary">
-                      {annotationDraft.length} / {DOCUMENT_ANNOTATION_MAX_LENGTH}
-                    </Text>
+                {preview && activeTab === "presentation" && presentationText.bytes ? (
+                  <VStack padding={4} gap={3} width="100%" isScrollable>
+                    {presentationText.loading ? (
+                      <Spinner label={t("workspaceFilePreview.loading")} />
+                    ) : presentationText.error ? (
+                      <Banner status="error" title={presentationText.error} />
+                    ) : presentationText.entries.length ? (
+                      presentationText.entries.map((field) => (
+                        <TextInput
+                          key={field.id}
+                          label={`${t("workspaceFilePreview.slide")} ${field.slide} · ${field.label}`}
+                          value={presentationEdits[field.id] ?? field.text}
+                          isDisabled={!field.editable || loading}
+                          onChange={(value) => {
+                            if (
+                              !mountedRef.current ||
+                              !openRef.current ||
+                              requestRef.current !== activePreviewRequest ||
+                              !field.editable ||
+                              !validPresentationText(value) ||
+                              previewRef.current !== preview
+                            )
+                              return;
+                            const edits = { ...presentationEditsRef.current };
+                            if (value === field.text) delete edits[field.id];
+                            else edits[field.id] = value;
+                            setPresentationEdits(edits);
+                          }}
+                          width="100%"
+                        />
+                      ))
+                    ) : (
+                      <EmptyState title={t("workspaceFilePreview.empty")} isCompact />
+                    )}
                   </VStack>
                 ) : preview && activeTab === "source" && preview.text !== null ? (
                   <VStack height="100%" minHeight={0} padding={3}>

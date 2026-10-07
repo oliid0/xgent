@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PDFDocument, PDFName } from "pdf-lib";
+import { PDFDocument } from "pdf-lib";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 import { createReactHookHarness } from "../helpers/react-hook-harness.mjs";
 
@@ -55,80 +55,19 @@ async function harness() {
     throw new Error("Preview did not reach the expected async state");
   }
   const unmount = () => { hooks.unmount(); if (previous === undefined) delete globalThis.window; else globalThis.window = previous; };
-  render(); await waitFor(() => !!controls().tabs);
-  controls().tabs.props.onChange("annotations");
-  render();
+  render(); await waitFor(() => !!find(element => element.props?.preview?.kind === "pdf"));
   return { props, options, disk, calls, render, controls, flush, waitFor, find, saveBinary, previewDrafts, previewPendingWrites, previewDraftKey, unmount };
 }
 
-async function notes(data, page) {
-  const pdf = await PDFDocument.load(Buffer.from(data, "base64"));
-  const annotations = pdf.getPage(page - 1).node.Annots();
-  return annotations ? Array.from({ length: annotations.size() }, (_, index) => pdf.context.lookup(annotations.get(index)).get(PDFName.of("Contents")).decodeText()) : [];
-}
-
-test("shared document annotations save immediate drafts and page selection without a rerender", async () => {
+test("shared PDF preview preserves file bytes and omits the standalone annotation editor", async () => {
   const h = await harness();
   try {
-    const old = h.controls();
-    old.text.props.onChange("Current note 😀"); old.page.props.onChange(2); old.save.props.onClick(); old.save.props.onClick();
-    await h.waitFor(() => h.calls.some(([command]) => command === "fs_write_binary") && !h.previewPendingWrites.size);
-    assert.equal(h.calls.filter(([command]) => command === "fs_write_binary").length, 1);
-    assert.deepEqual(await notes(h.disk.data, 2), ["Current note 😀"]);
-    assert.equal(h.controls().text.props.value, "");
-  } finally { h.unmount(); }
-});
-
-test("shared annotations preserve later text and page edits after a pending write", async () => {
-  const h = await harness(), wait = Promise.withResolvers();
-  try {
-    h.options.write = async args => { await wait.promise; return h.saveBinary(args); };
-    h.controls().text.props.onChange("Written"); h.controls().save.props.onClick();
-    await h.waitFor(() => h.calls.some(([command]) => command === "fs_write_binary"));
-    const fields = h.controls(); fields.text.props.onChange("Later"); fields.page.props.onChange(2);
-    wait.resolve(); await h.waitFor(() => !h.previewPendingWrites.size);
-    assert.equal(h.controls().text.props.value, "Later"); assert.equal(h.controls().page.props.value, 2);
-    h.options.write = undefined; h.controls().save.props.onClick();
-    await h.waitFor(() => !h.previewPendingWrites.size);
-    assert.equal(h.calls.at(-1)[1].expected_content_hash, "written");
-    assert.deepEqual(await notes(h.disk.data, 1), ["Written"]); assert.deepEqual(await notes(h.disk.data, 2), ["Later"]);
-  } finally { wait.resolve(); h.unmount(); }
-});
-
-test("shared annotation callbacks retire on file changes and reopening waits for a background save", async () => {
-  const h = await harness(), wait = Promise.withResolvers();
-  try {
-    h.options.write = async args => { await wait.promise; return h.saveBinary(args); };
-    h.controls().text.props.onChange("Written"); h.controls().save.props.onClick();
-    await h.waitFor(() => h.calls.some(([command]) => command === "fs_write_binary"));
-    const old = h.controls(); old.text.props.onChange("Later draft");
-    const first = h.props.openRequest;
-    h.props.openRequest = { ...first, id: 2, path: "b.pdf" }; h.render(); await h.flush();
-    h.controls().tabs.props.onChange("annotations"); h.render();
-    old.text.props.onChange("Retired"); old.save.props.onClick();
-    assert.equal(h.controls().text.props.value, "");
-    h.props.openRequest = { ...first, id: 3 }; h.render(); await h.flush();
-    assert.equal(h.calls.filter(([command, args]) => command.startsWith("fs_read") && args.path === "a.pdf").length, 1);
-    wait.resolve(); await h.waitFor(() => h.calls.filter(([command, args]) => command.startsWith("fs_read") && args.path === "a.pdf").length === 2);
-    h.controls().tabs.props.onChange("annotations"); h.render();
-    assert.equal(h.controls().text.props.value, "Later draft");
-    h.options.write = undefined; h.controls().save.props.onClick(); await h.waitFor(() => !h.previewPendingWrites.size);
-    assert.equal(h.calls.at(-1)[1].expected_content_hash, "written");
-  } finally { wait.resolve(); h.unmount(); }
-});
-
-test("shared annotation errors preserve drafts and a closed preview ignores late failures", async () => {
-  const h = await harness();
-  try {
-    h.options.write = async () => { throw new Error("Write conflict"); };
-    h.controls().text.props.onChange("Retained"); h.controls().save.props.onClick();
-    await h.waitFor(() => !h.previewPendingWrites.size);
-    assert.equal(h.controls().text.props.value, "Retained");
-    assert.ok(h.find(element => element.type === "Banner" && element.props.description === "Write conflict"));
-    const wait = Promise.withResolvers(); h.options.write = () => wait.promise;
-    h.controls().save.props.onClick(); await h.waitFor(() => h.calls.filter(([command]) => command === "fs_write_binary").length === 2);
-    h.props.isOpen = false; h.render(); wait.reject(new Error("Retired error"));
-    await h.waitFor(() => !h.previewPendingWrites.size);
-    assert.equal(h.find(element => element.type === "Banner" && element.props.description === "Retired error"), undefined);
+    const original = h.disk.data;
+    assert.equal(h.controls().text, undefined);
+    assert.equal(h.controls().page, undefined);
+    assert.equal(h.controls().save, undefined);
+    assert.equal(h.controls().tabs, undefined);
+    assert.equal(h.disk.data, original);
+    assert.equal(h.calls.some(([command]) => command === "fs_write_binary"), false);
   } finally { h.unmount(); }
 });

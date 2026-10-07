@@ -18,7 +18,7 @@ struct XgentBrowserTabs: View {
 
     var body: some View {
         Group {
-            if !model.windowChromeInstalled {
+            if document.mode != .panel {
                 HStack(spacing: 6) {
                     if let add = node.children?.first { content(add) }
                     ScrollViewReader { proxy in

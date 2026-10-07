@@ -232,6 +232,7 @@ import { useSidebarSelector } from "../lib/sidebar/useSidebarSelector";
 import {
   buildSkillsSystemPrompt,
   formatExplicitSkillMentions,
+  isUserSelectableSkill,
   mergeAlwaysEnabledSkillNames,
   resolveExplicitSkillMentions,
 } from "../lib/skills";
@@ -333,6 +334,7 @@ import { DesktopCheckpointRewindProvider } from "./chat/components/DesktopCheckp
 import { SplitConversationPane } from "./chat/components/SplitConversationPane";
 import { WorkspaceCloneTaskOverlay } from "./chat/components/WorkspaceCloneTaskOverlay";
 import { WorkspaceProjectSettingsDialog } from "./chat/components/WorkspaceProjectSettingsDialog";
+import { useComposerSkillSelection } from "./chat/composer/useComposerSkillSelection";
 import {
   isNativeDropInsideUploadZone,
   nativeDropPositionScaleFactor,
@@ -5955,6 +5957,16 @@ export function ChatPage(props: ChatPageProps) {
     isUploadingFiles;
   const canDropUpload =
     isAgentMode && Boolean(displayedConversationWorkdir.trim()) && !isComposerInputDisabled;
+  const selectableComposerSkills = skillsEnabled
+    ? availableSkills.filter(isUserSelectableSkill)
+    : [];
+  const selectComposerSkill = useComposerSkillSelection({
+    availableSkills: selectableComposerSkills,
+    conversationId: currentConversationId,
+    workdir: displayedConversationWorkdir,
+    enabled: skillsEnabled && !isComposerInputDisabled,
+    setSettings,
+  });
   const fileDropTitle = canDropUpload
     ? t("chat.upload.dropReady")
     : !isAgentMode
@@ -6181,6 +6193,8 @@ export function ChatPage(props: ChatPageProps) {
       inputPlaceholder={composerPlaceholder}
       workdir={displayedConversationWorkdir}
       enabledSkills={enabledComposerSkills}
+      availableSkills={selectableComposerSkills}
+      onSelectSkill={selectComposerSkill}
       isAgentMode={isAgentMode}
       hasModels={hasModels}
       currentModelLabel={currentModelLabel}
@@ -6464,6 +6478,10 @@ export function ChatPage(props: ChatPageProps) {
         <NotifyToast items={notifyItems} onDismiss={dismissNotify} />
         <NativeChatPage
           appUpdate={appUpdate}
+          gitClient={desktopCommandHostAvailable ? tauriGitClient : null}
+          workspaceActivityClient={
+            desktopCommandHostAvailable ? tauriWorkspaceActivityClient : null
+          }
           onCommandSafetyModeChange={(commandSafetyMode) =>
             setSettings((previous) => updateSystem(previous, { commandSafetyMode }))
           }
@@ -6482,6 +6500,8 @@ export function ChatPage(props: ChatPageProps) {
           thinkingAlwaysOn={chatRuntimeThinkingAlwaysOn}
           onChatRuntimeControlsChange={handleChatRuntimeControlsChange}
           enabledSkills={enabledComposerSkills}
+          availableSkills={selectableComposerSkills}
+          onSelectSkill={selectComposerSkill}
           selectedValue={selectedValue}
           contextUsageTokensSource={contextUsageTokensSource}
           contextWindow={currentModelContextWindow}
@@ -6559,6 +6579,7 @@ export function ChatPage(props: ChatPageProps) {
           sidebarOpenRequestId={nativeSidebarOpenRequestId}
           onOpenRemote={() => setMobileWorkspaceDestination({ kind: "ssh" })}
           onOpenBrowser={handleOpenBrowser}
+          onNewBrowser={handleNewRightBrowser}
           onOpenBrowserSettings={() => setMobileWorkspaceDestination({ kind: "browser-settings" })}
           onOpenGitReview={() => setMobileWorkspaceDestination({ kind: "git-review" })}
           onOpenBackgroundTasks={() => setMobileWorkspaceDestination({ kind: "background-tasks" })}
@@ -7454,7 +7475,7 @@ export function ChatPage(props: ChatPageProps) {
                     }
                     onNewSideChat={isAgentMode ? handleNewRightSideChat : undefined}
                     toolsDisabled={!desktopCommandHostAvailable || Boolean(terminalDisabledMessage)}
-                    presentation="side"
+                    presentation={rightSidebarPresentation}
                     width="100%"
                     onPresentationChange={setRightSidebarPresentation}
                   />

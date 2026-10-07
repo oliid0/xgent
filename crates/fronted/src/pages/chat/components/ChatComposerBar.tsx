@@ -310,6 +310,8 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   inputPlaceholder: string;
   workdir: string;
   enabledSkills: MentionComposerSkill[];
+  availableSkills?: MentionComposerSkill[];
+  onSelectSkill?: (skill: MentionComposerSkill) => boolean;
   isAgentMode: boolean;
   hasModels: boolean;
   currentModelLabel: string;
@@ -358,6 +360,8 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
     inputPlaceholder,
     workdir,
     enabledSkills,
+    availableSkills = enabledSkills,
+    onSelectSkill,
     isAgentMode,
     hasModels,
     currentModelLabel,
@@ -481,6 +485,9 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
   const scheduleHeightMeasureRef = useRef<(() => void) | null>(null);
   const [queueCollapsed, setQueueCollapsed] = useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  useEffect(() => {
+    setIsAddMenuOpen(false);
+  }, [conversationId, workdir, isAgentMode, isInputDisabled]);
   const [voiceInputAvailable, setVoiceInputAvailable] = useState(false);
   const [voiceInputActive, setVoiceInputActive] = useState(false);
   const [voiceInputError, setVoiceInputError] = useState<string | null>(null);
@@ -646,7 +653,10 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
 
   const addMenuContent = (
     <VStack gap={3} padding={2} width="100%">
-      <List density="compact" hasDividers>
+      <Text type="supporting" color="secondary">
+        {t("chat.upload.add")}
+      </Text>
+      <List density="compact">
         <ListItem
           label={t("chat.upload.filesAndPhotos")}
           description={uploadDisabled ? uploadTooltip : t("chat.upload.selectFiles")}
@@ -658,13 +668,13 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           }}
         />
         <ListItem
-          label={t("chat.composer.plugins")}
+          label={t("chat.composer.filesAndFolders")}
           description={t("chat.composer.addMentionDesc")}
-          startContent={<Blend />}
-          isDisabled={controlsDisabled || enabledSkills.length === 0}
+          startContent={<Paperclip />}
+          isDisabled={controlsDisabled || !isAgentMode || !workdir.trim()}
           onClick={() => {
             setIsAddMenuOpen(false);
-            composerRef.current?.insertText("/");
+            composerRef.current?.insertText("@");
             composerRef.current?.focus();
           }}
         />
@@ -738,6 +748,30 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
           canWrite={gitWriteEnabled}
           disabledMessage={gitDisabledMessage}
         />
+      ) : null}
+      {availableSkills.length > 0 ? (
+        <VStack gap={1} width="100%">
+          <Text type="supporting" color="secondary">
+            {t("chat.composer.plugins")}
+          </Text>
+          <List density="compact">
+            {availableSkills.map((skill) => (
+              <ListItem
+                key={skill.skillFile}
+                label={skill.name}
+                description={skill.description}
+                startContent={<Blend />}
+                isDisabled={controlsDisabled}
+                onClick={() => {
+                  if (onSelectSkill && !onSelectSkill(skill)) return;
+                  setIsAddMenuOpen(false);
+                  composerRef.current?.insertSkillMention(skill);
+                  composerRef.current?.focus();
+                }}
+              />
+            ))}
+          </List>
+        </VStack>
       ) : null}
     </VStack>
   );

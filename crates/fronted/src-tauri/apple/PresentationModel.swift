@@ -422,7 +422,8 @@ final class XgentPresentationModel: ObservableObject {
         #if os(macOS)
         defer {
             let identities = documents.filter { $0.mode == .panel }.map {
-                XgentWorkspacePanelIdentity(surface: $0.surface, focusRequest: $0.workspacePanel?.focusRequest ?? 0)
+                XgentWorkspacePanelIdentity(surface: $0.surface, focusRequest: $0.workspacePanel?.focusRequest ?? 0,
+                                           expandRequest: $0.workspacePanel?.expandRequest ?? 0)
             }
             if identities != workspaceIdentities {
                 workspaceIdentities = identities

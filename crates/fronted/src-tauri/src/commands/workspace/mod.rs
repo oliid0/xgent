@@ -1,4 +1,5 @@
 pub(crate) mod edit_match;
+mod docx_text;
 pub mod fs;
 #[cfg(target_os = "macos")]
 mod file_applications_macos;

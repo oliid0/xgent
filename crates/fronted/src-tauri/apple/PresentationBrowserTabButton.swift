@@ -8,6 +8,7 @@ struct XgentBrowserTabButton: View {
     @Environment(\.xgentPresentationTheme) private var theme
 
     var body: some View {
+        HStack(spacing: 0) {
         Button { model.send(node, in: document) } label: {
             VStack(spacing: 4) {
                 HStack(spacing: 6) {
@@ -33,5 +34,18 @@ struct XgentBrowserTabButton: View {
         #if os(macOS)
         .help(node.text ?? node.label ?? "")
         #endif
+            if let close = node.children?.first(where: { $0.id.hasPrefix("browser-tab-close:") }) {
+                Button { model.send(close, in: document) } label: {
+                    Image(systemName: "xmark")
+                        .frame(width: document.formFactor == .mobile ? 44 : 28,
+                               height: document.formFactor == .mobile ? 44 : 32)
+                }
+                .buttonStyle(.plain)
+                .disabled(close.disabled == true || model.isBusy(close, in: document))
+                .accessibilityLabel(close.label ?? "")
+                .accessibilityIdentifier(close.id)
+            }
+        }
+        .accessibilityElement(children: .contain)
     }
 }

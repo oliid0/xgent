@@ -22,6 +22,9 @@ final class BrowserControlsRenderingTests: XCTestCase {
                 let document = try fixture()
                 let model = XgentPresentationModel()
                 model.update(document)
+                #if os(macOS)
+                model.windowChromeInstalled = true
+                #endif
                 let content = VStack {
                     #if os(iOS)
                     XgentIOSNodes(nodes: document.nodes, document: document, model: model)
@@ -51,6 +54,13 @@ final class BrowserControlsRenderingTests: XCTestCase {
                         XCTAssertLessThanOrEqual(element.shape.bezierPath.bounds.maxY, 180,
                             "Browser controls must leave the remaining height to the webpage: \(id)")
                     }
+                }
+                for id in ["tool-review", "tool-terminal", "tool-files", "tool-chat"] {
+                    let element = try XCTUnwrap(elements.first { $0.identifier == id }, id)
+                    XCTAssertGreaterThan(element.shape.bezierPath.bounds.width, 0, id)
+                    XCTAssertGreaterThanOrEqual(element.shape.bezierPath.bounds.minX, -1, id)
+                    XCTAssertLessThanOrEqual(element.shape.bezierPath.bounds.maxX, width + 1, id)
+                    XCTAssertLessThanOrEqual(element.shape.bezierPath.bounds.maxY, 780, id)
                 }
                 let strategy = Snapshotting<UIView, UIImage>.image(size: CGSize(width: width, height: 780))
                 let image = await withCheckedContinuation { continuation in
@@ -118,7 +128,11 @@ final class BrowserControlsRenderingTests: XCTestCase {
                 ["id": "error", "kind": "Banner", "status": "error", "label": "网页暂时无法打开，请检查网络后重试；标签和网址仍然保留。"],
                 icon("dismiss-error", "关闭提示", "xmark")]],
             ["id": "browser-empty", "kind": "VStack", "variant": "browser-empty", "fill": true, "children": [
-                ["id": "empty", "kind": "EmptyState", "label": "开始浏览", "text": "输入网址或打开新的标签页。", "icon": "globe"]]]]]
+                ["id": "start-tools", "kind": "VStack", "variant": "browser-new-tab-tools", "label": "工具", "children": [
+                    ["id": "tool-review", "kind": "Button", "label": "审查", "icon": "checkmark.rectangle", "action": "review"],
+                    ["id": "tool-terminal", "kind": "Button", "label": "终端", "icon": "terminal", "action": "terminal"],
+                    ["id": "tool-files", "kind": "Button", "label": "文件", "icon": "folder", "action": "files"],
+                    ["id": "tool-chat", "kind": "Button", "label": "侧边对话", "icon": "bubble.left", "action": "chat"]]]]]]]
         #if os(iOS)
         let factor = "mobile"
         #else

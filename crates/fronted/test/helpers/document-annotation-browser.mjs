@@ -15,18 +15,20 @@ const candidates = [process.env.CHROME_PATH,
   "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser"];
 export const annotationBrowser = candidates.find(candidate => candidate && existsSync(candidate));
 if (!annotationBrowser && process.env.XGENT_REQUIRE_BROWSER_TESTS === "true") {
-  throw new Error("Document annotation tests require Chrome/Edge with a real XML DOM");
+  throw new Error("Office browser tests require Chrome/Edge with a real XML DOM");
 }
 
-export const annotateInBrowser = (bytes, format, page, text) =>
-  officeModuleInBrowser(bytes, "documentAnnotations.ts", "annotateDocument", [format, page, text]);
 export const editSpreadsheetInBrowser = (bytes, edits) =>
   officeModuleInBrowser(bytes, "workspaceSpreadsheet.ts", "writeSpreadsheetEdits", [edits]);
+export const editPresentationInBrowser = (bytes, edits) =>
+  officeModuleInBrowser(bytes, "workspacePresentationText.ts", "writePresentationText", [edits]);
+export const readPresentationInBrowser = bytes =>
+  officeModuleInBrowser(bytes, "workspacePresentationText.ts", "readPresentationText", [], false, true);
 export const rotateImageInBrowser = (bytes, mimeType, degrees, encoderFallback = false) =>
   officeModuleInBrowser(bytes, "workspaceImageOperations.ts", "rotateWorkspaceImage", [mimeType, degrees], encoderFallback);
 
 /** Execute the production module with its real libraries and browser XML APIs. */
-async function officeModuleInBrowser(bytes, module, operation, args, encoderFallback = false) {
+async function officeModuleInBrowser(bytes, module, operation, args, encoderFallback = false, jsonResult = false) {
   if (!annotationBrowser) throw new Error("No document annotation browser is available");
   const temporaryRoot = path.resolve(tmpdir());
   const directory = await mkdtemp(path.join(temporaryRoot, "xgent-annotation-test-"));
@@ -40,7 +42,7 @@ async function officeModuleInBrowser(bytes, module, operation, args, encoderFall
     const lowered = ts.transpileModule(source, { compilerOptions: {
       module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true,
     } }).outputText;
-    const request = JSON.stringify({ data: Buffer.from(bytes).toString("base64"), operation, args, encoderFallback }).replaceAll("<", "\\u003c");
+    const request = JSON.stringify({ data: Buffer.from(bytes).toString("base64"), operation, args, encoderFallback, jsonResult }).replaceAll("<", "\\u003c");
     const vendor = relative => pathToFileURL(path.join(root, relative)).href;
     const html = `<!doctype html><meta charset="utf-8"><pre id="result"></pre>
 <script src="${vendor("node_modules/jszip/dist/jszip.min.js")}"></script>
@@ -58,7 +60,8 @@ function encode(bytes) { let result = ""; for (let offset = 0; offset < bytes.le
     HTMLCanvasElement.prototype.toBlob = function(callback) { original.call(this, callback, "image/png"); };
   }
   const bytes = Uint8Array.from(atob(request.data), character => character.charCodeAt(0));
-  result = { ok: true, data: encode(await exports[request.operation](bytes, ...request.args)) };
+  const output = await exports[request.operation](bytes, ...request.args);
+  result = request.jsonResult ? { ok: true, value: output } : { ok: true, data: encode(output) };
 } catch (error) { result = { ok: false, error: String(error?.message ?? error) }; }
 document.getElementById("result").textContent = encode(new TextEncoder().encode(JSON.stringify(result)));
 })();
@@ -71,7 +74,7 @@ document.getElementById("result").textContent = encode(new TextEncoder().encode(
     const encoded = await imageBrowserCompletion(annotationBrowser, pathToFileURL(file).href, directory);
     const result = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
     if (!result.ok) throw new Error(result.error);
-    return new Uint8Array(Buffer.from(result.data, "base64"));
+    return jsonResult ? result.value : new Uint8Array(Buffer.from(result.data, "base64"));
   } finally {
     await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }

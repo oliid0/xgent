@@ -29,6 +29,7 @@ import { safeStringify, summarizeToolCall } from "../lib/chat/messages/uiMessage
 import type { PendingUploadedFile } from "../lib/chat/messages/uploadedFiles";
 import { normalizeConversationTitle } from "../lib/chat/page/chatPageHelpers";
 import { isTaskToolBlock, selectLatestTaskProgress } from "../lib/chat/taskProgress";
+import type { GitClient } from "../lib/git/types";
 import {
   checkMobileAssistantPermissions,
   mobileAssistantStatus,
@@ -53,8 +54,10 @@ import { useSoul } from "../lib/soul";
 import { type DesktopSttCapture, startDesktopSttCapture } from "../lib/stt/desktopAudioCapture";
 import type { TaskListState } from "../lib/tools/builtinTypes";
 import type { PendingToolApprovalSummary, ToolApprovalDecision } from "../lib/tools/toolApproval";
+import type { WorkspaceActivityClient } from "../lib/workspace-activity/types";
 import { sortWorkspaceProjectsByActivity } from "../lib/workspaceProjects";
 import type { ChatQueueTurnPreview } from "../pages/chat/components/ChatComposerBar";
+import { useComposerGitRepository } from "../pages/chat/composer/useComposerGitRepository";
 import type { SectionId } from "../pages/settings/types";
 import { type ComposerAtomicKey, createNativeComposerStore } from "./composerStore";
 import { presentationControls } from "./controls";
@@ -108,6 +111,10 @@ function activityIcon(toolName: string) {
 
 export type NativeChatPageProps = NativeWorkspaceActionsProps & {
   appUpdate?: AppUpdateController;
+  gitClient?: GitClient | null;
+  gitWriteEnabled?: boolean;
+  gitDisabledMessage?: string;
+  workspaceActivityClient?: WorkspaceActivityClient | null;
   editorSessions?: NativeWorkspaceEditorSessions;
   conversationId: string;
   uploadWorkdir: string;
@@ -123,6 +130,8 @@ export type NativeChatPageProps = NativeWorkspaceActionsProps & {
   thinkingAlwaysOn: boolean;
   onChatRuntimeControlsChange: (patch: Partial<ChatRuntimeControls>) => void;
   enabledSkills?: MentionComposerSkill[];
+  availableSkills?: MentionComposerSkill[];
+  onSelectSkill?: (skill: MentionComposerSkill) => boolean;
   selectedValue?: string;
   contextUsageTokensSource: {
     subscribe: (listener: () => void) => () => void;
@@ -167,6 +176,7 @@ export type NativeChatPageProps = NativeWorkspaceActionsProps & {
   sidebarOpenRequestId?: number;
   onOpenRemote: () => void;
   onOpenBrowser: () => void;
+  onNewBrowser?: () => void;
   onOpenBrowserSettings: () => void;
   onOpenGitReview: () => void;
   onOpenBackgroundTasks: () => void;
@@ -208,6 +218,15 @@ export function NativeChatPage(props: NativeChatPageProps) {
   }, [updateRequest]);
   const [composer] = useState(createNativeComposerStore);
   const agentToolsEnabled = props.settings.system.executionMode !== "text";
+  const composerGit = useComposerGitRepository({
+    workdir: agentToolsEnabled ? props.uploadWorkdir : "",
+    gitClient: agentToolsEnabled ? props.gitClient : null,
+    workspaceActivityClient: props.workspaceActivityClient,
+    isOpen: agentToolsEnabled,
+    isDisabled: props.inputDisabled,
+    canWrite: props.gitWriteEnabled,
+    disabledMessage: props.gitDisabledMessage,
+  });
   const visibleNavigation = (nodes: PresentationNode[]) =>
     nodes.filter(
       (node) =>
@@ -784,6 +803,105 @@ export function NativeChatPage(props: NativeChatPageProps) {
     t,
   );
   for (const [id, handler] of runtime.handlers) handlers.set(id, handler);
+  const composerExtras = presentationControls(
+    `composer:${props.conversationId}:${attachmentContext.revision}`,
+  );
+  const composerGitNodes: PresentationNode[] =
+    agentToolsEnabled && props.gitClient
+      ? [
+          ...(composerGit.noRepository
+            ? [
+                {
+                  ...composerExtras.toggle(
+                    "composer-git-init",
+                    t("git.branchSelector.initRepository"),
+                    false,
+                    (enabled) => (enabled ? composerGit.initializeRepository() : undefined),
+                    !composerGit.isDisabled &&
+                      composerGit.canWrite &&
+                      !composerGit.isLoading &&
+                      !composerGit.isMutating &&
+                      !composerGit.error,
+                  ),
+                  icon: "arrow.triangle.branch",
+                },
+              ]
+            : [
+                {
+                  ...composerExtras.select(
+                    "composer-git-branch",
+                    composerGit.repositoryMenuLabel,
+                    composerGit.selectedBranch,
+                    composerGit.branchOptions,
+                    composerGit.switchBranch,
+                    !composerGit.isDisabled &&
+                      composerGit.canWrite &&
+                      !composerGit.isLoading &&
+                      !composerGit.isMutating,
+                  ),
+                  variant: "composer-repository",
+                  icon: "arrow.triangle.branch",
+                },
+              ]),
+          ...(composerGit.repositoryOptions.length > 1
+            ? [
+                composerExtras.select(
+                  "composer-git-repository",
+                  t("git.branchSelector.repositoryLabel"),
+                  composerGit.selectedRepository,
+                  composerGit.repositoryOptions,
+                  composerGit.selectRepository,
+                  !composerGit.isDisabled && !composerGit.isLoading && !composerGit.isMutating,
+                ),
+              ]
+            : []),
+          ...(composerGit.error
+            ? [
+                {
+                  id: "composer-git-error",
+                  kind: "Banner" as const,
+                  status: "error" as const,
+                  text: composerGit.error,
+                },
+                composerExtras.action(
+                  "composer-git-retry",
+                  t("git.branchSelector.refresh"),
+                  composerGit.refresh,
+                  !composerGit.isDisabled && !composerGit.isLoading && !composerGit.isMutating,
+                ),
+              ]
+            : []),
+        ]
+      : [];
+  const composerSkillNodes: PresentationNode[] = (
+    agentToolsEnabled ? (props.availableSkills ?? props.enabledSkills ?? []) : []
+  ).map((skill) => ({
+    ...composerExtras.action(
+      `composer-skill:${skill.skillFile}`,
+      skill.name,
+      () => {
+        if (props.onSelectSkill && !props.onSelectSkill(skill)) return;
+        composer.handle.insertSkillMention(skill);
+        composer.handle.focus();
+      },
+      !props.inputDisabled,
+    ),
+    text: skill.description,
+    icon: "sparkles",
+  }));
+  const fileReferenceNode = {
+    ...composerExtras.action(
+      "composer-workspace-reference",
+      t("chat.composer.filesAndFolders"),
+      () => {
+        composer.handle.insertText("@");
+        composer.handle.focus();
+      },
+      !props.inputDisabled && agentToolsEnabled && !!props.uploadWorkdir.trim(),
+    ),
+    icon: "folder",
+  };
+  for (const [id, handler] of composerExtras.handlers) handlers.set(id, handler);
   const nodes: PresentationNode[] = [
     {
       id: "chat",
@@ -806,6 +924,18 @@ export function NativeChatPage(props: NativeChatPageProps) {
                     ...button("workspace-open-browser", t("browser.title"), props.onOpenBrowser),
                     icon: "globe",
                   },
+                  ...(props.onNewBrowser
+                    ? [
+                        {
+                          ...button(
+                            "workspace-new-browser",
+                            t("browser.newTab"),
+                            props.onNewBrowser,
+                          ),
+                          icon: "plus",
+                        },
+                      ]
+                    : []),
                   {
                     ...button(
                       "workspace-open-terminal",
@@ -1140,7 +1270,8 @@ export function NativeChatPage(props: NativeChatPageProps) {
                 {
                   id: "attach",
                   kind: "FilePicker",
-                  label: t("chat.upload.button"),
+                  variant: "composer-add",
+                  label: t("chat.upload.add"),
                   options: ["camera", "photos", "files"].map((value) => ({
                     value,
                     label: t("chat.upload." + value),
@@ -1148,6 +1279,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                   })),
                   disabled: props.isUploading || props.inputDisabled,
                   children: [
+                    fileReferenceNode,
                     {
                       ...button(
                         "attach-plugins",
@@ -1158,7 +1290,18 @@ export function NativeChatPage(props: NativeChatPageProps) {
                       icon: "puzzlepiece.extension",
                     },
                     { id: "attach-runtime-divider", kind: "Divider" },
-                    ...runtime.nodes,
+                    ...runtime.nodes.filter((node) => node.id !== "runtime-reasoning"),
+                    ...composerGitNodes,
+                    ...(composerSkillNodes.length
+                      ? [
+                          {
+                            id: "composer-skills",
+                            kind: "Section" as const,
+                            label: t("chat.composer.plugins"),
+                            children: composerSkillNodes,
+                          },
+                        ]
+                      : []),
                   ],
                   action: change(
                     `attach:${props.conversationId}:${attachmentContext.revision}`,
@@ -1186,10 +1329,12 @@ export function NativeChatPage(props: NativeChatPageProps) {
                     !props.inputDisabled && props.settings.system.executionMode !== "text",
                   ),
                 },
+                { id: "composer-spacer", kind: "Spacer" },
+                ...(contextUsageNode ? [contextUsageNode] : []),
                 {
                   id: "model",
                   kind: "Selector",
-                  variant: "compact",
+                  variant: "composer-model",
                   icon: "sparkles",
                   label: t("chat.model"),
                   text: t("chat.searchModel"),
@@ -1208,6 +1353,13 @@ export function NativeChatPage(props: NativeChatPageProps) {
                       label: t("chat.noModelFound"),
                       icon: "magnifyingglass",
                     },
+                    { id: "model:search", kind: "Text", label: t("chat.searchModel") },
+                    {
+                      id: "model:search-clear-label",
+                      kind: "Text",
+                      label: t("chat.history.searchClear"),
+                    },
+                    { id: "model:close", kind: "Text", label: t("settings.cancel") },
                   ],
                   action: change(
                     "model",
@@ -1220,8 +1372,9 @@ export function NativeChatPage(props: NativeChatPageProps) {
                     props.modelOptions.length > 0,
                   ),
                 },
-                ...(contextUsageNode ? [contextUsageNode] : []),
-                { id: "composer-spacer", kind: "Spacer" },
+                ...runtime.nodes
+                  .filter((node) => node.id === "runtime-reasoning")
+                  .map((node) => ({ ...node, variant: "composer-reasoning" })),
                 ...(voiceAvailable
                   ? [
                       {

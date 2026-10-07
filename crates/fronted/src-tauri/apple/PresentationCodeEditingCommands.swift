@@ -92,11 +92,23 @@ final class XgentCodeEditingCommands: ObservableObject {
         view.copy(nil)
     }
     func undo() {
-        guard canUndo, let view = target else { return }
+        guard canUndo, focusTarget(), let view = target else { return }
         view.undoManager?.undo()
     }
     func redo() {
-        guard canRedo, let view = target else { return }
+        guard canRedo, focusTarget(), let view = target else { return }
         view.undoManager?.redo()
+    }
+
+    private func focusTarget() -> Bool {
+        guard isAvailable, let view = target else { return false }
+        // Find fields own a different responder and undo history. Explicit
+        // editor commands must target the editor's active editing session.
+        #if os(iOS)
+        return view.becomeFirstResponder()
+        #else
+        guard view.acceptsFirstResponder, let window = view.window else { return false }
+        return window.makeFirstResponder(view) && window.firstResponder === view
+        #endif
     }
 }

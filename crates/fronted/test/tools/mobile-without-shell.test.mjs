@@ -75,7 +75,7 @@ test("a pending Shell probe does not block native file and network MCP tool exec
   const pendingStatus = h.mobile.mobileExecutionStatus();
   const registry = await h.build();
   const names = registry.tools.map((tool) => tool.name);
-  for (const name of ["Read", "Write", "Edit", "List", "SkillsManager", "McpManager", "browser_use", "PreviewFile", "MobilePersonalData", "MobilePersonalActions", "MobileEnvironment"]) {
+  for (const name of ["Read", "Write", "OfficeCreate", "Edit", "List", "SkillsManager", "McpManager", "browser_use", "PreviewFile", "MobilePersonalData", "MobilePersonalActions", "MobileEnvironment"]) {
     assert.ok(names.includes(name), name);
   }
   assert.ok(!names.includes("Bash"));

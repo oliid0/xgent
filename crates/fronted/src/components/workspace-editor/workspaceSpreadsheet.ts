@@ -42,7 +42,7 @@ export function buildSpreadsheetTable(
 ): SpreadsheetTable | null {
   if (!preview || preview.kind !== "spreadsheet") return null;
   try {
-    const workbook = read(preview.bytes, { type: "array", cellDates: true });
+    const workbook = read(preview.bytes, { type: "array", cellDates: true, sheetStubs: true });
     const sheetNames = workbook.SheetNames;
     const selectedSheetName =
       sheetNames.find((name) => name === activeSheetName) ?? sheetNames[0] ?? "";
@@ -70,18 +70,24 @@ export function buildSpreadsheetTable(
         },
       },
     });
-    const maxColumns = rawRows.reduce(
-      (max, row) => Math.max(max, Array.isArray(row) ? row.length : 0),
-      0,
+    const maxColumns = Math.max(
+      range.e.c + 1,
+      rawRows.reduce((max, row) => Math.max(max, Array.isArray(row) ? row.length : 0), 0),
     );
     const rows = rawRows.slice(0, SPREADSHEET_MAX_ROWS).map((row, rowIndex) => {
       const cells = Array.from(
         { length: Math.min(maxColumns, SPREADSHEET_MAX_COLUMNS) },
-        (_, index) => ({
-          id: `c${index}`,
-          columnIndex: index,
-          value: String(Array.isArray(row) ? (row[index] ?? "") : ""),
-        }),
+        (_, index) => {
+          const source = sheet[utils.encode_cell({ r: rowIndex, c: index })];
+          return {
+            id: `c${index}`,
+            columnIndex: index,
+            value:
+              source?.f && (source.t === "z" || source.v === undefined)
+                ? `=${source.f}`
+                : String(Array.isArray(row) ? (row[index] ?? "") : ""),
+          };
+        },
       );
       return {
         id: `r${rowIndex}-${hashString(cells.map((cell) => cell.value).join("\u0000"))}`,

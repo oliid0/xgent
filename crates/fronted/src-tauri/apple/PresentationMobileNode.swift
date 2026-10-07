@@ -260,8 +260,6 @@ struct XgentIOSNode: View {
             rendered.accessibilityElement(children: .contain)
         case .selector where node.variant == "workspace-file-sheets" || node.variant == "provider-vendor-tabs":
             rendered.accessibilityElement(children: .contain)
-        case .numberInput where node.variant == "document-annotation-page":
-            rendered.accessibilityElement(children: .contain)
         case .mediaPreview where node.variant == "workspace-image-preview":
             rendered.accessibilityElement(children: .contain)
         case .vStack, .hStack, .scrollView, .card, .section, .list,
@@ -301,14 +299,14 @@ struct XgentIOSNode: View {
             } else if node.variant == "workspace-editor-run-output" {
                 XgentWorkspaceRunOutput(node: node, document: document, model: model)
                     .id(node.value?.text ?? node.id)
-            } else if node.variant == "workspace-file-annotations" {
-                XgentDocumentAnnotationsEditor(node: node, document: document, model: model)
             } else if node.variant == "workspace-file-layout" {
                 XgentWorkspaceFileLayout(node: node, document: document, model: model)
             } else if node.variant == "terminal-rename-editor" {
                 XgentTerminalRenameEditor(node: node, document: document, model: model)
             } else if node.variant == "browser-navigation" {
                 XgentBrowserNavigation(node: node, document: document, model: model)
+            } else if node.variant == "browser-new-tab-tools" {
+                XgentBrowserStartTools(node: node, document: document, model: model)
             } else if node.variant == "browser-tabs" {
                 XgentBrowserTabs(node: node, document: document, model: model)
             } else if node.variant == "browser-header" {
@@ -435,8 +433,6 @@ struct XgentIOSNode: View {
                 XgentWorkspaceBulkAction(node: node, document: document, model: model)
             } else if node.variant == "workspace-image-save" {
                 XgentWorkspaceImageSaveButton(node: node, document: document, model: model)
-            } else if node.variant == "workspace-file-save" {
-                XgentWorkspaceFileSaveButton(node: node, document: document, model: model)
             } else if node.variant == "question-option" {
                 XgentQuestionOptionButton(node: node, document: document, model: model)
             } else { actionButton }
@@ -449,9 +445,7 @@ struct XgentIOSNode: View {
         case .timeInput:
             XgentTimeInput(node: node, document: document, model: model)
         case .textArea:
-            if node.variant == "document-annotation" {
-                XgentDocumentAnnotationText(node: node, document: document, model: model)
-            } else { textArea }
+            textArea
         case .toggle:
             XgentSwitch(node: node, document: document, model: model)
         case .selector:
@@ -503,8 +497,6 @@ struct XgentIOSNode: View {
         case .numberInput:
             if node.variant == "workspace-image-rotation" {
                 XgentImageRotationButton(node: node, document: document, model: model)
-            } else if node.variant == "document-annotation-page" {
-                XgentDocumentAnnotationPage(node: node, document: document, model: model)
             } else { XgentNumberInput(node: node, document: document, model: model) }
         case .collapsible:
             XgentDisclosure(node: node, document: document, model: model)

@@ -64,6 +64,8 @@ export function NativeBrowserPage(props: {
   const addressRef = useRef({ sessionId: "", text: "" });
   const commands = useRef(new Set<string>());
   const alive = useRef(false);
+  const toolsRef = useRef(props.tools);
+  toolsRef.current = props.tools;
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -304,10 +306,31 @@ export function NativeBrowserPage(props: {
           text: session.url,
           selected: session.sessionId === active?.sessionId,
           status: state.busySessionIds.includes(session.sessionId) ? "running" : undefined,
+          children: [
+            button(
+              `browser-tab-close:${session.sessionId}`,
+              `${t("browser.closeTab")}: ${session.title?.trim() || browserTabLabel(session.url) || t("browser.untitled")}`,
+              "xmark",
+              () => {
+                if (
+                  browserSessionController
+                    .sessionsForConversation()
+                    .some((item) => item.sessionId === session.sessionId)
+                )
+                  return browserSessionController.closeSession(session.sessionId);
+              },
+            ),
+          ],
           action: bind(
             `browser-tab:${session.sessionId}`,
             () => {
-              if (alive.current) browserSessionController.selectSession(session.sessionId);
+              if (
+                alive.current &&
+                browserSessionController
+                  .sessionsForConversation()
+                  .some((item) => item.sessionId === session.sessionId)
+              )
+                browserSessionController.selectSession(session.sessionId);
             },
             (value) => value === null,
           ),
@@ -421,25 +444,38 @@ export function NativeBrowserPage(props: {
                 variant: "browser-empty",
                 fill: true,
                 children: [
-                  {
-                    id: "browser-empty-message",
-                    kind: "EmptyState" as const,
-                    icon: "globe",
-                    label: t(state.initializing ? "browser.preparing" : "browser.startBrowsing"),
-                    text: t("browser.startBrowsingDescription"),
-                  },
+                  ...(!blank || !props.tools?.length
+                    ? [
+                        {
+                          id: "browser-empty-message",
+                          kind: "EmptyState" as const,
+                          icon: "globe",
+                          label: t(
+                            state.initializing ? "browser.preparing" : "browser.startBrowsing",
+                          ),
+                          text: t("browser.startBrowsingDescription"),
+                        },
+                      ]
+                    : []),
                   ...(blank && props.tools?.length
                     ? [
                         {
                           id: "browser-new-tab-tools",
-                          kind: "HStack" as const,
-                          wrap: true,
+                          kind: "VStack" as const,
+                          variant: "browser-new-tab-tools",
+                          label: t("browser.tools"),
                           children: props.tools.map((tool) => ({
                             ...button(
                               `browser-tool:${tool.id}`,
                               tool.label,
                               tool.icon,
-                              tool.run,
+                              () => {
+                                const current = toolsRef.current?.find(
+                                  (item) => item.id === tool.id,
+                                );
+                                if (current?.enabled !== false && current?.run === tool.run)
+                                  current.run();
+                              },
                               tool.enabled !== false,
                             ),
                             kind: "Button" as const,
@@ -468,7 +504,12 @@ export function NativeBrowserPage(props: {
   return (
     <NativeSurface
       document={{
-        ...createNativeWorkspacePanel(t, compact, state.panelFocusRequest),
+        ...createNativeWorkspacePanel(
+          t,
+          compact,
+          state.panelFocusRequest,
+          state.panelExpandRequest,
+        ),
         title: t("browser.title"),
         appearance: props.settings.theme,
         formFactor: compact ? "mobile" : "desktop",

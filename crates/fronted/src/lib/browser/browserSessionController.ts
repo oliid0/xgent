@@ -5,9 +5,11 @@ import {
   type BrowserAutomationClient,
   type BrowserOpenTabListener,
   type BrowserSessionSummary,
+  type BrowserShortcutListener,
   type BrowserStatus,
   type BrowserViewport,
   listenBrowserOpenTabs,
+  listenBrowserShortcuts,
   localBrowserAutomationClient,
 } from "../browserAutomation";
 
@@ -25,6 +27,7 @@ export type BrowserControllerState = {
   activeSessionId: string | null;
   panelOpen: boolean;
   panelFocusRequest: number;
+  panelExpandRequest: number;
   panelOpenSource: "agent" | "user" | null;
   busySessionIds: string[];
   humanAssistance: BrowserHumanAssistance | null;
@@ -111,6 +114,7 @@ export class BrowserSessionController {
   constructor(
     private readonly client: BrowserAutomationClient = localBrowserAutomationClient,
     private readonly openTabListener?: BrowserOpenTabListener,
+    private readonly shortcutListener?: BrowserShortcutListener,
   ) {}
 
   private homePage = DEFAULT_BROWSER_HOME;
@@ -164,6 +168,7 @@ export class BrowserSessionController {
     activeSessionId: null,
     panelOpen: false,
     panelFocusRequest: 0,
+    panelExpandRequest: 0,
     panelOpenSource: null,
     busySessionIds: [],
     humanAssistance: null,
@@ -188,18 +193,65 @@ export class BrowserSessionController {
   private nextUserTabId = 0;
   private closeAllPromise: Promise<void> | null = null;
   private stopOpenTabListener?: () => void;
+  private stopShortcutListener?: () => void;
 
   subscribe = (listener: Listener) => {
     this.listeners.add(listener);
     this.startOpenTabListener();
+    this.startShortcutListener();
     return () => {
       this.listeners.delete(listener);
       if (this.listeners.size === 0) {
         this.stopOpenTabListener?.();
         this.stopOpenTabListener = undefined;
+        this.stopShortcutListener?.();
+        this.stopShortcutListener = undefined;
       }
     };
   };
+
+  handleShortcut(key: string, sessionId = this.state.activeSessionId) {
+    if (
+      !sessionId ||
+      !this.state.panelOpen ||
+      sessionId !== this.state.activeSessionId ||
+      !this.sessionsForConversation().some((session) => session.sessionId === sessionId)
+    )
+      return;
+    if (key === "F11") this.update({ panelExpandRequest: this.state.panelExpandRequest + 1 });
+    if (key === "F12") void this.action("open_devtools", {}, { sessionId }).catch(() => undefined);
+  }
+
+  private startShortcutListener() {
+    if (!this.shortcutListener || this.stopShortcutListener) return;
+    let active = true;
+    let cleanup: (() => void | Promise<void>) | undefined;
+    const dispose = (unlisten: () => void | Promise<void>) => {
+      void Promise.resolve()
+        .then(unlisten)
+        .catch(() => undefined);
+    };
+    this.stopShortcutListener = () => {
+      active = false;
+      if (cleanup) dispose(cleanup);
+    };
+    void this.shortcutListener((request) => {
+      if (
+        active &&
+        request &&
+        typeof request.key === "string" &&
+        typeof request.sessionId === "string"
+      )
+        this.handleShortcut(request.key, request.sessionId);
+    })
+      .then((unlisten) => {
+        if (active) cleanup = unlisten;
+        else dispose(unlisten);
+      })
+      .catch((error) => {
+        if (active) this.update({ error: errorMessage(error) });
+      });
+  }
 
   private startOpenTabListener() {
     if (!this.openTabListener || this.stopOpenTabListener) return;
@@ -850,4 +902,5 @@ export class BrowserSessionController {
 export const browserSessionController = new BrowserSessionController(
   localBrowserAutomationClient,
   listenBrowserOpenTabs,
+  listenBrowserShortcuts,
 );
