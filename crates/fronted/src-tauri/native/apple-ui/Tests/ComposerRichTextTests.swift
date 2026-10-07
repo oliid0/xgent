@@ -3,6 +3,16 @@ import XCTest
 @testable import XgentNativeUI
 
 final class ComposerRichTextTests: XCTestCase {
+    func testComposedCharactersCannotBeSplitByNativeSelectionOrReferenceRanges() {
+        for text in ["😀", "e\u{301}", "👨‍👩‍👧‍👦", "🇨🇳"] {
+            XCTAssertTrue(XgentComposerRange.isValid(NSRange(location: 0, length: text.utf16.count), in: text))
+            XCTAssertTrue(XgentComposerRange.isValid(NSRange(location: text.utf16.count, length: 0), in: text))
+            for offset in 1..<text.utf16.count {
+                XCTAssertFalse(XgentComposerRange.isValid(NSRange(location: offset, length: 0), in: text))
+                XCTAssertFalse(XgentComposerRange.isValid(NSRange(location: 0, length: offset), in: text))
+            }
+        }
+    }
     func testOpaqueChipsHaveTheSharedWordBoundariesWithoutChangingNativeEditingUnits() {
         let value = NSMutableAttributedString(string: "word\u{fffc}next")
         value.addAttribute(.xgentComposerReference,

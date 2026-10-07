@@ -143,6 +143,7 @@ struct XgentComposerNativeField: NSViewRepresentable {
         view.accessibilityIdentifier = next.identifier; view.accessibilityLabel = next.label
         #else
         view.setAccessibilityIdentifier(next.identifier); view.setAccessibilityLabel(next.label)
+        view.setAccessibilityEnabled(!next.disabled)
         #endif
         if !next.fieldState.composing { refreshContent(force: leaseChanged); applySelection() }
         if next.consumeFocus() { pendingFocus = true }
@@ -269,6 +270,9 @@ struct XgentComposerNativeField: NSViewRepresentable {
     func retire() {
         retired = true; pendingFocus = false
         view.onKey = nil; view.onWindow = nil; view.onPaste = nil; view.delegate = nil; view.isEditable = false
+        #if os(macOS)
+        view.setAccessibilityEnabled(false)
+        #endif
     }
 }
 

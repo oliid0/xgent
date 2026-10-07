@@ -188,7 +188,7 @@ private func iosToolchainPayload(
 final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private let installationPreferenceKey = "xgent.mobileExecution.iosShellInstalled"
     private let installationVerificationKey = "xgent.mobileExecution.iosShellVerification"
-    private let installationVerificationVersion = "ios-a-shell-v7"
+    private let installationVerificationVersion = "ios-a-shell-v8"
     private let installationDirectoryName = "environment-v3"
     private let installationMarkerName = ".xgent-environment"
     private let installationProbeToken = "xgent-ios-shell-ready"
@@ -995,6 +995,9 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
     private func runInstallationProbes(workspace: URL, onProgress: (Int) -> Void) throws {
         let diagnostics = Logger(subsystem: "com.ohi.xgent", category: "shell-installation")
         let token = installationProbeToken
+        let wasmProbe = workspace.appendingPathComponent(".xgent-probe.wasm")
+        try AShellWasmProbe.module.write(to: wasmProbe, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: wasmProbe) }
         let probes: [(name: String, command: String, expected: String)] = [
             ("shell", "printf '\(token)'", token),
             (
@@ -1018,7 +1021,7 @@ final class MobileExecutionPlugin: Plugin, UIDocumentPickerDelegate {
                 token
             ),
             ("ffmpeg", "ffmpeg -version", "ffmpeg version"),
-            ("WebAssembly interpreter", "wasm3 2>&1; [ \"$?\" -eq 1 ]", "Usage: wasm3 command arguments"),
+            ("WebAssembly interpreter", "wasm3 .xgent-probe.wasm", AShellWasmProbe.expectedOutput),
             ("package manager", "pkg", "Usage: pkg"),
             ("package registry", "pkg list >/dev/null && printf '\(token)'", token),
         ]

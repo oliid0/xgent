@@ -54,7 +54,7 @@ struct XgentComposerRichText {
         for value in values {
             guard !value.id.isEmpty, value.location >= end, value.length > 0, !value.label.isEmpty,
                   value.location <= text.utf16.count, value.length <= text.utf16.count - value.location,
-                  Range(NSRange(location: value.location, length: value.length), in: text) != nil else { return [] }
+                  XgentComposerRange.isValid(NSRange(location: value.location, length: value.length), in: text) else { return [] }
             end = value.location + value.length
         }
         return values
@@ -103,12 +103,12 @@ struct XgentComposerRichText {
         let start = plainOffset(range.location, preferFollowing: range.length > 0)
         let end = plainOffset(range.location + range.length, preferFollowing: false)
         let result = NSRange(location: start, length: end - start)
-        return Range(result, in: text) == nil ? nil : result
+        return XgentComposerRange.isValid(result, in: text) ? result : nil
     }
 
     func nativeRange(_ range: NSRange) -> NSRange? {
         guard range.location >= 0, range.length >= 0, range.location <= text.utf16.count,
-              range.length <= text.utf16.count - range.location, Range(range, in: text) != nil else { return nil }
+              range.length <= text.utf16.count - range.location, XgentComposerRange.isValid(range, in: text) else { return nil }
         let start = nativeOffset(range.location, trailing: false)
         let end = nativeOffset(range.location + range.length, trailing: range.length > 0)
         return NSRange(location: start, length: end - start)

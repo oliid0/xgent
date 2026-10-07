@@ -79,7 +79,7 @@ final class SidebarConversationRenderingTests: XCTestCase {
                         try await Task.sleep(nanoseconds: 50_000_000)
                         let action = try XCTUnwrap(actions.last)
                         XCTAssertEqual(action.action, "\(id):disclosure")
-                        model.complete(XgentActionResult(surface: action.surface, requestId: action.requestId, ok: true))
+                        model.complete(XgentActionResult(surface: action.surface, requestId: action.requestId, ok: true, error: nil))
                     }
                 }
                 let strategy = Snapshotting<NSView, NSImage>.image(size: CGSize(width: width, height: 720))

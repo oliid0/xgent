@@ -160,7 +160,7 @@ private struct XgentComposerReferenceBadge: View {
         // Replacing from the end keeps every authoritative UTF-16 range valid.
         for (index, reference) in references.enumerated().reversed() {
             let range = NSRange(location: reference.location, length: reference.length)
-            guard Range(range, in: text) != nil else { continue }
+            guard XgentComposerRange.isValid(range, in: text) else { continue }
             let value = XgentComposerReferenceValue(id: reference.id, text: (text as NSString).substring(with: range), label: reference.label, icon: reference.icon,
                 newPaste: pastes.contains { $0.id == reference.id })
             let attachment = XgentComposerReferenceAttachment(reference: value, fontFamily: fontFamily,

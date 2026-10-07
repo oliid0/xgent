@@ -169,7 +169,7 @@ final class ControlRenderingTests: XCTestCase {
         diagnostic.lifetime = .keepAlways
         add(diagnostic)
         let field = try XCTUnwrap(textField(in: window, identifier: "password"))
-        XCTAssertTrue(field.delegate is XgentIOSSecretField.Coordinator)
+        XCTAssertTrue(field.delegate is XgentIOSSingleLineField.Coordinator)
         XCTAssertFalse(field.allTargets.isEmpty)
         XCTAssertTrue(field.isSecureTextEntry)
         XCTAssertEqual(field.autocapitalizationType, .none)

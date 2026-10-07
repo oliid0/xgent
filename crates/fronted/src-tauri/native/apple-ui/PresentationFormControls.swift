@@ -28,26 +28,20 @@ struct XgentTextInput: View {
     }
 
     @ViewBuilder private var entry: some View {
+        #if os(iOS)
+        XgentIOSSingleLineField(text: value, focused: $secretFocused, node: node, commit: commit)
+        #else
         if node.secure == true {
-            #if os(iOS)
-            XgentIOSSecretField(text: value, focused: $secretFocused, node: node, commit: commit)
-            #else
             SecureField(node.text ?? "", text: value).focused($focused)
-            #endif
         }
         else { TextField(node.text ?? "", text: value).focused($focused) }
+        #endif
     }
 
     @ViewBuilder private var accessibleEntry: some View {
         #if os(iOS)
-        if node.secure == true {
-            // UIKit owns the secure trait and label. A SwiftUI AX wrapper
-            // replaces that native field with a traitless virtual element.
-            entry
-        } else {
-            entry.accessibilityIdentifier(node.id)
-                .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
-        }
+        // UIKit owns the interactive element's identifier and traits.
+        entry
         #else
         entry.accessibilityIdentifier(node.id)
             .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")

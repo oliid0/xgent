@@ -67,7 +67,8 @@ import AppKit
         #else
         let text = field.string, caret = field.selectedRange()
         #endif
-        guard caret.length == 0, let range = Range(caret, in: text) else { return false }
+        guard caret.length == 0, XgentComposerRange.isValid(caret, in: text),
+              let range = Range(caret, in: text) else { return false }
         return previous ? !text[..<range.lowerBound].contains("\n") : !text[range.upperBound...].contains("\n")
     }
     func hasReference(for key: String, caret: NSRange) -> Bool {

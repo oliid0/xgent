@@ -102,6 +102,8 @@ final class PresentationTransportTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(100))
         let editor = try XCTUnwrap(window.firstResponder as? NSTextView,
                                   "Clicking the composer must focus its actual native field editor")
+        XCTAssertTrue(editor.isEditable)
+        XCTAssertTrue(editor.isAccessibilityEnabled(), "The real editable text view must accept accessibility input")
         XCTAssertEqual(editor.string, "Draft")
         editor.setSelectedRange(NSRange(location: editor.string.utf16.count, length: 0))
         for type in [NSEvent.EventType.keyDown, .keyUp] {

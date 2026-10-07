@@ -2,9 +2,9 @@
 import SwiftUI
 import UIKit
 
-// iOS 26's hosted SecureField failed both real editing and AX traversal in CI.
-// Keep a native secure UITextField inside SwiftUI with an explicit event bridge.
-struct XgentIOSSecretField: UIViewRepresentable {
+// Keep editing, keyboard configuration and accessibility on the same UIKit
+// field for secure credentials and ordinary model parameters alike.
+struct XgentIOSSingleLineField: UIViewRepresentable {
     @Binding var text: String
     @Binding var focused: Bool
     let node: XgentNode
@@ -12,15 +12,15 @@ struct XgentIOSSecretField: UIViewRepresentable {
     @Environment(\.isEnabled) private var enabled
     @Environment(\.xgentPresentationTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.multilineTextAlignment) private var textAlignment
+    @Environment(\.layoutDirection) private var direction
     @ScaledMetric(relativeTo: .body) private var scale = 1.0
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text, focused: $focused, commit: commit) }
 
     func makeUIView(context: Context) -> UITextField {
         let field = UITextField()
-        field.isSecureTextEntry = true
         // yy's provider form also opts out of login/password AutoFill.
-        field.textContentType = .oneTimeCode
         field.autocapitalizationType = .none
         field.autocorrectionType = .no
         field.spellCheckingType = .no
@@ -44,6 +44,13 @@ struct XgentIOSSecretField: UIViewRepresentable {
     private func configure(_ field: UITextField) {
         if field.text != text && field.markedTextRange == nil { field.text = text }
         field.placeholder = node.text
+        field.isSecureTextEntry = node.secure == true
+        field.textContentType = node.secure == true ? .oneTimeCode : nil
+        field.keyboardType = node.variant == "integer-input" ? .numberPad :
+            node.variant == "decimal-input" ? .decimalPad : .default
+        field.textAlignment = textAlignment == .trailing
+            ? (direction == .rightToLeft ? .left : .right)
+            : textAlignment == .center ? .center : .natural
         field.isEnabled = enabled
         let fontSize = CGFloat(17 * theme.fontScale) * scale
         field.font = XgentFonts.name(for: theme.fontFamily).flatMap { UIFont(name: $0, size: fontSize) }

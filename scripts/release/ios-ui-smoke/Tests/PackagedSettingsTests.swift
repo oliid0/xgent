@@ -131,7 +131,7 @@ final class PackagedSettingsTests: XCTestCase {
     }
 
     private func openSettings(_ app: XCUIApplication) {
-        let draft = app.descendants(matching: .any)["draft"].firstMatch
+        let draft = app.textViews["draft"].firstMatch
         XCTAssertTrue(draft.waitForExistence(timeout: 60), "The actual native chat must render")
         if !app.buttons["settings"].firstMatch.isHittable {
             tap(app.buttons["sidebar"].firstMatch, in: app)
@@ -145,7 +145,7 @@ final class PackagedSettingsTests: XCTestCase {
 
     private func closeSettings(_ app: XCUIApplication) {
         tap(activeButton("presentation-sheet-close", in: app), in: app)
-        let draft = app.descendants(matching: .any)["draft"].firstMatch
+        let draft = app.textViews["draft"].firstMatch
         XCTAssertTrue(draft.waitForExistence(timeout: 30))
         XCTAssertTrue(draft.isHittable, "Settings must return pointer/touch ownership to the composer")
     }

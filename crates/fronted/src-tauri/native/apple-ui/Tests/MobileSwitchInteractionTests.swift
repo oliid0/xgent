@@ -13,7 +13,7 @@ final class MobileSwitchInteractionTests: XCTestCase {
                     "version": 1, "surface": "settings:voice", "revision": 1,
                     "mode": "sheet", "title": "语音输入", "appearance": "light", "formFactor": "mobile",
                     "nodes": [["id": "voice-general", "kind": "SettingsGroup", "children": [
-                        ["id": "voice-enabled", "kind": "Toggle", "label": "Enable voice input · 将语音转换为输入框文字",
+                        ["id": "voice-enabled", "kind": "Switch", "label": "Enable voice input · 将语音转换为输入框文字",
                          "text": "The full description wraps without covering the switch. 不会自动发送。",
                          "action": "voice-enabled", "value": false]
                     ]]]

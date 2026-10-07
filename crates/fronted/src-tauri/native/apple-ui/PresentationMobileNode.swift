@@ -249,7 +249,7 @@ struct XgentIOSNode: View {
 
     @ViewBuilder private var identified: some View {
         switch node.kind {
-        case .textInput, .colorInput, .toggle, .button, .iconButton:
+        case .textInput, .composerInput, .colorInput, .toggle, .button, .iconButton:
             // Controls identify their actual interactive element. Repeating
             // an identifier on this layout wrapper creates a second AX
             // button/switch with different hit bounds on iOS.
@@ -282,7 +282,7 @@ struct XgentIOSNode: View {
             .modifier(XgentIOSNodeFrame(node: node, alignment: alignment, parentAxis: parentAxis))
             .lineLimit(node.maxLines)
             .fixedSize(horizontal: node.wrap == false, vertical: false)
-            .disabled(node.disabled == true || model.isBusy(node, in: document))
+            .disabled(node.disabled == true || (node.kind != .composerInput && model.isBusy(node, in: document)))
             .opacity(node.disabled == true && node.kind != .button && node.kind != .iconButton ? 0.48 : 1)
             .modifier(XgentIOSAccessibility(node: node))
     }

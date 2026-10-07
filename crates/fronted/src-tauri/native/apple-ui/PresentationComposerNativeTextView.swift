@@ -94,7 +94,8 @@ struct XgentComposerKey {
     @discardableResult private func replaceComposerFragment(in range: NSRange, with fragment: NSAttributedString,
                                                           selectionAfter: NSRange) -> Bool {
         guard isEditable, range.location >= 0, range.length >= 0, range.location <= textStorage.length,
-              range.length <= textStorage.length - range.location, Range(range, in: textStorage.string) != nil else { return false }
+              range.length <= textStorage.length - range.location,
+              XgentComposerRange.isValid(range, in: textStorage.string) else { return false }
         let previous = textStorage.attributedSubstring(from: range), previousSelection = selectedRange
         let replaced = NSRange(location: range.location, length: fragment.length)
         undoManager?.registerUndo(withTarget: self) { target in

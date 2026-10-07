@@ -25,7 +25,7 @@ enum XgentComposerTokens {
                 : caret.location >= token.location && caret.location < end
             if matches {
                 let range = NSRange(location: token.location, length: token.length)
-                return Range(range, in: text) == nil ? nil : range
+                return XgentComposerRange.isValid(range, in: text) ? range : nil
             }
         }
         return nil
