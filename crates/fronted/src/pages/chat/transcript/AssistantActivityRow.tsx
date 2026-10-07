@@ -15,7 +15,7 @@ import { createAstryxToolCall, ToolCallDetail } from "../components/assistant-bu
 import { AssistantRenderUnit } from "./AssistantRenderUnit";
 import type { AssistantActivityRow as AssistantActivityRowModel } from "./rowModel";
 import { useTranscriptPreferences } from "./TranscriptPreferences";
-import { groupWorkTools, workDuration, workRecord } from "./workRecord";
+import { groupWorkTools, workDuration, workRecord, workToolGroupLabel } from "./workRecord";
 
 export const AssistantActivityRow = memo(function AssistantActivityRow(props: {
   row: AssistantActivityRowModel;
@@ -92,7 +92,8 @@ export const AssistantActivityRow = memo(function AssistantActivityRow(props: {
               <ChatToolCalls
                 key={items[0].toolCall.id}
                 calls={calls}
-                defaultIsExpanded={row.live}
+                label={workToolGroupLabel(items, t)}
+                defaultIsExpanded={false}
               />
             );
           })

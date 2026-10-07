@@ -14,10 +14,14 @@ test("desktop panels require a valid focus token, translated controls and a real
     ...createNativeWorkspacePanel(key => key, false, 2), formFactor: "desktop", dismissAction: "close" };
   assert.doesNotThrow(() => validatePresentationDocument(panel, handlers));
   assert.equal(createNativeWorkspacePanel(key => key, true).mode, "root");
+  assert.doesNotThrow(() => validatePresentationDocument({ ...panel, workspacePanel: {
+    ...panel.workspacePanel, dockLabel: "Dock", undockLabel: "Restore" } }, handlers));
   for (const patch of [{ formFactor: "mobile" }, { dismissAction: undefined },
     { workspacePanel: undefined }, { workspacePanel: { ...panel.workspacePanel, focusRequest: -1 } },
     { workspacePanel: { ...panel.workspacePanel, closeLabel: " " } },
-    { workspacePanel: { ...panel.workspacePanel, closeTabLabel: " " } }]) {
+    { workspacePanel: { ...panel.workspacePanel, closeTabLabel: " " } },
+    { workspacePanel: { ...panel.workspacePanel, dockLabel: "Dock" } },
+    { workspacePanel: { ...panel.workspacePanel, dockLabel: "Dock", undockLabel: " " } }]) {
     assert.throws(() => validatePresentationDocument({ ...panel, ...patch }, handlers), /workspace panel/);
   }
 });

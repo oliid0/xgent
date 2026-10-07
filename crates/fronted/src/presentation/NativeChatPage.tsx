@@ -207,6 +207,24 @@ export function NativeChatPage(props: NativeChatPageProps) {
     };
   }, [updateRequest]);
   const [composer] = useState(createNativeComposerStore);
+  const agentToolsEnabled = props.settings.system.executionMode !== "text";
+  const visibleNavigation = (nodes: PresentationNode[]) =>
+    nodes.filter(
+      (node) =>
+        agentToolsEnabled ||
+        ![
+          "files",
+          "scheduled",
+          "remote",
+          "create-project",
+          "tool:terminal",
+          "tool:shell",
+          "tool:git",
+          "tool:ssh",
+          "tool:background",
+          "tool:trajectory",
+        ].includes(node.id),
+    );
   const composerImages = useNativeComposerImages(props.uploads, props.uploadWorkdir);
   const [mentionSearch] = useState(createNativeMentionSearch);
   useSyncExternalStore(composer.subscribe, composer.getSnapshot, composer.getSnapshot);
@@ -257,7 +275,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
     },
     t,
   );
-  const sidebarProjects = sortWorkspaceProjectsByActivity(props.projects, {
+  const sidebarProjects = sortWorkspaceProjectsByActivity(agentToolsEnabled ? props.projects : [], {
     projectActivityUpdatedAts: sidebar.workdirActivity,
     runningProjectPathKeys: sidebar.runningWorkdirPathKeys,
   });
@@ -427,6 +445,9 @@ export function NativeChatPage(props: NativeChatPageProps) {
     search: t("chat.search.webSearch"),
     arguments: t("chat.toolDetails.arguments"),
     result: t("chat.toolDetails.result"),
+    integration: t("chat.work.integration"),
+    integrationCommands: t("chat.work.integrationCommands"),
+    toolCalls: t("chat.work.calls"),
   };
   const activityItems = collectActivityItems(props.historyItems, live).filter(
     (item) => !isTaskToolBlock({ kind: "tool", item }),
@@ -1323,6 +1344,9 @@ export function NativeChatPage(props: NativeChatPageProps) {
     run: () => unknown,
     enabled = true,
   ): PresentationNode => {
+    enabled =
+      enabled &&
+      (agentToolsEnabled || !["files", "scheduled", "remote", "create-project"].includes(id));
     sidebarHandlers.set(id, { enabled, accepts: (value) => value === null, run });
     return {
       id,
@@ -1588,15 +1612,16 @@ export function NativeChatPage(props: NativeChatPageProps) {
     icon: string,
     run: () => unknown,
   ): PresentationNode => {
+    const enabled = agentToolsEnabled || ["tool:browser", "tool:browser-settings"].includes(id);
     toolsHandlers.set(id, {
-      enabled: true,
+      enabled,
       accepts: (value) => value === null,
       run: () => {
         setToolsOpen(false);
         return run();
       },
     });
-    return { id, kind: "NavigationRow", label, icon, action: id };
+    return { id, kind: "NavigationRow", label, icon, action: id, disabled: !enabled };
   };
   toolsHandlers.set("close", {
     enabled: true,
@@ -1659,7 +1684,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
           icon: "gearshape",
           run: () => props.onOpenSettings(),
         },
-      ],
+      ].filter((tool) => agentToolsEnabled || tool.id === "sidebar-soul-settings"),
     },
     t,
   );
@@ -1846,7 +1871,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                   {
                     id: "sidebar-list",
                     kind: "List",
-                    children: [
+                    children: visibleNavigation([
                       ...(compact
                         ? [
                             {
@@ -1956,7 +1981,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                             ),
                           ]
                         : []),
-                    ],
+                    ]),
                   },
                   {
                     id: "sidebar-footer",
@@ -2013,7 +2038,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
               {
                 id: "tools-list",
                 kind: "List",
-                children: [
+                children: visibleNavigation([
                   toolRow(
                     "tool:terminal",
                     t("chat.mobileMenu.terminal"),
@@ -2062,7 +2087,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
                         ),
                       ]
                     : []),
-                ],
+                ]),
               },
             ],
           }}
@@ -2108,7 +2133,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
           onError={setFailure}
         />
       ) : null}
-      {workspaceActions.dialog ? (
+      {agentToolsEnabled && workspaceActions.dialog ? (
         <NativeSurface
           document={{
             mode: "sheet",

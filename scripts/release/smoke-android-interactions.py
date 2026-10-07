@@ -21,10 +21,24 @@ def type_text(value):
 
 
 def snapshot():
-    adb("shell", "uiautomator", "dump", "/sdcard/xgent-interactions.xml")
-    data = adb("exec-out", "cat", "/sdcard/xgent-interactions.xml")
-    (evidence / "xgent-android-interactions.xml").write_bytes(data)
-    return ET.fromstring(data)
+    # AOSP DumpCommand returns normally without writing when its root is null
+    # or idle detection times out. Never reuse a previous successful hierarchy.
+    errors = []
+    for _ in range(4):
+        try:
+            adb("shell", "rm", "-f", "/sdcard/xgent-interactions.xml")
+            adb("shell", "uiautomator", "dump", "/sdcard/xgent-interactions.xml")
+            data = adb("exec-out", "cat", "/sdcard/xgent-interactions.xml")
+            root = ET.fromstring(data)
+            if root.tag != "hierarchy" or not list(root.iter("node")):
+                raise ValueError("Empty Android accessibility hierarchy")
+            (evidence / "xgent-android-interactions.xml").write_bytes(data)
+            return root
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ET.ParseError, ValueError) as error:
+            errors.append(str(error))
+            time.sleep(0.5)
+    capture("accessibility-unavailable")
+    raise AssertionError(f"Could not obtain a fresh Android hierarchy: {errors}")
 
 
 def matches(node, labels):
@@ -141,7 +155,9 @@ tap({"设置", "Settings"})
 capture("settings")
 tap({"关闭", "Close"})
 tap({"工作工具", "Workspace tools"})
+capture("workspace-tools-menu")
 tap({"Shell 管理", "Shell management"})
+capture("shell-settings-opened")
 tap({"刷新状态", "Refresh status"}, scroll=True)
 capture("shell-settings")
 nodes = list(snapshot().iter("node"))

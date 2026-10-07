@@ -36,6 +36,7 @@ import {
   answerAskUserQuestion,
   getAskUserQuestionDeadlineAt,
 } from "../../../../lib/tools/askUserQuestionTools";
+import { workToolIntegration } from "../../transcript/workRecord";
 import {
   areStableValuesEqual,
   getBuiltinResultKind,
@@ -208,12 +209,19 @@ export function createAstryxToolCall(
             includeManagerAction: false,
           });
   const title = getToolDisplayTitle(item.toolCall);
+  const integration = workToolIntegration(item);
   const stats = deriveFileChangeStats(item.toolCall);
   const errorText = result?.isError ? toolResultMessageToText(result) : "";
 
   return {
     key: item.toolCall.id,
-    name: nameOverride ?? (title.action ? `${title.name} · ${title.action}` : title.name),
+    name:
+      nameOverride ??
+      (integration
+        ? `${integration.label} · ${integration.tool}`
+        : title.action
+          ? `${title.name} · ${title.action}`
+          : title.name),
     target: summary || undefined,
     status: isRunning ? "running" : result ? (result.isError ? "error" : "complete") : "pending",
     additions: stats?.added,

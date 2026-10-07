@@ -209,6 +209,7 @@ struct XgentControlTypography: ViewModifier {
 }
 
 struct XgentFieldSurface: ViewModifier {
+    var rounded = false
     let node: XgentNode
     var active = false
     var tracksFocus = true
@@ -229,9 +230,9 @@ struct XgentFieldSurface: ViewModifier {
             .padding(.horizontal, metrics.horizontalPadding)
             .padding(.vertical, CGFloat(theme.spacing.xs))
             .frame(maxWidth: .infinity, minHeight: metrics.height, alignment: .leading)
-            .background(Color(xgentHex: palette.surface), in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous))
+            .background(Color(xgentHex: palette.surface), in: RoundedRectangle(cornerRadius: rounded ? metrics.height / 2 : CGFloat(theme.radius.element), style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
+                RoundedRectangle(cornerRadius: rounded ? metrics.height / 2 : CGFloat(theme.radius.element), style: .continuous)
                     .stroke(Color(xgentHex: focused || active ? palette.accent : palette.emphasizedBorder), lineWidth: focused || active ? 2 : 1)
                     .allowsHitTesting(false)
             }

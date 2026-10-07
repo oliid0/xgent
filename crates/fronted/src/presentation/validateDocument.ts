@@ -74,6 +74,10 @@ export function validatePresentationDocument(
       !panel ||
       (panel.closeTabLabel !== undefined &&
         (typeof panel.closeTabLabel !== "string" || !panel.closeTabLabel.trim())) ||
+      ((panel.dockLabel !== undefined || panel.undockLabel !== undefined) &&
+        [panel.dockLabel, panel.undockLabel].some(
+          (label) => typeof label !== "string" || !label.trim(),
+        )) ||
       !Number.isSafeInteger(panel.focusRequest) ||
       panel.focusRequest < 0 ||
       [

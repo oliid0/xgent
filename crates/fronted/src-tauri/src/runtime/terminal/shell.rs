@@ -195,16 +195,13 @@ pub(crate) fn resolve_shell(shell: Option<String>) -> Result<ShellSpec, String> 
         .unwrap_or_else(|| "default".to_string());
 
     if cfg!(windows) {
-        let powershell_args = vec![
-            "-NoLogo".to_string(),
-            "-ExecutionPolicy".to_string(),
-            "Bypass".to_string(),
-        ];
         match requested.as_str() {
             "powershell" | "default" => Ok(ShellSpec {
                 label: "PowerShell".to_string(),
                 command: "powershell.exe".to_string(),
-                args: powershell_args,
+                // Match directly opening Windows PowerShell, including its
+                // banner, profile and configured execution policy.
+                args: Vec::new(),
             }),
             "cmd" => Ok(ShellSpec {
                 label: "Cmd".to_string(),

@@ -27,7 +27,7 @@ pub fn terminal_list(
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub fn terminal_create(
+pub async fn terminal_create(
     registry: State<'_, Arc<TerminalSessionRegistry>>,
     cwd: String,
     project_path_key: Option<String>,
@@ -36,7 +36,13 @@ pub fn terminal_create(
     cols: Option<u16>,
     rows: Option<u16>,
 ) -> Result<TerminalSnapshotResponse, String> {
-    registry.create(cwd, project_path_key, shell, title, cols, rows)
+    // PTY creation and process startup can block; keep them off Tauri's UI thread.
+    let registry = Arc::clone(registry.inner());
+    tauri::async_runtime::spawn_blocking(move || {
+        registry.create(cwd, project_path_key, shell, title, cols, rows)
+    })
+    .await
+    .map_err(|error| format!("terminal_create join failed: {error}"))?
 }
 
 #[tauri::command(rename_all = "snake_case")]

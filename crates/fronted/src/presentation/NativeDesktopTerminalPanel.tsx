@@ -652,7 +652,7 @@ export function NativeDesktopTerminalPanel(props: {
             action: `terminal-events:${session.id}`,
             disabled: !stream.packet,
             fill: true,
-            minHeight: 300,
+            minHeight: 160,
           },
         ]
       : !loading
@@ -689,6 +689,11 @@ export function NativeDesktopTerminalPanel(props: {
       <NativeSurface
         document={{
           ...createNativeWorkspacePanel(t, false),
+          workspacePanel: {
+            ...createNativeWorkspacePanel(t, false).workspacePanel!,
+            dockLabel: t("chat.terminal.dockBottom"),
+            undockLabel: t("chat.terminal.restoreSide"),
+          },
           title: panelTitle,
           appearance: props.settings.theme,
           formFactor: "desktop",

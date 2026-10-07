@@ -1,5 +1,7 @@
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -29,16 +31,23 @@ import {
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
+  Copy,
+  ExternalLink,
+  FileText,
+  GitBranch,
   Globe,
   Lock,
   Maximize2,
+  MessageSquare,
   Minimize2,
+  MoreHorizontal,
   Plus,
   RefreshCw,
   Terminal,
   X,
 } from "../../../components/icons";
 import { useLocale } from "../../../i18n";
+import { canOpenBrowserPage, runBrowserPageAction } from "../../../lib/browser/browserPageActions";
 import {
   browserSessionController,
   HIDDEN_BROWSER_VIEWPORT,
@@ -73,7 +82,7 @@ function BrowserTabs(props: { compact: boolean }) {
         variant="ghost"
         size="sm"
         isDisabled={state.sessions.length >= MAX_BROWSER_SESSIONS}
-        onClick={() => void browserSessionController.newSession()}
+        onClick={() => void browserSessionController.newSession("about:blank")}
       />
       <StackItem size="fill">
         <TabList
@@ -124,6 +133,7 @@ function BrowserAddressBar(props: { compact: boolean }) {
   );
   const active = state.sessions.find((session) => session.sessionId === state.activeSessionId);
   const busy = Boolean(active && state.busySessionIds.includes(active.sessionId));
+  const [failure, setFailure] = useState("");
   const [value, setValue] = useState(active?.url === "about:blank" ? "" : (active?.url ?? ""));
   useEffect(
     () => setValue(active?.url === "about:blank" ? "" : (active?.url ?? "")),
@@ -143,68 +153,115 @@ function BrowserAddressBar(props: { compact: boolean }) {
   };
 
   return (
-    <HStack as="form" width="100%" gap={2} vAlign="center" padding={2} onSubmit={submit}>
-      <IconButton
-        label={t("browser.back")}
-        tooltip={t("browser.back")}
-        icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
-        variant="ghost"
-        size="sm"
-        isDisabled={!active || busy}
-        onClick={() => run("go_back")}
-      />
-      <IconButton
-        label={t("browser.forward")}
-        tooltip={t("browser.forward")}
-        icon={<Icon icon={ArrowLeft} size="sm" color="inherit" className="rotate-180" />}
-        variant="ghost"
-        size="sm"
-        isDisabled={!active || busy}
-        onClick={() => run("go_forward")}
-      />
-      {!props.compact ? <Icon icon={Lock} size="sm" color="secondary" /> : null}
-      {!isNativeMobileRuntime() && isTauriRuntime() ? (
+    <VStack width="100%" gap={0}>
+      <HStack
+        as="form"
+        width="100%"
+        gap={props.compact ? 1 : 2}
+        vAlign="center"
+        padding={2}
+        onSubmit={submit}
+      >
         <IconButton
-          label="Developer tools (F12)"
-          tooltip="Developer tools (F12)"
-          icon={<Icon icon={Terminal} size="sm" />}
-          size="sm"
+          label={t("browser.back")}
+          tooltip={t("browser.back")}
+          icon={<Icon icon={ArrowLeft} size="sm" color="inherit" />}
           variant="ghost"
-          isDisabled={!active}
-          onClick={() => run("open_devtools")}
+          size="sm"
+          isDisabled={!active || busy}
+          onClick={() => run("go_back")}
         />
-      ) : null}
-      <StackItem size="fill">
-        <TextInput
-          label={t("browser.addressPlaceholder")}
-          isLabelHidden
-          data-edge-swipe-ignore
-          value={value}
-          onChange={setValue}
-          placeholder={t("browser.addressPlaceholder")}
-          isDisabled={!active}
+        <IconButton
+          label={t("browser.forward")}
+          tooltip={t("browser.forward")}
+          icon={<Icon icon={ArrowLeft} size="sm" color="inherit" className="rotate-180" />}
+          variant="ghost"
+          size="sm"
+          isDisabled={!active || busy}
+          onClick={() => run("go_forward")}
         />
-      </StackItem>
-      <IconButton
-        label={t("browser.reload")}
-        tooltip={t("browser.reload")}
-        icon={
-          busy ? (
-            <Spinner size="sm" aria-label={t("browser.reload")} />
-          ) : (
-            <Icon icon={RefreshCw} size="sm" color="inherit" />
-          )
-        }
-        variant="ghost"
-        size="sm"
-        isDisabled={!active || busy}
-        onClick={() => run("reload")}
-      />
-    </HStack>
+        <StackItem size="fill">
+          <TextInput
+            label={t("browser.addressPlaceholder")}
+            isLabelHidden
+            style={{ borderRadius: "999px" }}
+            startIcon={active?.url.startsWith("https:") ? Lock : Globe}
+            autoComplete="off"
+            data-edge-swipe-ignore
+            value={value}
+            onChange={setValue}
+            placeholder={t("browser.addressPlaceholder")}
+            isDisabled={!active}
+          />
+        </StackItem>
+        <IconButton
+          label={t("browser.reload")}
+          tooltip={t("browser.reload")}
+          icon={
+            busy ? (
+              <Spinner size="sm" aria-label={t("browser.reload")} />
+            ) : (
+              <Icon icon={RefreshCw} size="sm" color="inherit" />
+            )
+          }
+          variant="ghost"
+          size="sm"
+          isDisabled={!active || busy}
+          onClick={() => run("reload")}
+        />
+        <DropdownMenu
+          button={{
+            label: t("browser.more"),
+            icon: <Icon icon={MoreHorizontal} size="sm" />,
+            isIconOnly: true,
+            variant: "ghost",
+            size: "sm",
+          }}
+          items={[
+            ...(["copy_address", "open_external"] as const).map((action) => ({
+              label: t(action === "copy_address" ? "browser.copyAddress" : "browser.openExternal"),
+              icon: <Icon icon={action === "copy_address" ? Copy : ExternalLink} size="sm" />,
+              isDisabled: !canOpenBrowserPage(active?.url),
+              onClick: async () => {
+                setFailure("");
+                try {
+                  if (active) await runBrowserPageAction(action, active.url);
+                } catch {
+                  setFailure(t("browser.pageActionFailed"));
+                }
+              },
+            })),
+            ...(!isNativeMobileRuntime() && isTauriRuntime()
+              ? [
+                  {
+                    label: t("browser.developerTools"),
+                    isDisabled: !active || busy,
+                    onClick: () => run("open_devtools"),
+                    icon: <Icon icon={Terminal} size="sm" />,
+                  },
+                ]
+              : []),
+          ]}
+          onOpenChange={browserSessionController.setSurfaceOccluded}
+          placement="below"
+          alignment="end"
+          hasChevron={false}
+        />
+      </HStack>
+      {failure ? <Banner status="error" title={failure} collapsible={false} /> : null}
+    </VStack>
   );
 }
 
-function BrowserViewportSlot() {
+type BrowserTools = {
+  onNewTerminal?: () => void;
+  onOpenReview?: () => void;
+  onOpenFiles?: () => void;
+  onNewSideChat?: () => void;
+  toolsDisabled?: boolean;
+};
+
+function BrowserViewportSlot(props: BrowserTools) {
   const { t } = useLocale();
   const slotRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);
@@ -289,11 +346,30 @@ function BrowserViewportSlot() {
           description={t("browser.remoteHostDescription")}
         />
       ) : blank ? (
-        <EmptyState
-          icon={<Icon icon={Globe} size="lg" color="secondary" />}
-          title={t("browser.startBrowsing")}
-          description={t("browser.startBrowsingDescription")}
-        />
+        <VStack width="100%" gap={4} padding={4} style={{ overflowY: "auto" }}>
+          <Text type="supporting" color="secondary">
+            {t("browser.startBrowsingDescription")}
+          </Text>
+          <HStack width="100%" gap={2} wrap="wrap">
+            {[
+              { run: props.onOpenReview, label: t("sidebar.gitReview"), icon: GitBranch },
+              { run: props.onNewTerminal, label: t("sidebar.terminal"), icon: Terminal },
+              { run: props.onOpenFiles, label: t("sidebar.myFiles"), icon: FileText },
+              { run: props.onNewSideChat, label: t("chat.split.toolbar"), icon: MessageSquare },
+            ]
+              .filter((tool) => tool.run)
+              .map((tool) => (
+                <Button
+                  key={tool.label}
+                  label={tool.label}
+                  icon={<Icon icon={tool.icon} size="sm" />}
+                  variant="secondary"
+                  onClick={tool.run}
+                  isDisabled={props.toolsDisabled}
+                />
+              ))}
+          </HStack>
+        </VStack>
       ) : !activeSessionId ? (
         <Spinner size="lg" label={t("browser.preparing")} />
       ) : null}
@@ -303,12 +379,14 @@ function BrowserViewportSlot() {
 
 export type BrowserPanelPresentation = "side" | "fullscreen";
 
-export function BrowserPanel(props: {
-  presentation: BrowserPanelPresentation;
-  width?: number | string;
-  onPresentationChange: (presentation: BrowserPanelPresentation) => void;
-  embedded?: boolean;
-}) {
+export function BrowserPanel(
+  props: BrowserTools & {
+    presentation: BrowserPanelPresentation;
+    width?: number | string;
+    onPresentationChange: (presentation: BrowserPanelPresentation) => void;
+    embedded?: boolean;
+  },
+) {
   const { t } = useLocale();
   const compactViewport = useCompactViewport();
   const compact = compactViewport || isNativeMobileRuntime();
@@ -469,7 +547,7 @@ export function BrowserPanel(props: {
         }
         content={
           <LayoutContent padding={0} isScrollable={false} label={t("browser.title")}>
-            <BrowserViewportSlot />
+            <BrowserViewportSlot {...props} />
           </LayoutContent>
         }
       />

@@ -1,5 +1,6 @@
 ﻿import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useLocale } from "../i18n";
+import { canOpenBrowserPage, runBrowserPageAction } from "../lib/browser/browserPageActions";
 import {
   browserSessionController,
   HIDDEN_BROWSER_VIEWPORT,
@@ -38,7 +39,16 @@ function parseViewport(value: PresentationValue): NativeViewport | null {
 }
 
 /** Native chrome; the shared controller owns every browser session and command. */
-export function NativeBrowserPage(props: { settings: AppSettings }) {
+export function NativeBrowserPage(props: {
+  settings: AppSettings;
+  tools?: readonly {
+    id: string;
+    label: string;
+    icon: string;
+    run: () => void;
+    enabled?: boolean;
+  }[];
+}) {
   const { t } = useLocale();
   const compact = isNativeMobileRuntime();
   const state = useSyncExternalStore(
@@ -223,17 +233,6 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
         () => run("go_forward"),
         !!active && !busy,
       ),
-      ...(!compact
-        ? [
-            button(
-              "browser-devtools",
-              t("browser.developerTools"),
-              "terminal",
-              () => run("open_devtools"),
-              !!active && !busy,
-            ),
-          ]
-        : []),
       entry,
       button(
         "browser-reload",
@@ -242,6 +241,43 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
         () => run("reload"),
         !!active && !busy,
       ),
+      {
+        id: "browser-more",
+        kind: "Menu",
+        variant: "compact",
+        label: t("browser.more"),
+        icon: "ellipsis",
+        children: [
+          ...(["copy_address", "open_external"] as const).map((action) =>
+            button(
+              `browser-${action}`,
+              t(action === "copy_address" ? "browser.copyAddress" : "browser.openExternal"),
+              action === "copy_address" ? "doc.on.doc" : "arrow.up.right.square",
+              async () => {
+                if (!currentSession(active?.sessionId) || !active) return;
+                setFailure("");
+                try {
+                  await runBrowserPageAction(action, active.url);
+                } catch {
+                  if (currentSession(active.sessionId)) setFailure(t("browser.pageActionFailed"));
+                }
+              },
+              canOpenBrowserPage(active?.url),
+            ),
+          ),
+          ...(!compact
+            ? [
+                button(
+                  "browser-devtools",
+                  t("browser.developerTools"),
+                  "terminal",
+                  () => run("open_devtools"),
+                  !!active && !busy,
+                ),
+              ]
+            : []),
+        ],
+      },
       ...(compact ? [button("browser-close", t("browser.close"), "xmark", close)] : []),
     ],
   };
@@ -254,7 +290,7 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
         "browser-new",
         t("browser.newTab"),
         "plus",
-        () => browserSessionController.newSession(),
+        () => browserSessionController.newSession("about:blank"),
         state.sessions.length < MAX_BROWSER_SESSIONS,
       ),
       {
@@ -392,6 +428,26 @@ export function NativeBrowserPage(props: { settings: AppSettings }) {
                     label: t(state.initializing ? "browser.preparing" : "browser.startBrowsing"),
                     text: t("browser.startBrowsingDescription"),
                   },
+                  ...(blank && props.tools?.length
+                    ? [
+                        {
+                          id: "browser-new-tab-tools",
+                          kind: "HStack" as const,
+                          wrap: true,
+                          children: props.tools.map((tool) => ({
+                            ...button(
+                              `browser-tool:${tool.id}`,
+                              tool.label,
+                              tool.icon,
+                              tool.run,
+                              tool.enabled !== false,
+                            ),
+                            kind: "Button" as const,
+                            variant: "secondary",
+                          })),
+                        },
+                      ]
+                    : []),
                   ...(!active
                     ? [
                         button(

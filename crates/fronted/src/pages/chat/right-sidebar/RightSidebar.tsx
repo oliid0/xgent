@@ -3,12 +3,14 @@ import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useId, useRef } from "react";
 import { browserSessionController } from "../../../lib/browser/browserSessionController";
 import { tabForKey } from "./tabState";
 import "./rightSidebar.css";
 
 import {
+  FileText,
+  GitBranch,
   Globe,
   Maximize2,
   MessageSquare,
@@ -38,15 +40,21 @@ export function RightSidebar(props: {
   onNewBrowser: () => void;
   onNewTerminal: () => void;
   onNewSideChat: () => void;
+  onOpenReview?: () => void;
+  onOpenFiles?: () => void;
   onCloseTab: (tabId: string) => void;
+  agentToolsEnabled?: boolean;
   terminalDisabled?: boolean;
   browserDisabled?: boolean;
   onPresentationChange: (presentation: RightSidebarPresentation) => void;
   onClose: () => void;
+  onDockTerminal?: () => void;
+  terminalIsDocked?: boolean;
   visible?: boolean;
   compact?: boolean;
 }) {
   const { t } = useLocale();
+  const panelId = useId();
   const stripRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const selected = stripRef.current?.querySelector('[aria-selected="true"]');
@@ -59,18 +67,42 @@ export function RightSidebar(props: {
       icon: <Icon icon={Globe} size="sm" color="inherit" />,
       onClick: props.onNewBrowser,
     },
-    {
-      label: t("sidebar.terminal"),
-      isDisabled: props.terminalDisabled,
-      icon: <Icon icon={Terminal} size="sm" color="inherit" />,
-      onClick: props.onNewTerminal,
-    },
-    {
-      label: t("chat.newConversation"),
-      description: t("chat.split.empty"),
-      icon: <Icon icon={MessageSquare} size="sm" color="inherit" />,
-      onClick: props.onNewSideChat,
-    },
+    ...(props.agentToolsEnabled !== false
+      ? [
+          ...(props.onOpenReview
+            ? [
+                {
+                  label: t("sidebar.gitReview"),
+                  icon: <Icon icon={GitBranch} size="sm" />,
+                  isDisabled: props.terminalDisabled,
+                  onClick: props.onOpenReview,
+                },
+              ]
+            : []),
+          ...(props.onOpenFiles
+            ? [
+                {
+                  label: t("sidebar.myFiles"),
+                  icon: <Icon icon={FileText} size="sm" />,
+                  isDisabled: props.terminalDisabled,
+                  onClick: props.onOpenFiles,
+                },
+              ]
+            : []),
+          {
+            label: t("sidebar.terminal"),
+            isDisabled: props.terminalDisabled,
+            icon: <Icon icon={Terminal} size="sm" color="inherit" />,
+            onClick: props.onNewTerminal,
+          },
+          {
+            label: t("chat.split.toolbar"),
+            description: t("chat.split.empty"),
+            icon: <Icon icon={MessageSquare} size="sm" color="inherit" />,
+            onClick: props.onNewSideChat,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -126,7 +158,7 @@ export function RightSidebar(props: {
                     type="button"
                     role="tab"
                     aria-selected={props.activeTabId === tab.id}
-                    aria-controls="xgent-right-tab-panel"
+                    aria-controls={panelId}
                     tabIndex={props.activeTabId === tab.id ? 0 : -1}
                     title={tab.label}
                     onClick={() => props.onSelectTab(tab.id)}
@@ -183,6 +215,17 @@ export function RightSidebar(props: {
             hasChevron={false}
           />
         </HStack>
+        {props.onDockTerminal ? (
+          <IconButton
+            label={t(
+              props.terminalIsDocked ? "chat.terminal.restoreSide" : "chat.terminal.dockBottom",
+            )}
+            icon={<Icon icon={Terminal} size="sm" />}
+            variant="ghost"
+            size="sm"
+            onClick={props.onDockTerminal}
+          />
+        ) : null}
         <IconButton
           label={
             props.presentation === "fullscreen"
@@ -217,7 +260,7 @@ export function RightSidebar(props: {
         />
       </HStack>
       <StackItem
-        id="xgent-right-tab-panel"
+        id={panelId}
         role="tabpanel"
         aria-label={props.tabs.find((tab) => tab.id === props.activeTabId)?.label}
         size="fill"

@@ -12,6 +12,7 @@ import {
 import { useLocale } from "../../../i18n";
 
 type MobileQuickActionsProps = {
+  agentToolsEnabled?: boolean;
   onOpenTerminal: () => void;
   onOpenRootfs: () => void;
   onOpenBrowser: () => void;
@@ -72,7 +73,14 @@ export function MobileQuickActions(props: MobileQuickActionsProps) {
         run: props.onOpenBackgroundTasks,
       },
     ],
-  ].filter((actions) => actions.length > 0);
+  ]
+    .map((actions) =>
+      actions.filter(
+        (action) =>
+          props.agentToolsEnabled !== false || ["browser", "browser-settings"].includes(action.id),
+      ),
+    )
+    .filter((actions) => actions.length > 0);
 
   const items: DropdownMenuOption[] = actionGroups.map((actions, groupIndex) => ({
     type: "section",

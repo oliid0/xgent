@@ -4,11 +4,17 @@ import { readStreamPreviewMeta } from "../lib/chat/messages/toolPreview";
 import {
   safeStringify,
   summarizeToolCall,
+  type ToolTraceItem,
   toolResultMessageToText,
   type UiRound,
 } from "../lib/chat/messages/uiMessages";
 import { isTaskToolBlock } from "../lib/chat/taskProgress";
 import type { EditResultDetails, WriteResultDetails } from "../lib/tools/builtinTypes";
+import {
+  groupWorkTools,
+  workToolGroupLabel,
+  workToolIntegration,
+} from "../pages/chat/transcript/workRecord";
 import type { PresentationNode } from "./types";
 
 function toolResultPreviewNodes(result: unknown, prefix: string): PresentationNode[] {
@@ -164,11 +170,19 @@ export function roundNodes(
   rounds: UiRound[],
   prefix: string,
   showThinking: boolean,
-  labels: { thinking: string; search: string; arguments: string; result: string },
+  labels: {
+    thinking: string;
+    search: string;
+    arguments: string;
+    result: string;
+    integration?: string;
+    integrationCommands?: string;
+    toolCalls?: string;
+  },
   questionNodes?: ReadonlyMap<string, PresentationNode>,
 ): PresentationNode[] {
-  return rounds.flatMap((round) =>
-    round.blocks.flatMap((block): PresentationNode[] => {
+  return rounds.flatMap((round) => {
+    const renderBlock = (block: UiRound["blocks"][number]): PresentationNode[] => {
       const id = `${prefix}:${round.key}`;
       if (block.kind === "text") {
         return [
@@ -205,7 +219,9 @@ export function roundNodes(
             id: `${id}:tool:${block.item.toolCall.id}`,
             kind: "ToolCall",
             variant: "timeline",
-            label: block.item.toolCall.name,
+            label: workToolIntegration(block.item)
+              ? `${workToolIntegration(block.item)!.label} · ${workToolIntegration(block.item)!.tool}`
+              : block.item.toolCall.name,
             text: summarizeToolCall(block.item.toolCall, { includeName: false }),
             status: running
               ? "running"
@@ -255,8 +271,56 @@ export function roundNodes(
         ];
       }
       return [];
-    }),
-  );
+    };
+    const nodes: PresentationNode[] = [];
+    let pending: ToolTraceItem[] = [];
+    const flush = () => {
+      for (const group of groupWorkTools(pending)) {
+        const children = group.flatMap((item) => renderBlock({ kind: "tool", item }));
+        if (children.length <= 1) {
+          nodes.push(...children);
+          continue;
+        }
+        const groupId = `${prefix}:${round.key}:group:${group[0].toolCall.id}`;
+        const title = workToolGroupLabel(group, (key) =>
+          key === "chat.work.integrationCommands"
+            ? (labels.integrationCommands ?? "{provider} integration and commands")
+            : (labels.integration ?? "{provider} integration"),
+        );
+        nodes.push({
+          id: groupId,
+          kind: "ToolCall",
+          variant: "timeline",
+          label: title ?? group[0].toolCall.name,
+          text: (labels.toolCalls ?? "{count} calls").replace("{count}", String(group.length)),
+          status: children.some((node) => node.status === "running")
+            ? "running"
+            : children.some((node) => node.status === "error")
+              ? "error"
+              : children.every((node) => node.status === "completed")
+                ? "completed"
+                : "pending",
+          children,
+        });
+      }
+      pending = [];
+    };
+    for (const block of round.blocks) {
+      if (
+        block.kind === "tool" &&
+        !isTaskToolBlock(block) &&
+        !questionNodes?.has(block.item.toolCall.id) &&
+        !["Image", "Agent", "AskUserQuestion"].includes(block.item.toolCall.name)
+      ) {
+        pending.push(block.item);
+      } else {
+        flush();
+        nodes.push(...renderBlock(block));
+      }
+    }
+    flush();
+    return nodes;
+  });
 }
 
 export function splitWorkNodes(nodes: PresentationNode[]) {

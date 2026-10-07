@@ -31,7 +31,7 @@ struct XgentBrowserAddressField: View {
     private var field: some View {
         TextField(input.text ?? input.label ?? "", text: text)
             .textFieldStyle(.plain)
-            .modifier(XgentFieldSurface(node: input, active: focused))
+            .modifier(XgentFieldSurface(rounded: true, node: input, active: focused))
             .focused($focused)
             .onSubmit(send)
             .accessibilityIdentifier(input.id)

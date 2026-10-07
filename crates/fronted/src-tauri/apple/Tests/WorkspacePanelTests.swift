@@ -37,6 +37,30 @@ final class WorkspacePanelTests: XCTestCase {
         XCTAssertFalse(state.expanded)
     }
 
+    func testDockKeepsBrowserSelectionAndOutputCannotMoveTerminalBackToSide() {
+        var state = XgentWorkspacePanelState()
+        let browser = XgentWorkspacePanelIdentity(surface: "browser", focusRequest: 0)
+        let terminal = XgentWorkspacePanelIdentity(surface: "terminal", focusRequest: 0)
+        state.synchronize([browser, terminal])
+        state.dock("terminal")
+        XCTAssertEqual(state.dockedSurface, "terminal")
+        XCTAssertEqual(state.selectedSurface, "browser")
+        state.synchronize([browser, XgentWorkspacePanelIdentity(surface: "terminal", focusRequest: 1)])
+        XCTAssertEqual(state.selectedSurface, "browser", "New terminal sessions stay in the dock")
+        state.restoreDock()
+        XCTAssertNil(state.dockedSurface)
+        XCTAssertEqual(state.selectedSurface, "terminal")
+        state.dock("terminal")
+        state.hideDock()
+        XCTAssertEqual(state.selectedSurface, "browser", "Hiding the dock preserves the browser")
+        state.dock("terminal")
+        state.synchronize([browser])
+        XCTAssertNil(state.dockedSurface, "A retired document cannot expose a previous workspace")
+        XCTAssertEqual(state.selectedSurface, "browser")
+        state.dock("retired")
+        XCTAssertNil(state.dockedSurface)
+    }
+
     func testNarrowWindowAndInvalidSavedWidthCannotSqueezeTheMainChat() {
         XCTAssertFalse(XgentWorkspacePanelState.canSplit(width: 640, minimumMainWidth: 440))
         XCTAssertFalse(XgentWorkspacePanelState.canSplit(width: 1040, minimumMainWidth: 800))

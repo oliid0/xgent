@@ -27,13 +27,7 @@ final class PackagedApplicationTests: XCTestCase {
         assertWindowToolbar(window)
         record(app, name: "macos-packaged-chat")
         XCTAssertEqual(window.webViews.count, 0, "The covered execution host must be excluded from native accessibility")
-        if !draft.isHittable { recordComposerHit(draft, applicationPath: path) }
-        XCTAssertTrue(draft.isHittable, "The composer must remain reachable")
-        click(draft)
-        draft.typeText("xgent native settings smoke")
-        let typed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "xgent native settings smoke"), object: draft)
-        XCTAssertEqual(XCTWaiter.wait(for: [typed], timeout: 15), .completed,
-                       "Actual pointer and keyboard input must edit the packaged composer")
+        editComposer(draft, app: app, applicationPath: path, expected: "xgent native settings smoke")
 
         let settings = window.buttons["settings"].firstMatch
         if !settings.exists { click(window.buttons["xgent-window-left"].firstMatch) }
@@ -72,7 +66,7 @@ final class PackagedApplicationTests: XCTestCase {
         let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: title)
         XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 15), .completed,
             "Clicking outside the desktop settings dialog must dismiss it")
-        XCTAssertTrue(draft.isHittable)
+        editComposer(draft, app: app, applicationPath: path, expected: "xgent native settings smoke-dismissed")
         let before = window.frame
         let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -2, dy: -2))
         corner.press(forDuration: 0.1, thenDragTo: corner.withOffset(CGVector(dx: 640 - before.width, dy: 0)))
@@ -85,9 +79,29 @@ final class PackagedApplicationTests: XCTestCase {
         record(app, name: "macos-packaged-settings-system-narrow")
         click(window.buttons["settings-close"].firstMatch)
         XCTAssertTrue(draft.waitForExistence(timeout: 30))
-        XCTAssertTrue(draft.isHittable, "Closing settings must restore the actual composer")
+        editComposer(draft, app: app, applicationPath: path, expected: "xgent native settings smoke-dismissed-narrow")
         assertWindowToolbar(window)
         record(app, name: "macos-packaged-chat-narrow")
+    }
+
+    private func editComposer(_ draft: XCUIElement, app: XCUIApplication, applicationPath: String,
+                              expected: String) {
+        XCTAssertTrue(draft.waitForExistence(timeout: 30))
+        XCTAssertTrue(draft.isEnabled)
+        let frame = draft.frame
+        XCTAssertGreaterThan(frame.width, 0)
+        XCTAssertGreaterThan(frame.height, 0)
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(frame), "The input must be inside the actual window")
+        if !draft.isHittable { recordComposerHit(draft, applicationPath: applicationPath) }
+        // XCTest computes isHittable from accessibility. Direct coordinate input
+        // also verifies the real AppKit hit target and first responder, without
+        // asking typeText on an element to refocus it automatically.
+        draft.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        app.typeKey("a", modifierFlags: .command)
+        app.typeText(expected)
+        let typed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", expected), object: draft)
+        XCTAssertEqual(XCTWaiter.wait(for: [typed], timeout: 15), .completed,
+                       "Actual pointer and keyboard input must edit the packaged composer exactly")
     }
 
     private func recordComposerHit(_ draft: XCUIElement, applicationPath: String) {
@@ -97,7 +111,7 @@ final class PackagedApplicationTests: XCTestCase {
            let running = NSRunningApplication.runningApplications(withBundleIdentifier: identifier).first {
             let application = AXUIElementCreateApplication(running.processIdentifier)
             // AX and XCTest both use top-left screen coordinates. Query the
-            // actual packaged process, keeping the failed input assertion intact.
+            // actual packaged process, retaining the actual pointer and keyboard input assertion.
             for fraction in [0.1, 0.5, 0.9] {
                 var hit: AXUIElement?
                 let status = AXUIElementCopyElementAtPosition(application,

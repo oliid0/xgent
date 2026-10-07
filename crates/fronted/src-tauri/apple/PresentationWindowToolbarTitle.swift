@@ -55,6 +55,10 @@ struct XgentWindowToolbarTitle: View {
                 }
                 .accessibilityIdentifier("xgent-window-expand-panel")
                 .keyboardShortcut(KeyEquivalent(Character(String(UnicodeScalar(Int(NSEvent.SpecialKey.f11.rawValue))!))), modifiers: [])
+                if let label = controls.dockLabel {
+                    Button(label) { model.workspaceState.dock(panel.surface) }
+                        .accessibilityIdentifier("xgent-window-dock-terminal")
+                }
                 Button(controls.closeLabel) { model.workspaceState.visible = false }
                 if let close = context.closeAction {
                     Button(close.node.label ?? controls.closeTabLabel ?? controls.closeLabel) { context.closeSelectedTab() }

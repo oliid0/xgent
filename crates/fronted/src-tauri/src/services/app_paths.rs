@@ -61,12 +61,27 @@ pub fn initialize_desktop() -> Result<Vec<String>, String> {
         }
     }
 
+    remove_obsolete_window_state(&data_dir, &mut warnings);
+    remove_obsolete_window_state(&root, &mut warnings);
     initialize(root)?;
     Ok(warnings)
 }
 
 pub fn mobile_root(platform_app_data_dir: &Path) -> PathBuf {
     platform_app_data_dir.join(APP_ROOT_NAME)
+}
+
+/// iOS can use its sandboxed data directory directly; Android retains its
+/// platform app directory. Migrate the old nested root before opening services.
+pub fn initialize_mobile(platform_data_dir: &Path, legacy_app_dir: Option<&Path>) -> Result<Vec<String>, String> {
+    let root = mobile_root(platform_data_dir);
+    validate_root(&root)?;
+    let mut warnings = Vec::new();
+    if let Some(legacy) = legacy_app_dir {
+        migrate_directory(&mobile_root(legacy), &root, &mut warnings);
+    }
+    initialize(root)?;
+    Ok(warnings)
 }
 
 pub fn app_root_dir() -> Result<PathBuf, String> {
@@ -122,6 +137,24 @@ fn migrate_directory(source: &Path, destination: &Path, warnings: &mut Vec<Strin
             source.display(),
             destination.display()
         ));
+    }
+}
+
+// Only these obsolete geometry files and migration collisions are disposable.
+// Do not traverse the browser profile or remove symlinks/directories/user data.
+fn remove_obsolete_window_state(directory: &Path, warnings: &mut Vec<String>) {
+    let Ok(entries) = fs::read_dir(directory) else { return };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        let obsolete = [".window-state.json", "main-window-size.json"].iter().any(|base| {
+            name == *base || name.strip_prefix(*base).and_then(|suffix| suffix.strip_prefix(".legacy-"))
+                .is_some_and(|suffix| !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_digit()))
+        });
+        if !obsolete || !entry.file_type().is_ok_and(|kind| kind.is_file()) { continue }
+        if let Err(error) = fs::remove_file(entry.path()) {
+            warnings.push(format!("Could not remove obsolete window geometry {}: {error}", entry.path().display()));
+        }
     }
 }
 
@@ -222,6 +255,40 @@ fn legacy_collision_path(destination: &Path) -> Result<PathBuf, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn obsolete_geometry_cleanup_preserves_all_other_entries() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        for name in [".window-state.json", ".window-state.json.legacy-63", "main-window-size.json.legacy-42",
+                     "settings.json", "main-window-size.json.legacy-not-a-number", "notes-window-state.json"] {
+            fs::write(temp.path().join(name), "value").expect("write fixture");
+        }
+        fs::create_dir(temp.path().join("main-window-size.json")).expect("directory must survive");
+        let mut warnings = Vec::new();
+        remove_obsolete_window_state(temp.path(), &mut warnings);
+        assert!(warnings.is_empty());
+        assert!(!temp.path().join(".window-state.json").exists());
+        assert!(!temp.path().join(".window-state.json.legacy-63").exists());
+        assert!(!temp.path().join("main-window-size.json.legacy-42").exists());
+        assert!(temp.path().join("settings.json").is_file());
+        assert!(temp.path().join("main-window-size.json.legacy-not-a-number").is_file());
+        assert!(temp.path().join("notes-window-state.json").is_file());
+        assert!(temp.path().join("main-window-size.json").is_dir());
+    }
+
+    #[test]
+    fn ios_legacy_nested_root_moves_into_its_sandbox_data_root() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let legacy = mobile_root(&temp.path().join("com.ohi.xgent"));
+        let root = mobile_root(temp.path());
+        fs::create_dir_all(legacy.join("data")).expect("create legacy");
+        fs::write(legacy.join("data/settings.json"), "settings").expect("write settings");
+        let mut warnings = Vec::new();
+        migrate_directory(&legacy, &root, &mut warnings);
+        assert!(warnings.is_empty());
+        assert_eq!(fs::read_to_string(root.join("data/settings.json")).expect("migrated settings"), "settings");
+        assert!(!legacy.exists());
+    }
 
     #[test]
     fn migration_archives_conflicts_and_removes_the_legacy_directory() {

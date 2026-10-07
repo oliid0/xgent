@@ -106,7 +106,8 @@ test("model pickers search models and providers", () => {
 
 test("composer exposes the requested controls through Astryx slots", () => {
   assert.match(composerSource, /<Popover/);
-  assert.match(composerSource, /<ChatComposerDrawer>/);
+  assert.match(composerSource, /input=\{[\s\S]*?<PendingImageThumbnail[\s\S]*?<MentionComposer/);
+  assert.doesNotMatch(composerSource, /<ChatComposerDrawer>/);
   assert.match(composerSource, /<Thumbnail/);
   assert.match(composerSource, /planModeEnabled: value/);
   assert.match(composerSource, /nativeWebSearchEnabled: value/);

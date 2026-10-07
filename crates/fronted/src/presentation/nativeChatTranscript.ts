@@ -24,6 +24,9 @@ export function createNativeChatTranscript(
     search: t("chat.search.webSearch"),
     arguments: t("chat.toolDetails.arguments"),
     result: t("chat.toolDetails.result"),
+    integration: t("chat.work.integration"),
+    integrationCommands: t("chat.work.integrationCommands"),
+    toolCalls: t("chat.work.calls"),
   };
   let lastUserAt: number | undefined;
   const messages: PresentationNode[] = historyItems.flatMap((item): PresentationNode[] => {

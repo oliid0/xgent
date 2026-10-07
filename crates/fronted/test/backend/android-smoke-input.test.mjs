@@ -89,3 +89,39 @@ assert captures[-1] == 'terminal-input-mismatch'
 `, script], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr || result.stdout);
 });
+
+
+test("Android snapshots never reuse a stale XML after a successful-exit dump with no root", () => {
+  const script = fileURLToPath(new URL("../../../../scripts/release/smoke-android-interactions.py", import.meta.url));
+  const result = spawnSync(process.platform === "win32" ? "python" : "python3", ["-c", String.raw`
+import ast, pathlib, subprocess, sys, tempfile, xml.etree.ElementTree as ET
+from types import SimpleNamespace
+tree = ast.parse(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
+function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'snapshot')
+calls, captures, delays = [], [], []
+state = {'data': b'<hierarchy><node text="stale"/></hierarchy>', 'dumps': 0, 'fail': False}
+def adb(*args):
+    calls.append(args)
+    if args[1] == 'rm': state['data'] = None; return b''
+    if args[1] == 'uiautomator':
+        state['dumps'] += 1
+        if state['dumps'] > 1 and not state['fail']: state['data'] = b'<hierarchy><node text="fresh"/></hierarchy>'
+        return b''  # AOSP returns normally even when it wrote no hierarchy.
+    if state['data'] is None: raise subprocess.CalledProcessError(1, args)
+    return state['data']
+with tempfile.TemporaryDirectory() as directory:
+    namespace = {'adb': adb, 'ET': ET, 'subprocess': subprocess, 'time': SimpleNamespace(sleep=delays.append), 'evidence': pathlib.Path(directory), 'capture': captures.append}
+    exec(compile(ast.Module(body=[function], type_ignores=[]), sys.argv[1], 'exec'), namespace)
+    root = namespace['snapshot']()
+    assert [node.get('text') for node in root.iter('node')] == ['fresh']
+    assert calls[0] == ('shell', 'rm', '-f', '/sdcard/xgent-interactions.xml')
+    assert len([c for c in calls if c[1] == 'rm']) == 2
+    assert not captures
+    state['fail'] = True
+    try: namespace['snapshot']()
+    except AssertionError as error: assert 'fresh Android hierarchy' in str(error)
+    else: raise AssertionError('Repeated null-root dumps must fail instead of accepting stale XML')
+    assert captures == ['accessibility-unavailable']
+`, script], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+});

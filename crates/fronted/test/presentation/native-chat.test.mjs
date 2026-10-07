@@ -177,7 +177,7 @@ function harness(overrides = {}, options = {}) {
   const props = {
     conversationId: "conversation",
     uploadWorkdir: "/project",
-    settings: { theme: "system", system: { executionMode: "text", commandSafetyMode: "ask" }, customSettings: { appearance: { showThinking: true } } },
+    settings: { theme: "system", system: { executionMode: "tools", commandSafetyMode: "ask" }, customSettings: { appearance: { showThinking: true } } },
     composerRef: { current: null },
     sidebarStore: { subscribe: () => () => {}, getSnapshot: () => sidebarSnapshot() },
     historyItems: [], liveTranscriptStore: createLiveTranscriptStore(),
@@ -926,6 +926,7 @@ test("native iPhone work modes belong to the sidebar title while command safety 
   const selectedModes = [];
   const safety = [];
   const h = harness({ onChangeMode: (mode) => selectedModes.push(mode), onCommandSafetyModeChange: mode => safety.push(mode) }, { mobile: true });
+  h.props.settings.system.executionMode = "text";
   const chat = h.render().nodes[0];
   const toolbar = chat.children.find((node) => node.id === "toolbar");
   assert.equal(toolbar.children.some(node => node.id === "execution-mode"), false);
@@ -1201,8 +1202,11 @@ test("native chat does not turn truncated or fuzzy Edit previews into a file dif
     ] }],
   }];
   const transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
-  const tools = assistantWork(transcript, "edit-preview")
-    .filter((node) => node.kind === "ToolCall");
+  const descendants = nodes => nodes.flatMap(node => [node, ...descendants(node.children ?? [])]);
+  const work = descendants(assistantWork(transcript, "edit-preview"));
+  assert.ok(work.every(node => node.language !== "diff"));
+  const tools = ["truncated", "fuzzy"].map(id => work.find(node => node.id.endsWith(`:tool:${id}`)));
+  assert.ok(tools.every(Boolean), "Grouping must retain both actual Edit previews");
   for (const tool of tools) {
     assert.equal(tool.children.some((node) => node.language === "diff"), false);
     assert.equal(tool.children.find((node) => node.id.endsWith(":edit-preview")).text, "old\n→\nnew");
@@ -1572,4 +1576,28 @@ test("clipboard attachment metadata uses the current file importer without repla
   assert.deepEqual(imported, [{ name: "Clipboard.png", type: "image/png", bytes: png }]);
   assert.equal(control(h.render(), "draft").value, draft.value);
   h.unmount();
+});
+
+
+test("XChat cannot dispatch agent workspace tools while its browser remains usable", async () => {
+  for (const mobile of [false, true]) {
+    const opened = [];
+    const h = harness({
+      settings: { theme: "system", system: { executionMode: "text", commandSafetyMode: "ask" }, customSettings: { appearance: { showThinking: true } } },
+      projects: [{ id: "previous-agent", name: "Agent project", path: "/agent-project" }],
+      onOpenTerminal: () => opened.push("terminal"), onOpenGitReview: () => opened.push("review"),
+      onOpenRemote: () => opened.push("ssh"), onOpenBackgroundTasks: () => opened.push("background"),
+      onOpenBrowser: () => opened.push("browser"), onOpenFiles: () => opened.push("files"),
+    }, { mobile });
+    await h.dispatch("tools"); h.render();
+    const tools = h.documents().find(document => document.title === "chat.mobileMenu.title").nodes[0].children;
+    assert.deepEqual(tools.map(node => node.id), ["tool:browser", "tool:browser-settings"]);
+    for (const id of ["terminal", "git", "ssh", "background"])
+      assert.equal((await h.dispatch(`tool:${id}`, null, "tools")).ok, false);
+    assert.equal((await h.dispatch("tool:browser", null, "tools")).ok, true);
+    await h.dispatch("sidebar"); h.render();
+    assert.equal((await h.dispatch("files", null, "sidebar")).ok, false);
+    assert.deepEqual(opened, ["browser"]);
+    h.unmount();
+  }
 });

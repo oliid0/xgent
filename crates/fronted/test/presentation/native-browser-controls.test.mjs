@@ -33,12 +33,13 @@ function browser(options = {}) {
     "../lib/browser/browserSessionController": { browserSessionController: controller, MAX_BROWSER_SESSIONS: 16,
       HIDDEN_BROWSER_VIEWPORT: { x: 0, y: 0, width: 1, height: 1, visible: false, scaleFactor: 1 },
       normalizeBrowserAddress: text => text.trim() ? (/^https?:/.test(text.trim()) ? text.trim() : `https://${text.trim()}`) : "about:blank" },
+    "../lib/browser/browserPageActions": { canOpenBrowserPage: url => /^https?:/.test(url ?? ""), runBrowserPageAction: options.pageAction ?? (async (...args) => { calls.push(["page-action", ...args]); }) },
     "./NativeSurface": { NativeSurface: "NativeSurface" }, "./nativeTheme": { createNativePresentationTheme: () => undefined },
   } });
   const { NativeBrowserPage } = loader.loadModule("src/presentation/NativeBrowserPage.tsx");
   const { validatePresentationDocument } = loader.loadModule("src/presentation/validateDocument.ts");
   const render = () => {
-    const element = hooks.render(() => NativeBrowserPage({ settings: normalizeSettings({}) }));
+    const element = hooks.render(() => NativeBrowserPage({ settings: normalizeSettings({}), tools: options.tools }));
     if (!element) return null;
     const surface = element.props;
     validatePresentationDocument({ ...surface.document, version: 1, surface: "browser", revision: 1 }, surface.handlers);
@@ -205,4 +206,50 @@ test("native session cleanup reports partial errors, blocks repeated clicks and 
     assert.ok(!flatten(other.render().document.nodes).some(node => node.id === "browser-settings-error"));
     other.replay(); assert.equal(other.render().handlers.get("browser-home-save").enabled, true);
   } finally { other.unmount(); }
+});
+
+
+test("native browser menu uses real page actions and rejects internal, stale and retired pages", async () => {
+  const h = browser();
+  try {
+    const published = h.render();
+    await h.action("browser-copy_address"); await h.action("browser-open_external");
+    assert.deepEqual(h.calls, [["page-action", "copy_address", "https://example.test"], ["page-action", "open_external", "https://example.test"]]);
+    h.state.activeSessionId = "two";
+    await h.action("browser-copy_address", null, published); assert.equal(h.calls.length, 2);
+    h.state.sessions[1].url = "about:blank";
+    assert.equal(h.render().handlers.get("browser-open_external").enabled, false);
+  } finally { h.unmount(); }
+  const failed = browser({ pageAction: async () => { throw Error("clipboard blocked"); } });
+  try {
+    await failed.action("browser-copy_address");
+    assert.equal(failed.nodes().find(node => node.id === "browser-error-message").label, "browser.pageActionFailed");
+  } finally { failed.unmount(); }
+});
+
+test("native new tab tools dispatch actual workspace actions while omitted tools stay absent", async () => {
+  const selected = [];
+  const h = browser({ url: "about:blank", tools: ["review", "terminal", "files", "side-chat"].map(id => ({ id, label: id, icon: "terminal", run: () => selected.push(id) })) });
+  try {
+    for (const id of ["review", "terminal", "files", "side-chat"]) await h.action(`browser-tool:${id}`);
+    assert.deepEqual(selected, ["review", "terminal", "files", "side-chat"]);
+    for (const id of selected) { const node = h.nodes().find(item => item.id === `browser-tool:${id}`); assert.equal(node.kind, "Button"); assert.equal(node.label, id); }
+  } finally { h.unmount(); }
+  const chat = browser({ url: "about:blank" });
+  try { assert.ok(!chat.nodes().some(node => node.id === "browser-new-tab-tools")); }
+  finally { chat.unmount(); }
+});
+
+
+test("native new-tab unavailable workspace actions and retired asynchronous failures stay inert", async () => {
+  const selected = [];
+  const disabled = browser({ url: "about:blank", tools: [{ id: "terminal", label: "Terminal", icon: "terminal", run: () => selected.push("terminal"), enabled: false }] });
+  try { const handler = disabled.render().handlers.get("browser-tool:terminal"); assert.equal(handler.enabled, false); assert.equal(disabled.nodes().find(node => node.id === "browser-tool:terminal").disabled, true); assert.deepEqual(selected, []); }
+  finally { disabled.unmount(); }
+  const pending = deferred(), h = browser({ pageAction: () => pending.promise });
+  try {
+    const task = h.action("browser-copy_address"); h.state.activeSessionId = "two";
+    pending.reject(Error("previous tab failure")); await task;
+    assert.ok(!h.nodes().some(node => node.id === "browser-error-message"));
+  } finally { h.unmount(); }
 });

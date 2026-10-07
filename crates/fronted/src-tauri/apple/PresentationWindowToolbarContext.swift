@@ -35,7 +35,7 @@ struct XgentWindowToolbarContext {
     var overlay: XgentDocument? { model.documents.last { $0.mode == .sheet || $0.mode == .alert } }
     var titleDocument: XgentDocument? { overlay ?? root }
     var supportsPanels: Bool { overlay == nil && root?.nodes.contains { $0.kind == .chatLayout } == true }
-    var panels: [XgentDocument] { supportsPanels ? model.documents.filter { $0.mode == .panel } : [] }
+    var panels: [XgentDocument] { supportsPanels ? model.documents.filter { $0.mode == .panel && $0.surface != model.workspaceState.dockedSurface } : [] }
     var selectedPanel: XgentDocument? {
         guard model.workspaceState.visible else { return nil }
         return panels.first { $0.surface == model.workspaceState.selectedSurface } ?? panels.last

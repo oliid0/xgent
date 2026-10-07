@@ -5,7 +5,6 @@ use serde_json::Value;
 #[cfg(target_os = "macos")]
 use std::ffi::{CStr, CString};
 use std::path::PathBuf;
-use tauri::Manager;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,9 +25,9 @@ fn permissions() -> Option<Permissions> {
 }
 #[cfg(not(target_os = "macos"))]
 fn permissions() -> Option<Permissions> { None }
-fn disabled_marker(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+fn disabled_marker(_app: &tauri::AppHandle) -> Result<PathBuf, String> {
     // Preserve the per-platform preference across app updates.
-    app.path().app_data_dir().map(|path| path.join("computer-use").join("abi1")
+    crate::services::app_paths::app_storage_dir().map(|path| path.join("computer-use").join("abi1")
         .join(format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH)).join("disabled"))
         .map_err(|error| error.to_string())
 }

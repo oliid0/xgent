@@ -122,20 +122,15 @@ test("mobile Shell permits registering and retiring real native output listeners
   }
 });
 
-test("desktop starts 15 percent smaller and migrates only the legacy default geometry", () => {
+test("desktop starts at its current default without persisting obsolete window geometry", () => {
   for (const { name, config } of desktopWindowConfigs) {
     const mainWindow = config.app.windows[0];
     assert.equal(mainWindow.width, 1156, `${name} width`);
     assert.equal(mainWindow.height, 723, `${name} height`);
   }
-  assert.match(desktopCommands, /const MAIN_WINDOW_STATE_VERSION: u8 = 2/);
-  assert.match(desktopCommands, /const LEGACY_DEFAULT_MAIN_WINDOW_WIDTH: u32 = 1360/);
-  assert.match(desktopCommands, /const LEGACY_DEFAULT_MAIN_WINDOW_HEIGHT: u32 = 850/);
-  assert.match(
-    desktopCommands,
-    /state\.version < MAIN_WINDOW_STATE_VERSION[\s\S]*?state\.width == LEGACY_DEFAULT_MAIN_WINDOW_WIDTH[\s\S]*?state\.height == LEGACY_DEFAULT_MAIN_WINDOW_HEIGHT/,
-  );
-  assert.match(desktopCommands, /\.map\(migrate_main_window_size\)/);
+  assert.match(desktopCommands, /const DEFAULT_MAIN_WINDOW_WIDTH: u32 = 1156/);
+  assert.match(desktopCommands, /const DEFAULT_MAIN_WINDOW_HEIGHT: u32 = 723/);
+  assert.doesNotMatch(desktopCommands, /MAIN_WINDOW_STATE_VERSION|main-window-size|MainWindowSize/);
 });
 
 test("manual release separates packaging, publishing, and signing", () => {
@@ -426,30 +421,11 @@ test("release jobs smoke launch every newly repaired application target", () => 
   assert.match(ios, /xcrun simctl terminate "\$simulator_udid" "\$bundle_id"/);
   assert.match(ios, /xgent-ios-launch-evidence/);
   assert.match(workflow, /! -name '\*-smoke\.png'/);
-  assert.match(desktopHost, /with_denylist\(&\[MAIN_WINDOW_LABEL\]\)/);
-  assert.match(
-    desktopHost,
-    /matches!\(event, WindowEvent::Resized\(_\) \| WindowEvent::Moved\(_\)\)\s*&& window\.is_visible\(\)\.unwrap_or\(false\)/,
-  );
-  assert.match(desktopCommands, /window\.set_size\(tauri::PhysicalSize::new\(state\.width, state\.height\)\)/);
-  assert.match(desktopCommands, /window\.set_position\(position\)/);
-  assert.match(desktopCommands, /restorable_main_window_position/);
-  assert.match(
-    desktopCommands,
-    /window\s*\.show\(\)[\s\S]*?if let Some\(state\) = restored_state[\s\S]*?PhysicalSize::new\(state\.width, state\.height\)/,
-  );
-  const closeHandlerStart = desktopHost.indexOf(".on_window_event({");
-  const closeHandlerEnd = desktopHost.indexOf(".invoke_handler", closeHandlerStart);
-  assert.ok(closeHandlerStart >= 0 && closeHandlerEnd > closeHandlerStart);
-  const closeHandler = desktopHost.slice(
-    closeHandlerStart,
-    closeHandlerEnd,
-  );
-  assert.doesNotMatch(closeHandler, /save_window_state/);
-  assert.match(
-    desktopHost,
-    /RunEvent::ExitRequested[\s\S]*?allow_exit\.load[\s\S]*?save_main_window_size\(&window\)/,
-  );
+  assert.doesNotMatch(desktopHost, /tauri_plugin_window_state|save_main_window_size/);
+  assert.doesNotMatch(desktopCommands, /main-window-size|MainWindowSize|restorable_main_window_position/);
+  assert.match(desktopCommands, /sized\.swap\(true, Ordering::SeqCst\)/);
+  assert.match(desktopCommands, /monitor\.work_area\(\)/);
+  assert.match(desktopCommands, /window\s*\.show\(\)[\s\S]*?if let Some\(size\) = fitted_size/);
 });
 
 test("desktop activation reveals the painted main window without exposing startup frames", () => {

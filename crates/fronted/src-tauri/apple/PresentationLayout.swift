@@ -677,7 +677,7 @@ struct XgentRootLayout: View {
         #if os(macOS)
         GeometryReader { geometry in
             let panelEnabled = root?.nodes.contains(where: { $0.kind == .chatLayout }) == true
-            let panels = model.documents.filter { $0.mode == .panel }
+            let panels = model.documents.filter { $0.mode == .panel && $0.surface != model.workspaceState.dockedSurface }
             let panel = panels.first { $0.surface == model.workspaceState.selectedSurface } ?? panels.last
             let placement = XgentDesktopSidebarPlacement(
                 availableWidth: geometry.size.width, storedWidth: storedSidebarWidth,

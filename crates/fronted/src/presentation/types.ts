@@ -114,6 +114,8 @@ export type PresentationDocument = {
     restoreLabel: string;
     closeLabel: string;
     closeTabLabel?: string;
+    dockLabel?: string;
+    undockLabel?: string;
   };
   title: string;
   appearance: "system" | "light" | "dark";

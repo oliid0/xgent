@@ -16,10 +16,6 @@ use tauri::WindowEvent;
 #[cfg(desktop)]
 const MAIN_WINDOW_LABEL: &str = "main";
 #[cfg(desktop)]
-pub(crate) const WINDOW_STATE_FLAGS: tauri_plugin_window_state::StateFlags =
-    tauri_plugin_window_state::StateFlags::SIZE
-        .union(tauri_plugin_window_state::StateFlags::MAXIMIZED);
-#[cfg(desktop)]
 const TRAY_SHOW_MENU_ON_LEFT_CLICK: bool = false;
 #[cfg(desktop)]
 const TERMINAL_EXIT_REQUESTED_EVENT: &str = "terminal:exit-requested";
@@ -861,15 +857,6 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_mcp_bridge::init())
         .plugin(
-            tauri_plugin_window_state::Builder::new()
-                .with_state_flags(WINDOW_STATE_FLAGS)
-                // The main window persists its client size in
-                // main-window-size.json. Letting the plugin restore its own
-                // cached size as well creates a startup race on Windows.
-                .with_denylist(&[MAIN_WINDOW_LABEL])
-                .build(),
-        )
-        .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
                     if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
@@ -993,23 +980,8 @@ pub fn run() {
                     return;
                 }
 
-                // Persist user resizing while the window is alive. A tray close or
-                // OS shutdown can race process teardown; startup fitting is excluded.
-                if matches!(event, WindowEvent::Resized(_) | WindowEvent::Moved(_))
-                    && window.is_visible().unwrap_or(false)
-                    && window.app_handle().state::<Arc<commands::app::FrontendReadyState>>()
-                        .painted.load(Ordering::SeqCst)
-                {
-                    if let Err(error) = commands::app::save_main_window_size(window) {
-                        eprintln!("failed to persist main window geometry: {error}");
-                    }
-                }
-
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
-                    if let Err(error) = commands::app::save_main_window_size(window) {
-                        eprintln!("failed to save native main window size: {error}");
-                    }
                     if commands::app::is_close_window_exit(&close_window_behavior) {
                         request_app_exit(window.app_handle(), &allow_exit, &terminal_registry);
                     } else if let Err(error) = window.hide() {
@@ -1047,11 +1019,6 @@ pub fn run() {
                 }
                 api.prevent_exit();
             } else {
-                if let Some(window) = _app.get_window(MAIN_WINDOW_LABEL) {
-                    if let Err(error) = commands::app::save_main_window_size(&window) {
-                        eprintln!("failed to save main window geometry before exit: {error}");
-                    }
-                }
                 // Real exit: reclaim every non-isolated managed process
                 // before the OS tears us down (Drop is not guaranteed).
                 terminal_registry.shutdown_cleanup();
@@ -1078,9 +1045,19 @@ fn record_mobile_startup_failure(
 
 #[cfg(mobile)]
 fn initialize_mobile_storage(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    let app_data_dir = app.path().app_data_dir()
+    #[cfg(target_os = "ios")]
+    let platform_data_dir = app.path().data_dir();
+    #[cfg(target_os = "android")]
+    let platform_data_dir = app.path().app_data_dir();
+    let platform_data_dir = platform_data_dir
         .map_err(|error| format!("resolve mobile app data directory failed: {error}"))?;
-    services::app_paths::initialize(services::app_paths::mobile_root(&app_data_dir))?;
+    #[cfg(target_os = "ios")]
+    let legacy_app_dir = app.path().app_data_dir().ok();
+    #[cfg(target_os = "android")]
+    let legacy_app_dir: Option<std::path::PathBuf> = None;
+    for warning in services::app_paths::initialize_mobile(&platform_data_dir, legacy_app_dir.as_deref())? {
+        eprintln!("{warning}");
+    }
     services::app_paths::app_storage_dir()
 }
 

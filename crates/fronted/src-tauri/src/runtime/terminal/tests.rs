@@ -15,6 +15,14 @@ fn shell_options_include_default() {
     assert!(!options.options.is_empty());
 }
 
+#[cfg(windows)]
+#[test]
+fn interactive_powershell_preserves_system_startup_defaults() {
+    let shell = resolve_shell(Some("powershell".to_string())).expect("system PowerShell");
+    assert_eq!(shell.command, "powershell.exe");
+    assert!(shell.args.is_empty(), "Do not suppress the banner/profile or override policy");
+}
+
 #[test]
 fn ssh_client_config_enables_interactive_keepalive() {
     let config = ssh_client_config();
