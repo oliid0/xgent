@@ -178,6 +178,7 @@ struct XgentComposerKey {
     // and redo. NSTextView's plain insertion path loses this declaration.
     func insertComposerFragment(_ fragment: NSAttributedString) -> Bool {
         guard isEditable, !hasMarkedText() else { return false }
+        breakUndoCoalescing()
         let manager = undoManager
         manager?.beginUndoGrouping()
         defer { manager?.endUndoGrouping() }
@@ -189,18 +190,26 @@ struct XgentComposerKey {
     @discardableResult private func replaceComposerFragment(in range: NSRange, with fragment: NSAttributedString,
                                                            selectionAfter: NSRange) -> Bool {
         guard isEditable, let storage = textStorage,
-              XgentComposerRange.isValid(range, in: storage.string),
-              shouldChangeText(in: range, replacementString: fragment.string) else { return false }
+              XgentComposerRange.isValid(range, in: storage.string) else { return false }
         let previous = storage.attributedSubstring(from: range), previousSelection = selectedRange()
         let replaced = NSRange(location: range.location, length: fragment.length)
-        undoManager?.registerUndo(withTarget: self) { target in
-            MainActor.assumeIsolated {
-                _ = target.replaceComposerFragment(in: replaced, with: previous, selectionAfter: previousSelection)
-            }
+        let manager = undoManager
+        // As in XgentCodeReplacement, let this attributed inverse own the edit.
+        // AppKit's automatic record would otherwise undo the same insertion twice.
+        manager?.disableUndoRegistration()
+        guard shouldChangeText(in: range, replacementString: fragment.string) else {
+            manager?.enableUndoRegistration()
+            return false
         }
         storage.beginEditing(); storage.replaceCharacters(in: range, with: fragment); storage.endEditing()
         setSelectedRange(selectionAfter)
         didChangeText()
+        manager?.enableUndoRegistration()
+        manager?.registerUndo(withTarget: self) { target in
+            MainActor.assumeIsolated {
+                _ = target.replaceComposerFragment(in: replaced, with: previous, selectionAfter: previousSelection)
+            }
+        }
         return true
     }
 }
