@@ -34,6 +34,7 @@ import {
 import { applyMcpOpsToAppSettings } from "../../../lib/settings/mcpOps";
 import { toolGroupPolicyKey } from "../../../lib/tools/toolPolicy";
 import { presentationControls } from "../../../presentation/controls";
+import { NativeMcpRegistryPreview } from "../../../presentation/NativeMcpRegistryPreview";
 import { NativeSurface } from "../../../presentation/NativeSurface";
 import { nativeMcpServerList } from "../../../presentation/nativeMcpServerList";
 import { createNativePresentationTheme } from "../../../presentation/nativeTheme";
@@ -81,6 +82,7 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [nativeError, setNativeError] = useState("");
+  const [previewCard, setPreviewCard] = useState<McpRegistryCard | null>(null);
   const [installScope] = useState(() => ({ active: true, busy: false, revision: 0 }));
   useEffect(() => {
     installScope.active = true;
@@ -325,7 +327,13 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
                 kind: "VStack",
                 fill: true,
                 children: [
-                  { id: `mcp-store:${card.id}:name`, kind: "Heading", text: card.displayName },
+                  {
+                    ...root.action(`mcp-store:${card.id}:preview`, card.displayName, () =>
+                      setPreviewCard(card),
+                    ),
+                    kind: "NavigationRow",
+                    icon: card.remote ? "network" : "server.rack",
+                  },
                   {
                     id: `mcp-store:${card.id}:description`,
                     kind: "Text",
@@ -612,6 +620,24 @@ export function MobileMcpPage(props: MobileMcpPageProps) {
     return (
       <>
         {dialog}
+        {previewCard && !configuring ? (
+          <NativeMcpRegistryPreview
+            key={previewCard.id}
+            card={previewCard}
+            settings={props.settings}
+            compact={compact}
+            allowStdio={props.allowStdio}
+            installed={cardIsInstalled(previewCard)}
+            installing={installingCardId === previewCard.id}
+            installBusy={Boolean(installingCardId)}
+            installError={registryError}
+            close={() => {
+              setPreviewCard(null);
+              setRegistryError("");
+            }}
+            install={installRegistryCard}
+          />
+        ) : null}
         <NativeSurface
           sessionSurface={props.nativeSettingsSurfaceId}
           document={{

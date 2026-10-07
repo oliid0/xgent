@@ -135,8 +135,8 @@ struct XgentProviderListView: View {
                 XgentNativeMenu(node: actions, document: document, model: model)
                     .accessibilityIdentifier(actions.id)
                     .fixedSize()
+                    .disabled(node.disabled == true || model.isBusy(node, in: document))
             }
-            .disabled(node.disabled == true || model.isBusy(node, in: document))
         }
         .accessibilityElement(children: .contain)
     }

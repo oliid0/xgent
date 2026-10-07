@@ -179,6 +179,7 @@ test("native MCP hub keeps desktop import and group/server policy actions while 
       "../../../lib/runtimePlatform": { isNativeMobileRuntime: () => mobile },
       "../../../runtime/applePresentation": { isApplePresentationRuntime: () => true },
       "../../../presentation/NativeSurface": { NativeSurface: "NativeSurface" },
+      "../../../presentation/NativeMcpRegistryPreview": { NativeMcpRegistryPreview: "NativeMcpRegistryPreview" },
       "../../../presentation/nativeTheme": { createNativePresentationTheme: () => undefined },
       "../../../components/astryx/useConfirmDialog": { useConfirmDialog: () => ({ confirm: async () => true, dialog: null }) },
       "../../../components/icons": {}, "./MobileHubChrome": {},
@@ -210,4 +211,52 @@ test("native MCP hub keeps desktop import and group/server policy actions while 
     await action("mcp-server:docs:delete"); assert.equal(settings.mcp.servers.length, 0);
     assert.equal(settings.system.toolPolicies["server:docs"], undefined); hooks.unmount();
   }
+});
+
+test("native MCP store opens a separate live preview and shares install state with its card", async () => {
+  const hooks = createReactHookHarness(); const previousWindow = globalThis.window;
+  globalThis.window = { setTimeout, clearTimeout };
+  const registry = baseLoader.loadModule("src/lib/mcpRegistry/index.ts");
+  const card = { id: "store-docs", sourceId: "docs", source: "official", name: "docs", displayName: "Docs",
+    description: "Remote docs", verified: true, remote: true, tags: [], transportHints: ["http"],
+    installDraft: { status: "ready", requiredConfig: [], warnings: [], commandPreview: "https://example.test/mcp",
+      server: { id: "remote-docs", enabled: true, transport: "http", url: "https://example.test/mcp", args: [] } } };
+  let settings = normalizeSettings({});
+  const mocks = {
+    react: hooks.react,
+    "../../../i18n": { useLocale: () => ({ t }) },
+    "../../../lib/runtimePlatform": { isNativeMobileRuntime: () => true },
+    "../../../runtime/applePresentation": { isApplePresentationRuntime: () => true },
+    "../../../lib/mcpRegistry": { ...registry, searchMcpRegistry: async () => ({ items: [card] }) },
+    "../../../presentation/NativeSurface": { NativeSurface: "NativeSurface" },
+    "../../../presentation/NativeMcpRegistryPreview": { NativeMcpRegistryPreview: "NativeMcpRegistryPreview" },
+    "../../../presentation/nativeTheme": { createNativePresentationTheme: () => undefined },
+    "../../../components/astryx/useConfirmDialog": { useConfirmDialog: () => ({ confirm: async () => true, dialog: null }) },
+    "../../../components/icons": {}, "./MobileHubChrome": {}, "../../mcp-hub/McpRegistryBrowser": {},
+    "../../mcp-hub/McpServersForm": {}, "../../mcp-hub/McpImportView": {},
+  };
+  for (const name of ["Badge", "Button", "ClickableCard", "EmptyState", "IconButton", "Layout", "Switch", "Text", "Token"]) mocks[`@astryxdesign/core/${name}`] = {};
+  const loader = createTsModuleLoader({ mocks });
+  const { MobileMcpPage } = loader.loadModule("src/pages/chat/mobile/MobileMcpPage.tsx");
+  const props = { settings, allowStdio: false, onOpenSidebar() {}, setSettings: update => { settings = update(settings); props.settings = settings; } };
+  const render = () => hooks.render(() => MobileMcpPage(props));
+  function find(tree, type) {
+    if (tree?.type === type) return tree.props;
+    for (const child of [tree?.props?.children].flat()) { const result = child && find(child, type); if (result) return result; }
+  }
+  try {
+    find(render(), "NativeSurface").handlers.get("mcp-view").run("store"); render();
+    await new Promise(resolve => setTimeout(resolve, 10)); await settle();
+    let root = find(render(), "NativeSurface");
+    assert.equal(flatten(root.document.nodes).find(node => node.id === "mcp-store:store-docs:preview").kind, "NavigationRow");
+    root.handlers.get("mcp-store:store-docs:preview").run(null);
+    let preview = find(render(), "NativeMcpRegistryPreview");
+    assert.equal(preview.card.id, card.id); assert.equal(preview.installed, false);
+    assert.equal(find(render(), "NativeSurface").document.mode, "root");
+    await preview.install(card); preview = find(render(), "NativeMcpRegistryPreview");
+    assert.equal(preview.installed, true); assert.equal(settings.mcp.servers[0].url, "https://example.test/mcp");
+    preview.close(); assert.equal(find(render(), "NativeMcpRegistryPreview"), undefined);
+    root = find(render(), "NativeSurface"); assert.equal(root.document.mode, "root");
+    assert.equal(flatten(root.document.nodes).find(node => node.id === "mcp-store:store-docs:install").disabled, true);
+  } finally { hooks.unmount(); if (previousWindow === undefined) delete globalThis.window; else globalThis.window = previousWindow; }
 });

@@ -17,7 +17,7 @@ struct XgentDesktopSheetSizing: ViewModifier {
     }
 
     @ViewBuilder func body(content: Content) -> some View {
-        if document.nodes.contains(where: { $0.kind == .settingsLayout }) {
+        if document.nodes.contains(where: { $0.kind == .settingsLayout || $0.variant == "mcp-registry-preview" }) {
             let size = Self.settingsSize(in: availableSize)
             content.frame(width: size.width, height: size.height).presentationSizing(.fitted)
         } else if document.nodes.contains(where: { $0.variant == "workspace-search-palette" }) {

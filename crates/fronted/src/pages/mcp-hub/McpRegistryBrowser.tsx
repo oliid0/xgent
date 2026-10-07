@@ -57,6 +57,13 @@ import {
   selectMcpRegistryCardForHost,
   withUniqueMcpServerId,
 } from "../../lib/mcpRegistry";
+import {
+  configTargetLabel,
+  configureDraftForCard,
+  installLabelKey,
+  primaryRegistryLink,
+  registryExternalLinks,
+} from "../../lib/mcpRegistry/preview";
 import { type AppSettings, type McpServerConfig, updateMcp } from "../../lib/settings";
 
 const STORE_PAGE_LIMIT = 18;
@@ -80,12 +87,6 @@ type McpConfigModalDraft = {
   messageUrl: string;
   headersText: string;
   configValues: Record<string, string>;
-};
-
-type McpPreviewLink = {
-  key: string;
-  labelKey: string;
-  url: string;
 };
 
 type McpRegistryCardGroup = {
@@ -131,35 +132,6 @@ function mergeMcpRegistryCards(current: McpRegistryCard[], next: McpRegistryCard
   const byId = new Map(current.map((card) => [card.id, card]));
   for (const card of next) byId.set(card.id, card);
   return Array.from(byId.values());
-}
-
-function installLabelKey(card: McpRegistryCard) {
-  if (!card.installDraft && card.source === "smithery") return "mcpHub.storeInstall";
-  if (card.installDraft?.status === "needs_config") return "mcpHub.storeConfigure";
-  return card.installDraft ? "mcpHub.storeInstall" : "mcpHub.storeManualOnly";
-}
-
-function configureDraftForCard(card: McpRegistryCard) {
-  return card.installDraft ?? card.manualDraft;
-}
-
-function primaryRegistryLink(card: McpRegistryCard) {
-  return card.detailUrl ?? card.homepageUrl ?? card.repositoryUrl;
-}
-
-function registryExternalLinks(card: McpRegistryCard): McpPreviewLink[] {
-  const candidates: Array<{ key: string; labelKey: string; url?: string }> = [
-    { key: "detail", labelKey: "mcpHub.storePreviewDetailPage", url: card.detailUrl },
-    { key: "homepage", labelKey: "mcpHub.storePreviewHomepage", url: card.homepageUrl },
-    { key: "repository", labelKey: "mcpHub.storePreviewRepository", url: card.repositoryUrl },
-  ];
-  const seen = new Set<string>();
-  return candidates.flatMap((candidate) => {
-    const url = candidate.url?.trim();
-    if (!url || seen.has(url)) return [];
-    seen.add(url);
-    return [{ key: candidate.key, labelKey: candidate.labelKey, url }];
-  });
 }
 
 function formatKeyValueRecord(input: Record<string, string> | undefined) {
@@ -286,14 +258,6 @@ function buildModalDraft(
     headersText: formatKeyValueRecord(server?.headers),
     configValues,
   };
-}
-
-function configTargetLabel(input: McpRegistryConfigInput, t: (key: string) => string) {
-  if (input.target === "env") return t("mcpHub.previewEnv");
-  if (input.target === "header") return t("mcpHub.previewHeaders");
-  if (input.target === "argument") return t("mcpHub.previewArgs");
-  if (input.target === "url") return "URL";
-  return "Config";
 }
 
 function keyListLabel(record: Record<string, string> | undefined) {
