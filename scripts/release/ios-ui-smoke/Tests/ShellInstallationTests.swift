@@ -95,6 +95,26 @@ final class ShellInstallationTests: XCTestCase {
         XCTAssertTrue(output.matching(NSPredicate(format: "label CONTAINS %@", "xgent-python-modules-ok")).firstMatch.exists)
         XCTAssertTrue(output.matching(NSPredicate(format: "label CONTAINS %@", "pip 22.")).firstMatch.exists)
 
+        // Installation already used Python; all aliases must remain runnable
+        // across later tasks and after a nonzero Python exit, without rotating
+        // into an interpreter framework absent from the signed application.
+        tap(app.buttons["clear"], in: app)
+        tap(command, in: app)
+        command.typeText("python -c 'import sys; sys.exit(7)'")
+        tap(app.buttons["run"], in: app)
+        XCTAssertTrue(exit.waitForExistence(timeout: 45))
+        assertExit(7, element: exit)
+
+        tap(app.buttons["clear"], in: app)
+        tap(command, in: app)
+        command.typeText("python -c 'print(\"xgent-python-reused\")'; python3 -c 'print(\"xgent-python3-reused\")'; python3.9 -c 'print(\"xgent-python39-reused\")'")
+        tap(app.buttons["run"], in: app)
+        XCTAssertTrue(exit.waitForExistence(timeout: 45), "All public aliases must reuse the installed interpreter")
+        assertExit(0, element: exit)
+        for marker in ["xgent-python-reused", "xgent-python3-reused", "xgent-python39-reused"] {
+            XCTAssertTrue(output.matching(NSPredicate(format: "label CONTAINS %@", marker)).firstMatch.exists)
+        }
+
         tap(app.buttons["clear"], in: app)
         tap(command, in: app)
         command.typeText("read answer; printf 'xgent-input-%s' \"$answer\"")

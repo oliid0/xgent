@@ -60,7 +60,8 @@ test("macOS narrow sidebar uses an accessible drawer without forcing both pane m
   assert.match(nativeLayoutSource, /\.allowsHitTesting\(!drawerVisible\)/);
   assert.match(nativeLayoutSource, /\.accessibilityHidden\(drawerVisible\)/);
   assert.match(nativeLayoutSource, /xgent-sidebar-dismiss-backdrop/);
-  assert.match(nativeLayoutSource, /placement\.widthToRemember\(width\)/);
+  assert.doesNotMatch(nativeLayoutSource, /onPreferenceChange\(XgentSidebarWidth/);
+  assert.match(nativeLayoutSource, /storedSidebarWidth = Double\(\$0\)/);
   assert.match(nativeLayoutSource, /onChange\(of: root\?\.node\(id: "chat"\)\?\.value\)/);
 });
 
@@ -92,7 +93,7 @@ test("native glass keeps grouped surfaces distinct from floating controls", () =
   assert.match(nativeSettingsSource, /struct XgentDesktopSettingsLayout: View/);
   assert.match(nativeSettingsSource, /geometry\.size\.width >= 760/);
   assert.doesNotMatch(nativeSettingsSource, /minWidth: 900|NavigationSplitView/);
-  assert.match(nativeLayoutSource, /HSplitView \{/);
+  assert.match(nativeLayoutSource, /XgentPaneDivider\(axis: \.horizontal/);
   assert.match(nativeLayoutSource, /@AppStorage\("xgent\.native\.sidebar-width\.v1"\)/);
 });
 

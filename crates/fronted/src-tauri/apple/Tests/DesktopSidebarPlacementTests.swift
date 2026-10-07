@@ -36,17 +36,15 @@ final class DesktopSidebarPlacementTests: XCTestCase {
         XCTAssertEqual(placement(1440, stored: 10_000).columnWidth, 480)
     }
 
-    func testNarrowingDoesNotReplaceTheUsersSavedSidebarWidth() {
+    func testNarrowingKeepsTheSavedPreferenceAndClampsOnlyTheLiveSidebarWidth() {
         let constrained = XgentDesktopSidebarPlacement(availableWidth: 760, storedWidth: 360,
             sidebarVisible: true, panelVisible: false, panelExpanded: false)
         XCTAssertEqual(constrained.columnWidth, 312)
-        XCTAssertNil(constrained.widthToRemember(312))
-        XCTAssertEqual(constrained.widthToRemember(290), 290)
-        XCTAssertNil(constrained.widthToRemember(.nan))
+        XCTAssertEqual(constrained.preferredWidth, 360)
         let wide = XgentDesktopSidebarPlacement(availableWidth: 1440, storedWidth: 360,
             sidebarVisible: true, panelVisible: false, panelExpanded: false)
         XCTAssertEqual(wide.columnWidth, 360)
-        XCTAssertEqual(wide.widthToRemember(420), 420)
+        XCTAssertEqual(wide.preferredWidth, constrained.preferredWidth)
     }
 
     @MainActor func testActualSidebarControlsFitResizedWindowsAndBackdropUsesTheDismissBridge() async throws {

@@ -105,17 +105,44 @@ fn patch_paragraph(xml: &str, replacement: &str) -> Result<String, String> {
     }
     let old_chars = old.chars().collect::<Vec<_>>();
     let new_chars = replacement.chars().collect::<Vec<_>>();
-    let prefix = old_chars
+    let mut prefix = old_chars
         .iter()
         .zip(&new_chars)
         .take_while(|(a, b)| a == b)
         .count();
-    let suffix = old_chars[prefix..]
+    let mut suffix = old_chars[prefix..]
         .iter()
         .rev()
         .zip(new_chars[prefix..].iter().rev())
         .take_while(|(a, b)| a == b)
         .count();
+    // Whitespace/repeated characters can make a pure insertion ambiguous.
+    // Prefer an equivalent run boundary over inserting into an otherwise
+    // unchanged run (which may belong to a hyperlink or a different style).
+    if prefix == old_chars.len() - suffix {
+        let full_suffix = old_chars
+            .iter()
+            .rev()
+            .zip(new_chars.iter().rev())
+            .take_while(|(a, b)| a == b)
+            .count();
+        let earliest = old_chars.len() - full_suffix;
+        let mut boundary = 0usize;
+        let mut preferred = None;
+        for node in &slices {
+            if boundary >= earliest && boundary < prefix {
+                preferred = Some(boundary);
+            }
+            boundary += quick_xml::escape::unescape(&xml[node.body_start..node.body_end])
+                .map_err(|error| format!("Malformed Word text: {error}"))?
+                .chars()
+                .count();
+        }
+        if let Some(boundary) = preferred {
+            suffix += prefix - boundary;
+            prefix = boundary;
+        }
+    }
     let change_end = old_chars.len() - suffix;
     let inserted = new_chars[prefix..new_chars.len() - suffix]
         .iter()
@@ -219,6 +246,20 @@ mod tests {
         assert!(edited.contains("<w:rPr><w:b/></w:rPr>"));
         assert!(edited.contains("<w:hyperlink r:id=\"link\"><w:r><w:t xml:space=\"preserve\">end</w:t>"));
         assert_eq!(read_word_text(&edited).unwrap(), "Staend");
+    }
+
+    #[test]
+    fn docx_ambiguous_insertion_keeps_the_following_hyperlink_unchanged() {
+        let xml = "<w:p><w:r><w:t>plain </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>bold</w:t></w:r><w:hyperlink r:id=\"link\"><w:r><w:t> suffix</w:t></w:r></w:hyperlink></w:p>";
+        for text in ["plain bold changed suffix", "plain bold 中文😀 suffix", "plain bold  suffix"] {
+            let edited = patch_word_text(xml, text).unwrap();
+            assert!(edited.contains("<w:hyperlink r:id=\"link\"><w:r><w:t> suffix</w:t></w:r></w:hyperlink>"));
+            assert!(edited.contains("<w:rPr><w:b/></w:rPr>"));
+            assert_eq!(read_word_text(&edited).unwrap(), text);
+        }
+        let inside = patch_word_text(xml, "plain bold suf-added-fix").unwrap();
+        assert!(inside.contains("<w:rPr><w:b/></w:rPr><w:t>bold</w:t>"));
+        assert_eq!(read_word_text(&inside).unwrap(), "plain bold suf-added-fix");
     }
 
     #[test]

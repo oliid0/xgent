@@ -23,12 +23,5 @@ struct XgentDesktopSidebarPlacement {
         minimumMainWidth = 440 + (inline ? columnWidth + 8 : 0)
     }
 
-    func widthToRemember(_ measured: Double) -> Double? {
-        guard inline, measured.isFinite, measured >= 280 else { return nil }
-        // Remember user divider changes without treating a window-imposed
-        // maximum as a new preferred width.
-        if maximumWidth < preferredWidth, abs(CGFloat(measured) - maximumWidth) < 1 { return nil }
-        return min(480, max(280, measured))
-    }
 }
 #endif

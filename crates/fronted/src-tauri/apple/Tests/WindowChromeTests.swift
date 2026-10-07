@@ -117,7 +117,14 @@ final class WindowChromeTests: XCTestCase {
     @MainActor func testActualHostInstallsNativeToolbarWithoutCoveringContentAndRestoresWindowOnReset() async throws {
         let accessibility = try NativeMacAccessibilitySession()
         defer { accessibility.restore() }
+        let sidebarWidthKey = "xgent.native.sidebar-width.v1"
+        let savedSidebarWidth = UserDefaults.standard.object(forKey: sidebarWidthKey)
+        defer {
+            if let savedSidebarWidth { UserDefaults.standard.set(savedSidebarWidth, forKey: sidebarWidthKey) }
+            else { UserDefaults.standard.removeObject(forKey: sidebarWidthKey) }
+        }
         for width: CGFloat in [320, 640, 871, 1156] {
+            UserDefaults.standard.set(360, forKey: sidebarWidthKey)
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 720),
                                   styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                                   backing: .buffered, defer: false)
@@ -193,6 +200,7 @@ final class WindowChromeTests: XCTestCase {
             ]
             XCTAssertEqual(try publish(sidebar, to: pointer), 0)
             for resizedWidth: CGFloat in [871, 1156, 640, width] {
+                NSLog("WindowChromeTests bridged sidebar resize: %.0f", resizedWidth)
                 window.setContentSize(NSSize(width: resizedWidth, height: 720))
                 container.layoutSubtreeIfNeeded()
                 try await Task.sleep(for: .milliseconds(200))
@@ -201,6 +209,24 @@ final class WindowChromeTests: XCTestCase {
                 XCTAssertEqual(native.frame.width, container.bounds.width, accuracy: 0.5)
                 XCTAssertEqual(native.subviews.first?.frame.width ?? 0, native.bounds.width, accuracy: 0.5)
                 XCTAssertTrue(native.frame.height.isFinite)
+                let divider = nativeMacAccessibilityTree(window).first { $0.accessibilityIdentifier() == "xgent-sidebar-divider" }
+                if resizedWidth >= 728 {
+                    let frame = try XCTUnwrap(divider).accessibilityFrame()
+                    XCTAssertEqual(frame.width, 8, accuracy: 0.5)
+                    XCTAssertGreaterThanOrEqual(frame.minX, nativeFrame.minX)
+                    XCTAssertLessThanOrEqual(frame.maxX, nativeFrame.minX + resizedWidth)
+                    if resizedWidth == 1156 {
+                        XCTAssertTrue(try XCTUnwrap(divider).accessibilityPerformIncrement())
+                        try await Task.sleep(for: .milliseconds(200))
+                        container.layoutSubtreeIfNeeded()
+                        let resized = try XCTUnwrap(nativeMacAccessibilityTree(window).first {
+                            $0.accessibilityIdentifier() == "xgent-sidebar-divider"
+                        }).accessibilityFrame()
+                        XCTAssertEqual(resized.minX, frame.minX + 16, accuracy: 0.5,
+                                       "The real divider adjustment must resize the sidebar, not just announce a value")
+                        XCTAssertEqual(native.frame.width, container.bounds.width, accuracy: 0.5)
+                    }
+                } else { XCTAssertNil(divider, "The drawer must not leave an interactive inline divider") }
             }
             sidebar["revision"] = 2
             sidebar["removed"] = true

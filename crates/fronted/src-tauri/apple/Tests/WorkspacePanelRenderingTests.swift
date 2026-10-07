@@ -22,7 +22,7 @@ final class WorkspacePanelRenderingTests: XCTestCase {
         let model = XgentPresentationModel()
         defer { model.invalidate() }
         let rootPayload: [String: Any] = ["version": 1, "surface": "chat", "revision": 1, "mode": "root",
-            "title": "Chat", "formFactor": "desktop", "nodes": [["id": "chat", "kind": "ChatLayout", "children": [
+            "title": "Chat", "appearance": "light", "formFactor": "desktop", "nodes": [["id": "chat", "kind": "ChatLayout", "children": [
                 ["id": "workspace-panel-actions", "kind": "Menu", "label": "Tools", "children": [
                     ["id": "workspace-new-browser", "kind": "Button", "label": "New browser tab", "action": "new-browser"]]]]]]]
         let chat = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: rootPayload))

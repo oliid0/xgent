@@ -60,6 +60,12 @@ enum AShellPythonRuntime {
             throw MobileExecutionError.io("The Python command bridge is not exported: \(loaderError())")
         }
         _ = try runtime.get()
+        // ios_system v3.0.4 rotates commands named python* to pythonA/B/etc,
+        // even after replaceCommand. Only python3_ios is bundled here. Its
+        // public interpreter limit makes subsequent commands reuse slot zero
+        // after cleanup_function releases it; the plugin already serializes
+        // execution. Do not dispatch to framework copies that do not exist.
+        numPythonInterpreters = 1
         withExtendedLifetime(callback) {
             replaceCommand("python3", "xgent_python_main", true)
         }

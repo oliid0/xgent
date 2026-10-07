@@ -9,6 +9,12 @@ struct XgentBrowserLayout: View {
     @ObservedObject var model: XgentPresentationModel
     @State private var focusRequest = 0
 
+    private var hasStartTools: Bool {
+        (node.children ?? []).contains { item in
+            item.variant == "browser-empty" && (item.children ?? []).contains { $0.variant == "browser-new-tab-tools" }
+        }
+    }
+
     @ViewBuilder private func content(_ item: XgentNode) -> some View {
         #if os(iOS)
         XgentIOSNode(node: item, document: document, model: model)
@@ -20,10 +26,14 @@ struct XgentBrowserLayout: View {
     var body: some View {
         VStack(spacing: 0) {
             ForEach(node.children ?? []) { item in
-                if item.variant == "browser-empty" {
-                    if (item.children ?? []).contains(where: { $0.variant == "browser-new-tab-tools" }) {
+                if hasStartTools && item.variant == "browser-error" {
+                    // Error details scroll with the start page so large text
+                    // cannot consume the tool viewport below the address bar.
+                } else if item.variant == "browser-empty" {
+                    if hasStartTools {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 12) {
+                                ForEach((node.children ?? []).filter { $0.variant == "browser-error" }) { content($0) }
                                 ForEach(item.children ?? []) { content($0) }
                             }.frame(maxWidth: .infinity, alignment: .leading)
                         }.frame(maxWidth: .infinity, maxHeight: .infinity)

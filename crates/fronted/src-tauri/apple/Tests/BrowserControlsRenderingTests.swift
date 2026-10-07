@@ -56,11 +56,23 @@ final class BrowserControlsRenderingTests: XCTestCase {
                     }
                 }
                 for id in ["tool-review", "tool-terminal", "tool-files", "tool-chat"] {
-                    let element = try XCTUnwrap(elements.first { $0.identifier == id }, id)
+                    var current = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view).flattenToElements()
+                    var element = try XCTUnwrap(current.first { $0.identifier == id }, id)
+                    var viewport = host.view.bounds
+                    if let scroll = verticalScrollView(in: host.view) {
+                        let target = scroll.convert(element.shape.bezierPath.bounds, from: host.view)
+                        scroll.scrollRectToVisible(target.insetBy(dx: 0, dy: -4), animated: false)
+                        host.view.layoutIfNeeded()
+                        try await Task.sleep(for: .milliseconds(100))
+                        current = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view).flattenToElements()
+                        element = try XCTUnwrap(current.first { $0.identifier == id }, id)
+                        viewport = scroll.convert(scroll.bounds, to: host.view)
+                    }
                     XCTAssertGreaterThan(element.shape.bezierPath.bounds.width, 0, id)
                     XCTAssertGreaterThanOrEqual(element.shape.bezierPath.bounds.minX, -1, id)
                     XCTAssertLessThanOrEqual(element.shape.bezierPath.bounds.maxX, width + 1, id)
-                    XCTAssertLessThanOrEqual(element.shape.bezierPath.bounds.maxY, 780, id)
+                    XCTAssertGreaterThanOrEqual(element.shape.bezierPath.bounds.minY, viewport.minY - 1, id)
+                    XCTAssertLessThanOrEqual(element.shape.bezierPath.bounds.maxY, viewport.maxY + 1, id)
                 }
                 let strategy = Snapshotting<UIView, UIImage>.image(size: CGSize(width: width, height: 780))
                 let image = await withCheckedContinuation { continuation in
@@ -84,6 +96,15 @@ final class BrowserControlsRenderingTests: XCTestCase {
             }
         }
     }
+
+    #if os(iOS)
+    @MainActor private func verticalScrollView(in view: UIView) -> UIScrollView? {
+        if let scroll = view as? UIScrollView,
+           scroll.bounds.height > 100, scroll.contentSize.height > scroll.bounds.height + 1 { return scroll }
+        for child in view.subviews { if let scroll = verticalScrollView(in: child) { return scroll } }
+        return nil
+    }
+    #endif
 
     @MainActor func testAddressDraftSurvivesUnrelatedDocumentUpdatesAndDoesNotLeakToAnotherTab() throws {
         let model = XgentPresentationModel()

@@ -619,13 +619,6 @@ extension XgentNodeView {
 
 }
 
-#if os(macOS)
-private struct XgentSidebarWidthPreferenceKey: PreferenceKey {
-    static let defaultValue = 360.0
-    static func reduce(value: inout Double, nextValue: () -> Double) { value = nextValue() }
-}
-#endif
-
 struct XgentRootLayout: View {
     @ObservedObject var model: XgentPresentationModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -745,22 +738,16 @@ struct XgentRootLayout: View {
     #if os(macOS)
     @ViewBuilder private func desktopMain(placement: XgentDesktopSidebarPlacement) -> some View {
         if placement.inline, let sidebar, let root {
-            HSplitView {
+            HStack(spacing: 0) {
                 content(sidebar)
-                    .frame(minWidth: 280, idealWidth: placement.columnWidth, maxWidth: placement.maximumWidth)
-                    .background {
-                        GeometryReader { geometry in
-                            Color.clear.preference(key: XgentSidebarWidthPreferenceKey.self,
-                                                   value: Double(geometry.size.width))
-                        }
-                    }
+                    .frame(width: placement.columnWidth)
+                XgentPaneDivider(axis: .horizontal, extent: placement.columnWidth,
+                    limits: 280...placement.maximumWidth, label: sidebar.title,
+                    identifier: "xgent-sidebar-divider") { storedSidebarWidth = Double($0) }
                 content(root)
-                    .frame(minWidth: 440)
+                    .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
                     .accessibilityIdentifier("xgent-native-root")
                     .onAppear { NSLog("XgentNativeUI root rendered") }
-            }
-            .onPreferenceChange(XgentSidebarWidthPreferenceKey.self) { width in
-                if let preferred = placement.widthToRemember(width) { storedSidebarWidth = preferred }
             }
         } else if let root {
             content(root)

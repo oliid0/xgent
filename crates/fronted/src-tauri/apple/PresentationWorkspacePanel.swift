@@ -2,16 +2,6 @@
 import AppKit
 import SwiftUI
 
-private struct XgentTerminalDockHeight: PreferenceKey {
-    static let defaultValue: CGFloat = 240
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
-
-private struct XgentWorkspacePanelWidth: PreferenceKey {
-    static let defaultValue: CGFloat = 420
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
-
 struct XgentDesktopWorkspaceLayout<Main: View>: View {
     @ObservedObject var model: XgentPresentationModel
     let minimumMainWidth: CGFloat
@@ -44,19 +34,17 @@ struct XgentDesktopWorkspaceLayout<Main: View>: View {
     var body: some View {
         GeometryReader { geometry in
             if enabled, let docked, let controls = docked.workspacePanel {
-                VSplitView {
-                    side(geometry: geometry).frame(minHeight: min(240, max(120, geometry.size.height * 0.5)))
+                let minimumMain = min(240, max(120, geometry.size.height * 0.5))
+                let minimumDock = min(200, max(100, geometry.size.height * 0.35))
+                let maximumDock = max(minimumDock, geometry.size.height - minimumMain - 8)
+                let height = min(maximumDock, max(minimumDock, storedDockHeight.isFinite ? CGFloat(storedDockHeight) : 240))
+                VStack(spacing: 0) {
+                    side(geometry: geometry).frame(minHeight: 0, maxHeight: .infinity)
+                    XgentPaneDivider(axis: .vertical, extent: height,
+                        limits: minimumDock...maximumDock, reversed: true, label: docked.title,
+                        identifier: "xgent-terminal-dock-divider") { storedDockHeight = Double($0) }
                     panel(docked, controls: controls, canSplit: false, inDock: true)
-                        .frame(minHeight: min(200, max(100, geometry.size.height * 0.35)),
-                               idealHeight: storedDockHeight.isFinite ? storedDockHeight : 240,
-                               maxHeight: max(100, geometry.size.height - min(240, max(120, geometry.size.height * 0.5)) - 8))
-                        .background(GeometryReader { size in
-                            Color.clear.preference(key: XgentTerminalDockHeight.self, value: size.size.height)
-                        })
-                }
-                .onPreferenceChange(XgentTerminalDockHeight.self) { height in
-                    guard height.isFinite, height >= 200 else { return }
-                    storedDockHeight = Double(height)
+                        .frame(height: height)
                 }
             } else { side(geometry: geometry) }
         }
@@ -77,20 +65,16 @@ struct XgentDesktopWorkspaceLayout<Main: View>: View {
                     }
                 }
             } else if canSplit, !model.workspaceState.expanded {
-                HSplitView {
-                    main.frame(minWidth: minimumMainWidth)
+                let width = XgentWorkspacePanelState.panelWidth(storedWidth, available: geometry.size.width,
+                                                               minimumMainWidth: minimumMainWidth)
+                HStack(spacing: 0) {
+                    main.frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
+                    XgentPaneDivider(axis: .horizontal, extent: width,
+                        limits: 360...max(360, geometry.size.width - minimumMainWidth - 8),
+                        reversed: true, label: selected.title,
+                        identifier: "xgent-workspace-panel-divider") { storedWidth = Double($0) }
                     panel(selected, controls: controls, canSplit: true)
-                        .frame(minWidth: 360,
-                               idealWidth: XgentWorkspacePanelState.panelWidth(storedWidth, available: geometry.size.width,
-                                                                              minimumMainWidth: minimumMainWidth),
-                               maxWidth: max(360, geometry.size.width - minimumMainWidth - 8))
-                        .background(GeometryReader { size in
-                            Color.clear.preference(key: XgentWorkspacePanelWidth.self, value: size.size.width)
-                        })
-                }
-                .onPreferenceChange(XgentWorkspacePanelWidth.self) { width in
-                    guard width.isFinite, width >= 360 else { return }
-                    storedWidth = Double(width)
+                        .frame(width: width)
                 }
             } else {
                 panel(selected, controls: controls, canSplit: canSplit)

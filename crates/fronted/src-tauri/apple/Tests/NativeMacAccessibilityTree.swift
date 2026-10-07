@@ -55,6 +55,17 @@ struct NativeMacAccessibilityElement {
         object.accessibilityPerformAction(.press)
         return true
     }
+    func accessibilityPerformIncrement() -> Bool {
+        if let modern = object as? any NSAccessibilityProtocol { return modern.accessibilityPerformIncrement() }
+        let selector = NSSelectorFromString("accessibilityPerformIncrement")
+        if object.responds(to: selector), let implementation = object.method(for: selector) {
+            typealias Increment = @convention(c) (AnyObject, Selector) -> Bool
+            return unsafeBitCast(implementation, to: Increment.self)(object, selector)
+        }
+        guard object.accessibilityActionNames().contains(.increment) else { return false }
+        object.accessibilityPerformAction(.increment)
+        return true
+    }
     fileprivate var children: [Any] {
         guard let children = attribute(.children, getter: "accessibilityChildren") as? [Any] else { return [] }
         return NSAccessibility.unignoredChildren(from: children)
