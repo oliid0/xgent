@@ -35,7 +35,7 @@ final class PresentationTransportTests: XCTestCase {
         let document: [String: Any] = ["version": 1, "surface": "page", "revision": 1,
             "mode": "root", "title": "Native host", "formFactor": "desktop", "appearance": "light",
             "nodes": [["id": "host-controls", "kind": "VStack", "children": [
-                ["id": "draft", "kind": "ComposerInput", "label": "Message", "value": "Draft", "action": "edit"],
+                ["id": "draft", "kind": "ComposerInput", "label": "Message", "value": "", "action": "edit"],
                 ["id": "native-action", "kind": "Button", "label": "Native action", "action": "send"],
             ]]]]
         let data = try JSONSerialization.data(withJSONObject: document)
@@ -109,7 +109,7 @@ final class PresentationTransportTests: XCTestCase {
                                   "Clicking the composer must focus its actual native field editor")
         XCTAssertTrue(editor.isEditable)
         XCTAssertTrue(editor.isAccessibilityEnabled(), "The real editable text view must accept accessibility input")
-        XCTAssertEqual(editor.string, "Draft")
+        XCTAssertEqual(editor.string, "", "A new conversation must expose its empty composer before focus")
         editor.setSelectedRange(NSRange(location: editor.string.utf16.count, length: 0))
         for type in [NSEvent.EventType.keyDown, .keyUp] {
             window.sendEvent(try XCTUnwrap(NSEvent.keyEvent(with: type, location: .zero,
@@ -117,14 +117,14 @@ final class PresentationTransportTests: XCTestCase {
                 characters: "x", charactersIgnoringModifiers: "x", isARepeat: false, keyCode: 7)))
         }
         try await Task.sleep(for: .milliseconds(100))
-        XCTAssertEqual(editor.string, "Draftx", "Physical keyboard input must edit the native composer")
+        XCTAssertEqual(editor.string, "x", "Physical keyboard input must edit the native composer")
         let draftDeadline = ContinuousClock.now + .seconds(3)
         var edited: [String: Any]?
         while edited == nil, ContinuousClock.now < draftDeadline {
             edited = try await transport.evaluateJavaScript("window.nativeActions.find(action => action.action === 'edit') ?? null") as? [String: Any]
             if edited == nil { try await Task.sleep(for: .milliseconds(50)) }
         }
-        XCTAssertEqual(try XCTUnwrap(edited)["value"] as? String, "Draftx",
+        XCTAssertEqual(try XCTUnwrap(edited)["value"] as? String, "x",
                        "The clicked and typed draft must reach the shared execution host")
         let value = try await transport.evaluateJavaScript("6 * 7")
         XCTAssertEqual((value as? NSNumber)?.intValue, 42, "Native accessibility must preserve shared JS execution")
