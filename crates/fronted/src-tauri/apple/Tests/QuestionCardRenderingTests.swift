@@ -46,14 +46,14 @@ final class QuestionCardRenderingTests: XCTestCase {
                 let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
                 try attachNativeAccessibilityEvidence(hierarchy, name: "question-accessibility-\(Int(width))-\(size)")
                 let elements = hierarchy.flattenToElements()
-                for id in ["question:option", "question:other", "question:tabs:0", "question:submit"] {
+                for id in ["question:option", "question:previous", "question:next", "question:close", "question:skip", "question:submit"] {
                     let element = try XCTUnwrap(elements.first { $0.identifier == id && $0.traits.contains(.button) })
                     let rect = element.shape.bezierPath.bounds
                     XCTAssertGreaterThanOrEqual(rect.height, 43.5)
                     XCTAssertGreaterThanOrEqual(rect.minX, -1)
                     XCTAssertLessThanOrEqual(rect.maxX, width + 1)
                 }
-                let selected = try XCTUnwrap(elements.first { $0.identifier == "question:other" })
+                let selected = try XCTUnwrap(elements.first { $0.identifier == "question:option" })
                 XCTAssertTrue(selected.traits.contains(.selected))
                 let strategy = Snapshotting<UIView, UIImage>.image(size: CGSize(width: width, height: 1000))
                 let image = await withCheckedContinuation { continuation in
@@ -77,6 +77,12 @@ final class QuestionCardRenderingTests: XCTestCase {
                 XCTAssertTrue(button.accessibilityPerformPress())
                 try await Task.sleep(nanoseconds: 30_000_000)
                 XCTAssertEqual(actions.last?.action, "option")
+                for id in ["previous", "next", "close", "skip", "submit"] {
+                    let control = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "question:\(id)" })
+                    XCTAssertTrue(control.accessibilityPerformPress())
+                    try await Task.sleep(nanoseconds: 30_000_000)
+                    XCTAssertEqual(actions.last?.action, id)
+                }
                 let strategy = Snapshotting<NSView, NSImage>.image(size: CGSize(width: width, height: 1000))
                 let image = await withCheckedContinuation { continuation in
                     strategy.snapshot(host).run { continuation.resume(returning: $0) }
@@ -99,17 +105,22 @@ final class QuestionCardRenderingTests: XCTestCase {
 
     private func fixture() throws -> XgentDocument {
         let card: [String: Any] = ["id": "question", "kind": "VStack", "variant": "question-card", "children": [
-            ["id": "question:tabs", "kind": "SegmentedControl", "label": "问题", "value": "0", "action": "tabs", "options": [
-                ["value": "0", "label": "演示文稿风格"], ["value": "1", "label": "文档输出格式"],
+            ["id": "question:header", "kind": "HStack", "variant": "question-header", "children": [
+                ["id": "question:prompt", "kind": "Text", "text": "选择演示文稿的风格，也可以输入自己的要求。"],
+                ["id": "question:navigation", "kind": "HStack", "children": [
+                    ["id": "question:previous", "kind": "Button", "label": "上一个问题", "icon": "chevron.left", "action": "previous"],
+                    ["id": "question:counter", "kind": "Text", "text": "2/3"],
+                    ["id": "question:next", "kind": "Button", "label": "下一个问题", "icon": "chevron.right", "action": "next"],
+                    ["id": "question:close", "kind": "Button", "label": "关闭提问", "icon": "xmark", "action": "close"],
+                ]],
             ]],
-            ["id": "question:prompt", "kind": "Text", "text": "选择演示文稿的风格，也可以输入自己的要求。"],
-            ["id": "question:option", "kind": "Button", "variant": "question-option", "label": "简洁的商务风格", "text": "使用清晰的层级和少量强调颜色，便于展示表格及任务结果。", "action": "option", "selected": false, "children": [
+            ["id": "question:option", "kind": "Button", "variant": "question-option", "label": "简洁的商务风格", "text": "使用清晰的层级和少量强调颜色，便于展示表格及任务结果。", "action": "option", "selected": true, "children": [
                 ["id": "question:recommended", "kind": "Badge", "label": "推荐"],
             ]],
-            ["id": "question:other", "kind": "Button", "variant": "question-option", "label": "其他", "selected": true, "action": "other"],
-            ["id": "question:custom", "kind": "TextInput", "label": "其他", "text": "输入你的要求", "value": "使用蓝色主题", "action": "custom"],
+            ["id": "question:custom", "kind": "TextInput", "label": "其他", "text": "输入你的要求", "value": "", "action": "custom", "variant": "compact", "size": "medium"],
             ["id": "question:footer", "kind": "VStack", "variant": "question-footer", "children": [
                 ["id": "question:status", "kind": "Text", "text": "2/2 · 2:49", "secondary": true],
+                ["id": "question:skip", "kind": "Button", "label": "跳过", "action": "skip", "variant": "ghost", "size": "small"],
                 ["id": "question:submit", "kind": "Button", "label": "提交回答", "action": "submit", "prominent": true],
             ]],
         ]]

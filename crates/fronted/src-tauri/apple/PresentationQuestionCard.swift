@@ -10,8 +10,8 @@ struct XgentQuestionCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: CGFloat(theme.spacing.md)) {
             ForEach(node.children ?? []) { item in
-                if item.kind == .segmentedControl {
-                    XgentQuestionTabs(node: item, document: document, model: model)
+                if item.variant == "question-header" {
+                    XgentQuestionHeader(node: item, document: document, model: model)
                 } else {
                     #if os(iOS)
                     XgentIOSNode(node: item, document: document, model: model)

@@ -83,6 +83,23 @@ export function hasPendingAskUserQuestion(toolCallId: string) {
   return pendingByToolCallId.has(toolCallId.trim());
 }
 
+/** Dismiss only this card; other pending questions in the conversation stay active. */
+export function cancelAskUserQuestion(
+  toolCallId: string,
+  options?: { conversationId?: string },
+): { ok: boolean; message?: string } {
+  const pending = pendingByToolCallId.get(toolCallId.trim());
+  if (!pending) {
+    return { ok: false, message: "Question is not pending (already answered or cancelled)." };
+  }
+  const expectedConversationId = options?.conversationId?.trim();
+  if (expectedConversationId && pending.conversationId !== expectedConversationId) {
+    return { ok: false, message: "Question belongs to a different conversation." };
+  }
+  pending.settle({ kind: "cancelled" });
+  return { ok: true };
+}
+
 export function cancelPendingAskUserQuestionsForConversation(conversationId: string) {
   for (const pending of pendingByToolCallId.values()) {
     if (pending.conversationId === conversationId) pending.settle({ kind: "cancelled" });
@@ -98,8 +115,9 @@ The questions render as an interactive card; execution pauses until the user ans
 Rules:
 - Ask 1-${ASK_USER_QUESTION_MAX_QUESTIONS} focused questions per call; each question needs ${ASK_USER_QUESTION_MIN_OPTIONS}-${ASK_USER_QUESTION_MAX_OPTIONS} options (3-4 is ideal); different questions may have different option counts.
 - Options must be short, concrete, and mutually exclusive. Set recommended=true on your suggested choice (at most one per question) — it is shown first and becomes the timeout fallback.
-- The UI automatically appends an "Other" free-text option to every question, so the user can always type their own answer. Do NOT add your own catch-all option (e.g. "Other", "Custom", "其他", "自定义"). When the user types an answer, the result marks it as user-typed and returns their exact words instead of a listed label — treat it as authoritative.
-- Give each question a short header (2-6 chars works best) — it becomes the tab label when several questions show at once.
+- The UI provides a free-text field for every question, so the user can always type their own answer. Do NOT add your own catch-all option (e.g. "Other", "Custom", "其他", "自定义"). When the user types an answer, the result marks it as user-typed and returns their exact words instead of a listed label — treat it as authoritative.
+- Give each question a short header (2-6 chars works best) for navigation between questions.
+- The user can skip or close the card. Cancellation returns no selections; never assume an answer.
 - Do not use this for questions answerable from the code or the conversation, and never ask for confirmation of work you can safely do.`;
 
 const parameters = Type.Object({
@@ -227,7 +245,7 @@ export function createAskUserQuestionTools(params: {
       return {
         ...errorResult(
           toolCall,
-          "The user stopped the turn without answering. Do not assume any selection.",
+          "These questions were cancelled without an answer. Do not assume any selection.",
         ),
         details,
       };

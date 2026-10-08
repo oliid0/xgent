@@ -34,6 +34,7 @@ import { requestToolActivity, toolStepLabel } from "../../../../lib/chat/toolAct
 import { isSubagentCardToolCall } from "../../../../lib/subagents/card";
 import {
   answerAskUserQuestion,
+  cancelAskUserQuestion,
   getAskUserQuestionDeadlineAt,
 } from "../../../../lib/tools/askUserQuestionTools";
 import { workToolIntegration } from "../../transcript/workRecord";
@@ -277,6 +278,7 @@ export function ToolCallDetail({
           interactive={Boolean(isRunning) && !result}
           deadlineAt={getAskUserQuestionDeadlineAt(item.toolCall.id) ?? undefined}
           onSubmit={submitAskUserQuestion}
+          onCancel={() => Promise.resolve(cancelAskUserQuestion(item.toolCall.id))}
         />
       ) : null}
 

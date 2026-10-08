@@ -96,8 +96,25 @@ test("AskUserQuestion abort releases the pending execution as cancelled", async 
   assert.equal(result.details.cancelled, true);
   assert.equal(
     result.content[0].text,
-    "The user stopped the turn without answering. Do not assume any selection.",
+    "These questions were cancelled without an answer. Do not assume any selection.",
   );
+});
+
+test("skipping one question card is scoped, releases its tool and leaves other cards pending", async () => {
+  const ask = createTsModuleLoader().loadModule("src/lib/tools/askUserQuestionTools.ts");
+  const bundle = ask.createAskUserQuestionTools({ conversationId: "conversation" });
+  const first = bundle.executeToolCall(createQuestionCall("first"));
+  const second = bundle.executeToolCall(createQuestionCall("second"));
+  assert.equal(ask.cancelAskUserQuestion("first", { conversationId: "another" }).ok, false);
+  assert.equal(ask.hasPendingAskUserQuestion("first"), true);
+  assert.deepEqual(ask.cancelAskUserQuestion("first", { conversationId: "conversation" }), { ok: true });
+  assert.equal(ask.cancelAskUserQuestion("first").ok, false);
+  const result = await first;
+  assert.equal(result.details.cancelled, true);
+  assert.deepEqual(result.details.answers, []);
+  assert.equal(ask.hasPendingAskUserQuestion("second"), true);
+  ask.cancelPendingAskUserQuestionsForConversation("conversation");
+  await second;
 });
 
 test("AskUserQuestion accepts different option counts for independent questions like xx", () => {

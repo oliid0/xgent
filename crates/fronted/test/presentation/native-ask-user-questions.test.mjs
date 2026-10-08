@@ -43,8 +43,7 @@ test("native question card resumes the actual shared tool with every option and 
   assert.equal(f.node(`${prefix}:option:0:0`).label, "活泼");
   assert.equal(f.node(`${prefix}:option:0:0`).text, "使用更丰富的颜色");
   await f.run(`${prefix}:option:0:0`);
-  await f.run(`${prefix}:tabs`, "1");
-  await f.run(`${prefix}:other:1`);
+  await f.run(`${prefix}:next`);
   await f.run(`${prefix}:custom:1`, "  生成 Markdown 和 PDF  ");
   assert.equal(f.node(`${prefix}:submit`).disabled, false);
   const first = f.send(`${prefix}:submit`), second = f.send(`${prefix}:submit`);
@@ -81,7 +80,7 @@ test("wrong-conversation submissions report the actual backend rejection and pre
   const pending = f.ask.createAskUserQuestionTools({ conversationId: "another" }).executeToolCall(toolCall);
   f.props.items = [{ toolCall, running: true, round: 1 }]; f.render();
   const prefix = "question:conversation:ask";
-  await f.run(`${prefix}:option:0:0`); await f.run(`${prefix}:tabs`, "1"); await f.run(`${prefix}:option:1:0`);
+  await f.run(`${prefix}:option:0:0`); await f.run(`${prefix}:next`); await f.run(`${prefix}:option:1:0`);
   assert.equal((await f.run(`${prefix}:submit`)).ok, false);
   assert.match(f.node(`${prefix}:error`).label, /different conversation/);
   assert.equal(f.ask.hasPendingAskUserQuestion("ask"), true);
@@ -93,7 +92,7 @@ test("retired conversations, cancelled tools and custom length limits cannot sub
   const pending = f.ask.createAskUserQuestionTools({ conversationId: "conversation" }).executeToolCall(toolCall);
   f.props.items = [{ toolCall, running: true, round: 1 }]; const old = f.render();
   const prefix = "question:conversation:ask";
-  await f.run(`${prefix}:other:0`); await f.run(`${prefix}:custom:0`, "x".repeat(2100));
+  await f.run(`${prefix}:custom:0`, "x".repeat(2100));
   assert.equal(f.node(`${prefix}:custom:0`).value.length, 2000);
   f.props.conversationId = "new-conversation"; f.props.items = []; f.render();
   assert.throws(() => old.handlers.get(`${prefix}:option:0:0`).run(null), /submitFailed/);
@@ -103,6 +102,34 @@ test("retired conversations, cancelled tools and custom length limits cannot sub
   assert.equal(f.node(`${prefix}:option:0:0`).disabled, true);
   f.close();
 });
+
+for (const action of ["skip", "close"]) {
+  test(`native question ${action} settles only its card and rejects stale controls`, async () => {
+    const f = fixture(), toolCall = call();
+    const pending = f.ask.createAskUserQuestionTools({ conversationId: "conversation" }).executeToolCall(toolCall);
+    const other = f.ask.createAskUserQuestionTools({ conversationId: "conversation" }).executeToolCall(call("other"));
+    f.props.items = [{ toolCall, running: true, round: 1 }]; const old = f.render();
+    const prefix = "question:conversation:ask";
+    assert.equal(f.node(`${prefix}:custom:0`).disabled, false);
+    assert.equal(f.node(`${prefix}:previous`).disabled, true);
+    await f.run(`${prefix}:custom:0`, "Draft retained across navigation");
+    await f.run(`${prefix}:next`);
+    assert.equal(f.node(`${prefix}:next`).disabled, true);
+    assert.equal(f.node(`${prefix}:counter`).text, "2/2");
+    await f.run(`${prefix}:previous`);
+    assert.equal(f.node(`${prefix}:custom:0`).value, "Draft retained across navigation");
+    assert.equal((await f.run(`${prefix}:${action}`)).ok, true);
+    const result = await pending;
+    assert.equal(result.details.cancelled, true);
+    assert.deepEqual(result.details.answers, []);
+    assert.equal(f.node(`${prefix}:status`).text, "chat.askUser.cancelled");
+    assert.equal(f.node(`${prefix}:close`), undefined);
+    assert.equal(f.node(`${prefix}:skip`), undefined);
+    assert.equal(f.ask.hasPendingAskUserQuestion("other"), true);
+    assert.throws(() => old.handlers.get(`${prefix}:close`).run(null), /submitFailed/);
+    f.ask.cancelPendingAskUserQuestionsForConversation("conversation"); await other; f.close();
+  });
+}
 
 test("native questions show the actual timeout fallback and never reactivate an expired pending document", async () => {
   const f = fixture(), toolCall = call();

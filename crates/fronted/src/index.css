@@ -2465,9 +2465,9 @@
   background: transparent;
 }
 .settings-page-desktop [role="navigation"] .astryx-list-item {
-  min-height: 48px;
+  min-height: 40px;
   border-radius: var(--radius-element);
-  margin-block: 2px;
+  margin-block: 1px;
 }
 .settings-page-desktop .settings-row-group > .astryx-list {
   border: 1px solid var(--color-border);

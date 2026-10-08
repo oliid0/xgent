@@ -32,6 +32,17 @@ final class DesktopSettingsRenderingTests: XCTestCase {
             let expected = width < 792 ? "settings-navigation-menu" : "desktop-nav:system"
             XCTAssertTrue(elements.contains { $0.accessibilityIdentifier() == expected })
             XCTAssertFalse(elements.contains { $0.accessibilityText() == "Back to Chat" })
+            if width == 1040 {
+                let system = try XCTUnwrap(elements.first {
+                    $0.accessibilityIdentifier() == "desktop-nav:system" && $0.accessibilityRole() == .button
+                })
+                let providers = try XCTUnwrap(elements.first {
+                    $0.accessibilityIdentifier() == "desktop-nav:providers" && $0.accessibilityRole() == .button
+                })
+                XCTAssertGreaterThanOrEqual(system.accessibilityFrame().height, 39.5)
+                XCTAssertLessThanOrEqual(abs(system.accessibilityFrame().midY - providers.accessibilityFrame().midY), 43,
+                    "Compact one-line navigation must not retain the previous 52-point row pitch")
+            }
             let close = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "settings-close" })
             XCTAssertGreaterThan(close.accessibilityFrame().width, 0)
             let image = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))

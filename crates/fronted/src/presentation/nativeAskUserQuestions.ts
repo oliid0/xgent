@@ -9,6 +9,7 @@ import {
 } from "../lib/chat/askUserQuestion";
 import {
   answerAskUserQuestion,
+  cancelAskUserQuestion,
   getAskUserQuestionDeadlineAt,
   hasPendingAskUserQuestion,
 } from "../lib/tools/askUserQuestionTools";
@@ -21,6 +22,7 @@ type Form = {
   index: number;
   drafts: Map<string, Draft>;
   accepted: boolean;
+  cancelled: boolean;
   error: string;
 };
 
@@ -79,7 +81,14 @@ export function useNativeAskUserQuestions(
     const signature = JSON.stringify(questions);
     let form = scope.forms.get(item.toolCall.id);
     if (!form || form.signature !== signature) {
-      form = { signature, index: 0, drafts: new Map(), accepted: false, error: "" };
+      form = {
+        signature,
+        index: 0,
+        drafts: new Map(),
+        accepted: false,
+        cancelled: false,
+        error: "",
+      };
       scope.forms.set(item.toolCall.id, form);
     }
     const state = form;
@@ -131,33 +140,78 @@ export function useNativeAskUserQuestions(
         )?.trim(),
       ),
     ).length;
-    const children: PresentationNode[] = [];
-    if (questions.length > 1) {
-      children.push({
-        ...c.select(
-          `${prefix}:tabs`,
-          t("chat.askUser.question"),
-          String(index),
-          questions.map((entry, entryIndex) => ({
-            value: String(entryIndex),
-            label: entry.header || `${t("chat.askUser.question")} ${entryIndex + 1}`,
-          })),
-          (value) => {
-            if (
-              !scope.active ||
-              scope.revision !== revision ||
-              scope.conversationId !== conversationId ||
-              scope.forms.get(item.toolCall.id) !== state
-            )
-              return;
-            state.index = Number(value);
-            redraw((value) => value + 1);
-          },
-        ),
-        kind: "SegmentedControl",
+    const navigate = (offset: number) => {
+      if (
+        !scope.active ||
+        scope.revision !== revision ||
+        scope.conversationId !== conversationId ||
+        scope.forms.get(item.toolCall.id) !== state ||
+        state.index !== index
+      ) {
+        throw new Error(t("chat.askUser.submitFailed"));
+      }
+      state.index = Math.max(0, Math.min(questions.length - 1, index + offset));
+      redraw((value) => value + 1);
+    };
+    const dismiss = () => {
+      if (!editable()) throw new Error(t("chat.askUser.submitFailed"));
+      const outcome = cancelAskUserQuestion(item.toolCall.id, { conversationId });
+      if (!outcome.ok) {
+        state.error = outcome.message || t("chat.askUser.submitFailed");
+        redraw((value) => value + 1);
+        throw new Error(state.error);
+      }
+      state.accepted = true;
+      state.cancelled = true;
+      state.drafts.clear();
+      state.error = "";
+      redraw((value) => value + 1);
+    };
+    const navigation: PresentationNode[] =
+      questions.length > 1
+        ? [
+            {
+              ...c.action(
+                `${prefix}:previous`,
+                t("chat.askUser.previous"),
+                () => navigate(-1),
+                index > 0,
+              ),
+              icon: "chevron.left",
+            },
+            {
+              id: `${prefix}:counter`,
+              kind: "Text",
+              text: `${index + 1}/${questions.length}`,
+              secondary: true,
+            },
+            {
+              ...c.action(
+                `${prefix}:next`,
+                t("chat.askUser.next"),
+                () => navigate(1),
+                index < questions.length - 1,
+              ),
+              icon: "chevron.right",
+            },
+          ]
+        : [];
+    if (!settled)
+      navigation.push({
+        ...c.action(`${prefix}:close`, t("chat.askUser.close"), dismiss, available),
+        icon: "xmark",
       });
-    }
-    children.push({ id: `${prefix}:prompt`, kind: "Text", text: question.prompt });
+    const children: PresentationNode[] = [
+      {
+        id: `${prefix}:header`,
+        kind: "HStack",
+        variant: "question-header",
+        children: [
+          { id: `${prefix}:prompt`, kind: "Text", text: question.prompt },
+          { id: `${prefix}:navigation`, kind: "HStack", children: navigation },
+        ],
+      },
+    ];
     const options = question.options.map(
       (option, optionIndex): PresentationNode => ({
         ...c.action(
@@ -183,50 +237,45 @@ export function useNativeAskUserQuestions(
           : [],
       }),
     );
-    options.push({
-      ...c.action(
-        `${prefix}:other:${index}`,
-        t("chat.askUser.other"),
-        () => {
-          const draft = state.drafts.get(question.id);
-          choose(draft?.custom ? draft.value : "", true);
-        },
-        available,
-      ),
-      variant: "question-option",
-      selected: selected?.custom === true,
-    });
-    children.push({ id: `${prefix}:options`, kind: "VStack", spacing: 8, children: options });
-    if (selected?.custom) {
+    children.push({ id: `${prefix}:options`, kind: "VStack", spacing: 6, children: options });
+    if (!settled || selected?.custom) {
       children.push(
-        available
+        !settled
           ? {
               ...c.input(
                 `${prefix}:custom:${index}`,
                 t("chat.askUser.other"),
-                selected.value,
+                selected?.custom ? selected.value : "",
                 (value) => choose(value.slice(0, ASK_USER_QUESTION_CUSTOM_MAX_LENGTH), true),
                 false,
-                true,
+                available,
                 (value) => value.slice(0, ASK_USER_QUESTION_CUSTOM_MAX_LENGTH),
               ),
               text: t("chat.askUser.otherPlaceholder"),
+              variant: "compact",
+              size: "medium",
             }
-          : { id: `${prefix}:custom-answer`, kind: "Text", text: selected.value, secondary: true },
+          : { id: `${prefix}:custom-answer`, kind: "Text", text: selected?.value, secondary: true },
       );
     }
     const remaining = Math.max(0, Math.ceil(((deadline ?? Date.now()) - Date.now()) / 1000));
-    const statusLabel = details?.cancelled
-      ? t("chat.askUser.cancelled")
-      : details?.timedOut
-        ? t("chat.askUser.timedOut")
-        : settled
-          ? t("chat.askUser.answered")
-          : `${answered}/${questions.length} · ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`;
+    const statusLabel =
+      details?.cancelled || state.cancelled
+        ? t("chat.askUser.cancelled")
+        : details?.timedOut
+          ? t("chat.askUser.timedOut")
+          : settled
+            ? t("chat.askUser.answered")
+            : `${answered}/${questions.length} · ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`;
     const footer: PresentationNode[] = [
       { id: `${prefix}:status`, kind: "Text", text: statusLabel, secondary: true },
     ];
-    if (!settled)
+    if (!settled) {
+      footer.push({
+        ...c.action(`${prefix}:skip`, t("chat.askUser.skip"), dismiss, available),
+        variant: "ghost",
+        size: "small",
+      });
       footer.push({
         ...c.action(
           `${prefix}:submit`,
@@ -252,7 +301,9 @@ export function useNativeAskUserQuestions(
           available && answered === questions.length,
         ),
         prominent: true,
+        size: "small",
       });
+    }
     children.push({
       id: `${prefix}:footer`,
       kind: "VStack",

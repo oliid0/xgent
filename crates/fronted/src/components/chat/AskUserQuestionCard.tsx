@@ -2,13 +2,13 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { RadioList, RadioListItem } from "@astryxdesign/core/RadioList";
-import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useLocale } from "../../i18n";
 import {
@@ -17,7 +17,7 @@ import {
   type AskUserQuestionAnswer,
   type AskUserQuestionItem,
 } from "../../lib/chat/askUserQuestion";
-import { Check, Sparkles } from "../icons";
+import { ChevronLeft, ChevronRight, Sparkles, X } from "../icons";
 
 type SubmitOutcome = { ok: boolean; message?: string };
 type DraftAnswer = { kind: "option"; value: string } | { kind: "custom"; value: string };
@@ -35,6 +35,7 @@ export function AskUserQuestionCard({
   interactive,
   deadlineAt,
   onSubmit,
+  onCancel,
 }: {
   questions: AskUserQuestionItem[];
   answers?: AskUserQuestionAnswer[];
@@ -43,20 +44,33 @@ export function AskUserQuestionCard({
   interactive: boolean;
   deadlineAt?: number;
   onSubmit?: (answers: AskUserQuestionAnswer[]) => Promise<SubmitOutcome>;
+  onCancel?: () => Promise<SubmitOutcome>;
 }) {
   const { t } = useLocale();
   const [activeIndex, setActiveIndex] = useState(0);
   const [drafts, setDrafts] = useState<Record<string, DraftAnswer>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [resolution, setResolution] = useState<{
+    answers?: AskUserQuestionAnswer[];
+    cancelled?: boolean;
+  }>();
+  const request = useRef({ active: true, busy: false, resolved: false, index: 0, deadlineAt: 0 });
+  useEffect(() => {
+    request.current.active = true;
+    return () => {
+      request.current.active = false;
+    };
+  }, []);
   const [fallbackDeadline] = useState(() => Date.now() + ASK_USER_QUESTION_TIMEOUT_MS);
   const effectiveDeadline = deadlineAt ?? fallbackDeadline;
+  request.current.deadlineAt = effectiveDeadline;
   const [remaining, setRemaining] = useState(() => effectiveDeadline - Date.now());
 
   const settled = useMemo(
     () =>
       new Map(
-        (answers ?? []).map((answer) => [
+        (answers ?? resolution?.answers ?? []).map((answer) => [
           answer.questionId,
           {
             kind: answer.custom ? ("custom" as const) : ("option" as const),
@@ -64,21 +78,23 @@ export function AskUserQuestionCard({
           },
         ]),
       ),
-    [answers],
+    [answers, resolution],
   );
 
   useEffect(() => {
-    if (!interactive || settled.size > 0 || cancelled) return;
+    if (!interactive || settled.size > 0 || cancelled || timedOut || resolution?.cancelled) return;
     const update = () => setRemaining(effectiveDeadline - Date.now());
     update();
     const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
-  }, [cancelled, effectiveDeadline, interactive, settled.size]);
+  }, [cancelled, effectiveDeadline, interactive, settled.size, timedOut, resolution?.cancelled]);
 
   if (questions.length === 0) return null;
   const currentIndex = Math.min(activeIndex, questions.length - 1);
+  request.current.index = currentIndex;
   const current = questions[currentIndex];
-  const isSettled = settled.size > 0 || cancelled;
+  const isCancelled = cancelled || resolution?.cancelled === true;
+  const isSettled = settled.size > 0 || isCancelled || timedOut;
   const selected = isSettled ? settled.get(current.id) : drafts[current.id];
   const canInteract = interactive && !isSettled && remaining > 0 && !submitting;
   const answeredCount = questions.filter((question) => {
@@ -86,15 +102,22 @@ export function AskUserQuestionCard({
     return Boolean(answer?.value.trim());
   }).length;
   const allAnswered = answeredCount === questions.length;
+  const editable = () =>
+    canInteract &&
+    request.current.active &&
+    !request.current.busy &&
+    !request.current.resolved &&
+    request.current.index === currentIndex &&
+    request.current.deadlineAt > Date.now();
 
   const choose = (answer: DraftAnswer) => {
-    if (!canInteract) return;
+    if (!editable()) return;
     setError("");
     setDrafts((currentDrafts) => ({ ...currentDrafts, [current.id]: answer }));
   };
 
   const submit = async () => {
-    if (!canInteract || !allAnswered || !onSubmit) return;
+    if (!editable() || !allAnswered || !onSubmit) return;
     const payload = questions.map((question) => {
       const answer = drafts[question.id];
       return {
@@ -104,58 +127,101 @@ export function AskUserQuestionCard({
         ...(answer?.kind === "custom" ? { custom: true } : {}),
       };
     });
+    request.current.busy = true;
     setSubmitting(true);
     setError("");
     try {
       const outcome = await onSubmit(payload);
-      if (!outcome.ok) setError(outcome.message || t("chat.askUser.submitFailed"));
+      if (!request.current.active) return;
+      if (outcome.ok) {
+        request.current.resolved = true;
+        setResolution({ answers: payload });
+      } else setError(outcome.message || t("chat.askUser.submitFailed"));
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : t("chat.askUser.submitFailed"));
+      if (request.current.active)
+        setError(
+          submitError instanceof Error ? submitError.message : t("chat.askUser.submitFailed"),
+        );
     } finally {
-      setSubmitting(false);
+      request.current.busy = false;
+      if (request.current.active) setSubmitting(false);
     }
   };
 
-  const radioValue =
-    selected?.kind === "custom"
-      ? "custom"
-      : selected?.kind === "option"
-        ? `option:${selected.value}`
-        : "";
+  const dismiss = async () => {
+    if (!editable() || !onCancel) return;
+    request.current.busy = true;
+    setSubmitting(true);
+    setError("");
+    try {
+      const outcome = await onCancel();
+      if (!request.current.active) return;
+      if (outcome.ok) {
+        request.current.resolved = true;
+        setResolution({ cancelled: true });
+      } else setError(outcome.message || t("chat.askUser.submitFailed"));
+    } catch (cause) {
+      if (request.current.active)
+        setError(cause instanceof Error ? cause.message : t("chat.askUser.submitFailed"));
+    } finally {
+      request.current.busy = false;
+      if (request.current.active) setSubmitting(false);
+    }
+  };
+
+  const radioValue = selected?.kind === "option" ? `option:${selected.value}` : "";
 
   return (
     <Card padding={0} elevation="low" className="tool-expand">
       <VStack gap={0}>
-        {questions.length > 1 ? (
-          <SegmentedControl
-            label={t("chat.askUser.question")}
-            value={String(currentIndex)}
-            onChange={(value) => setActiveIndex(Number(value))}
-            size="sm"
-          >
-            {questions.map((question, index) => {
-              const answer = isSettled ? settled.get(question.id) : drafts[question.id];
-              const label = question.header || `${t("chat.askUser.question")} ${index + 1}`;
-              return (
-                <SegmentedControlItem
-                  key={question.id}
-                  value={String(index)}
-                  label={label}
-                  icon={
-                    answer?.value.trim() ? (
-                      <Icon icon={Check} size="xsm" color="success" />
-                    ) : undefined
-                  }
+        <VStack gap={2} padding={3}>
+          <HStack gap={2} vAlign="center" wrap="wrap">
+            <StackItem size="fill">
+              <Text type="body" weight="medium" wordBreak="break-word">
+                {current.prompt}
+              </Text>
+            </StackItem>
+            <HStack gap={0} vAlign="center">
+              {questions.length > 1 ? (
+                <>
+                  <IconButton
+                    label={t("chat.askUser.previous")}
+                    tooltip={t("chat.askUser.previous")}
+                    icon={<Icon icon={ChevronLeft} />}
+                    variant="ghost"
+                    size="sm"
+                    isDisabled={currentIndex === 0 || submitting}
+                    onClick={() => setActiveIndex((index) => Math.max(0, index - 1))}
+                  />
+                  <Text type="supporting" color="secondary" hasTabularNumbers>
+                    {currentIndex + 1}/{questions.length}
+                  </Text>
+                  <IconButton
+                    label={t("chat.askUser.next")}
+                    tooltip={t("chat.askUser.next")}
+                    icon={<Icon icon={ChevronRight} />}
+                    variant="ghost"
+                    size="sm"
+                    isDisabled={currentIndex === questions.length - 1 || submitting}
+                    onClick={() =>
+                      setActiveIndex((index) => Math.min(questions.length - 1, index + 1))
+                    }
+                  />
+                </>
+              ) : null}
+              {!isSettled ? (
+                <IconButton
+                  label={t("chat.askUser.close")}
+                  tooltip={t("chat.askUser.close")}
+                  icon={<Icon icon={X} />}
+                  variant="ghost"
+                  size="sm"
+                  isDisabled={!canInteract || !onCancel}
+                  onClick={() => void dismiss()}
                 />
-              );
-            })}
-          </SegmentedControl>
-        ) : null}
-
-        <VStack gap={3} padding={3}>
-          <Text type="body" weight="medium">
-            {current.prompt}
-          </Text>
+              ) : null}
+            </HStack>
+          </HStack>
           <RadioList
             label={current.prompt}
             isLabelHidden
@@ -163,13 +229,6 @@ export function AskUserQuestionCard({
             width="100%"
             isDisabled={!canInteract}
             onChange={(value) => {
-              if (value === "custom") {
-                choose({
-                  kind: "custom",
-                  value: selected?.kind === "custom" ? selected.value : "",
-                });
-                return;
-              }
               choose({ kind: "option", value: value.slice("option:".length) });
             }}
           >
@@ -191,14 +250,14 @@ export function AskUserQuestionCard({
                 }
               />
             ))}
-            <RadioListItem label={t("chat.askUser.other")} value="custom" />
           </RadioList>
 
-          {selected?.kind === "custom" && canInteract ? (
+          {!isSettled ? (
             <TextInput
-              hasAutoFocus
               label={t("chat.askUser.other")}
-              value={selected.value}
+              isLabelHidden
+              isDisabled={!canInteract}
+              value={selected?.kind === "custom" ? selected.value : ""}
               placeholder={t("chat.askUser.otherPlaceholder")}
               width="100%"
               onChange={(value) =>
@@ -208,7 +267,8 @@ export function AskUserQuestionCard({
                 })
               }
               onKeyDown={(event) => {
-                if (event.key === "Enter" && allAnswered) void submit();
+                if (event.key === "Enter" && !event.nativeEvent.isComposing && allAnswered)
+                  void submit();
               }}
             />
           ) : selected?.kind === "custom" && selected.value ? (
@@ -220,7 +280,7 @@ export function AskUserQuestionCard({
           <HStack gap={2} vAlign="center" wrap="wrap">
             <StackItem size="fill">
               <Text type="supporting" color="secondary" hasTabularNumbers>
-                {cancelled
+                {isCancelled
                   ? t("chat.askUser.cancelled")
                   : timedOut
                     ? t("chat.askUser.timedOut")
@@ -231,11 +291,20 @@ export function AskUserQuestionCard({
             </StackItem>
             {!isSettled ? (
               <Button
+                label={t("chat.askUser.skip")}
+                variant="ghost"
+                size="sm"
+                isDisabled={!canInteract || !onCancel}
+                onClick={() => void dismiss()}
+              />
+            ) : null}
+            {!isSettled ? (
+              <Button
                 label={submitting ? t("chat.askUser.submitting") : t("chat.askUser.submit")}
                 variant="primary"
                 size="sm"
                 isLoading={submitting}
-                isDisabled={!canInteract || !allAnswered}
+                isDisabled={!canInteract || !allAnswered || !onSubmit}
                 onClick={() => void submit()}
               />
             ) : null}

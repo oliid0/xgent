@@ -2,6 +2,8 @@
 Converge Astryx and SwiftUI desktop/mobile UI and actions against the 14 supplied references; repair Apple CI and packaged interactions. No local build/dev/Cargo. Push and package-only CI are authorized after local checks; complete visual/task parity remains unverified.
 
 ## Completed / evidence
+- Exact 6feae47c CI #337 (37721265063) is fully successful: macOS and iOS each 226/226 pass, including original drawer pointer/AX, selected-category bounds, delayed undo and brand-color assertions; frontend/Rust/device/guards pass. Actual native Gemini screenshot inspected. Release #151 (37721311806) is still running.
+- Actual native settings screenshot confirms excessive 48+4-point navigation pitch and 16-point row padding. Both desktop navigations now use 40-point minima; native row padding uses existing sm/lg tokens and setting cards reuse XgentGlassSurface (including reduced transparency fallback) to match existing Astryx glass styling. Installed Astryx Item confirms balanced 8-point vertical padding. Added actual button navigation pitch assertion; existing narrow/large-text bounds preserved; CSS formatter checked.
 - Prior pushed commits through 54144302 cover guarded Office/PDF editing, native composer/files/Skills, browser/terminal panels, text measurement, provider and sidebar layouts. Preserve those repairs.
 - Exact 54144302 CI #336 (37701201119): frontend/Rust/device/architecture/workflow/diff pass; PDF regressions pass. macOS drawer AX hit instead selects the full-window backdrop (10 failures); iOS category selected tab is outside the viewport (28 failures); find undo restores immediately then gets overwritten after 200 ms (3 failures).
 - Release #150 (37701209821): Windows/Linux/Android succeed, both macOS binaries compile but packaged settings clicks fail. Native evidence downloaded to ignored .ci-artifacts/latest-{arm,intel,ios}; two exported Intel crash attachments are system Spotlight crashes.
@@ -14,11 +16,13 @@ Converge Astryx and SwiftUI desktop/mobile UI and actions against the 14 supplie
 ## Touched files
 - Apple PresentationLayout, PresentationProviderCategoryTabs, PresentationRetainedCodeEditor, PresentationTextArea, PresentationControlStyle, PresentationProviderGlyphs; new PresentationGeminiGlyph and Tests/ProviderBrandRenderingTests.
 - Frontend ProvidersSection, SystemSettingsForm, nativeDesktopSystem; new terminal/useTerminalShellDiscovery and settings/terminal-shell-discovery.test.mjs; history.md.
+- Current follow-up: AskUserQuestionCard, ToolCallItem, shared askUserQuestionTools, nativeAskUserQuestions, i18n; new question-card renderer regressions; native QuestionHeader/Card/Footer and rendering fixtures (obsolete tabs removed); desktop settings/CSS/navigation fixture.
 
 ## Verification / CI
-- Current pnpm check, lint (692 files), native:check (55 kinds/46 properties), architecture and diff checks pass. Shell renderer regression: 2/2 pass.
-- Full pnpm test:non-native: 2024/2024 pass, no failures/skips/cancellations, 404.6 seconds; .ci-artifacts/final-local-tests.log. Relevant settings/provider follow-up: 8/8 pass. No local native compilation/build/dev. New exact-SHA native and package verification pending push.
+- Current pnpm check, lint (692 files), native:check (55 kinds/46 properties), architecture and diff checks pass. Question regressions: 19/19; relevant settings/material regressions: 7/7.
+- Full pnpm test:non-native: 2032/2032 pass, no failures/skips/cancellations, 409 seconds; .ci-artifacts/question-local-tests.log. No local native compilation/build/dev. Current follow-up is ready for commit/push and exact-SHA native/package verification.
 
 ## Remaining
+- Question card follow-up: top arrow/counter/close controls, always-visible free text and skip share real single-card cancellation. Live completion/index/deadline guards, wrong-conversation failures and draft retention pass locally; native header/footer wrapping/button fixtures await CI.
 - Verify these repairs on both native platforms and packaged applications, fixing failures without relaxing assertions; then continue settings/component/mobile and complex task parity audits.
 - Broader task completion parity, full visual parity and measured startup/terminal performance are not established. Existing Office fidelity/structured-reference renaming, legacy DOC editing and browser extension gaps remain; do not claim future bugs eliminated.

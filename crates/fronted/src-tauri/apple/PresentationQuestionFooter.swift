@@ -7,7 +7,7 @@ struct XgentQuestionFooter: View {
     @Environment(\.dynamicTypeSize) private var textSize
 
     private var status: XgentNode? { node.children?.first { $0.kind == .text } }
-    private var submit: XgentNode? { node.children?.first { $0.kind == .button } }
+    private var actions: [XgentNode] { node.children?.filter { $0.kind == .button } ?? [] }
 
     @ViewBuilder private var statusText: some View {
         if let status {
@@ -20,9 +20,17 @@ struct XgentQuestionFooter: View {
     }
 
     @ViewBuilder private var button: some View {
-        if let submit {
-            XgentActionButton(node: submit, document: document, model: model)
-                .accessibilityIdentifier(submit.id)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                ForEach(actions) { action in
+                    XgentActionButton(node: action, document: document, model: model)
+                }
+            }.fixedSize(horizontal: true, vertical: false)
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(actions) { action in
+                    XgentActionButton(node: action, document: document, model: model)
+                }
+            }
         }
     }
 

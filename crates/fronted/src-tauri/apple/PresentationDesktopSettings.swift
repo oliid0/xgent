@@ -73,7 +73,7 @@ struct XgentDesktopSettingsLayout: View {
             closeControl
             if let search { XgentSettingsSearchField(node: search, document: document, model: model) }
             ScrollView {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     ForEach(navigation) { item in
                         navigationItem(item)
                     }
@@ -109,8 +109,8 @@ struct XgentDesktopSettingsLayout: View {
             }
             .modifier(XgentControlTypography(node: item))
             .fontWeight(item.selected == true ? .semibold : .regular)
-            .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            .padding(8)
+            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
             .background(item.selected == true ? Color(xgentHex: palette.accent).opacity(0.16) : .clear,
                         in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.inner)))
             .contentShape(Rectangle())
@@ -136,7 +136,7 @@ struct XgentDesktopSettingsLayout: View {
                     .frame(minHeight: 60, alignment: .leading)
                 Divider()
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: CGFloat(theme.spacing.lg)) {
+                    LazyVStack(alignment: .leading, spacing: CGFloat(theme.spacing.md)) {
                         ForEach((detail.children ?? []).filter {
                             $0.id != "settings-detail-title" && $0.id != "save-status" &&
                             $0.id != providerEditorFooter?.id
@@ -144,7 +144,7 @@ struct XgentDesktopSettingsLayout: View {
                             XgentNodeView(node: child, document: document, model: model, parentAxis: .vertical)
                         }
                     }
-                    .padding(20)
+                    .padding(16)
                     .frame(maxWidth: 640, alignment: .leading)
                     .frame(maxWidth: .infinity, alignment: .top)
                 }
@@ -188,7 +188,8 @@ struct XgentDesktopSettingsCard: View {
                             if index > 0 { Divider().padding(.horizontal, CGFloat(theme.spacing.lg)) }
                             XgentNodeView(node: child, document: document, model: model, parentAxis: .vertical)
                                 .environment(\.xgentSettingsRow, true)
-                                .padding(CGFloat(theme.spacing.lg))
+                                .padding(.horizontal, CGFloat(theme.spacing.lg))
+                                .padding(.vertical, CGFloat(theme.spacing.sm))
                                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         }
                     }
@@ -210,10 +211,6 @@ struct XgentDesktopSettingsCard: View {
 
     private func surface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content().frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(xgentHex: theme.palette(for: colorScheme).card), in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.container)))
-        .overlay {
-            RoundedRectangle(cornerRadius: CGFloat(theme.radius.container))
-                .stroke(Color(xgentHex: theme.palette(for: colorScheme).border), lineWidth: 1)
-        }
+        .modifier(XgentGlassSurface())
     }
 }
