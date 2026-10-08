@@ -1,6 +1,6 @@
 ﻿# Current objective
 Converge Astryx and SwiftUI desktop/mobile UI and real interactions against the 14 references, then verify exact-source Apple CI and packaged applications. Goal remains active until that verification succeeds.
-User steering: consolidate implementation locally; no incremental commit/push/build triggers. No local build/dev/Cargo/make. Allowed frontend test/check/lint and native-contract/architecture checks completed; final consolidated push is next.
+User steering: consolidate implementation locally; no incremental commit/push/build triggers. No local build/dev/Cargo/make. Final frontend test/check/lint passed before the 59-file push; current seven-file Apple-only corrective batch retains those results and passes native-contract/architecture/diff checks.
 
 ## Implemented
 - Earlier pushed repairs through bd7ecdd cover readable glass/settings density and fluid sizing, provider brand colors, composer menu placement/direct Git initialization/pale-blue messages, right-sidebar new-tab/two-column tools/add menu, question navigation/input/skip/close, responsive Git diff visibility/actions, retained editor input, shell discovery and temporary drawer dismissal.
@@ -24,5 +24,6 @@ User steering: consolidate implementation locally; no incremental commit/push/bu
 - Prior CI #337/#338 succeeded (226 native tests/platform); downloaded native338 macOS and release151 ARM evidence remains local. #339 and releases #152/#153 were externally cancelled. Recent GitHub listing no longer exposes those runs/artifacts; historical outcomes do not verify this batch.
 
 ## Remaining
-- Consolidated commit/push, then exact-SHA Apple compilation/hosted tests and actual screenshots. Investigate actual failures and repair all identified failures together without weakening assertions.
+- Consolidated 59-file commit 7e939a15 is pushed; CI #340 / 37734095966 passes frontend/Rust/device archive checks. iOS fixture optional-label compilation corrected locally. macOS screenshots confirm both preview edges clipped; nested Skill sheets now use the existing fitted-presentation policy. Timeline wrappers stop assigning container identifiers over independently identified disclosure buttons on both platforms. Old height assertions now check actual compact summaries, folded details, both completed/running evidence opened through live AX buttons, and completed-round folding. Transcript fixtures attach real AX diagnostics before assertions. Corrective Apple execution pending.
+- Corrective fixtures inspect actual visible evidence text rather than the inner CodeBlock identifier, which the generic renderer intentionally replaces with the wire-node identity; diff rows expose parsed text without the source marker. Native contract/architecture/diff checks pass. Consolidated corrective commit/push next; exact-SHA Apple compilation/hosted tests and screenshots remain required.
 - After CI succeeds, package the same source with device interaction diagnostics and inspect desktop/mobile UI evidence against the references. Do not mark the goal complete before required verification succeeds.

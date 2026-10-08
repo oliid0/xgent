@@ -8,6 +8,8 @@ import XCTest
 final class DesktopRenderingTests: XCTestCase {
     @MainActor
     func testWorkEvidenceRemainsVisibleUntilTheRoundCompletes() async throws {
+        let accessibilitySession = try NativeMacAccessibilitySession()
+        defer { accessibilitySession.restore() }
         let edited = node("edit", "ToolCall", [
             "label": "Edited workspace file", "text": "src/settings/ProviderConnection.swift",
             "variant": "timeline", "status": "completed", "children": [
@@ -33,18 +35,16 @@ final class DesktopRenderingTests: XCTestCase {
         for (width, appearance) in [(CGFloat(640), XgentDocument.Appearance.light), (CGFloat(1040), .dark)] {
             let live = try document(nodes: [node("live:work", "Section", ["label": "Working", "children": liveNodes])], appearance: appearance)
             let completed = try document(nodes: completedNodes, appearance: appearance)
-            let liveHeight = try await capture(live, name: "desktop-work-live-\(Int(width))",
-                                               width: width, appearance: appearance)
-            let completedHeight = try await capture(completed, name: "desktop-work-completed-\(Int(width))",
-                                                    width: width, appearance: appearance)
-            XCTAssertGreaterThan(liveHeight, completedHeight + 120,
-                                 "Both finished and running tool evidence must render during work")
+            try await capture(live, name: "desktop-work-live-\(Int(width))",
+                              width: width, appearance: appearance, active: true)
+            try await capture(completed, name: "desktop-work-completed-\(Int(width))",
+                              width: width, appearance: appearance, active: false)
         }
     }
 
     @MainActor
     private func capture(_ document: XgentDocument, name: String, width: CGFloat,
-                         appearance: XgentDocument.Appearance) async throws -> CGFloat {
+                         appearance: XgentDocument.Appearance, active: Bool) async throws {
         let model = XgentPresentationModel()
         model.update(document)
         let content = VStack(alignment: .leading, spacing: 12) {
@@ -57,10 +57,38 @@ final class DesktopRenderingTests: XCTestCase {
         .modifier(XgentPresentationThemeModifier(theme: .fallback, appearance: appearance))
         .preferredColorScheme(appearance == .dark ? .dark : .light)
         let hosting = NSHostingView(rootView: content)
-        hosting.frame = CGRect(x: 0, y: 0, width: width, height: 720)
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: 720),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = hosting; window.makeKeyAndOrderFront(nil)
+        defer { model.invalidate(); window.close() }
         hosting.layoutSubtreeIfNeeded()
         try await Task.sleep(nanoseconds: 500_000_000)
-        let height = hosting.fittingSize.height
+        func elements() -> [NativeMacAccessibilityElement] { nativeMacAccessibilityTree(window) }
+        XCTAssertFalse(elements().contains { $0.accessibilityText()?.contains("pnpm check") == true },
+                       "Detailed evidence starts folded while summaries remain readable")
+        if active {
+            for text in ["Edited workspace file", "src/settings/ProviderConnection.swift",
+                         "Checking the change", "Running the relevant checks"] {
+                XCTAssertTrue(elements().contains { $0.accessibilityText()?.contains(text) == true },
+                              "Active work retains the summary: \(text)")
+            }
+            for id in ["edit:disclosure", "verify:disclosure"] {
+                let disclosure = try XCTUnwrap(elements().first {
+                    $0.accessibilityIdentifier() == id && $0.accessibilityRole() == .button
+                })
+                XCTAssertTrue(disclosure.accessibilityPerformPress())
+                try await Task.sleep(for: .milliseconds(150))
+            }
+            for text in ["ProviderConnection.swift +2 -1", "verified setting", "pnpm check"] {
+                XCTAssertTrue(elements().contains { $0.accessibilityText()?.contains(text) == true },
+                              "Finished and running evidence remains reachable: \(text)")
+            }
+        } else {
+            XCTAssertTrue(elements().contains { $0.accessibilityText()?.contains("Worked for 2m 38s") == true })
+            XCTAssertTrue(elements().contains { $0.accessibilityText()?.contains("The settings change is complete.") == true })
+            XCTAssertFalse(elements().contains { $0.accessibilityIdentifier() == "edit:disclosure" },
+                           "Completed work folds the round instead of occupying the reply")
+        }
         let strategy = Snapshotting<NSView, NSImage>.image(size: CGSize(width: width, height: 720))
         let image = await withCheckedContinuation { continuation in
             strategy.snapshot(hosting).run { continuation.resume(returning: $0) }
@@ -73,7 +101,6 @@ final class DesktopRenderingTests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
-        return height
     }
 
     private func node(_ id: String, _ kind: String, _ properties: [String: Any]) -> [String: Any] {

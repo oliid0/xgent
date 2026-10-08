@@ -53,7 +53,6 @@ struct XgentTranscriptToolCall: View {
         .tint(Color(xgentHex: theme.palette(for: scheme).secondaryText))
         .padding(.vertical, 2)
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(node.id)
     }
 }
 

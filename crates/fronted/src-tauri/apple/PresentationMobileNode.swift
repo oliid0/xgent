@@ -238,6 +238,8 @@ struct XgentIOSNode: View {
             rendered
         case .collapsible where node.variant == "memory-project":
             rendered.accessibilityElement(children: .contain)
+        case .toolCall where node.variant == "timeline":
+            rendered.accessibilityElement(children: .contain)
         case .selector where node.variant == "workspace-file-sheets" || node.variant == "provider-vendor-tabs":
             rendered.accessibilityElement(children: .contain)
         case .mediaPreview where node.variant == "workspace-image-preview":

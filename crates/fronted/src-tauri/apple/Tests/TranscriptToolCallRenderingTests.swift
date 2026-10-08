@@ -39,9 +39,11 @@ final class TranscriptToolCallRenderingTests: XCTestCase {
                 window.rootViewController = host; window.makeKeyAndVisible()
                 defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
                 host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(200))
-                let elements = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view).flattenToElements()
-                XCTAssertFalse(elements.contains { $0.identifier == "xgent-code-block" }, "Arguments and results start folded")
-                XCTAssertTrue(elements.contains { $0.label.contains("git log --oneline") }, "The latest target remains visible")
+                let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
+                try attachNativeAccessibilityEvidence(hierarchy, name: "work-process-\(Int(width))-\(size)-accessibility")
+                let elements = hierarchy.flattenToElements()
+                XCTAssertFalse(elements.contains { $0.label?.contains("Failed command output") == true }, "Arguments and results start folded")
+                XCTAssertTrue(elements.contains { $0.label?.contains("git log --oneline") == true }, "The latest target remains visible")
                 var frames: [CGRect] = []
                 for id in ["single:disclosure", "group:disclosure"] {
                     let element = try XCTUnwrap(elements.first { $0.identifier == id && $0.traits.contains(.button) })
@@ -64,7 +66,11 @@ final class TranscriptToolCallRenderingTests: XCTestCase {
                 defer { model.invalidate(); window.close() }
                 try await Task.sleep(for: .milliseconds(200)); host.layoutSubtreeIfNeeded()
                 let elements = nativeMacAccessibilityTree(window)
-                XCTAssertFalse(elements.contains { $0.accessibilityIdentifier() == "xgent-code-block" })
+                try attachNativeAccessibilityEvidence(elements.map {
+                    ["id": $0.accessibilityIdentifier() ?? "", "role": $0.accessibilityRole()?.rawValue ?? "",
+                     "text": $0.accessibilityText() ?? "", "frame": NSStringFromRect($0.accessibilityFrame())]
+                }, name: "work-process-\(Int(width))-\(size)-accessibility")
+                XCTAssertFalse(elements.contains { $0.accessibilityText()?.contains("Failed command output") == true })
                 XCTAssertTrue(elements.contains { $0.accessibilityText()?.contains("git log --oneline") == true })
                 let bounds = window.convertToScreen(host.convert(host.bounds, to: nil))
                 var frames: [CGRect] = []
@@ -105,6 +111,10 @@ final class TranscriptToolCallRenderingTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(200))
         func elements() -> [NativeMacAccessibilityElement] { nativeMacAccessibilityTree(window) }
         func press(_ id: String) async throws {
+            try attachNativeAccessibilityEvidence(elements().map {
+                ["id": $0.accessibilityIdentifier() ?? "", "role": $0.accessibilityRole()?.rawValue ?? "",
+                 "text": $0.accessibilityText() ?? "", "frame": NSStringFromRect($0.accessibilityFrame())]
+            }, name: "work-process-before-\(id)")
             let element = try XCTUnwrap(elements().first { $0.accessibilityIdentifier() == id && $0.accessibilityRole() == .button })
             XCTAssertTrue(element.accessibilityPerformPress())
             try await Task.sleep(for: .milliseconds(150)); host.layoutSubtreeIfNeeded()
@@ -113,7 +123,7 @@ final class TranscriptToolCallRenderingTests: XCTestCase {
         try await press("group:disclosure")
         XCTAssertTrue(elements().contains { $0.accessibilityIdentifier() == "first:disclosure" })
         XCTAssertTrue(elements().contains { $0.accessibilityIdentifier() == "latest:disclosure" })
-        XCTAssertFalse(elements().contains { $0.accessibilityIdentifier() == "xgent-code-block" })
+        XCTAssertFalse(elements().contains { $0.accessibilityText()?.contains("Failed command output") == true })
         try await press("first:disclosure")
         for label in ["Arguments", "Failed command output", "Change diff"] {
             XCTAssertTrue(elements().contains { $0.accessibilityText()?.contains(label) == true }, "Expanded evidence retains \(label)")
@@ -122,10 +132,10 @@ final class TranscriptToolCallRenderingTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(150))
         XCTAssertTrue(elements().contains { $0.accessibilityText()?.contains("git log --oneline --max-count=5") == true },
             "Streaming verification must render the revised document, not a captured fixture")
-        XCTAssertTrue(elements().contains { $0.accessibilityIdentifier() == "xgent-code-block" }, "A retained call does not refold on document updates")
+        XCTAssertTrue(elements().contains { $0.accessibilityText()?.contains("Failed command output") == true }, "A retained call does not refold on document updates")
         try await press("group:disclosure")
         XCTAssertFalse(elements().contains { $0.accessibilityIdentifier() == "first:disclosure" })
-        XCTAssertFalse(elements().contains { $0.accessibilityIdentifier() == "xgent-code-block" })
+        XCTAssertFalse(elements().contains { $0.accessibilityText()?.contains("Failed command output") == true })
     }
     #endif
 

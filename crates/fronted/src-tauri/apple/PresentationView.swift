@@ -279,7 +279,8 @@ private struct XgentNodeControlModifier: ViewModifier {
             // not copy its identity to the placeholder or disable it while an
             // earlier keystroke is awaiting a shared action acknowledgement.
             content.controlSize(controlSize)
-        } else if isContainer || node.variant == "sidebar-conversation-row" || node.variant == "sidebar-workspace-row" ||
+        } else if isContainer || (node.kind == .toolCall && node.variant == "timeline") ||
+           node.variant == "sidebar-conversation-row" || node.variant == "sidebar-workspace-row" ||
            node.variant == "memory-project" || node.kind == .colorInput ||
            node.kind == .spreadsheetGrid || node.variant == "workspace-file-layout" ||
            node.variant == "workspace-file-toolbar" || node.variant == "workspace-file-sheets" ||
