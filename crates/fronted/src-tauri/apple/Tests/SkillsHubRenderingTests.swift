@@ -65,6 +65,7 @@ final class SkillsHubRenderingTests: XCTestCase {
                         let rect = footer.shape.bezierPath.bounds
                         XCTAssertGreaterThanOrEqual(rect.height, 43.5)
                         XCTAssertGreaterThanOrEqual(rect.minX, -1)
+                        XCTAssertGreaterThanOrEqual(rect.minY, -1)
                         XCTAssertLessThanOrEqual(rect.maxX, width + 1)
                         XCTAssertLessThanOrEqual(rect.maxY, 921)
                         XCTAssertFalse(rect.intersects(field.shape.bezierPath.bounds))
@@ -105,9 +106,19 @@ final class SkillsHubRenderingTests: XCTestCase {
                         $0.accessibilityIdentifier() == (preview ? "preview-close" : "skill-enabled")
                     })
                     let bounds = visibleWindow.convertToScreen(visibleView.convert(visibleView.bounds, to: nil))
+                    try attachNativeAccessibilityEvidence([
+                        "window": NSStringFromRect(visibleWindow.frame), "content": NSStringFromRect(bounds),
+                        "elements": nativeMacAccessibilityTree(visibleWindow).map {
+                            ["id": $0.accessibilityIdentifier() ?? "", "role": $0.accessibilityRole()?.rawValue ?? "",
+                             "text": $0.accessibilityText() ?? "", "frame": NSStringFromRect($0.accessibilityFrame())]
+                        }.description
+                    ], name: "skills-\(preview ? "preview" : "installed")-\(Int(width))-\(textSize)-accessibility")
                     XCTAssertGreaterThanOrEqual(field.accessibilityFrame().minX, bounds.minX - 1)
                     XCTAssertLessThanOrEqual(field.accessibilityFrame().maxX, bounds.maxX + 1)
                     if preview {
+                        XCTAssertGreaterThanOrEqual(field.accessibilityFrame().minY, bounds.minY - 1)
+                        XCTAssertLessThanOrEqual(field.accessibilityFrame().maxY, bounds.maxY + 1,
+                                                 "The fixed header must remain inside a screen-constrained sheet")
                         let elements = nativeMacAccessibilityTree(visibleWindow)
                         let footer = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "preview-copy" && $0.accessibilityRole() == .button })
                         let frame = footer.accessibilityFrame()
@@ -115,6 +126,7 @@ final class SkillsHubRenderingTests: XCTestCase {
                         XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX - 1)
                         XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX + 1)
                         XCTAssertGreaterThanOrEqual(frame.minY, bounds.minY - 1)
+                        XCTAssertLessThanOrEqual(frame.maxY, bounds.maxY + 1)
                         XCTAssertFalse(frame.intersects(field.accessibilityFrame()))
                         XCTAssertTrue(footer.accessibilityPerformPress())
                         XCTAssertEqual(actions.last?.action, "copy")

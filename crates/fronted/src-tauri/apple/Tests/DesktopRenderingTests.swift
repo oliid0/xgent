@@ -74,7 +74,7 @@ final class DesktopRenderingTests: XCTestCase {
             }
             for id in ["edit:disclosure", "verify:disclosure"] {
                 let disclosure = try XCTUnwrap(elements().first {
-                    $0.accessibilityIdentifier() == id && $0.accessibilityRole() == .button
+                    $0.accessibilityIdentifier() == id && $0.accessibilityRole() == .disclosureTriangle
                 })
                 XCTAssertTrue(disclosure.accessibilityPerformPress())
                 try await Task.sleep(for: .milliseconds(150))

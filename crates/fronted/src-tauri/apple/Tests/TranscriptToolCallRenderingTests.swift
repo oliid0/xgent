@@ -75,7 +75,7 @@ final class TranscriptToolCallRenderingTests: XCTestCase {
                 let bounds = window.convertToScreen(host.convert(host.bounds, to: nil))
                 var frames: [CGRect] = []
                 for id in ["single:disclosure", "group:disclosure"] {
-                    let element = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == id && $0.accessibilityRole() == .button })
+                    let element = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == id && $0.accessibilityRole() == .disclosureTriangle })
                     let frame = element.accessibilityFrame()
                     XCTAssertGreaterThanOrEqual(frame.height, 23.5)
                     XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX + 15)
@@ -115,7 +115,7 @@ final class TranscriptToolCallRenderingTests: XCTestCase {
                 ["id": $0.accessibilityIdentifier() ?? "", "role": $0.accessibilityRole()?.rawValue ?? "",
                  "text": $0.accessibilityText() ?? "", "frame": NSStringFromRect($0.accessibilityFrame())]
             }, name: "work-process-before-\(id)")
-            let element = try XCTUnwrap(elements().first { $0.accessibilityIdentifier() == id && $0.accessibilityRole() == .button })
+            let element = try XCTUnwrap(elements().first { $0.accessibilityIdentifier() == id && $0.accessibilityRole() == .disclosureTriangle })
             XCTAssertTrue(element.accessibilityPerformPress())
             try await Task.sleep(for: .milliseconds(150)); host.layoutSubtreeIfNeeded()
         }

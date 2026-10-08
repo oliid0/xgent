@@ -8,6 +8,8 @@ struct XgentIOSNativeSwitch: UIViewRepresentable {
     @Binding var value: Bool
     let node: XgentNode
     @Environment(\.isEnabled) private var enabled
+    @Environment(\.xgentPresentationTheme) private var theme
+    @Environment(\.colorScheme) private var scheme
 
     func makeCoordinator() -> Coordinator { Coordinator(value: $value) }
 
@@ -30,7 +32,7 @@ struct XgentIOSNativeSwitch: UIViewRepresentable {
     private func configure(_ control: XgentNativeSwitch) {
         control.setOn(value, animated: false)
         control.isEnabled = enabled && node.disabled != true
-        control.onTintColor = .systemGreen
+        control.onTintColor = UIColor(Color(xgentHex: theme.palette(for: scheme).accent))
         control.isAccessibilityElement = true
         control.accessibilityIdentifier = node.id
         control.accessibilityLabel = node.accessibilityLabel ?? node.label ?? ""

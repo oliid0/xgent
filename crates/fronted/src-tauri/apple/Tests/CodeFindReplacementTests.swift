@@ -109,10 +109,34 @@ final class CodeFindReplacementTests: XCTestCase {
         } while ContinuousClock.now < deadline
         let input = try XCTUnwrap(editor(in: root).flatMap { $0.window != nil ? $0 : nil },
                                  "The editable find input must mount within two seconds: \(model.codeHosts.nativeEvidence())")
+        func acknowledgement(_ request: Int) -> XgentAction? {
+            actions.last { action in
+                guard action.action == "find",
+                      let payload = (try? JSONSerialization.jsonObject(with: Data(action.value.text.utf8))) as? [String: Any]
+                else { return false }
+                return payload["command"] as? String == "ack" && payload["editRequest"] as? Int == request
+            }
+        }
+        func waitForAcknowledgement(_ request: Int) async throws -> XgentAction {
+            // Configuration publishing and introspection each defer beyond
+            // the current render transaction. Wait for the real request's
+            // acknowledgement, not a simulator-dependent 300 ms delay.
+            let deadline = ContinuousClock.now + .seconds(2)
+            repeat {
+                #if os(iOS)
+                root.layoutIfNeeded()
+                #else
+                root.layoutSubtreeIfNeeded()
+                #endif
+                if let action = acknowledgement(request) { return action }
+                try await Task.sleep(for: .milliseconds(50))
+            } while ContinuousClock.now < deadline
+            return try XCTUnwrap(acknowledgement(request),
+                "Mounted find request \(request) must acknowledge within two seconds: \(model.codeHosts.nativeEvidence())")
+        }
         model.update(try findFixture(before, revision: 2, edit: true))
-        try await Task.sleep(nanoseconds: 300_000_000)
+        let ack = try await waitForAcknowledgement(1)
         XCTAssertEqual(source(input), after)
-        let ack = try XCTUnwrap(actions.last { $0.action == "find" })
         let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(ack.value.text.utf8)) as? [String: Any])
         XCTAssertEqual(payload["applied"] as? Bool, true)
         let commands = XgentCodeEditingCommands()
@@ -135,9 +159,8 @@ final class CodeFindReplacementTests: XCTestCase {
         // A later edit request with a stale expected source must be consumed and
         // rejected, even when that source becomes equal again in the future.
         model.update(try findFixture(before, revision: 4, edit: true, request: 2, expected: "let value = fox"))
-        try await Task.sleep(nanoseconds: 200_000_000)
+        let rejected = try await waitForAcknowledgement(2)
         XCTAssertEqual(source(input), before)
-        let rejected = try XCTUnwrap(actions.last { $0.action == "find" })
         let rejectedPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(rejected.value.text.utf8)) as? [String: Any])
         XCTAssertEqual(rejectedPayload["applied"] as? Bool, false)
     }

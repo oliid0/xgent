@@ -26,8 +26,7 @@ struct XgentSkillsHubLayout: View {
                         if let preview {
                             #if os(macOS)
                             let size = XgentDesktopSheetSizing.extensionPreviewSize(in: geometry.size)
-                            content(preview).frame(width: size.width, height: size.height)
-                                .presentationSizing(.fitted)
+                            content(preview).modifier(XgentDesktopSheetFrame(size: size))
                             #else
                             content(preview).presentationDetents([.large])
                             #endif

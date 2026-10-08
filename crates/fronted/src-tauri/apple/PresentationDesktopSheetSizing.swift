@@ -24,16 +24,30 @@ struct XgentDesktopSheetSizing: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
         if document.nodes.contains(where: { $0.variant == "mcp-registry-preview" || $0.variant == "provider-model-settings" }) {
             let size = Self.extensionPreviewSize(in: availableSize)
-            content.frame(width: size.width, height: size.height).presentationSizing(.fitted)
+            content.modifier(XgentDesktopSheetFrame(size: size))
         } else if document.nodes.contains(where: { $0.kind == .settingsLayout }) {
             let size = Self.settingsSize(in: availableSize)
-            content.frame(width: size.width, height: size.height).presentationSizing(.fitted)
+            content.modifier(XgentDesktopSheetFrame(size: size))
         } else if document.nodes.contains(where: { $0.variant == "workspace-search-palette" }) {
             let size = Self.settingsSize(in: availableSize)
-            content.frame(width: min(640, size.width), height: min(560, size.height)).presentationSizing(.fitted)
+            content.modifier(XgentDesktopSheetFrame(size: CGSize(width: min(640, size.width), height: min(560, size.height))))
         } else {
             content
         }
+    }
+}
+
+// AppKit may constrain the sheet to its screen's visible frame even when its
+// parent window is taller. Keep the preferred size, accepting that smaller
+// proposal so the fixed header and footer stay inside the actual sheet.
+struct XgentDesktopSheetFrame: ViewModifier {
+    let size: CGSize
+
+    func body(content: Content) -> some View {
+        content.frame(minWidth: 0, idealWidth: size.width, maxWidth: size.width,
+                      minHeight: 0, idealHeight: size.height, maxHeight: size.height,
+                      alignment: .topLeading)
+            .presentationSizing(.fitted)
     }
 }
 #endif
