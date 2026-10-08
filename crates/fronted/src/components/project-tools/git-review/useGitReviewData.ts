@@ -120,6 +120,7 @@ export function useGitReviewData(options: UseGitReviewDataOptions) {
   const [operationNotice, setOperationNotice] = useState<GitOperationNotice | null>(null);
   const [selectedPath, setSelectedPath] = useState("");
   const [reviewMode, setReviewMode] = useState<GitReviewMode>("changes");
+  const [diffVisible, setDiffVisible] = useState(true);
   const [historyCommits, setHistoryCommits] = useState<GitCommitSummary[]>([]);
   const [historyGraphState, setHistoryGraphState] = useState<GitHistoryGraphState>(
     EMPTY_GIT_HISTORY_GRAPH_STATE,
@@ -235,6 +236,7 @@ export function useGitReviewData(options: UseGitReviewDataOptions) {
     setHistoryLoadMoreError("");
     setHistoryError("");
     setCommitDiffLoading(false);
+    setDiffVisible(true);
   }, [cwdKey]);
 
   const beginGitOperation = useCallback((name: string) => {
@@ -1145,6 +1147,7 @@ export function useGitReviewData(options: UseGitReviewDataOptions) {
 
   const selectPath = useCallback(
     (path: string) => {
+      setDiffVisible(true);
       selectedPathRef.current = path;
       setSelectedPath(path);
       void loadDiffForPath(path);
@@ -1195,6 +1198,7 @@ export function useGitReviewData(options: UseGitReviewDataOptions) {
 
   const selectCommitFileData = useCallback(
     (commit: GitCommitSummary, file: GitCommitFile) => {
+      setDiffVisible(true);
       selectedCommitShaRef.current = commit.sha;
       selectedCommitFilePathRef.current = file.path;
       const nextExpandedCommitShas = new Set(expandedCommitShasRef.current);
@@ -1237,6 +1241,7 @@ export function useGitReviewData(options: UseGitReviewDataOptions) {
 
   const openCommitDiffData = useCallback(
     (commit: GitCommitSummary) => {
+      setDiffVisible(true);
       focusCommitData(commit);
       setHistoryDiffTitle(t("projectTools.gitReview.commitDiff"));
       setHistoryDiffSubtitle(`${commit.shortSha || commit.sha.slice(0, 7)} - ${commit.subject}`);
@@ -1248,6 +1253,7 @@ export function useGitReviewData(options: UseGitReviewDataOptions) {
   const compareCommitWithRemote = useCallback(
     (commit: GitCommitSummary) => {
       if (!gitClient || !cwd.trim()) return;
+      setDiffVisible(true);
       focusCommitData(commit);
       const requestId = commitDiffRequestIdRef.current + 1;
       commitDiffRequestIdRef.current = requestId;
@@ -1290,6 +1296,7 @@ export function useGitReviewData(options: UseGitReviewDataOptions) {
     compareCommitWithRemote,
     cwd,
     diffLoading,
+    diffVisible,
     disabledMessage,
     discoverRepositories,
     dismissBranchSwitchConflict,
@@ -1335,6 +1342,7 @@ export function useGitReviewData(options: UseGitReviewDataOptions) {
     setHistoryError,
     setRemoteSetupUrl,
     setReviewMode,
+    setDiffVisible,
     stashAndSwitchBranch,
     state,
     switchBranch,

@@ -339,7 +339,8 @@ export function NativeDesktopGitBody(props: {
       id: "git-summary",
       kind: "Text",
       secondary: true,
-      text: `${state.upstream || data.branchDiff?.baseRef || t("projectTools.gitReview.unresolved")} · ↑${state.ahead} ↓${state.behind} · ${t("projectTools.gitReview.labelStaged")} ${state.dirtyCounts.staged} · ${t("projectTools.gitReview.labelUnstaged")} ${state.dirtyCounts.unstaged} · ${t("projectTools.gitReview.labelUntracked")} ${state.dirtyCounts.untracked}`,
+      size: "small",
+      text: `${data.branchDiff?.baseRef || state.upstream || t("projectTools.gitReview.unresolved")} · ↑${state.ahead} ↓${state.behind} · ${t("projectTools.gitReview.labelStaged")} ${state.dirtyCounts.staged} · ${t("projectTools.gitReview.labelUnstaged")} ${state.dirtyCounts.unstaged} · ${t("projectTools.gitReview.labelUntracked")} ${state.dirtyCounts.untracked}`,
     },
     {
       ...c.select(
@@ -357,6 +358,14 @@ export function NativeDesktopGitBody(props: {
       ),
       kind: "SegmentedControl",
     },
+    c.toggle(
+      "git-diff-visible",
+      t(data.diffVisible ? "projectTools.gitReview.hideDiff" : "projectTools.gitReview.showDiff"),
+      data.diffVisible,
+      (value) => {
+        if (current()) data.setDiffVisible(value);
+      },
+    ),
   ];
   const banners: PresentationNode[] = [];
   for (const [id, text] of [

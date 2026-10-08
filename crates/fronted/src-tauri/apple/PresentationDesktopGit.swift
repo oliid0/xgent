@@ -1,34 +1,31 @@
 #if os(macOS)
 import SwiftUI
 
-/// The sidebar panel has independent list and diff scrollports. Narrow panels
-/// navigate between them; expanded panels keep both visible with a resize divider.
+/// Independent file/diff scrollports stack vertically when the sidebar narrows.
 struct XgentDesktopGitLayout: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
-    @State private var detailVisible = false
 
     private var toolbar: XgentNode? { document.node(id: "desktop-git-toolbar") }
     private var list: XgentNode? { document.node(id: "desktop-git-list") }
     private var detail: XgentNode? { document.node(id: "desktop-git-detail") }
     private var commit: XgentNode? { document.node(id: "desktop-git-commit") }
-    private var selection: String {
-        let prefix = document.node(id: "git-view")?.value?.text == "history" ? "git-commit:" : "git-working:"
-        return (list?.children ?? []).flatMap { $0.children ?? [] }
-            .first { $0.id.hasPrefix(prefix) && $0.selected == true }?.id
-            ?? document.node(id: "git-diff-title")?.text ?? ""
+    private var diffVisible: Bool {
+        guard let toggle = document.node(id: "git-diff-visible") else { return true }
+        return model.value(toggle, in: document).boolean
     }
 
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 if let toolbar {
-                    ScrollView { XgentNodeView(node: toolbar, document: document, model: model) }
-                        .frame(maxHeight: min(240, geometry.size.height * 0.38))
+                    XgentGitToolbar(node: toolbar, document: document, model: model)
                 }
                 Divider()
-                if geometry.size.width >= 620 {
+                if !diffVisible {
+                    pane(list)
+                } else if geometry.size.width >= 620 {
                     HSplitView {
                         pane(list).frame(minWidth: 200, idealWidth: 280, maxWidth: geometry.size.width * 0.6)
                         pane(detail).frame(minWidth: 240, maxWidth: .infinity)
@@ -36,15 +33,12 @@ struct XgentDesktopGitLayout: View {
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("xgent-git-split")
                 } else {
-                    HStack {
-                        Button(list?.label ?? "") { detailVisible = false }
-                            .accessibilityIdentifier("xgent-git-show-list")
-                        Button(detail?.label ?? "") { detailVisible = true }
-                            .accessibilityIdentifier("xgent-git-show-detail")
+                    VSplitView {
+                        pane(list).frame(minHeight: 100, idealHeight: geometry.size.height * 0.3)
+                        pane(detail).frame(minHeight: 140, maxHeight: .infinity)
                     }
-                    .buttonStyle(.bordered)
-                    .padding(8)
-                    pane(detailVisible ? detail : list)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("xgent-git-stack")
                 }
                 if let commit, commit.children?.isEmpty == false {
                     Divider()
@@ -56,7 +50,6 @@ struct XgentDesktopGitLayout: View {
                 }
             }
         }
-        .onChange(of: selection) { _, value in if !value.isEmpty { detailVisible = true } }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("xgent-desktop-git")

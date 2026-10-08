@@ -209,6 +209,67 @@ final class DesktopSidebarPlacementTests: XCTestCase {
         }
     }
 
+    @MainActor func testSettingsClosesOnlyTemporaryDrawerAndComposerAcceptsPointerAndKeyboardAfterwards() async throws {
+        let session = try NativeMacAccessibilitySession()
+        defer { session.restore() }
+        for width in [CGFloat(640), 1440] {
+            let model = XgentPresentationModel()
+            var actions: [XgentAction] = []
+            model.actionSink = { action in
+                actions.append(action)
+                model.complete(.init(surface: action.surface, requestId: action.requestId, ok: true, error: nil))
+                if action.surface == "sidebar", action.action == "close" {
+                    model.update(try! self.sidebar(revision: 2, removed: true))
+                }
+            }
+            model.update(try fixture("chat", mode: "root", nodes: [[
+                "id": "chat", "kind": "ChatLayout", "fill": true, "children": [
+                    ["id": "transcript", "kind": "Text", "text": "Conversation"],
+                    ["id": "composer", "kind": "Composer", "children": [
+                        ["id": "draft", "kind": "ComposerInput", "label": "Message", "value": "Before settings", "action": "draft"]]]
+                ]
+            ]]))
+            model.update(try sidebar(revision: 1))
+            let host = NSHostingView(rootView: XgentRootLayout(model: model)
+                .transaction { $0.animation = nil; $0.disablesAnimations = true })
+            let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: 640),
+                styleMask: [.borderless], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
+            defer { model.invalidate(); window.close() }
+            host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(250))
+            let settingsNodes: [[String: Any]] = [["id": "settings-layout", "kind": "SettingsLayout", "children": [
+                ["id": "settings-sidebar", "kind": "VStack", "children": []],
+                ["id": "settings-detail", "kind": "ScrollView", "children": []]]]]
+            model.update(try fixture("settings", mode: "sheet", nodes: settingsNodes))
+            host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(150))
+            XCTAssertEqual(actions.filter { $0.surface == "sidebar" && $0.action == "close" }.count, width == 640 ? 1 : 0)
+            model.update(try fixture("settings", mode: "sheet", revision: 2, nodes: settingsNodes))
+            try await Task.sleep(for: .milliseconds(60))
+            XCTAssertEqual(actions.filter { $0.surface == "sidebar" && $0.action == "close" }.count, width == 640 ? 1 : 0,
+                "Settings revisions must not dismiss a permanent column or repeat the drawer action")
+            model.update(try fixture("settings", mode: "sheet", revision: 3, removed: true, nodes: []))
+            host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(150))
+            XCTAssertFalse(nativeMacAccessibilityTree(window).contains { $0.accessibilityIdentifier() == "xgent-sidebar-dismiss-backdrop" })
+            func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
+            let editor = try XCTUnwrap(descendants(host).compactMap { $0 as? NSTextView }.first { $0.string == "Before settings" })
+            let point = editor.convert(NSPoint(x: editor.bounds.midX, y: editor.bounds.midY), to: nil)
+            let click = try [NSEvent.EventType.leftMouseDown, .leftMouseUp].enumerated().map { index, type in
+                try XCTUnwrap(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                    timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                    context: nil, eventNumber: index + 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+            }
+            NSApp.postEvent(click[1], atStart: true); window.sendEvent(click[0])
+            if let release = NSApp.nextEvent(matching: .leftMouseUp, until: Date(), inMode: .default, dequeue: true) { window.sendEvent(release) }
+            XCTAssertTrue(window.firstResponder === editor, "Real pointer input must reach the uncovered composer")
+            editor.selectAll(nil)
+            window.sendEvent(try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: "x", charactersIgnoringModifiers: "x", isARepeat: false, keyCode: 7)))
+            try await Task.sleep(for: .milliseconds(60))
+            XCTAssertEqual(editor.string, "x")
+            XCTAssertEqual(actions.last { $0.action == "draft" }?.value, .string("x"))
+        }
+    }
+
     private func sidebar(revision: Int, removed: Bool = false) throws -> XgentDocument {
         try fixture("sidebar", mode: "sidebar", revision: revision, removed: removed, nodes: [[
             "id": "sidebar-layout", "kind": "VStack", "children": [

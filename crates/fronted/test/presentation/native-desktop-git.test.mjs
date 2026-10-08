@@ -12,7 +12,7 @@ function state(workdir = "/project") { return { repoRoot: workdir, workdir, head
     { path: "new.ts", indexStatus: "?", worktreeStatus: "?", staged: false, untracked: true, conflicted: false, kind: "untracked" },
   ] }; }
 function commit(index) { return { sha: `commit-${index}`, shortSha: `c${index}`, parents: [`commit-${index + 1}`], refs: index === 0 ? ["HEAD -> main"] : [], subject: `Commit ${index}`, authorName: "Author", authorEmail: "author@test", authorDate: "2026-01-01", fileCount: 1, localOnly: index === 0, files: [{ path: "changed.ts", status: "M", kind: "modified" }] }; }
-function harness(overrides = {}) {
+function harness(overrides = {}, native = true) {
   const hooks = createReactHookHarness(), calls = [], mentions = [], files = [], revealed = [];
   let closed = 0, reviews = 0;
   const result = workdir => ({ ok: true, state: state(workdir), stdout: "", stderr: "", message: "" });
@@ -42,7 +42,7 @@ function harness(overrides = {}) {
     fileTree: { onRevealInFileTree(path) { revealed.push(path); } },
   };
   const loader = createTsModuleLoader({ mocks: {
-    react: hooks.react,
+    react: { ...hooks.react, memo: component => component },
     "@xgent/runtime": { openUrl: async url => { calls.push(["openUrl", url]); } },
     "../components/project-tools/WorkspaceToolsContext": { WorkspaceToolsContext: { Provider: "Provider" } },
     "../WorkspaceToolsContext": { useWorkspaceToolsContext: () => context },
@@ -52,9 +52,13 @@ function harness(overrides = {}) {
     "../lib/system/clipboardText": { writeClipboardText: async text => calls.push(["clipboard", text]) },
     "./NativeSurface": { NativeSurface: "NativeSurface" },
     "./nativeTheme": { createNativePresentationTheme: () => undefined },
+    "./Toolbar": { GitReviewToolbar: "GitReviewToolbar", GitRemoteSetupModal: "GitRemoteSetupModal", GitOperationNoticeToast: "GitOperationNoticeToast" },
+    "./StatusView": { GitReviewStatusView: "GitReviewStatusView" },
+    "./HistoryView": { GitReviewHistoryView: "GitReviewHistoryView" },
   } });
   const { NativeDesktopGitBody } = loader.loadModule("src/presentation/NativeDesktopGitPanel.tsx");
-  const render = () => hooks.render(() => NativeDesktopGitBody({ settings: { theme: "system" }, context, onClose: () => { closed++; } })).props;
+  const { GitReviewPanel } = loader.loadModule("src/components/project-tools/git-review/index.tsx");
+  const render = () => hooks.render(() => native ? NativeDesktopGitBody({ settings: { theme: "system" }, context, onClose: () => { closed++; } }) : GitReviewPanel({ active: true })).props;
   const action = (id, value = null, surface = render()) => { const handler = surface.handlers.get(id); assert.ok(handler, id); assert.equal(handler.enabled, true, `${id} enabled`); return handler.run(value); };
   const nodes = () => render().document.nodes.flatMap(function walk(node) { return [node, ...(node.children ?? []).flatMap(walk)]; });
   const ready = async () => { for (let i = 0; i < 4; i++) { await settle(); render(); } };
@@ -84,6 +88,54 @@ test("native desktop Git exposes the desktop controller's detailed changes, diff
   assert.ok(h.calls.some(call => call[0] === "stage" && call[2] === "changed.ts"));
   assert.ok(h.calls.some(call => call[0] === "unstage" && call[2] === "staged.ts"));
   assert.ok(h.calls.some(call => call[0] === "addToGitignore" && call[2] === "new.ts"));
+  h.unmount();
+});
+
+test("native Git hides and restores its retained diff without extra loads and retires old visibility actions", async () => {
+  const h = harness(); await h.ready();
+  h.action("git-working:changed.ts:select"); await h.ready();
+  const patch = h.nodes().find(node => node.id === "git-diff-patch").text;
+  const before = h.calls.filter(call => call[0] === "diff").length;
+  h.action("git-diff-visible", false); const hidden = h.render();
+  assert.equal(h.nodes().find(node => node.id === "git-diff-visible").value, false);
+  assert.equal(h.nodes().find(node => node.id === "git-diff-patch").text, patch);
+  h.action("git-diff-visible", true);
+  assert.equal(h.calls.filter(call => call[0] === "diff").length, before);
+  h.action("git-diff-visible", false);
+  h.action("git-working:new.ts:select"); await h.ready();
+  assert.equal(h.nodes().find(node => node.id === "git-diff-visible").value, true);
+  h.action("git-repository", "/project/nested"); h.render(); await h.ready();
+  h.action("git-diff-visible", false, hidden);
+  assert.equal(h.nodes().find(node => node.id === "git-diff-visible").value, true);
+  h.unmount();
+});
+
+test("Astryx Git composes both panes, hides to the list and restores a working or history selection", async () => {
+  const h = harness({}, false); await h.ready();
+  const children = () => h.render().children.flat(Infinity).filter(Boolean);
+  const toolbar = () => children().find(node => node.type === "GitReviewToolbar").props;
+  const changes = () => children().find(node => node.type === "GitReviewStatusView").props;
+  const history = () => children().find(node => node.type === "GitReviewHistoryView").props;
+  assert.equal(h.render().style.containerName, "xgent-git-review");
+  assert.equal(changes().useSplitReviewLayout, true);
+  const before = h.calls.filter(call => call[0] === "diff").length;
+  toolbar().data.setDiffVisible(false);
+  assert.equal(changes().useSplitReviewLayout, false);
+  assert.equal(changes().stackedPane, "list");
+  toolbar().data.setDiffVisible(true);
+  assert.equal(h.calls.filter(call => call[0] === "diff").length, before);
+  toolbar().data.setDiffVisible(false);
+  toolbar().data.selectPath("changed.ts"); await h.ready();
+  assert.equal(changes().useSplitReviewLayout, true);
+  assert.equal(toolbar().data.selectedPath, "changed.ts");
+  toolbar().data.setReviewMode("history"); await h.ready();
+  toolbar().data.setDiffVisible(false);
+  assert.equal(history().useSplitReviewLayout, false);
+  const entry = toolbar().data.historyCommits[0];
+  toolbar().data.selectCommitFileData(entry, entry.files[0]); await h.ready();
+  assert.equal(history().useSplitReviewLayout, true);
+  assert.equal(toolbar().data.selectedCommitSha, entry.sha);
+  assert.ok(h.calls.some(call => call[0] === "commitDiff" && call[2] === entry.sha));
   h.unmount();
 });
 

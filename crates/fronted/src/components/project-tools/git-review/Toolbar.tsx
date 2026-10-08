@@ -28,6 +28,7 @@ import {
   Cloud,
   Download,
   Eye,
+  EyeOff,
   Folder,
   GitBranch,
   History,
@@ -44,7 +45,6 @@ import {
   type GitDiscardConfirmState,
   type GitOperationNotice,
   type GitRemoteSetupAction,
-  type GitReviewStackedPane,
   remoteSetupDescriptionKey,
   remoteSetupSubmitKey,
 } from "./model";
@@ -821,20 +821,10 @@ function GitReviewScopeDial(props: {
 
 export function GitReviewToolbar(props: {
   data: GitReviewData;
-  stackedPane: GitReviewStackedPane;
-  onStackedPaneChange: (pane: GitReviewStackedPane, dir: "forward" | "back") => void;
-  useSplitReviewLayout: boolean;
   visibleError: string;
   writeDisabled: boolean;
 }) {
-  const {
-    data,
-    stackedPane,
-    onStackedPaneChange,
-    useSplitReviewLayout,
-    visibleError,
-    writeDisabled,
-  } = props;
+  const { data, visibleError, writeDisabled } = props;
   const {
     branchDiff,
     busy,
@@ -1026,92 +1016,13 @@ export function GitReviewToolbar(props: {
         </Button>
       </AstryxStack>
       {state.status === "ready" ? (
-        <AstryxStack
-          direction="vertical"
-          className="mt-1.5 overflow-hidden rounded-xl border border-white/20 bg-white/50 shadow-sm backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.03]"
-        >
-          <AstryxStack
-            direction="horizontal"
-            className="flex items-center gap-1.5 border-b border-black/[0.04] px-3 py-2 dark:border-white/[0.06]"
-          >
-            <AstryxText
-              as="span"
-              type="inherit"
-              className="shrink-0 rounded bg-muted/70 px-1.5 py-0.5 text-[calc(10px*var(--zone-font-scale,1))] font-medium leading-none text-muted-foreground"
-            >
-              {t("projectTools.gitReview.labelBase")}
-            </AstryxText>
-            <Cloud className="h-3 w-3 shrink-0 text-muted-foreground/60" />
-            <AstryxText
-              as="span"
-              type="inherit"
-              className="min-w-0 truncate font-mono text-[calc(11px*var(--zone-font-scale,1))] text-foreground/75"
-              aria-label={
-                branchDiff?.baseRef || state.upstream || t("projectTools.gitReview.unresolved")
-              }
-            >
-              {branchDiff?.baseRef || state.upstream || t("projectTools.gitReview.unresolved")}
-            </AstryxText>
-          </AstryxStack>
-          <AstryxGrid className="grid grid-cols-5">
-            {[
-              {
-                count: state.ahead,
-                label: t("projectTools.gitReview.labelAhead"),
-                tone: "text-sky-600 dark:text-sky-400",
-              },
-              {
-                count: state.behind,
-                label: t("projectTools.gitReview.labelBehind"),
-                tone: "text-orange-600 dark:text-orange-400",
-              },
-              {
-                count: state.dirtyCounts.staged,
-                label: t("projectTools.gitReview.labelStaged"),
-                tone: "text-emerald-600 dark:text-emerald-400",
-              },
-              {
-                count: state.dirtyCounts.unstaged,
-                label: t("projectTools.gitReview.labelUnstaged"),
-                tone: "text-amber-600 dark:text-amber-400",
-              },
-              {
-                count: state.dirtyCounts.untracked,
-                label: t("projectTools.gitReview.labelUntracked"),
-                tone: "text-violet-600 dark:text-violet-400",
-              },
-            ].map((item, index) => (
-              <AstryxStack
-                direction="vertical"
-                key={item.label}
-                className={cn(
-                  "flex flex-col items-center gap-0.5 py-2",
-                  index > 0 && "border-l border-black/[0.04] dark:border-white/[0.06]",
-                )}
-              >
-                <AstryxText
-                  as="span"
-                  type="inherit"
-                  className={cn(
-                    "text-sm font-semibold tabular-nums leading-none",
-                    item.count > 0 ? item.tone : "text-muted-foreground/40",
-                  )}
-                >
-                  {item.count}
-                </AstryxText>
-                <AstryxText
-                  as="span"
-                  type="inherit"
-                  className="text-[calc(9px*var(--zone-font-scale,1))] leading-none text-muted-foreground/60"
-                >
-                  {item.label}
-                </AstryxText>
-              </AstryxStack>
-            ))}
-          </AstryxGrid>
-        </AstryxStack>
+        <HStack className="mt-1.5" gap={2} wrap="wrap">
+          <Text type="supporting" color="secondary" hasTabularNumbers wordBreak="break-word">
+            {`${branchDiff?.baseRef || state.upstream || t("projectTools.gitReview.unresolved")} · ↑${state.ahead} ↓${state.behind} · ${t("projectTools.gitReview.labelStaged")} ${state.dirtyCounts.staged} · ${t("projectTools.gitReview.labelUnstaged")} ${state.dirtyCounts.unstaged} · ${t("projectTools.gitReview.labelUntracked")} ${state.dirtyCounts.untracked}`}
+          </Text>
+        </HStack>
       ) : null}
-      <AstryxStack direction="horizontal" className="mt-3 flex items-center gap-2">
+      <AstryxStack direction="horizontal" className="mt-2 flex items-center gap-2">
         <ToggleButtonGroup
           label={`${t("projectTools.gitReview.localChangesView")} / ${t("projectTools.gitReview.commitHistoryView")}`}
           type="single"
@@ -1136,41 +1047,27 @@ export function GitReviewToolbar(props: {
             {t("projectTools.gitReview.commitHistoryView")}
           </ToggleButton>
         </ToggleButtonGroup>
-        {!useSplitReviewLayout ? (
-          <AstryxStack direction="horizontal" className="ml-auto shrink-0">
-            <ToggleButtonGroup
-              label={`${t("projectTools.gitReview.listPane")} / ${t("projectTools.gitReview.detailPane")}`}
-              type="single"
-              value={stackedPane}
-              onChange={(nextValue) => {
-                if (nextValue === "list") onStackedPaneChange("list", "back");
-                if (nextValue === "detail") onStackedPaneChange("detail", "forward");
-              }}
-              size="sm"
-            >
-              <ToggleButton
-                value="list"
-                label={t("projectTools.gitReview.listPane")}
-                tooltip={t("projectTools.gitReview.listPane")}
-                icon={
-                  reviewMode === "changes" ? (
-                    <GitBranch className="h-3.5 w-3.5" />
-                  ) : (
-                    <History className="h-3.5 w-3.5" />
-                  )
-                }
-                isIconOnly
-              />
-              <ToggleButton
-                value="detail"
-                label={t("projectTools.gitReview.detailPane")}
-                tooltip={t("projectTools.gitReview.detailPane")}
-                icon={<Eye className="h-3.5 w-3.5" />}
-                isIconOnly
-              />
-            </ToggleButtonGroup>
-          </AstryxStack>
-        ) : null}
+        {!data.diffVisible ? (
+          <ToggleButton
+            label={t("projectTools.gitReview.showDiff")}
+            tooltip={t("projectTools.gitReview.showDiff")}
+            size="sm"
+            isIconOnly
+            icon={<EyeOff className="h-3.5 w-3.5" />}
+            isPressed={data.diffVisible}
+            onPressedChange={data.setDiffVisible}
+          />
+        ) : (
+          <ToggleButton
+            label={t("projectTools.gitReview.hideDiff")}
+            tooltip={t("projectTools.gitReview.hideDiff")}
+            size="sm"
+            isIconOnly
+            icon={<Eye className="h-3.5 w-3.5" />}
+            isPressed={data.diffVisible}
+            onPressedChange={data.setDiffVisible}
+          />
+        )}
       </AstryxStack>
       {!canWrite && disabledMessage ? (
         <AstryxStack

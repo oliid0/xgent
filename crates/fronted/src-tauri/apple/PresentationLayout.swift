@@ -673,6 +673,15 @@ struct XgentRootLayout: View {
                 }
             }
             .animation(transitionAnimation, value: sidebar?.id)
+            .onChange(of: model.documents.last(where: {
+                $0.mode == .sheet && $0.nodes.contains(where: { $0.kind == .settingsLayout })
+            })?.id, initial: true) { _, settings in
+                // A temporary drawer must not remain over the composer after
+                // closing settings. Keep permanent desktop columns in place.
+                if settings != nil, drawerVisible, let sidebar {
+                    model.dismiss(sidebar)
+                }
+            }
             .onChange(of: root?.node(id: "chat")?.value) { previous, current in
                 // Streaming output changes the document revision, but only
                 // an accepted conversation selection closes a narrow drawer.

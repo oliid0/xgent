@@ -24,8 +24,7 @@ export type GitReviewClient = GitClient & {
   openSystemFileLocation?: (workdir: string, path: string) => Promise<GitOperationResponse>;
 };
 
-export const GIT_REVIEW_SPLIT_GRID_CLASS =
-  "grid-cols-[clamp(9.5rem,38%,18rem)_minmax(10rem,1fr)] grid-rows-1";
+export const GIT_REVIEW_SPLIT_GRID_CLASS = "git-review-panes";
 
 export const LARGE_DIFF_CHUNK_CHAR_LIMIT = 120 * 1024;
 export const LARGE_DIFF_CHUNK_LINE_LIMIT = 1800;

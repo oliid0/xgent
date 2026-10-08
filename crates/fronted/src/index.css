@@ -2458,6 +2458,18 @@
   background: transparent;
 }
 
+.git-review-panes {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+
+@container xgent-git-review (min-width: 620px) {
+  .git-review-panes {
+    grid-template-columns: minmax(200px, 0.9fr) minmax(240px, 1.1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+
 .settings-page-desktop > header {
   background: transparent;
 }

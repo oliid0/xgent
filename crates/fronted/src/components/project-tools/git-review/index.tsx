@@ -6,7 +6,7 @@
 // are allowed here.
 
 import { VStack } from "@astryxdesign/core/Layout";
-import { memo, useCallback, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import { useLocale } from "../../../i18n";
 import { GitReviewHistoryView } from "./HistoryView";
 import type { ChangeListSection, DiffViewKind, GitReviewStackedPane } from "./model";
@@ -15,8 +15,6 @@ import { GitOperationNoticeToast, GitRemoteSetupModal, GitReviewToolbar } from "
 import { useGitReviewData } from "./useGitReviewData";
 
 export type { GitCommitContextPayload, GitFileContextPayload } from "./model";
-
-const GIT_REVIEW_SPLIT_LAYOUT_MIN_WIDTH = 500;
 
 type GitReviewPanelProps = {
   // Visibility contract from the workspace feature panel: while inactive the
@@ -29,7 +27,6 @@ export const GitReviewPanel = memo(function GitReviewPanel(props: GitReviewPanel
   const { active = true } = props;
   const { t } = useLocale();
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const [useSplitReviewLayout, setUseSplitReviewLayout] = useState(false);
   const [activeDiffView, setActiveDiffView] = useState<DiffViewKind>("workingTree");
   const [commitMessage, setCommitMessage] = useState("");
   const [collapsedChangeSections, setCollapsedChangeSections] = useState<
@@ -38,36 +35,13 @@ export const GitReviewPanel = memo(function GitReviewPanel(props: GitReviewPanel
     staged: false,
     changes: false,
   });
-  const [changesStackedPane, setChangesStackedPane] = useState<GitReviewStackedPane>("list");
-  const [historyStackedPane, setHistoryStackedPane] = useState<GitReviewStackedPane>("list");
-  const [changesStackedDir, setChangesStackedDir] = useState<"forward" | "back">("forward");
-  const [historyStackedDir, setHistoryStackedDir] = useState<"forward" | "back">("forward");
 
   const data = useGitReviewData({ active });
   const { busy, canWrite, cwd, disabledMessage, reviewMode, state } = data;
 
-  useLayoutEffect(() => {
-    const panel = panelRef.current;
-    if (!panel) return;
-
-    const updateLayout = () => {
-      const nextUseSplitLayout =
-        panel.getBoundingClientRect().width >= GIT_REVIEW_SPLIT_LAYOUT_MIN_WIDTH;
-      setUseSplitReviewLayout((current) =>
-        current === nextUseSplitLayout ? current : nextUseSplitLayout,
-      );
-    };
-
-    updateLayout();
-    const resizeObserver =
-      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateLayout);
-    resizeObserver?.observe(panel);
-    window.addEventListener("resize", updateLayout);
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updateLayout);
-    };
-  }, []);
+  // Container queries choose horizontal or vertical panes without a delayed
+  // resize callback. A hidden diff gives all available space to the list.
+  const useSplitReviewLayout = data.diffVisible;
 
   const writeDisabled = !canWrite || Boolean(disabledMessage) || state.status !== "ready";
   const visibleError =
@@ -84,37 +58,24 @@ export const GitReviewPanel = memo(function GitReviewPanel(props: GitReviewPanel
     }));
   }, []);
 
-  const handleChangesStackedPaneChange = useCallback(
-    (pane: GitReviewStackedPane, dir: "forward" | "back") => {
-      setChangesStackedDir(dir);
-      setChangesStackedPane(pane);
+  const revealDetail = useCallback(
+    (pane: GitReviewStackedPane) => {
+      if (pane === "detail") data.setDiffVisible(true);
     },
-    [],
-  );
-
-  const handleHistoryStackedPaneChange = useCallback(
-    (pane: GitReviewStackedPane, dir: "forward" | "back") => {
-      setHistoryStackedDir(dir);
-      setHistoryStackedPane(pane);
-    },
-    [],
-  );
-
-  const handleToolbarStackedPaneChange = useCallback(
-    (pane: GitReviewStackedPane, dir: "forward" | "back") => {
-      if (data.reviewMode === "changes") {
-        setChangesStackedDir(dir);
-        setChangesStackedPane(pane);
-      } else {
-        setHistoryStackedDir(dir);
-        setHistoryStackedPane(pane);
-      }
-    },
-    [data.reviewMode],
+    [data.setDiffVisible],
   );
 
   return (
-    <VStack ref={panelRef} height="100%" minHeight={0} style={{ position: "relative" }}>
+    <VStack
+      ref={panelRef}
+      height="100%"
+      minHeight={0}
+      style={{
+        position: "relative",
+        containerType: "inline-size",
+        containerName: "xgent-git-review",
+      }}
+    >
       <GitRemoteSetupModal
         open={data.remoteSetupOpen}
         action={data.remoteSetupAction}
@@ -131,14 +92,7 @@ export const GitReviewPanel = memo(function GitReviewPanel(props: GitReviewPanel
         notice={data.operationNotice}
         onDismiss={data.dismissOperationNotice}
       />
-      <GitReviewToolbar
-        data={data}
-        stackedPane={reviewMode === "changes" ? changesStackedPane : historyStackedPane}
-        onStackedPaneChange={handleToolbarStackedPaneChange}
-        useSplitReviewLayout={useSplitReviewLayout}
-        visibleError={visibleError}
-        writeDisabled={writeDisabled}
-      />
+      <GitReviewToolbar data={data} visibleError={visibleError} writeDisabled={writeDisabled} />
       {reviewMode === "changes" ? (
         <GitReviewStatusView
           activeDiffView={activeDiffView}
@@ -147,21 +101,21 @@ export const GitReviewPanel = memo(function GitReviewPanel(props: GitReviewPanel
           data={data}
           onActiveDiffViewChange={setActiveDiffView}
           onCommitMessageChange={setCommitMessage}
-          onStackedPaneChange={handleChangesStackedPaneChange}
+          onStackedPaneChange={revealDetail}
           onToggleSection={handleToggleSection}
           panelRef={panelRef}
-          stackedDir={changesStackedDir}
-          stackedPane={changesStackedPane}
+          stackedDir="forward"
+          stackedPane="list"
           useSplitReviewLayout={useSplitReviewLayout}
           writeDisabled={writeDisabled}
         />
       ) : (
         <GitReviewHistoryView
           data={data}
-          onStackedPaneChange={handleHistoryStackedPaneChange}
+          onStackedPaneChange={revealDetail}
           panelRef={panelRef}
-          stackedDir={historyStackedDir}
-          stackedPane={historyStackedPane}
+          stackedDir="forward"
+          stackedPane="list"
           useSplitReviewLayout={useSplitReviewLayout}
           writeDisabled={writeDisabled}
         />
