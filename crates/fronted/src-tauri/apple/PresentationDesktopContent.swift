@@ -198,7 +198,7 @@ extension XgentNodeView {
         case .toggle:
             XgentSwitch(node: node, document: document, model: model)
         case .selector:
-            if node.variant == "provider-vendor-tabs" {
+            if node.variant == "provider-vendor-tabs" || node.variant == "provider-editor-tabs" {
                 XgentProviderCategoryTabs(node: node, document: document, model: model)
             } else if node.variant == "workspace-file-sheets" {
                 XgentSpreadsheetSheets(node: node, document: document, model: model)

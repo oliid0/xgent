@@ -94,10 +94,19 @@ final class XgentCodeEditingCommands: ObservableObject {
     func undo() {
         guard canUndo, focusTarget(), let view = target else { return }
         view.undoManager?.undo()
+        #if os(iOS)
+        // Programmatic edits do not guarantee UITextView delegate delivery.
+        // Publish the completed undo before a queued hosting update can
+        // restore the previous binding value into the retained input.
+        view.delegate?.textViewDidChange?(view)
+        #endif
     }
     func redo() {
         guard canRedo, focusTarget(), let view = target else { return }
         view.undoManager?.redo()
+        #if os(iOS)
+        view.delegate?.textViewDidChange?(view)
+        #endif
     }
 
     private func focusTarget() -> Bool {

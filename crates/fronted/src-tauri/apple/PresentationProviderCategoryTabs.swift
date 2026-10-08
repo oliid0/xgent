@@ -12,11 +12,11 @@ struct XgentProviderCategoryToolbar: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
-            if let tabs = node.children?.first(where: { $0.variant == "provider-vendor-tabs" }) {
+            if let tabs = node.children?.first(where: { ["provider-vendor-tabs", "provider-editor-tabs"].contains($0.variant ?? "") }) {
                 XgentProviderCategoryTabs(node: tabs, document: document, model: model)
                     .frame(minWidth: 0, maxWidth: .infinity)
             }
-            ForEach((node.children ?? []).filter { $0.variant != "provider-vendor-tabs" }) { action in
+            ForEach((node.children ?? []).filter { !["provider-vendor-tabs", "provider-editor-tabs"].contains($0.variant ?? "") }) { action in
                 XgentIconButton(node: action, document: document, model: model)
                     .fixedSize(horizontal: true, vertical: false)
             }
@@ -132,6 +132,11 @@ struct XgentProviderCategoryTabs: View {
     }
 }
 
+private struct XgentProviderCategoryScrollMetrics: Equatable {
+    let container: CGSize
+    let content: CGSize
+}
+
 private struct XgentProviderCategoryScroll<Content: View>: View {
     let selected: String
     let content: Content
@@ -146,6 +151,15 @@ private struct XgentProviderCategoryScroll<Content: View>: View {
             ScrollView(.horizontal) { content }
                 .scrollIndicators(.hidden)
                 .clipped()
+                .onScrollGeometryChange(for: XgentProviderCategoryScrollMetrics.self) { geometry in
+                    XgentProviderCategoryScrollMetrics(container: geometry.containerSize, content: geometry.contentSize)
+                } action: { _, geometry in
+                    guard geometry.container.width > 0, geometry.content.width > 0 else { return }
+                    // Target the completed scroll layout, including a newly
+                    // resized viewport. Offsets are deliberately not observed:
+                    // swiping to another category must not snap back.
+                    proxy.scrollTo(selected, anchor: .center)
+                }
                 .task(id: selected) {
                     // The eager target must have completed its first layout.
                     // An initial scrollPosition binding is ignored by the iOS host.

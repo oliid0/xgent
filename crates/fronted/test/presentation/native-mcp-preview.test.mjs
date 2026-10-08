@@ -49,6 +49,7 @@ test("native MCP details are a dismissible sheet with shared metadata, protected
   pending.resolve(detail); await settle();
   const nodes = h.nodes();
   const preview = h.render().document.nodes[0];
+  assert.equal(preview.children.find(node => node.kind === "Heading").maxLines, 2);
   const footer = preview.children.find(node => node.variant === "extension-preview-footer");
   assert.ok(footer.children.some(node => node.id === "mcp-preview-install"));
   assert.ok(!flatten([preview.children.find(node => node.variant === "extension-preview-body")]).some(node => node.id === "mcp-preview-install"));

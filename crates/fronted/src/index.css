@@ -4574,6 +4574,13 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   padding: 12px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
   flex-shrink: 0;
 }
+.xgent-compact-dialog-header .astryx-dialog-header-title-block h2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
 .settings-page-compact .settings-detail-header .astryx-dialog-header {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) 44px;

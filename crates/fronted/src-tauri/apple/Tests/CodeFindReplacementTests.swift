@@ -150,12 +150,17 @@ final class CodeFindReplacementTests: XCTestCase {
         XCTAssertTrue(window.firstResponder === input)
         #endif
         XCTAssertEqual(source(input), before, "Undo must restore TextKit before another hosting update")
+        let currentDocument = try findFixture(before, revision: 2, edit: true)
+        let currentEditor = try XCTUnwrap(currentDocument.node(id: "workspace-file-editor"))
+        XCTAssertEqual(model.value(currentEditor, in: currentDocument).text, before,
+                       "The completed Undo must synchronously publish its restored shared draft")
         XCTAssertTrue(undo.canRedo, "Undo must register the real inverse for redo")
         try await Task.sleep(nanoseconds: 200_000_000)
         XCTAssertEqual(source(input), before)
         model.update(try findFixture(before, revision: 3, edit: true))
         try await Task.sleep(nanoseconds: 200_000_000)
         XCTAssertEqual(source(input), before, "Re-publishing a consumed edit must not redo an undone replacement")
+        XCTAssertEqual(model.value(currentEditor, in: currentDocument).text, before)
         // A later edit request with a stale expected source must be consumed and
         // rejected, even when that source becomes equal again in the future.
         model.update(try findFixture(before, revision: 4, edit: true, request: 2, expected: "let value = fox"))

@@ -54,20 +54,29 @@ function createDraft(provider?: CustomProvider): RequestDraft {
   };
 }
 
-/** Per-provider request and usage details share the desktop validators and Rust usage commands. */
-export function NativeProviderRequestSettings(
-  props: SettingsSectionProps & {
-    providerId: string;
-    canTestUsage?: boolean;
-    onBack: () => void;
+type ProviderRequestSettingsProps = SettingsSectionProps & {
+  providerId: string;
+  canTestUsage?: boolean;
+  onBack: () => void;
+};
+
+/** Shared request draft/validators; embedded panes commit with the outer provider. */
+export function useNativeProviderRequestSettings(
+  props: ProviderRequestSettingsProps & {
+    embedded?: boolean;
+    section?: string;
+    enabled?: boolean;
+    scopeKey?: string;
+    readRequestConfiguration?: () => string;
   },
 ) {
   const { settings, setSettings } = props,
     { t } = useLocale();
   const provider = settings.customProviders.find((item) => item.id === props.providerId);
-  const [draft, setDraft] = useState(() => createDraft(provider));
-  const latest = useRef(draft);
-  const [page, setPage] = useState("request");
+  const [draftState, setDraft] = useState(() => createDraft(provider));
+  const latest = useRef(draftState);
+  const [selectedPage, setPage] = useState("request");
+  const page = props.section ?? selectedPage;
   const [visibleHeaders, setVisibleHeaders] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [testState, setTestState] = useState<{
@@ -76,33 +85,74 @@ export function NativeProviderRequestSettings(
     error: string;
   }>({ loading: false, result: null, error: "" });
   const [scope] = useState(() => ({
-    id: props.providerId,
-    active: true,
+    id: "",
+    key: "",
+    enabled: false,
+    active: false,
+    mounted: true,
+    dirty: false,
+    configuration: "",
+    initialAccountHeader: undefined as { key: string; value: string } | undefined,
     revision: 0,
     testRevision: 0,
     testing: false,
   }));
+  const enabled = props.enabled !== false;
+  const key = props.scopeKey ?? "";
+  if (scope.id !== props.providerId || scope.key !== key || scope.enabled !== enabled) {
+    scope.id = props.providerId;
+    scope.key = key;
+    scope.enabled = enabled;
+    scope.active = enabled && scope.mounted;
+    scope.revision++;
+    scope.testRevision++;
+    scope.testing = false;
+    scope.dirty = false;
+    latest.current = createDraft(provider);
+    scope.initialAccountHeader = provider?.customHeaders?.find(
+      (header) => header.key.toLowerCase() === "chatgpt-account-id",
+    );
+    setDraft(latest.current);
+    setVisibleHeaders(new Set());
+    setError("");
+    setTestState({ loading: false, result: null, error: "" });
+  }
+  const draft = latest.current;
+  const requestConfiguration = props.readRequestConfiguration?.() ?? "";
+  if (scope.configuration !== requestConfiguration) {
+    scope.configuration = requestConfiguration;
+    scope.testRevision++;
+    scope.testing = false;
+    setTestState({ loading: false, result: null, error: "" });
+  }
   const revision = scope.revision;
   const current = () =>
     scope.active && scope.id === props.providerId && scope.revision === revision;
   useEffect(() => {
-    scope.active = true;
+    scope.mounted = true;
+    scope.active = scope.enabled;
     scope.testing = false;
     setTestState({ loading: false, result: null, error: "" });
     return () => {
       scope.active = false;
+      scope.mounted = false;
+      scope.revision++;
       scope.testRevision++;
     };
   }, [scope]);
   const patch = (value: Partial<RequestDraft>) => {
     if (!current()) return;
     latest.current = { ...latest.current, ...value };
+    scope.dirty = true;
     setDraft(latest.current);
     // Editing a tested configuration retires its old response.
     scope.testRevision++;
     scope.testing = false;
     setTestState({ loading: false, result: null, error: "" });
     setError("");
+    // Accepted request fields belong to the same unsaved provider as General
+    // and model discovery. Keep invalid header text here for final validation.
+    if (props.embedded && !validate(latest.current)) syncDraft(latest.current);
   };
   const patchUsage = (value: Partial<UsageQueryConfig>) =>
     patch({ usage: normalizeUsageQueryConfig({ ...latest.current.usage, ...value }) });
@@ -112,11 +162,21 @@ export function NativeProviderRequestSettings(
         header.id === id ? { ...header, [field]: value } : header,
       ),
     });
-  const c = presentationControls();
-  const back = () => {
+  const c = presentationControls(
+    props.embedded
+      ? JSON.stringify(["provider-request", props.providerId, key, revision])
+      : undefined,
+  );
+  const retire = () => {
     if (!current()) return;
     scope.active = false;
     scope.revision++;
+    scope.testRevision++;
+    scope.testing = false;
+  };
+  const back = () => {
+    if (!current()) return;
+    retire();
     props.onBack();
   };
   const validate = (value: RequestDraft) => {
@@ -129,14 +189,7 @@ export function NativeProviderRequestSettings(
     }
     return "";
   };
-  const save = () => {
-    if (!current() || !provider) return;
-    const value = latest.current,
-      issue = validate(value);
-    if (issue) {
-      setError(issue);
-      return;
-    }
+  const syncDraft = (value: RequestDraft) => {
     try {
       setSettings((previous) =>
         updateCustomProviders(
@@ -144,6 +197,21 @@ export function NativeProviderRequestSettings(
           previous.customProviders.map((item) => {
             if (item.id !== props.providerId) return item;
             const supportsCache = item.type === "codex" || item.type === "claude_code";
+            let headers = value.headers.map(({ key, value }) => ({ key: key.trim(), value }));
+            const account = headers.find(
+              (header) => header.key.toLowerCase() === "chatgpt-account-id",
+            );
+            // The General pane also edits the OAuth account header. Preserve
+            // its latest accepted value unless Request deliberately edited it.
+            if (props.embedded && account?.value === scope.initialAccountHeader?.value) {
+              headers = headers.filter(
+                (header) => header.key.toLowerCase() !== "chatgpt-account-id",
+              );
+              const currentAccount = item.customHeaders?.find(
+                (header) => header.key.toLowerCase() === "chatgpt-account-id",
+              );
+              if (currentAccount) headers.push(currentAccount);
+            }
             return {
               ...item,
               useSystemProxy: value.proxy,
@@ -160,14 +228,12 @@ export function NativeProviderRequestSettings(
                 item.type === "claude_code" && value.caching && value.retention === "long"
                   ? "long"
                   : undefined,
-              customHeaders: value.headers
-                .map(({ key, value }) => ({ key: key.trim(), value }))
-                .filter(
-                  (header) =>
-                    item.type !== "codex" ||
-                    item.authMode === "oauth-token" ||
-                    header.key.toLowerCase() !== "chatgpt-account-id",
-                ),
+              customHeaders: headers.filter(
+                (header) =>
+                  item.type !== "codex" ||
+                  item.authMode === "oauth-token" ||
+                  header.key.toLowerCase() !== "chatgpt-account-id",
+              ),
               usageQuery: normalizeUsageQueryConfig(value.usage),
             };
           }),
@@ -175,15 +241,35 @@ export function NativeProviderRequestSettings(
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
-      return;
+      return false;
     }
-    back();
+    return true;
+  };
+  const commit = () => {
+    if (!current()) return false;
+    // The parent owns the missing-provider validation and its retry feedback.
+    if (!provider) return props.embedded === true;
+    if (props.embedded && !scope.dirty) return true;
+    const value = latest.current,
+      issue = validate(value);
+    if (issue) {
+      setError(issue);
+      return false;
+    }
+    return syncDraft(value);
+  };
+  const save = () => {
+    if (commit()) back();
   };
   const testUsage = async () => {
     if (!current() || scope.testing || !provider || props.canTestUsage === false) return;
     scope.testing = true;
     const requestRevision = ++scope.testRevision;
-    const ownsTest = () => current() && requestRevision === scope.testRevision;
+    const configurationKey = props.readRequestConfiguration?.() ?? "";
+    const ownsTest = () =>
+      current() &&
+      requestRevision === scope.testRevision &&
+      (props.readRequestConfiguration?.() ?? "") === configurationKey;
     setTestState({ loading: true, result: null, error: "" });
     const configuration = latest.current.usage;
     try {
@@ -200,24 +286,26 @@ export function NativeProviderRequestSettings(
       if (ownsTest()) scope.testing = false;
     }
   };
-  const nodes: PresentationNode[] = [
-    c.action("provider-request-back", t("settings.native.back"), back),
-    {
-      ...c.select(
-        "provider-detail-section",
-        t("settings.providerDialogNavigation"),
-        page,
-        [
-          { value: "request", label: t("settings.providerDialogRequest") },
-          { value: "usage", label: t("settings.navUsage") },
-        ],
-        (value) => {
-          if (current()) setPage(value);
+  const nodes: PresentationNode[] = props.embedded
+    ? []
+    : [
+        c.action("provider-request-back", t("settings.native.back"), back),
+        {
+          ...c.select(
+            "provider-detail-section",
+            t("settings.providerDialogNavigation"),
+            page,
+            [
+              { value: "request", label: t("settings.providerDialogRequest") },
+              { value: "usage", label: t("settings.navUsage") },
+            ],
+            (value) => {
+              if (current()) setPage(value);
+            },
+          ),
+          kind: "SegmentedControl",
         },
-      ),
-      kind: "SegmentedControl",
-    },
-  ];
+      ];
   if (!provider)
     nodes.push({
       id: "provider-request-missing",
@@ -393,7 +481,7 @@ export function NativeProviderRequestSettings(
         ),
       ]),
     );
-  } else {
+  } else if (page === "usage") {
     const usage = draft.usage;
     const credential = (
       id: string,
@@ -574,7 +662,26 @@ export function NativeProviderRequestSettings(
   }
   if (error)
     nodes.push({ id: "provider-request-error", kind: "Banner", status: "error", label: error });
-  if (provider) nodes.push(c.action("provider-request-save", t("settings.save"), save));
+  if (provider && !props.embedded)
+    nodes.push(c.action("provider-request-save", t("settings.save"), save));
+  return {
+    nodes,
+    handlers: c.handlers,
+    commit,
+    retire,
+    valid: !validate(draft),
+    onError: (cause: unknown) => {
+      if (current()) setError(cause instanceof Error ? cause.message : String(cause));
+    },
+  };
+}
+
+/** Standalone entry uses the same draft controller as the provider's inline panes. */
+export function NativeProviderRequestSettings(props: ProviderRequestSettingsProps) {
+  const { settings } = props;
+  const { t } = useLocale();
+  const provider = settings.customProviders.find((item) => item.id === props.providerId);
+  const request = useNativeProviderRequestSettings(props);
   const mobile = isNativeMobileRuntime();
   return (
     <NativeSurface
@@ -586,12 +693,10 @@ export function NativeProviderRequestSettings(
         formFactor: mobile ? "mobile" : "desktop",
         theme: createNativePresentationTheme(settings, mobile),
         dismissAction: "provider-request-back",
-        nodes: mobile ? nodes.map(withNativeSettingsIcons) : nodes,
+        nodes: mobile ? request.nodes.map(withNativeSettingsIcons) : request.nodes,
       }}
-      handlers={c.handlers}
-      onError={(cause) => {
-        if (current()) setError(cause instanceof Error ? cause.message : String(cause));
-      }}
+      handlers={request.handlers}
+      onError={request.onError}
     />
   );
 }

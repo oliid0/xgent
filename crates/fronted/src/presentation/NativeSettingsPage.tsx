@@ -53,7 +53,7 @@ import { MobileEnvironmentBrowser } from "../pages/settings/MobileEnvironmentBro
 import { MemoryPanel } from "../pages/settings/memory/MemoryPanel";
 import { mobileSettingsStatus } from "../pages/settings/mobileSettingsStatus";
 import { NativeProviderModelSettings } from "../pages/settings/NativeProviderModelSettings";
-import { NativeProviderRequestSettings } from "../pages/settings/NativeProviderRequestSettings";
+import { useNativeProviderRequestSettings } from "../pages/settings/NativeProviderRequestSettings";
 import { NativeProviderRuntimeSettings } from "../pages/settings/NativeProviderRuntimeSettings";
 import { ProjectRootsSection } from "../pages/settings/ProjectRootsSection";
 import { SoulSection } from "../pages/settings/SoulSection";
@@ -155,7 +155,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     props.initialSection === "failover" || props.initialSection === "usage",
   );
   const [providerModelId, setProviderModelId] = useState("");
-  const [providerRequestOpen, setProviderRequestOpen] = useState(false);
+  const [providerEditorSection, setProviderEditorSection] = useState("general");
   // A stalled Shell/status request must not disable provider controls after
   // navigation. Only the latest operation in the current route owns feedback.
   const [operations] = useState(() => ({ scope: "", revision: 0 }));
@@ -195,7 +195,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     setReturnPage("");
     setProviderId("");
     setProviderModelId("");
-    setProviderRequestOpen(false);
+    setProviderEditorSection("general");
     setProviderUrlDraft(null);
     setProviderRuntimeOpen(props.initialSection === "failover" || props.initialSection === "usage");
     setShellFilesOpen(false);
@@ -209,6 +209,18 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     settings: providerEditor.settings,
     setSettings: providerEditor.setSettings,
   };
+  const providerRequest = useNativeProviderRequestSettings({
+    ...providerProps,
+    setSettings: providerEditor.setRequestSettings,
+    providerId,
+    canTestUsage: !providerEditor.isNew,
+    onBack: () => setProviderEditorSection("general"),
+    embedded: true,
+    enabled: page === "providers" && !!provider,
+    scopeKey: String(providerEditor.revision),
+    readRequestConfiguration: providerEditor.readRequestConfiguration,
+    section: providerEditorSection,
+  });
   // Native controls can finish editing after a route changes. Reused field
   // IDs retain their layout identity; their actions belong to this provider
   // and authentication mode so a late credential cannot edit another account.
@@ -242,7 +254,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const providerModels = useNativeProviderModels(
     providerProps,
     page === "providers" ? provider : undefined,
-    page === "providers" && !!provider && !providerRuntimeOpen && !providerRequestOpen,
+    page === "providers" && !!provider && !providerRuntimeOpen,
     busy || !!providerModelId,
     work,
     setProviderModelId,
@@ -254,6 +266,11 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     setProviderId,
     t,
   );
+  if (!providerRequest.valid && providerModels.fetch) {
+    providerModels.fetch.disabled = true;
+    const handler = providerModels.handlers.get(providerModels.fetch.action ?? "");
+    if (handler) handler.enabled = false;
+  }
   const providerImports = useNativeProviderImports(
     props,
     !nativeMobile && page === "providers" && !provider,
@@ -466,11 +483,12 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       ({ id, icon }): PresentationNode => ({
         ...row(`desktop-nav:${id}`, titles[id], icon, () => {
           providerEditor.cancel();
+          providerRequest.retire();
           setProviderId("");
           setProviderUrlDraft(null);
           setProviderRuntimeOpen(false);
           setProviderModelId("");
-          setProviderRequestOpen(false);
+          setProviderEditorSection("general");
           setReturnPage("");
           setPage(id);
           setError("");
@@ -551,18 +569,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           handlers: new Map(c.handlers),
         },
   );
-  if (page === "providers" && providerRequestOpen && provider)
-    return (
-      <NativeProviderRequestSettings
-        key={provider.id}
-        settings={providerEditor.settings}
-        setSettings={providerEditor.setSettings}
-        providerId={provider.id}
-        canTestUsage={!providerEditor.isNew}
-        onBack={() => setProviderRequestOpen(false)}
-        nativeSettingsSurfaceId={sessionSurface}
-      />
-    );
   if (page === "providers" && providerImports.opened)
     return (
       <NativeSurface
@@ -702,7 +708,9 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       ...c.action("back", t("settings.native.back"), () => {
         if (providerId) {
           if (!providerEditor.cancel()) return;
+          providerRequest.retire();
           setProviderId("");
+          setProviderEditorSection("general");
           setProviderUrlDraft(null);
         } else {
           setPage(returnPage);
@@ -1098,176 +1106,198 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         }),
       );
     } else {
-      nodes.push(providerRuntimeAction);
-      nodes.push(
-        c.group("provider-details", provider.name, [
-          c.input("provider-name", t("settings.native.name"), provider.name, (name) =>
-            patchProvider({ name }),
-          ),
-          c.select(
-            "provider-type",
-            t("settings.native.api"),
-            provider.type,
-            ["codex", "claude_code", "gemini", "xai", "deepseek"].map((value) => ({
-              value,
-              label: value === "codex" ? "OpenAI compatible" : value,
-            })),
-            (type) =>
-              patchProvider({
-                type: type as CustomProvider["type"],
-                authMode: "api-key",
-                oauthAccountId: undefined,
-              }),
-          ),
-          c.input("provider-url", "Base URL", providerUrl, (baseUrl) => {
-            setProviderUrlDraft({ id: provider.id, value: baseUrl });
-            patchProvider({ baseUrl });
-          }),
-          ...(provider.type === "gemini"
-            ? []
-            : [
-                c.input(
-                  "provider-models-url",
-                  t("settings.providerModelsUrl"),
-                  provider.modelsUrl ?? "",
-                  (modelsUrl) => patchProvider({ modelsUrl: modelsUrl || undefined }),
-                  false,
-                  true,
-                  (value) => value.trim(),
-                ),
-              ]),
-          c.toggle(
-            "full-url",
-            t("settings.native.exactEndpoint"),
-            provider.isFullUrl,
-            (isFullUrl) => patchProvider({ isFullUrl, baseUrl: providerUrl }),
-          ),
-          ...(provider.type === "codex" || provider.type === "claude_code"
-            ? [
-                c.select(
-                  "provider-auth",
-                  t("settings.providerAuthMethod"),
-                  provider.authMode ?? "api-key",
-                  [
-                    { value: "api-key", label: t("settings.providerAuthApiKey") },
-                    ...(provider.type === "codex"
-                      ? [{ value: "oauth-managed", label: t("settings.providerAuthOAuth") }]
-                      : []),
-                    { value: "oauth-token", label: t("settings.providerAuthToken") },
-                  ],
-                  (authMode) =>
-                    patchProvider({
-                      authMode: authMode as CustomProvider["authMode"],
-                      oauthAccountId: undefined,
-                      apiKey: authMode === "oauth-managed" ? "" : provider.apiKey,
-                      apiKeyConfigured: authMode !== "oauth-managed" && !!provider.apiKey,
-                      customHeaders:
-                        authMode === "oauth-token"
-                          ? provider.customHeaders
-                          : provider.customHeaders?.filter(
-                              (header) => header.key.toLowerCase() !== "chatgpt-account-id",
-                            ),
-                    }),
-                ),
-              ]
-            : []),
-          ...(provider.authMode === "oauth-managed"
-            ? [
-                {
-                  id: "oauth-managed-hint",
-                  kind: "Text" as const,
-                  text: t("settings.providerOAuthManagedHintCodex"),
-                  secondary: true,
-                },
-              ]
-            : [
-                c.input(
-                  "provider-key",
-                  provider.authMode === "oauth-token"
-                    ? t("settings.providerOAuthToken")
-                    : "API Key",
-                  provider.apiKey,
-                  (apiKey) => patchProvider({ apiKey }),
-                  true,
-                ),
-              ]),
-          ...(provider.authMode === "oauth-token"
-            ? [
-                {
-                  id: "oauth-token-hint",
-                  kind: "Text" as const,
-                  secondary: true,
-                  text: t(
-                    provider.type === "claude_code"
-                      ? "settings.providerOAuthHintAnthropic"
-                      : "settings.providerOAuthHintCodex",
+      nodes.push({
+        id: "provider-editor-navigation",
+        kind: "HStack",
+        variant: "provider-category-toolbar",
+        children: [
+          {
+            ...c.select(
+              "provider-editor-section",
+              t("settings.providerDialogNavigation"),
+              providerEditorSection,
+              [
+                { value: "general", label: t("settings.providerDialogGeneral") },
+                { value: "request", label: t("settings.providerDialogRequest") },
+                { value: "usage", label: t("settings.navUsage") },
+              ],
+              setProviderEditorSection,
+            ),
+            variant: "provider-editor-tabs",
+            children: [
+              { id: "provider-editor-general", kind: "Text", value: "general", icon: "gearshape" },
+              { id: "provider-editor-request", kind: "Text", value: "request", icon: "globe" },
+              { id: "provider-editor-usage", kind: "Text", value: "usage", icon: "creditcard" },
+            ],
+          },
+          providerRuntimeAction,
+        ],
+      });
+      if (providerEditorSection === "general") {
+        nodes.push(
+          c.group("provider-details", provider.name, [
+            c.input("provider-name", t("settings.native.name"), provider.name, (name) =>
+              patchProvider({ name }),
+            ),
+            c.select(
+              "provider-type",
+              t("settings.native.api"),
+              provider.type,
+              ["codex", "claude_code", "gemini", "xai", "deepseek"].map((value) => ({
+                value,
+                label: value === "codex" ? "OpenAI compatible" : value,
+              })),
+              (type) =>
+                patchProvider({
+                  type: type as CustomProvider["type"],
+                  authMode: "api-key",
+                  oauthAccountId: undefined,
+                }),
+            ),
+            c.input("provider-url", "Base URL", providerUrl, (baseUrl) => {
+              setProviderUrlDraft({ id: provider.id, value: baseUrl });
+              patchProvider({ baseUrl });
+            }),
+            ...(provider.type === "gemini"
+              ? []
+              : [
+                  c.input(
+                    "provider-models-url",
+                    t("settings.providerModelsUrl"),
+                    provider.modelsUrl ?? "",
+                    (modelsUrl) => patchProvider({ modelsUrl: modelsUrl || undefined }),
+                    false,
+                    true,
+                    (value) => value.trim(),
                   ),
-                },
-                ...(provider.type === "codex"
-                  ? [
-                      c.input(
-                        "provider-oauth-account-id",
-                        t("settings.providerOAuthAccountId"),
-                        provider.customHeaders?.find(
-                          (header) => header.key.toLowerCase() === "chatgpt-account-id",
-                        )?.value ?? "",
-                        (value) =>
-                          patchProvider({
-                            customHeaders: [
-                              ...(provider.customHeaders ?? []).filter(
+                ]),
+            c.toggle(
+              "full-url",
+              t("settings.native.exactEndpoint"),
+              provider.isFullUrl,
+              (isFullUrl) => patchProvider({ isFullUrl, baseUrl: providerUrl }),
+            ),
+            ...(provider.type === "codex" || provider.type === "claude_code"
+              ? [
+                  c.select(
+                    "provider-auth",
+                    t("settings.providerAuthMethod"),
+                    provider.authMode ?? "api-key",
+                    [
+                      { value: "api-key", label: t("settings.providerAuthApiKey") },
+                      ...(provider.type === "codex"
+                        ? [{ value: "oauth-managed", label: t("settings.providerAuthOAuth") }]
+                        : []),
+                      { value: "oauth-token", label: t("settings.providerAuthToken") },
+                    ],
+                    (authMode) =>
+                      patchProvider({
+                        authMode: authMode as CustomProvider["authMode"],
+                        oauthAccountId: undefined,
+                        apiKey: authMode === "oauth-managed" ? "" : provider.apiKey,
+                        apiKeyConfigured: authMode !== "oauth-managed" && !!provider.apiKey,
+                        customHeaders:
+                          authMode === "oauth-token"
+                            ? provider.customHeaders
+                            : provider.customHeaders?.filter(
                                 (header) => header.key.toLowerCase() !== "chatgpt-account-id",
                               ),
-                              ...(value.trim()
-                                ? [{ key: "chatgpt-account-id", value: value.trim() }]
-                                : []),
-                            ],
-                          }),
-                        false,
-                        true,
-                        (value) => value.trim(),
-                      ),
-                      {
-                        id: "oauth-account-hint",
-                        kind: "Text" as const,
-                        text: t("settings.providerOAuthAccountIdHint"),
-                        secondary: true,
-                      },
-                    ]
-                  : []),
-              ]
-            : []),
-          ...(provider.type === "codex"
-            ? [
-                c.select(
-                  "request-format",
-                  t("settings.native.requestFormat"),
-                  provider.requestFormat ?? "openai-responses",
-                  [
-                    { value: "openai-responses", label: "Responses API" },
-                    { value: "openai-completions", label: "Chat Completions" },
-                  ],
-                  (requestFormat) =>
-                    patchProvider({
-                      requestFormat: requestFormat as CustomProvider["requestFormat"],
-                    }),
-                ),
-              ]
-            : []),
-          ...(providerModels.fetch ? [providerModels.fetch] : []),
-        ]),
-      );
-      if (provider.authMode === "oauth-managed")
-        nodes.push(nativeOAuthAccounts(c, oauth, provider.oauthAccountId ?? "", t));
-      nodes.push(...providerModels.nodes);
-      for (const [id, handler] of providerModels.handlers) c.handlers.set(id, handler);
-      nodes.push(
-        c.action(
-          "provider-request-settings",
-          t("settings.providerDialogRequest"),
-          () => setProviderRequestOpen(true),
-          !busy,
-        ),
-      );
+                      }),
+                  ),
+                ]
+              : []),
+            ...(provider.authMode === "oauth-managed"
+              ? [
+                  {
+                    id: "oauth-managed-hint",
+                    kind: "Text" as const,
+                    text: t("settings.providerOAuthManagedHintCodex"),
+                    secondary: true,
+                  },
+                ]
+              : [
+                  c.input(
+                    "provider-key",
+                    provider.authMode === "oauth-token"
+                      ? t("settings.providerOAuthToken")
+                      : "API Key",
+                    provider.apiKey,
+                    (apiKey) => patchProvider({ apiKey }),
+                    true,
+                  ),
+                ]),
+            ...(provider.authMode === "oauth-token"
+              ? [
+                  {
+                    id: "oauth-token-hint",
+                    kind: "Text" as const,
+                    secondary: true,
+                    text: t(
+                      provider.type === "claude_code"
+                        ? "settings.providerOAuthHintAnthropic"
+                        : "settings.providerOAuthHintCodex",
+                    ),
+                  },
+                  ...(provider.type === "codex"
+                    ? [
+                        c.input(
+                          "provider-oauth-account-id",
+                          t("settings.providerOAuthAccountId"),
+                          provider.customHeaders?.find(
+                            (header) => header.key.toLowerCase() === "chatgpt-account-id",
+                          )?.value ?? "",
+                          (value) =>
+                            patchProvider({
+                              customHeaders: [
+                                ...(provider.customHeaders ?? []).filter(
+                                  (header) => header.key.toLowerCase() !== "chatgpt-account-id",
+                                ),
+                                ...(value.trim()
+                                  ? [{ key: "chatgpt-account-id", value: value.trim() }]
+                                  : []),
+                              ],
+                            }),
+                          false,
+                          true,
+                          (value) => value.trim(),
+                        ),
+                        {
+                          id: "oauth-account-hint",
+                          kind: "Text" as const,
+                          text: t("settings.providerOAuthAccountIdHint"),
+                          secondary: true,
+                        },
+                      ]
+                    : []),
+                ]
+              : []),
+            ...(provider.type === "codex"
+              ? [
+                  c.select(
+                    "request-format",
+                    t("settings.native.requestFormat"),
+                    provider.requestFormat ?? "openai-responses",
+                    [
+                      { value: "openai-responses", label: "Responses API" },
+                      { value: "openai-completions", label: "Chat Completions" },
+                    ],
+                    (requestFormat) =>
+                      patchProvider({
+                        requestFormat: requestFormat as CustomProvider["requestFormat"],
+                      }),
+                  ),
+                ]
+              : []),
+            ...(providerModels.fetch ? [providerModels.fetch] : []),
+          ]),
+        );
+        if (provider.authMode === "oauth-managed")
+          nodes.push(nativeOAuthAccounts(c, oauth, provider.oauthAccountId ?? "", t));
+        nodes.push(...providerModels.nodes);
+        for (const [id, handler] of providerModels.handlers) c.handlers.set(id, handler);
+      }
+      nodes.push(...providerRequest.nodes);
+      for (const [id, handler] of providerRequest.handlers) c.handlers.set(id, handler);
       if (providerEditor.error)
         nodes.push({
           id: "provider-editor-error",
@@ -1284,7 +1314,9 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           {
             ...c.action("provider-editor-cancel", t("settings.cancel"), () => {
               if (!providerEditor.cancel()) return;
+              providerRequest.retire();
               setProviderId("");
+              setProviderEditorSection("general");
               setProviderUrlDraft(null);
             }),
             size: "large",
@@ -1293,8 +1325,10 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           },
           {
             ...c.action("provider-editor-save", t("settings.save"), () => {
-              if (!providerEditor.save()) return;
+              if (!providerRequest.commit() || !providerEditor.save()) return;
+              providerRequest.retire();
               setProviderId("");
+              setProviderEditorSection("general");
               setProviderUrlDraft(null);
             }),
             size: "large",
@@ -1802,7 +1836,10 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   c.handlers.set(c.actionId("close"), {
     enabled: !busy,
     accepts: (value) => value === null,
-    run: props.onBack,
+    run: () => {
+      providerRequest.retire();
+      props.onBack();
+    },
   });
   const renderedNodes: PresentationNode[] = nativeMobile
     ? nodes.map(withNativeSettingsIcons)

@@ -5,7 +5,7 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 import { createReactHookHarness } from "../helpers/react-hook-harness.mjs";
 
 function fixture() {
-  const requests = [];
+  const requests = [], usageRequests = [];
   const providerUtils = createTsModuleLoader().loadModule("src/pages/settings/providerUtils.ts");
   let activeHooks;
   const children = [];
@@ -25,7 +25,10 @@ function fixture() {
     "./NativeOtherSettings": { NativeOtherSettings: "NativeOtherSettings" },
     "./nativeTheme": { createNativePresentationTheme: () => ({}) },
     "../pages/settings/useCodexOAuthAccounts": { useCodexOAuthAccounts: () => ({ status: { accounts: [] }, loaded: true, locked: false }) },
-    "../../lib/providers/usageQuery": { useProviderUsage: () => ({ getState: () => ({ loading: false }), refresh() {} }) },
+    "../../lib/providers/usageQuery": {
+      useProviderUsage: () => ({ getState: () => ({ loading: false }), refresh() {} }),
+      testProviderUsage: (...args) => new Promise(resolve => usageRequests.push({ args, resolve })),
+    },
   };
   for (const name of ["CronSection", "SshSettingsSection", "ComputerUseSection", "GlobalShortcutsSection", "HooksSection", "SoulSection", "BackupSyncSection", "NativeProviderRuntimeSettings"])
     mocks["../pages/settings/" + name] = { [name]: name };
@@ -58,7 +61,7 @@ function fixture() {
     childRender(); return { render: childRender, action: childAction };
   };
   render();
-  return { render, action, handler, nodes, requests, providerUtils, settings: () => settings, rendered: () => rendered, get writes() { return writes; }, failSave: value => { failed = value; }, external: update => { settings = update(settings); render(); }, child, close: () => { hooks.unmount(); for (const childHooks of children) childHooks.unmount(); } };
+  return { render, action, handler, nodes, requests, usageRequests, providerUtils, settings: () => settings, rendered: () => rendered, get writes() { return writes; }, failSave: value => { failed = value; }, external: update => { settings = update(settings); render(); }, child, close: () => { hooks.unmount(); for (const childHooks of children) childHooks.unmount(); } };
 }
 
 test("native Add and Back keep a new provider unsaved", () => {
@@ -139,33 +142,140 @@ test("a provider removed externally cannot be resurrected by saving its native d
   } finally { f.close(); }
 });
 
-test("native request and usage Save updates the outer draft, and unsaved provider usage tests stay disabled", () => {
+test("native General, Request and Usage retain one draft and commit once; new-provider testing stays disabled", () => {
   const f = fixture();
   try {
     f.action("add-provider"); f.action("provider-name", "Request draft");
-    f.action("provider-request-settings");
-    assert.equal(f.rendered().props.canTestUsage, false);
-    const request = f.child();
-    request.action("provider-system-proxy", true);
-    request.action("provider-header-add");
-    let surface = request.render();
-    const visit = values => (values ?? []).flatMap(node => [node, ...visit(node.children)]);
-    const keyId = visit(surface.document.nodes).find(node => node.id.startsWith("provider-header-key:")).id;
+    const session = f.rendered().props.sessionSurface;
+    f.action("provider-editor-section", "request");
+    assert.equal(f.rendered().props.sessionSurface, session);
+    assert.deepEqual(f.nodes().find(node => node.id === "provider-editor-section").options.map(option => option.value), ["general", "request", "usage"]);
+    assert.ok(!f.nodes().some(node => ["provider-request-back", "provider-request-save", "provider-request-settings"].includes(node.id)));
+    f.action("provider-system-proxy", true);
+    f.action("provider-header-add");
+    const keyId = f.nodes().find(node => node.id.startsWith("provider-header-key:")).id;
     const headerId = keyId.split(":")[1];
-    request.action(keyId, "X-Draft"); request.action("provider-header-value:" + headerId, "draft-value");
-    request.action("provider-detail-section", "usage");
-    surface = request.render();
-    assert.equal(surface.handlers.get("provider-usage-test").enabled, false);
-    assert.ok(visit(surface.document.nodes).some(node => node.id === "provider-usage-save-first"));
-    request.action("provider-usage-mode", "custom"); request.action("provider-usage-script", "draft-script");
-    request.action("provider-request-save"); f.render();
+    f.action(keyId, "X-Draft"); f.action("provider-header-value:" + headerId, "draft-value");
+    f.action("provider-editor-section", "usage");
+    assert.equal(f.handler("provider-usage-test").enabled, false);
+    assert.ok(f.nodes().some(node => node.id === "provider-usage-save-first"));
+    f.action("provider-usage-mode", "custom"); f.action("provider-usage-script", "draft-script");
+    f.action("provider-editor-section", "general");
+    assert.equal(f.nodes().find(node => node.id === "provider-name").value, "Request draft");
+    f.action("provider-name", "Final name");
+    f.action("provider-editor-section", "request");
+    assert.equal(f.nodes().find(node => node.id === keyId).value, "X-Draft");
+    assert.equal(f.nodes().find(node => node.id === "provider-system-proxy").value, true);
+    f.action("provider-editor-section", "usage");
+    assert.equal(f.nodes().find(node => node.id === "provider-usage-script").value, "draft-script");
     assert.equal(f.writes, 0); assert.equal(f.settings().customProviders.length, 1);
     f.action("provider-editor-save");
     const saved = f.settings().customProviders[1];
+    assert.equal(saved.name, "Final name");
     assert.equal(saved.useSystemProxy, true);
     assert.deepEqual(saved.customHeaders, [{ key: "X-Draft", value: "draft-value" }]);
     assert.equal(saved.usageQuery.script, "draft-script");
     assert.equal(f.writes, 1);
+  } finally { f.close(); }
+});
+
+test("invalid Request fields block the shared Save in every pane and Cancel discards them", () => {
+  const f = fixture();
+  try {
+    f.action("provider:existing"); f.action("provider-editor-section", "request");
+    f.action("provider-header-add");
+    const key = f.nodes().find(node => node.id.startsWith("provider-header-key:")).id;
+    f.action(key, "Authorization");
+    f.action("provider-editor-section", "general"); f.action("provider-name", "Unsaved");
+    f.action("provider-editor-save");
+    assert.equal(f.writes, 0);
+    assert.equal(f.nodes().find(node => node.id === "provider-request-error").label, "settings.customHeaderReservedTitle");
+    f.action("provider-editor-cancel"); f.action("provider:existing");
+    assert.equal(f.nodes().find(node => node.id === "provider-name").value, "Original");
+    f.action("provider-editor-section", "request");
+    assert.ok(!f.nodes().some(node => node.id.startsWith("provider-header-key:")));
+    assert.ok(!f.nodes().some(node => node.id === "provider-request-error"));
+  } finally { f.close(); }
+});
+
+test("Request commit preserves the latest General OAuth account and credentials accepted before repaint", () => {
+  const f = fixture();
+  try {
+    f.action("provider:existing"); f.action("provider-type", "codex"); f.action("provider-auth", "oauth-token");
+    f.action("provider-editor-section", "request"); f.action("provider-system-proxy", true);
+    f.action("provider-editor-section", "general");
+    const save = f.handler("provider-editor-save");
+    f.handler("provider-key").run("final-token");
+    f.handler("provider-oauth-account-id").run("final-account");
+    save.run(null); f.render();
+    assert.equal(f.writes, 1);
+    const saved = f.settings().customProviders[0];
+    assert.equal(saved.apiKey, "final-token");
+    assert.equal(saved.useSystemProxy, true);
+    assert.deepEqual(saved.customHeaders, [{ key: "chatgpt-account-id", value: "final-account" }]);
+  } finally { f.close(); }
+});
+
+test("Cancel retires inline usage tests and callbacks before reopening the same provider", async () => {
+  const f = fixture();
+  try {
+    f.action("provider:existing"); f.action("provider-editor-section", "usage");
+    const oldMode = f.handler("provider-usage-mode");
+    const pending = f.action("provider-usage-test");
+    assert.equal(f.usageRequests.length, 1);
+    f.action("provider-editor-cancel"); f.action("provider:existing");
+    f.action("provider-editor-section", "usage");
+    oldMode.run("custom");
+    f.usageRequests[0].resolve({ data: [{ remaining: 42 }], isStale: false });
+    await pending; f.render();
+    assert.ok(!f.nodes().some(node => node.id === "provider-usage-success" || node.id === "provider-usage-loading"));
+    assert.notEqual(f.nodes().find(node => node.id === "provider-usage-mode").value, "custom");
+    assert.equal(f.writes, 0);
+  } finally { f.close(); }
+});
+
+test("model discovery reads the accepted Request draft and malformed headers disable a new fetch", async () => {
+  const f = fixture();
+  try {
+    f.action("provider:existing"); f.action("provider-editor-section", "request");
+    f.action("provider-system-proxy", true); f.action("provider-header-add");
+    const key = f.nodes().find(node => node.id.startsWith("provider-header-key:")).id;
+    f.action(key, "X-Draft"); f.action(key.replace("-key:", "-value:"), "accepted");
+    f.action("provider-editor-section", "general");
+    const fetching = f.action("fetch-models");
+    assert.equal(f.requests[0].args[3].useSystemProxy, true);
+    assert.deepEqual(f.requests[0].args[3].customHeaders, [{ key: "X-Draft", value: "accepted" }]);
+    f.requests[0].resolve([]); await fetching; f.render();
+    assert.equal(f.writes, 0, "Discovery uses the unsaved configuration without persisting it");
+    f.action("provider-editor-section", "request"); f.action(key, "Authorization");
+    f.action("provider-editor-section", "general");
+    assert.equal(f.handler("fetch-models").enabled, false);
+    assert.equal(f.nodes().find(node => node.id === "fetch-models").disabled, true);
+    f.action("provider-editor-cancel");
+    assert.equal(f.settings().customProviders[0].useSystemProxy, false);
+    assert.deepEqual(f.settings().customProviders[0].customHeaders, []);
+  } finally { f.close(); }
+});
+
+test("General connection edits retire inline usage results before repaint and clear settled feedback", async () => {
+  const f = fixture();
+  try {
+    f.action("provider:existing"); f.action("provider-editor-section", "usage");
+    const reading = f.action("provider-usage-test");
+    f.action("provider-editor-section", "general");
+    f.handler("provider-key").run("accepted-before-repaint");
+    f.usageRequests[0].resolve({ data: [{ remaining: 42 }], isStale: false });
+    await reading; f.render(); f.action("provider-editor-section", "usage");
+    assert.ok(!f.nodes().some(node => ["provider-usage-success", "provider-usage-error", "provider-usage-loading"].includes(node.id)));
+    const retry = f.action("provider-usage-test");
+    f.usageRequests[1].resolve({ data: [{ remaining: 24 }], isStale: false });
+    await retry; f.render();
+    assert.ok(f.nodes().some(node => node.id === "provider-usage-success"));
+    f.action("provider-editor-section", "general");
+    f.action("provider-url", "https://replacement.test/v1");
+    f.action("provider-editor-section", "usage");
+    assert.ok(!f.nodes().some(node => node.id === "provider-usage-success"));
+    assert.equal(f.writes, 0);
   } finally { f.close(); }
 });
 

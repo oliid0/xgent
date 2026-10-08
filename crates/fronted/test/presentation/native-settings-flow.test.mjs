@@ -17,6 +17,10 @@ test("native settings mirrors compact navigation and persists shared system, pro
     react: {
       useSyncExternalStore(_subscribe, getSnapshot) { return getSnapshot(); },
       useEffect() {},
+      useRef(current) {
+        const index = cursor++;
+        return states[index] ??= { current };
+      },
       useState(initial) {
         const index = cursor++;
         if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
@@ -47,7 +51,6 @@ test("native settings mirrors compact navigation and persists shared system, pro
     "../pages/settings/BackupSyncSection": { BackupSyncSection: "BackupSyncSection" },
     "../pages/settings/NativeProviderRuntimeSettings": { NativeProviderRuntimeSettings: "NativeProviderRuntimeSettings" },
     "../pages/settings/NativeProviderModelSettings": { NativeProviderModelSettings: "NativeProviderModelSettings" },
-    "../pages/settings/NativeProviderRequestSettings": { NativeProviderRequestSettings: "NativeProviderRequestSettings" },
     "./SettingsModalShell": { SettingsModalShell: "SettingsModalShell" },
     "../pages/settings/useCodexOAuthAccounts": { useCodexOAuthAccounts: () => ({ status: { accounts: [] }, loaded: true, locked: false }) },
   } });
@@ -280,12 +283,13 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.equal(rendered.props.providerType, provider.type);
   rendered.props.onBack(); render();
   assert.ok(rendered.props.handlers.has("fetch-models"), "Back returns to the same provider detail");
-  assert.equal((await dispatch("provider-request-settings")).ok, true);
-  assert.equal(rendered.type, "NativeProviderRequestSettings");
-  assert.equal(rendered.props.providerId, provider.id);
-  assert.equal(rendered.props.nativeSettingsSurfaceId, settingsSurface);
-  rendered.props.onBack(); render();
-  assert.ok(rendered.props.handlers.has(actionFor("provider-request-settings")));
+  assert.equal((await dispatch("provider-editor-section", "request")).ok, true);
+  assert.equal(rendered.type, "NativeSurface");
+  assert.equal(rendered.props.sessionSurface, settingsSurface);
+  assert.ok(rendered.props.handlers.has(actionFor("provider-system-proxy")));
+  assert.ok(!rendered.props.handlers.has("provider-request-back"));
+  assert.equal((await dispatch("provider-editor-section", "general")).ok, true);
+  assert.ok(rendered.props.handlers.has("fetch-models"));
   await dispatch("provider-editor-save");
   assert.ok(settings.customProviders.at(-1).activeModels.includes("example-model"));
   await dispatch("back");
@@ -383,6 +387,10 @@ test("native Shell install reports progress, errors, and live and final package 
     react: {
       useSyncExternalStore(_subscribe, getSnapshot) { return getSnapshot(); },
       useEffect(effect) { effects.push(effect); },
+      useRef(current) {
+        const index = cursor++;
+        return states[index] ??= { current };
+      },
       useState(initial) {
         const index = cursor++;
         if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;

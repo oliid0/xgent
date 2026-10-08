@@ -72,6 +72,26 @@ final class PackagedApplicationTests: XCTestCase {
                 XCTAssertLessThanOrEqual(previous.maxY, next.minY + 1, "Navigation rows must not overlap")
             }
             record(app, name: "macos-packaged-settings-" + section)
+            if section == "providers" {
+                click(window.buttons["add-provider"].firstMatch)
+                XCTAssertTrue(window.textFields["provider-name"].firstMatch.waitForExistence(timeout: 20))
+                record(app, name: "macos-packaged-provider-general")
+                click(window.buttons["provider-editor-section:request"].firstMatch)
+                let proxy = window.descendants(matching: .any)["provider-system-proxy"].firstMatch
+                XCTAssertTrue(proxy.waitForExistence(timeout: 20))
+                XCTAssertFalse(window.buttons["provider-request-back"].exists,
+                    "Request switches inline rather than opening another settings page")
+                record(app, name: "macos-packaged-provider-request")
+                click(window.buttons["provider-editor-section:usage"].firstMatch)
+                XCTAssertTrue(window.descendants(matching: .any)["provider-usage-mode"].firstMatch.waitForExistence(timeout: 20))
+                let usageTest = window.buttons["provider-usage-test"].firstMatch
+                XCTAssertTrue(usageTest.waitForExistence(timeout: 20))
+                XCTAssertFalse(usageTest.isEnabled,
+                    "An unsaved provider cannot run a persisted-provider usage command")
+                record(app, name: "macos-packaged-provider-usage")
+                click(window.buttons["provider-editor-cancel"].firstMatch)
+                XCTAssertTrue(window.buttons["add-provider"].firstMatch.waitForExistence(timeout: 20))
+            }
         }
 
         click(window.buttons["settings-close"].firstMatch)

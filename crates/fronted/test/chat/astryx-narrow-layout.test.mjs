@@ -409,6 +409,8 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
         const dialogPanel = dialog.querySelector('.settings-provider-model-dialog-body');
         const dialogFooter = dialog.querySelector('.settings-provider-model-dialog-footer');
         const dialogBounds = dialog.getBoundingClientRect();
+        const dialogTitle = dialog.querySelector('.astryx-dialog-header-title-block h2');
+        if (!dialogTitle || dialogTitle.getBoundingClientRect().height > parseFloat(getComputedStyle(dialogTitle).lineHeight) * 2 + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,overgrownModelTitle:true});
         for (const button of dialogFooter.querySelectorAll('button')) {
           const rect = button.getBoundingClientRect();
           if (rect.top < dialogPanel.getBoundingClientRect().bottom - 1 || rect.bottom > dialogBounds.bottom + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,coveredModelAction:button.textContent});

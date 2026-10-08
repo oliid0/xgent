@@ -56,6 +56,26 @@ final class PackagedSettingsTests: XCTestCase {
             XCTAssertFalse(title.frame.intersects(back.frame), "Header controls must not overlap the title")
             record(app, name: "ios-packaged-settings-" + page.id)
 
+            if page.id == "providers" {
+                tap(app.buttons["add-provider"].firstMatch, in: app)
+                reveal(app.textFields["provider-name"].firstMatch, in: app)
+                record(app, name: "ios-packaged-provider-general")
+                tap(app.buttons["provider-editor-section:request"].firstMatch, in: app)
+                reveal(app.switches["provider-system-proxy"].firstMatch, in: app)
+                XCTAssertFalse(app.buttons["provider-request-back"].exists,
+                    "Request switches inline in the same provider editor")
+                record(app, name: "ios-packaged-provider-request")
+                tap(app.buttons["provider-editor-section:usage"].firstMatch, in: app)
+                reveal(app.descendants(matching: .any)["provider-usage-mode"].firstMatch, in: app)
+                let usageTest = app.buttons["provider-usage-test"].firstMatch
+                for _ in 0..<10 where !usageTest.exists { app.swipeUp() }
+                XCTAssertTrue(usageTest.waitForExistence(timeout: 20))
+                XCTAssertFalse(usageTest.isEnabled)
+                record(app, name: "ios-packaged-provider-usage")
+                tap(app.buttons["provider-editor-cancel"].firstMatch, in: app)
+                XCTAssertTrue(app.buttons["add-provider"].firstMatch.waitForExistence(timeout: 20))
+            }
+
             if page.id == "other" {
                 let editors: [(area: String, action: String, field: String)] = [
                     ("hooks", "other:hooks:hook-add", "hook-name"),

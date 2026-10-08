@@ -17,6 +17,7 @@ export function CompactDialogHeader(props: {
   return (
     <VStack padding={4} width="100%" gap={0}>
       <DialogHeader
+        className="xgent-compact-dialog-header"
         title={props.title}
         subtitle={props.subtitle}
         startContent={props.startContent}

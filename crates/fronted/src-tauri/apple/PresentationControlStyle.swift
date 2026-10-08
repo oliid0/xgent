@@ -157,6 +157,7 @@ struct XgentActionButton: View {
                 if model.isBusy(node, in: document) { ProgressView().controlSize(.small) }
                 else if let icon = node.icon { Image(systemName: icon) }
                 Text(node.label ?? "").lineLimit(node.maxLines)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             // The label owns the interactive bounds. A transparent, expanded
             // ButtonStyle alone can report a full row to AX while only the

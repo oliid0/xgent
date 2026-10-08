@@ -1,25 +1,30 @@
-﻿# Current objective
-Converge Astryx and SwiftUI desktop/mobile UI and real interactions against all 14 references, then verify exact-source Apple CI and packaged applications. Goal remains active.
-User steering: consolidated commits/pushes; no incremental CI triggers. No local build/dev/Cargo/make.
+# Current objective
+Converge Astryx and SwiftUI desktop/mobile UI and real interactions against all 14 references; verify exact-source Apple CI and packaged applications. Goal remains active.
+User steering: consolidated commits/pushes; no incremental CI. No local build/dev/Cargo/make. Non-native tests, check/lint and existing browser evidence are permitted.
 
 ## Completed
-- Earlier changes through bd7ecdd: readable glass and fluid settings, provider colors/order, composer menu above input/direct Git initialization/pale-blue messages, right-sidebar new-tab/two-column tools/add menu, question navigation/input/skip/close, responsive Git diff/actions, editor state and shell discovery.
-- 59-file batch 7e939a15: compact Skill/MCP/model popups with one header, independent scrolling body and persistent real actions; native provider draft/list survives child model settings. Existing validation, reducers, save/delete/install/copy/progress/error behavior remains wired.
-- Provider/model rows support narrow/RTL/accessibility layouts with independent ordering controls. Sidebar titles/disclosures and work-process summaries use shared fonts/density, preserving full tool output/diffs and expansion during streaming.
-- Both terminals use scaled 14-point monospace, neutral foreground and preserved ANSI colors; pinned SwiftTerm uses 1.1 line spacing. Replay cache avoids unchanged encoding/decoding while preserving input/resize/session/retirement behavior.
-- Skill preview leases survive StrictMode setup/cleanup; controller regressions verify actual switch/close/copy payloads.
-- Corrective commits fe772e05/b2ca8191: desktop sheets accept screen-constrained sizes; disclosure queries use verified AXDisclosureTriangle roles and retain IDs; mounted iOS replacement test waits for matching real edit acknowledgement; native switches use shared theme accent.
-- Current local six-file batch: mobile settings use shared spacing/radius/secondary text; model/MCP detail shells no longer inherit the generic 300x360 minimum. Real nested macOS regression covers short/tall windows, large/accessibility text, header/footer bounds, live Save/Close and surviving parent settings. Pre-push review moved the existing JSON node helper into class scope.
+- Earlier changes through bd7ecdd: readable glass/fluid settings; provider colors/order; composer menu above input/direct Git initialization/pale-blue messages; right-sidebar new-tab/two-column tools/add menu; question navigation/input/skip/close; responsive Git diff/actions; editor state/shell discovery.
+- 7e939a15: compact Skill/MCP/model popups with independent scrolling body and persistent real actions, native provider draft/list retained behind model sheets; compact sidebar/work summaries; scaled monospace terminals/replay cache. Existing save/delete/install/copy/progress/error behavior and streaming output remain connected.
+- fe772e05/b2ca8191: screen-constrained desktop sheets, actual AXDisclosureTriangle queries, matching iOS find request acknowledgements and shared switch accent. CI #342 passes all eight jobs, including 230/230 macOS and iOS native tests.
+- ae0d07de: mobile shared spacing/radius/secondary text; nested model/MCP sheets adapt without generic minimums. CI #343 macOS passes 231/231, including actual nested Save/Close with parent settings retained.
+- Current consolidated batch: wrapped action labels own complete ideal height; provider footer chooses equal-width horizontal or full-width vertical actions. Compact titles cap visual text at two lines, preserving full accessible text; actual Astryx capture confirms the corrected popup.
+- Native General/Request/Usage now share one session and final Save/Cancel. Valid requests update the unsaved provider for model discovery; invalid headers remain editable and block Save/new fetch. Cancellation, pre-repaint OAuth fields, concurrent settings and retired usage/catalog replies are guarded.
 
 ## Evidence / decisions
-- All images reviewed. Decisions grounded in installed Astryx 0.6.3 source/types, Astryx MCP/CLI discovery, Swift MCP official docs, GitHub pinned package sources and Swift Package Index. No guessed SDK APIs/dependency additions.
-- CI screenshots/AX exposed fixed 736-point previews clipping inside 642-point sheets and hard-coded green iOS switches. macOS #342 captures confirm visible header/footer and compact/expanded work-process evidence.
-- Local mobile theme refinement follows iOS #341 screenshots, Astryx MobileAppearanceSettings gap={4}, and nativeTheme spacing/radius/palette mappings; 44-point controls preserved.
-- Shared Rust read/write/version guards remain authoritative. Office creation/round-trip/no-overwrite checks pass. Quick Look and Astryx JS renderers differ; arbitrary-document pixel fidelity, deterministic model output and future-bug-free behavior are not established.
-- Serialization microbenchmark: median 910.83ms uncached versus 36.78ms cached for 100 unchanged 256 KiB packets, identical output; encoding/serialization only.
+- All references reviewed; APIs grounded in installed Astryx 0.6.3, Astryx MCP/CLI, Swift MCP official docs, pinned GitHub package source and Swift Package Index. Provider glyphs match actual Astryx source; no speculative dependency additions.
+- #342 iOS screenshot/AX exposed three-line Cancel text overflowing a 98-point background and forced footer columns fragmenting labels. Mounted tests now measure the complete native label at actual width and require accessible actions to stack.
+- #343 / 37739757439, SHA ae0d07de68a4c28950fbe61228ccc40c67a73e30: seven jobs succeed; iOS fails five assertions in two tests (Undo text reverts after hosting updates; selected categories outside viewport). Local correction publishes completed Undo/Redo through the verified delegate and re-centers tabs on committed container/content geometry, excluding manual offsets. Native outcome remains unverified.
+- Astryx's actual usage regression requires General connection edits to retire pending/settled feedback. The native regression reproduced stale results before correction; it now consults existing provider configuration synchronously before accepting replies and clears settled feedback on change.
+- Rust file/version guards remain authoritative. Office round-trip/no-overwrite checks pass; Quick Look versus JS arbitrary-document pixel fidelity and deterministic model output are not established. Cached terminal packets match uncached output; the benchmark measures serialization rather than end-to-end latency.
+
+## Touched files
+- Apple: shared controls/detail/provider footer, category tabs/mobile+desktop routing, Undo commands; mounted find/category/provider/model/MCP regressions.
+- Frontend: compact Astryx header/CSS, native preview title, provider editor/request controller/settings composition; browser/native preview/provider/settings regressions.
+- Packaged macOS/iOS tests: real Add -> General/Request/Usage -> Cancel, obsolete request-back absence, actual disabled new-provider usage test and screenshot/AX evidence per pane. history.md records the same consolidated batch.
 
 ## Verification / remaining
-- Final non-native tests: 2040/2040 pass; pnpm check/lint pass (694 files, no fixes). Native contract (55 kinds/46 properties), architecture and git diff --check pass. Frontend unchanged after these checks. No local builds/native compilation/Cargo used.
-- CI #342 / 37737677043 validates b2ca819123e6e98f178ae860c53ce861c7629e10: all eight jobs finish successfully; both macOS and iOS full logs confirm 230/230 native tests. CI #341's seven macOS/two iOS assertions are repaired in b2ca8191.
-- Final six-file batch touches PresentationMobileSettings.swift, PresentationMobileSettingsCard.swift, PresentationMobileSettingsSectionHeader.swift, PresentationView.swift, Tests/DesktopSettingsRenderingTests.swift and history.md. All #342 outcomes are collected; consolidate this theme/detail refinement in one commit/push, then await exact-source CI. Local theme/detail regression has not yet been Apple-compiled.
-- After final exact-source CI passes, package that source once with real macOS/iOS interaction diagnostics and inspect runtime screenshots. Do not mark complete before required verification succeeds.
+- Focused provider/request/settings flows: 25/25 pass. pnpm check/lint pass (694 files, no fixes); native contract passes 55 kinds/46 properties; architecture/diff checks pass.
+- Final complete non-native suite after usage-retirement correction passes 2045/2045, zero failures (.ci-artifacts/frontend-provider-final.log); Cargo tests excluded. The preceding baseline passed 2044/2044.
+- Actual Astryx layout passes four viewports; refreshed model capture has zero layout failures. #343 macOS nested short/screen-constrained captures show complete header/footer/actions.
+- All local gates pass; publish the 23-file batch once, inspect exact-SHA Apple logs/screenshots, then package that source once with actual macOS/iOS diagnostics. SSH authenticates as an account without write access; cached HTTPS credentials are unavailable. GitHub MCP authenticates as owner oliid0 and confirms the unchanged baseline SHA, so publish the verified committed blobs atomically through MCP and verify local/remote trees. Planned manual tag v0.1.0-ci.20261008.154 has not been dispatched.
+- Do not mark complete before native/package verification succeeds. No local builds/native compilation/Cargo used.

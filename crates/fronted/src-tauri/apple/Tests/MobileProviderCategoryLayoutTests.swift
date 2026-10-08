@@ -6,8 +6,10 @@ import XCTest
 @testable import XgentNativeUI
 
 final class MobileProviderCategoryLayoutTests: XCTestCase {
-    private func fixture(selected: String, appearance: String) throws -> XgentDocument {
-        let vendors = [
+    private func fixture(selected: String, appearance: String, editor: Bool = false) throws -> XgentDocument {
+        let vendors = editor ? [
+            ("general", "Basic", "gearshape"), ("request", "Request", "globe"), ("usage", "Usage", "creditcard")
+        ] : [
             ("claude_code", "Anthropic", "xgent.provider.claude_code"), ("codex", "OpenAI", "xgent.provider.codex"),
             ("gemini", "Gemini", "xgent.provider.gemini"), ("xai", "Grok", "xgent.provider.xai"),
             ("deepseek", "DeepSeek", "xgent.provider.deepseek")
@@ -18,7 +20,8 @@ final class MobileProviderCategoryLayoutTests: XCTestCase {
             "nodes": [
                 ["id": "back", "kind": "Button", "label": "Back to settings", "action": "back"],
                 ["id": "provider-category-toolbar", "kind": "HStack", "variant": "provider-category-toolbar", "children": [
-                    ["id": "provider-vendor", "kind": "Selector", "variant": "provider-vendor-tabs", "label": "Providers",
+                    ["id": editor ? "provider-editor-section" : "provider-vendor", "kind": "Selector",
+                     "variant": editor ? "provider-editor-tabs" : "provider-vendor-tabs", "label": "Providers",
                      "value": selected, "action": "vendor",
                      "options": vendors.map { ["value": $0.0, "label": $0.1] },
                      "children": vendors.map { ["id": "provider-vendor-state:\($0.0)", "kind": "Text",
@@ -37,11 +40,12 @@ final class MobileProviderCategoryLayoutTests: XCTestCase {
     }
 
     @MainActor func testSelectedNamedCategoryAndAdvancedActionRemainVisibleAfterNarrowing() async throws {
-        for selected in ["claude_code", "deepseek"] {
+        for selected in ["claude_code", "deepseek", "usage"] {
             for appearance in ["light", "dark"] {
                 for size in [DynamicTypeSize.large, .accessibility3] {
                     for direction in [LayoutDirection.leftToRight, .rightToLeft] {
-                        let document = try fixture(selected: selected, appearance: appearance)
+                        let isEditor = selected == "usage"
+                        let document = try fixture(selected: selected, appearance: appearance, editor: isEditor)
                         let model = XgentPresentationModel(); model.update(document)
                         let content = XgentIOSSheetPresentation(initialDocument: document, model: model)
                             .dynamicTypeSize(size).environment(\.layoutDirection, direction)
@@ -56,11 +60,13 @@ final class MobileProviderCategoryLayoutTests: XCTestCase {
                             try await Task.sleep(for: .milliseconds(250))
                             let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
                             let elements = hierarchy.flattenToElements()
-                            let tabs = elements.filter { $0.identifier == "provider-vendor:\(selected)" }
+                            let tabs = elements.filter {
+                                $0.identifier == "\(isEditor ? "provider-editor-section" : "provider-vendor"):\(selected)"
+                            }
                             XCTAssertEqual(tabs.count, 1, "The selected tab has one actual button identity")
                             let tab = try XCTUnwrap(tabs.first)
                             XCTAssertTrue(tab.traits.contains(.selected))
-                            XCTAssertEqual(tab.label, selected == "claude_code" ? "Anthropic" : "DeepSeek")
+                            XCTAssertEqual(tab.label, isEditor ? "Usage" : selected == "claude_code" ? "Anthropic" : "DeepSeek")
                             let advanced = elements.filter { $0.identifier == "provider-runtime-settings" }
                             XCTAssertEqual(advanced.count, 1)
                             let frames = [tab.shape.bezierPath.bounds,

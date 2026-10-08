@@ -55,6 +55,22 @@ final class MobileProviderEditorLayoutTests: XCTestCase {
                         XCTAssertLessThanOrEqual(frame.maxX, width + 0.5)
                         XCTAssertLessThanOrEqual(frame.maxY, 844.5)
                         XCTAssertFalse(frame.intersects(close))
+                        let actionNode = try XCTUnwrap(document.node(id: id))
+                        // AX bounds alone miss text drawing outside a shorter
+                        // button background. Measure the same native font at
+                        // the action's actual available text width.
+                        let label = UIHostingController(rootView: Text(actionNode.label ?? "")
+                            .modifier(XgentControlTypography(node: actionNode))
+                            .fontWeight(.medium)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .dynamicTypeSize(size))
+                        label.safeAreaRegions = []
+                        let textSize = label.sizeThatFits(in: CGSize(
+                            width: max(1, frame.width - 2 * CGFloat(XgentPresentationTheme.fallback.spacing.md)),
+                            height: .greatestFiniteMagnitude))
+                        XCTAssertGreaterThanOrEqual(frame.height + 1, textSize.height +
+                            2 * CGFloat(XgentPresentationTheme.fallback.spacing.xs),
+                            "The complete wrapped label must fit inside its real button background")
                         frames.append(frame)
                     }
                     for first in frames.indices {
@@ -121,6 +137,12 @@ final class MobileProviderEditorLayoutTests: XCTestCase {
                 }
                 XCTAssertTrue(frames[0].intersection(frames[1]).isEmpty)
                 XCTAssertEqual(frames[0].width, frames[1].width, accuracy: 1)
+                if size.isAccessibilitySize {
+                    XCTAssertGreaterThanOrEqual(frames[0].width, width - 33,
+                        "Large text needs complete action names across the available row")
+                    XCTAssertGreaterThanOrEqual(frames[1].minY, frames[0].maxY + 7,
+                        "Long scaled actions must stack instead of fragmenting into narrow columns")
+                }
                 XCTAssertGreaterThan(frames[0].minY, 422, "The actions belong below the scrollable form")
                 let name = "provider-editor-\(Int(width))-\(size)"
                 try attachNativeAccessibilityEvidence(hierarchy, name: name)

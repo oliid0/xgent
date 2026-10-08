@@ -70,6 +70,7 @@ struct XgentSkillPreview: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 }
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(12).frame(maxWidth: .infinity, alignment: .trailing)
             }
         }

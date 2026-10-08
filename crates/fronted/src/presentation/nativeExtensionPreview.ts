@@ -28,7 +28,7 @@ export function compactExtensionPreview(
     fill: true,
     children: [
       ...(close ? [close] : []),
-      ...(title ? [title] : []),
+      ...(title ? [{ ...title, maxLines: title.maxLines ?? 2 }] : []),
       ...controls,
       {
         id: `${node.id}:body`,

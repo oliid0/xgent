@@ -32,7 +32,7 @@ function configuration(provider: CustomProvider | undefined) {
     : "";
 }
 
-/** One unsaved provider shared by its native general, model and request pages. */
+/** One unsaved provider shared by its native general, model and request panes. */
 export function useNativeProviderEditor(
   { settings, setSettings }: SettingsSectionProps,
   providerId: string,
@@ -97,6 +97,17 @@ export function useNativeProviderEditor(
     publish((value) => value + 1);
     return true;
   };
+  const updateDraft: SettingsSectionProps["setSettings"] = (update) => {
+    if (!current() || !scope.draft) return;
+    const next = update(viewSettings(scope.draft)).customProviders.find(
+      (item) => item.id === scope.id,
+    );
+    if (!next) return;
+    // Reducer normalization must preserve a deliberately invalid empty name.
+    scope.draft = { ...next, name: scope.draft.name };
+    scope.error = "";
+    publish((value) => value + 1);
+  };
   return {
     provider: draft,
     isNew: scope.isNew,
@@ -107,16 +118,12 @@ export function useNativeProviderEditor(
     settings: draft ? viewSettings(draft) : settings,
     setSettings: ((update) => {
       if (!current() || configuration(scope.draft) !== requestConfiguration || !scope.draft) return;
-      const next = update(viewSettings(scope.draft)).customProviders.find(
-        (item) => item.id === scope.id,
-      );
-      if (!next) return;
-      // Model/request reducers normalize providers. A deliberately empty name
-      // must remain invalid rather than turning into a normalized placeholder.
-      scope.draft = { ...next, name: scope.draft.name };
-      scope.error = "";
-      publish((value) => value + 1);
+      updateDraft(update);
     }) satisfies SettingsSectionProps["setSettings"],
+    // Synchronous pane commit reads the current draft even when General's last
+    // credential edit precedes repaint; async model responses retain the guard above.
+    setRequestSettings: updateDraft,
+    readRequestConfiguration: () => configuration(scope.draft),
     patch(patch: Partial<CustomProvider>) {
       if (!current() || !scope.draft) return;
       scope.draft = {
