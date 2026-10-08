@@ -32,8 +32,7 @@ import {
   normalizeFontFamily,
   toFontFamilySelectValue,
 } from "../../lib/system/fontFamily";
-import { tauriTerminalClient } from "../../lib/terminal/tauriTerminalClient";
-import type { TerminalShellOption } from "../../lib/terminal/types";
+import { useTerminalShellDiscovery } from "../../lib/terminal/useTerminalShellDiscovery";
 import { useTrayPrefs, writeTrayPrefs } from "../../lib/tray/trayPrefs";
 import { NativeMobileSystemSettings } from "../../presentation/NativeMobileSystemSettings";
 import { supportsApplePresentation } from "../../runtime/applePresentation";
@@ -132,7 +131,9 @@ function DesktopSystemSettingsForm({ settings, setSettings }: SystemSettingsForm
   const browser = isBrowserRuntime();
   const trayPrefs = useTrayPrefs();
   const isMacPlatform = useMemo(() => inferRuntimePlatform() === "macos", []);
-  const [terminalShellOptions, setTerminalShellOptions] = useState<TerminalShellOption[]>([]);
+  const { shell, refresh: refreshShells } = useTerminalShellDiscovery(true);
+  const terminalShellOptions = shell.options;
+  const shellReady = shell.status === "ready" && terminalShellOptions.length > 0;
   const [localFontFamilies, setLocalFontFamilies] = useState<string[]>([]);
   const [customFontModes, setCustomFontModes] = useState<
     Partial<Record<keyof FontFamilySettings, boolean>>
@@ -182,21 +183,6 @@ function DesktopSystemSettingsForm({ settings, setSettings }: SystemSettingsForm
     void listLocalFontFamilies().then((families) => {
       if (!cancelled) setLocalFontFamilies(families);
     });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    void tauriTerminalClient
-      .shellOptions()
-      .then((response) => {
-        if (!cancelled) setTerminalShellOptions(response.options);
-      })
-      .catch(() => {
-        if (!cancelled) setTerminalShellOptions([]);
-      });
     return () => {
       cancelled = true;
     };
@@ -337,16 +323,23 @@ function DesktopSystemSettingsForm({ settings, setSettings }: SystemSettingsForm
         </SettingsRow>
       </SettingsRowGroup>
 
-      {terminalShellOptions.length > 0 ? (
-        <SettingsRowGroup title={t("settings.terminalShell")} hideTitle>
-          <SettingsRow
-            label={t("settings.terminalShell")}
-            description={t("settings.terminalShellDesc")}
-          >
+      <SettingsRowGroup title={t("settings.terminalShell")} hideTitle>
+        <SettingsRow
+          label={t("settings.terminalShell")}
+          description={
+            shellReady
+              ? t("settings.terminalShellDesc")
+              : shell.status === "loading"
+                ? t("settings.loading")
+                : (shell.error ?? t("settings.terminalShellUnavailable"))
+          }
+        >
+          <VStack gap={2}>
             <Selector
               label={t("settings.terminalShell")}
               isLabelHidden
               value={terminalShellSelectValue}
+              isDisabled={!shellReady}
               width={CONTROL_WIDTH}
               options={[
                 { value: "auto", label: t("settings.terminalShellAuto") },
@@ -361,9 +354,16 @@ function DesktopSystemSettingsForm({ settings, setSettings }: SystemSettingsForm
                 )
               }
             />
-          </SettingsRow>
-        </SettingsRowGroup>
-      ) : null}
+            <Button
+              label={t("settings.mobileRefresh")}
+              variant="secondary"
+              size="sm"
+              isDisabled={shell.status === "loading"}
+              onClick={() => void refreshShells().catch(() => undefined)}
+            />
+          </VStack>
+        </SettingsRow>
+      </SettingsRowGroup>
 
       <SettingsRowGroup title={t("settings.appearance")} hideTitle>
         <SettingsRow label={t("settings.appearance")}>

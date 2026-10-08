@@ -36,6 +36,7 @@ import {
   Download,
   Eye,
   EyeOff,
+  GeminiIcon,
   Globe,
   GripVertical,
   List,
@@ -46,7 +47,6 @@ import {
   RefreshCw,
   Search,
   Settings,
-  Sparkles,
   Trash2,
   Wallet,
   Waypoints,
@@ -180,7 +180,7 @@ function ProviderBrandIcon({ type }: { type: ProviderId }) {
   const icon = {
     claude_code: ClaudeIcon,
     codex: OpenaiChatgptIcon,
-    gemini: Sparkles,
+    gemini: GeminiIcon,
     xai: Zap,
     deepseek: Waypoints,
   }[type];

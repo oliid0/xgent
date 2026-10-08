@@ -50,7 +50,7 @@ struct XgentTextArea: View {
             if node.variant == "workspace-code-editor", let session = XgentCodeSessionIdentity.decode(node.text) {
                 let binding = text
                 XgentRetainedCodeEditor(session: session, store: model.codeHosts, configuration: codeEditor(language),
-                                        content: binding.wrappedValue,
+                                        content: binding,
                                         environment: .init(theme: theme, colorScheme: colorScheme, dynamicTypeSize: dynamicTypeSize,
                                                            locale: locale, layoutDirection: layoutDirection, enabled: enabled),
                                         changed: { binding.wrappedValue = $0 })

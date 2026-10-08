@@ -1,17 +1,9 @@
-import { useEffect, useState } from "react";
 import { type TerminalShellPreference, updateSystem } from "../lib/settings";
-import { tauriTerminalClient } from "../lib/terminal/tauriTerminalClient";
-import type { TerminalShellOption } from "../lib/terminal/types";
+import { useTerminalShellDiscovery } from "../lib/terminal/useTerminalShellDiscovery";
 import { useTrayPrefs, writeTrayPrefs } from "../lib/tray/trayPrefs";
 import type { SettingsSectionProps } from "../pages/settings/types";
 import { presentationControls } from "./controls";
 import type { PresentationNode } from "./types";
-
-type ShellDiscovery = {
-  status: "loading" | "ready" | "error";
-  options: TerminalShellOption[];
-  error?: string;
-};
 
 /** macOS uses the same shell discovery and live tray preferences as desktop chat. */
 export function useNativeDesktopSystem(
@@ -20,38 +12,7 @@ export function useNativeDesktopSystem(
   t: (key: string) => string,
 ) {
   const tray = useTrayPrefs();
-  const [shell, setShell] = useState<ShellDiscovery>({ status: "loading", options: [] });
-  const [request] = useState(() => ({ active: enabled, revision: 0 }));
-
-  async function refresh() {
-    if (!request.active) return;
-    const revision = ++request.revision;
-    setShell({ status: "loading", options: [] });
-    try {
-      const result = await tauriTerminalClient.shellOptions();
-      if (request.active && request.revision === revision) {
-        setShell({ status: "ready", options: result.options });
-      }
-    } catch (cause) {
-      if (request.active && request.revision === revision) {
-        setShell({
-          status: "error",
-          options: [],
-          error: cause instanceof Error ? cause.message : String(cause),
-        });
-        throw cause;
-      }
-    }
-  }
-
-  useEffect(() => {
-    request.active = enabled;
-    if (enabled) void refresh().catch(() => undefined);
-    return () => {
-      request.active = false;
-      request.revision++;
-    };
-  }, [enabled]);
+  const { shell, refresh } = useTerminalShellDiscovery(enabled);
 
   const c = presentationControls();
   if (!enabled) return { nodes: [], handlers: c.handlers };

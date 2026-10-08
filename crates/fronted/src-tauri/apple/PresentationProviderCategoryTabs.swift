@@ -135,19 +135,24 @@ struct XgentProviderCategoryTabs: View {
 private struct XgentProviderCategoryScroll<Content: View>: View {
     let selected: String
     let content: Content
-    @State private var scrollTarget: String?
 
     init(selected: String, @ViewBuilder content: () -> Content) {
         self.selected = selected
         self.content = content()
-        _scrollTarget = State(initialValue: selected)
     }
 
     var body: some View {
-        ScrollView(.horizontal) { content }
-            .scrollIndicators(.hidden)
-            .scrollPosition(id: $scrollTarget, anchor: .center)
-            .clipped()
-            .onChange(of: selected) { scrollTarget = selected }
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) { content }
+                .scrollIndicators(.hidden)
+                .clipped()
+                .task(id: selected) {
+                    // The eager target must have completed its first layout.
+                    // An initial scrollPosition binding is ignored by the iOS host.
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    proxy.scrollTo(selected, anchor: .center)
+                }
+        }
     }
 }

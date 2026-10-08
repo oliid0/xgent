@@ -7,7 +7,7 @@ struct XgentRetainedCodeEditor: UIViewControllerRepresentable {
     let session: XgentCodeSessionIdentity
     let store: XgentCodeHostStore
     let configuration: XgentCodeEditor
-    let content: String
+    let content: Binding<String>
     let environment: XgentCodeHostEnvironment
     let changed: (String) -> Void
     final class Coordinator {
@@ -26,12 +26,15 @@ struct XgentRetainedCodeEditor: UIViewControllerRepresentable {
         install(in: container, coordinator: context.coordinator)
     }
     private func install(in container: UIViewController, coordinator: Coordinator) {
-        guard let entry = store.acquire(session, content: content) else {
+        // A render snapshot can predate a native undo. Read the shared draft
+        // when UIKit installs it so cached content cannot overwrite that edit.
+        let currentContent = content.wrappedValue
+        guard let entry = store.acquire(session, content: currentContent) else {
             coordinator.entry?.detach(coordinator.lease); coordinator.entry = nil; return
         }
         if coordinator.entry !== entry { coordinator.entry?.detach(coordinator.lease); coordinator.entry = entry }
         if let mount = container.view as? XgentCodeMountView { mount.entry = entry; mount.lease = coordinator.lease }
-        entry.update(lease: coordinator.lease, configuration: configuration, content: content, environment: environment, changed: changed)
+        entry.update(lease: coordinator.lease, configuration: configuration, content: currentContent, environment: environment, changed: changed)
         let host = entry.hosting
         if host.parent !== container {
             if host.parent != nil { host.willMove(toParent: nil); host.view.removeFromSuperview(); host.removeFromParent() }
@@ -60,7 +63,7 @@ struct XgentRetainedCodeEditor: NSViewRepresentable {
     let session: XgentCodeSessionIdentity
     let store: XgentCodeHostStore
     let configuration: XgentCodeEditor
-    let content: String
+    let content: Binding<String>
     let environment: XgentCodeHostEnvironment
     let changed: (String) -> Void
     final class Coordinator {
@@ -75,12 +78,13 @@ struct XgentRetainedCodeEditor: NSViewRepresentable {
     }
     func updateNSView(_ container: NSView, context: Context) { install(in: container, coordinator: context.coordinator) }
     private func install(in container: NSView, coordinator: Coordinator) {
-        guard let entry = store.acquire(session, content: content) else {
+        let currentContent = content.wrappedValue
+        guard let entry = store.acquire(session, content: currentContent) else {
             coordinator.entry?.detach(coordinator.lease); coordinator.entry = nil; return
         }
         if coordinator.entry !== entry { coordinator.entry?.detach(coordinator.lease); coordinator.entry = entry }
         if let mount = container as? XgentCodeMountView { mount.entry = entry; mount.lease = coordinator.lease }
-        entry.update(lease: coordinator.lease, configuration: configuration, content: content, environment: environment, changed: changed)
+        entry.update(lease: coordinator.lease, configuration: configuration, content: currentContent, environment: environment, changed: changed)
         let host = entry.hosting
         if host.superview !== container {
             host.translatesAutoresizingMaskIntoConstraints = false

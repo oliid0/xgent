@@ -651,7 +651,14 @@ struct XgentRootLayout: View {
                 // The drawer is a sibling of the disabled workspace. AppKit
                 // must not resolve its controls through a disabled base view.
                 if drawerVisible, let sidebar {
-                    ZStack(alignment: .leading) {
+                    HStack(spacing: 0) {
+                        content(sidebar)
+                            .frame(width: placement.drawerWidth)
+                            .frame(maxHeight: .infinity)
+                            .background(.regularMaterial)
+                            .shadow(color: .black.opacity(0.16), radius: 12, x: 4)
+                        // The dismissal target occupies only the uncovered pane.
+                        // A full-window button also masks drawer controls in AX hit testing.
                         Button { model.dismiss(sidebar) } label: {
                             Color.black.opacity(0.12)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -661,11 +668,6 @@ struct XgentRootLayout: View {
                         .disabled(sidebar.dismissAction == nil || model.isDismissing(sidebar))
                         .accessibilityLabel(sidebar.node(id: "sidebar-close")?.label ?? sidebar.title)
                         .accessibilityIdentifier("xgent-sidebar-dismiss-backdrop")
-                        content(sidebar)
-                            .frame(width: placement.drawerWidth)
-                            .frame(maxHeight: .infinity)
-                            .background(.regularMaterial)
-                            .shadow(color: .black.opacity(0.16), radius: 12, x: 4)
                     }
                     .transition(.move(edge: .leading).combined(with: .opacity))
                 }

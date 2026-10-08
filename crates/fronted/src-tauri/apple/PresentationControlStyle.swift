@@ -101,10 +101,12 @@ struct XgentControlIcon: View {
     var size: CGFloat = 17
 
     var body: some View {
-        if let svg = XgentProviderGlyphs.images[name] {
+        if name == "xgent.provider.gemini" {
+            XgentGeminiGlyph(size: size)
+        } else if let svg = XgentProviderGlyphs.images[name] {
             SVGView(svg: svg)
                 .resizable()
-                .renderingMode(.template)
+                .renderingMode(name == "xgent.provider.claude_code" ? .original : .template)
                 .aspectRatio(svg.size.width / svg.size.height, contentMode: .fit)
                 .frame(width: size, height: size)
         } else if name == "xgent.sidebar" {
