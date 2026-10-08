@@ -34,11 +34,11 @@ struct XgentIOSSettingsCard: View {
             // card here would double the inset and squeeze the actual controls.
             XgentIOSNode(node: area, document: document, model: model, parentAxis: .vertical)
         } else {
-          VStack(alignment: .leading, spacing: 10) {
+          VStack(alignment: .leading, spacing: CGFloat(theme.spacing.sm)) {
             if let field, !section.labels.contains(field.label ?? "") {
                 Text(field.label ?? "")
                     .font(XgentFonts.body(theme.fontFamily, size: labelSize * CGFloat(theme.fontScale), weight: .semibold))
-                    .foregroundStyle(Color(uiColor: .secondaryLabel))
+                    .foregroundStyle(Color(xgentHex: theme.palette(for: colorScheme).secondaryText))
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 16)
             }
@@ -55,7 +55,7 @@ struct XgentIOSSettingsCard: View {
                 }
             }
             .background(section.hasControls ? Color(xgentHex: theme.palette(for: colorScheme).card) : .clear,
-                in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+                in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.container), style: .continuous))
           }
         }
     }

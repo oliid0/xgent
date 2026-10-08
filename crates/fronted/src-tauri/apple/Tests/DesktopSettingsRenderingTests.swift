@@ -115,6 +115,97 @@ final class DesktopSettingsRenderingTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testNestedModelAndMCPDetailsKeepActionsInsideShortAndScreenConstrainedWindows() async throws {
+        let accessibility = try NativeMacAccessibilitySession()
+        defer { accessibility.restore() }
+        for variant in ["provider-model-settings", "mcp-registry-preview"] {
+            for size in [CGSize(width: 480, height: 420), CGSize(width: 1040, height: 920)] {
+                for textSize in [DynamicTypeSize.large, .accessibility3] {
+                    let model = XgentPresentationModel()
+                    var actions: [XgentAction] = []; model.actionSink = { actions.append($0) }
+                    let root = try JSONDecoder().decode(XgentDocument.self, from: Data(#"{"version":1,"surface":"root","revision":1,"mode":"root","title":"Chat","appearance":"light","formFactor":"desktop","nodes":[{"id":"welcome","kind":"Text","text":"Chat"}]}"#.utf8))
+                    model.update(root)
+                    let host = NSHostingView(rootView: XgentPresentationView(model: model).dynamicTypeSize(textSize))
+                    let window = NSWindow(contentRect: CGRect(origin: .zero, size: size),
+                                          styleMask: [.titled], backing: .buffered, defer: false)
+                    window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
+                    defer {
+                        if let sheet = window.attachedSheet { window.endSheet(sheet) }
+                        model.invalidate(); window.close()
+                    }
+                    model.update(try fixture(section: .appearance))
+                    var deadline = ContinuousClock.now + .seconds(3)
+                    while !nativeMacAccessibilityTree(window).contains(where: { $0.accessibilityIdentifier() == "settings-close" }),
+                          ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(50)) }
+                    XCTAssertTrue(nativeMacAccessibilityTree(window).contains { $0.accessibilityIdentifier() == "settings-close" })
+                    var detail: [String: Any] = ["version": 1, "surface": "detail", "revision": 1, "mode": "sheet",
+                        "title": "Configuration", "appearance": "light", "formFactor": "desktop", "dismissAction": "close",
+                        "nodes": [node("detail", "VStack", ["variant": variant, "fill": true, "children": [
+                            node("detail-close", "IconButton", ["label": "Close configuration", "icon": "xmark", "action": "close"]),
+                            node("detail-title", "Heading", ["text": "Configuration · 用户自定义模型"]),
+                            node("detail-body", "VStack", ["variant": "extension-preview-body", "children": (0..<20).map { index in
+                                node("detail-field-\(index)", "TextInput", ["label": "Configuration parameter \(index)",
+                                                                        "value": "Editable setting", "action": "edit-\(index)"])
+                            }]),
+                            node("detail-footer", "HStack", ["variant": "extension-preview-footer", "children": [
+                                node("detail-delete", "Button", ["label": "Delete configuration", "action": "delete", "destructive": true]),
+                                node("detail-cancel", "Button", ["label": "Cancel unsaved changes", "action": "cancel"]),
+                                node("detail-save", "Button", ["label": "Save configuration", "action": "save", "prominent": true])
+                            ]])
+                        ]])]]
+                    let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: detail))
+                    try document.validate(); model.update(document)
+                    deadline = ContinuousClock.now + .seconds(3)
+                    while window.attachedSheet == nil, ContinuousClock.now < deadline {
+                        try await Task.sleep(for: .milliseconds(50))
+                    }
+                    let sheet = try XCTUnwrap(window.attachedSheet)
+                    let view = try XCTUnwrap(sheet.contentView)
+                    try await Task.sleep(for: .milliseconds(200)); view.layoutSubtreeIfNeeded()
+                    let elements = nativeMacAccessibilityTree(sheet)
+                    let bounds = sheet.convertToScreen(view.convert(view.bounds, to: nil))
+                    let name = "nested-\(variant)-\(Int(size.width))-\(Int(size.height))-\(textSize)"
+                    try attachNativeAccessibilityEvidence(elements.map {
+                        ["id": $0.accessibilityIdentifier() ?? "", "role": $0.accessibilityRole()?.rawValue ?? "",
+                         "text": $0.accessibilityText() ?? "", "frame": NSStringFromRect($0.accessibilityFrame())]
+                    }, name: name + "-accessibility")
+                    var frames: [CGRect] = []
+                    for id in ["detail-close", "detail-delete", "detail-cancel", "detail-save"] {
+                        let control = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == id && $0.accessibilityRole() == .button })
+                        let frame = control.accessibilityFrame()
+                        XCTAssertGreaterThanOrEqual(frame.height, 31.5)
+                        XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX - 1)
+                        XCTAssertGreaterThanOrEqual(frame.minY, bounds.minY - 1)
+                        XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX + 1)
+                        XCTAssertLessThanOrEqual(frame.maxY, bounds.maxY + 1)
+                        XCTAssertFalse(frames.contains { $0.intersects(frame) })
+                        frames.append(frame)
+                    }
+                    XCTAssertLessThanOrEqual(bounds.width, 705)
+                    XCTAssertLessThanOrEqual(bounds.height, min(736, size.height) + 1)
+                    let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+                    view.cacheDisplay(in: view.bounds, to: bitmap)
+                    let attachment = XCTAttachment(image: NSImage(cgImage: try XCTUnwrap(bitmap.cgImage), size: view.bounds.size))
+                    attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+                    let save = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "detail-save" && $0.accessibilityRole() == .button })
+                    XCTAssertTrue(save.accessibilityPerformPress())
+                    XCTAssertEqual(actions.last?.surface, "detail"); XCTAssertEqual(actions.last?.action, "save")
+                    let close = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "detail-close" && $0.accessibilityRole() == .button })
+                    XCTAssertTrue(close.accessibilityPerformPress())
+                    XCTAssertEqual(actions.last?.surface, "detail"); XCTAssertEqual(actions.last?.action, "close")
+                    detail["revision"] = 2; detail["removed"] = true
+                    model.update(try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: detail)))
+                    deadline = ContinuousClock.now + .seconds(3)
+                    while window.attachedSheet != nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(50)) }
+                    XCTAssertNil(window.attachedSheet)
+                    XCTAssertTrue(nativeMacAccessibilityTree(window).contains { $0.accessibilityIdentifier() == "settings-close" },
+                                  "Closing a model/MCP detail must preserve its parent settings presentation")
+                }
+            }
+        }
+    }
+
     private enum Section: String, CaseIterable {
         case appearance, systemTools = "system-tools", proxy, about, permissions, providers
     }
@@ -184,13 +275,14 @@ final class DesktopSettingsRenderingTests: XCTestCase {
         XCTAssertEqual(actions.count, count)
     }
 
+    private func node(_ id: String, _ kind: String, _ fields: [String: Any] = [:]) -> [String: Any] {
+        var value = fields
+        value["id"] = id
+        value["kind"] = kind
+        return value
+    }
+
     private func fixture(section: Section = .providers) throws -> XgentDocument {
-        func node(_ id: String, _ kind: String, _ fields: [String: Any] = [:]) -> [String: Any] {
-            var value = fields
-            value["id"] = id
-            value["kind"] = kind
-            return value
-        }
         let appearanceGroups = [
             node("desktop-appearance", "SettingsGroup", ["label": "Appearance", "children": [
                 node("thinking", "Switch", ["label": "Show reasoning and thinking", "value": true, "action": "thinking"]),

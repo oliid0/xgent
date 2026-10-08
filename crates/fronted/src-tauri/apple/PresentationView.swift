@@ -571,9 +571,12 @@ struct XgentSheetView: View {
     private var usesGroupedForm: Bool {
         document.formFactor == .mobile && visibleNodes.contains { $0.kind == .settingsGroup }
     }
+    private var ownsDetailShell: Bool {
+        visibleNodes.contains { $0.variant == "mcp-registry-preview" || $0.variant == "provider-model-settings" }
+    }
     private var usesFullHeightContainer: Bool {
         visibleNodes.contains { $0.variant == "workspace-search-palette" } ||
-            visibleNodes.contains { $0.variant == "mcp-registry-preview" || $0.variant == "provider-model-settings" } ||
+            ownsDetailShell ||
             visibleNodes.contains { $0.kind == .settingsLayout } ||
             visibleNodes.contains { $0.kind == .terminalLayout } ||
             (visibleNodes.count == 1 && visibleNodes.first?.kind == .list)
@@ -599,7 +602,7 @@ struct XgentSheetView: View {
     }
 
     @ViewBuilder private var navigationContent: some View {
-        if visibleNodes.contains(where: { $0.kind == .settingsLayout || $0.variant == "mcp-registry-preview" || $0.variant == "provider-model-settings" }) {
+        if ownsDetailShell || visibleNodes.contains(where: { $0.kind == .settingsLayout }) {
             // These layouts own their fixed title, close and scrolling body.
             sheetContent
         } else {
@@ -633,7 +636,7 @@ struct XgentSheetView: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
         #endif
-        .frame(minWidth: 300, minHeight: 360)
+        .frame(minWidth: ownsDetailShell ? nil : 300, minHeight: ownsDetailShell ? nil : 360)
         .background { XgentThemeBackground().ignoresSafeArea() }
         .preferredColorScheme(document.colorScheme)
         .interactiveDismissDisabled(document.dismissAction == nil)

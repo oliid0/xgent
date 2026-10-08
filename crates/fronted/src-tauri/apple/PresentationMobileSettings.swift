@@ -52,31 +52,33 @@ struct XgentIOSSettingsForm: View {
     let nodes: [XgentNode]
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    @Environment(\.xgentPresentationTheme) private var theme
+    @Environment(\.colorScheme) private var scheme
 
     private var sections: [XgentSettingsFormSection] { XgentSettingsFormSection.sections(nodes) }
     private var route: String { nodes.first(where: { $0.kind == .settingsGroup })?.id ?? document.id }
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 28) {
+            LazyVStack(alignment: .leading, spacing: CGFloat(theme.spacing.lg)) {
                 ForEach(sections) { section in
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: CGFloat(theme.spacing.sm)) {
                         if !section.labels.isEmpty {
                             XgentIOSSettingsSectionHeader(labels: section.labels)
                         }
                         if !section.leadingNotes.isEmpty {
-                            notes(section.leadingNotes).padding(.horizontal, 16)
+                            notes(section.leadingNotes).padding(.horizontal, CGFloat(theme.spacing.lg))
                         }
                         XgentIOSSettingsCard(section: section, document: document, model: model)
                         if !section.trailingNotes.isEmpty {
-                            notes(section.trailingNotes).padding(.horizontal, 16)
+                            notes(section.trailingNotes).padding(.horizontal, CGFloat(theme.spacing.lg))
                         }
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 20)
-            .padding(.bottom, 32)
+            .padding(.horizontal, CGFloat(theme.spacing.lg))
+            .padding(.top, CGFloat(theme.spacing.lg))
+            .padding(.bottom, CGFloat(theme.spacing.xl))
         }
         .environment(\.xgentIOSFormRow, true)
         .environment(\.xgentSettingsRow, true)
@@ -89,7 +91,7 @@ struct XgentIOSSettingsForm: View {
             ForEach(nodes) { node in
                 XgentIOSNode(node: node, document: document, model: model, parentAxis: .vertical)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color(xgentHex: theme.palette(for: scheme).secondaryText))
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
