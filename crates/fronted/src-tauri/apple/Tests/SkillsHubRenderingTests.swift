@@ -60,6 +60,16 @@ final class SkillsHubRenderingTests: XCTestCase {
                     let field = try XCTUnwrap(elements.first { $0.identifier == (preview ? "preview-close" : "skill-enabled") })
                     XCTAssertLessThanOrEqual(field.shape.bezierPath.bounds.maxX, width + 1)
                     XCTAssertGreaterThanOrEqual(field.shape.bezierPath.bounds.minX, -1)
+                    if preview {
+                        let footer = try XCTUnwrap(elements.first { $0.identifier == "preview-copy" && $0.traits.contains(.button) })
+                        let rect = footer.shape.bezierPath.bounds
+                        XCTAssertGreaterThanOrEqual(rect.height, 43.5)
+                        XCTAssertGreaterThanOrEqual(rect.minX, -1)
+                        XCTAssertLessThanOrEqual(rect.maxX, width + 1)
+                        XCTAssertLessThanOrEqual(rect.maxY, 921)
+                        XCTAssertFalse(rect.intersects(field.shape.bezierPath.bounds))
+                        XCTAssertTrue(elements.contains { $0.identifier == "preview-enable" }, "The real native selection switch must remain reachable")
+                    }
                     let name = "skills-\(preview ? "preview" : "installed")-\(Int(width))-\(textSize)"
                     try attachNativeAccessibilityEvidence(hierarchy, name: name)
                     // SnapshotTesting's UIView strategy reparents its input.
@@ -97,6 +107,20 @@ final class SkillsHubRenderingTests: XCTestCase {
                     let bounds = visibleWindow.convertToScreen(visibleView.convert(visibleView.bounds, to: nil))
                     XCTAssertGreaterThanOrEqual(field.accessibilityFrame().minX, bounds.minX - 1)
                     XCTAssertLessThanOrEqual(field.accessibilityFrame().maxX, bounds.maxX + 1)
+                    if preview {
+                        let elements = nativeMacAccessibilityTree(visibleWindow)
+                        let footer = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "preview-copy" && $0.accessibilityRole() == .button })
+                        let frame = footer.accessibilityFrame()
+                        XCTAssertGreaterThanOrEqual(frame.height, 31.5)
+                        XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX - 1)
+                        XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX + 1)
+                        XCTAssertGreaterThanOrEqual(frame.minY, bounds.minY - 1)
+                        XCTAssertFalse(frame.intersects(field.accessibilityFrame()))
+                        XCTAssertTrue(footer.accessibilityPerformPress())
+                        XCTAssertEqual(actions.last?.action, "copy")
+                        XCTAssertTrue(elements.contains { $0.accessibilityIdentifier() == "preview-enable" })
+                        XCTAssertLessThanOrEqual(bounds.width, 705, "Extension previews must not occupy settings-dialog width")
+                    }
                     XCTAssertLessThanOrEqual(host.fittingSize.width, width + 1)
                     let strategy = Snapshotting<NSView, NSImage>.image(size: visibleView.bounds.size)
                     let image = await withCheckedContinuation { continuation in
@@ -141,9 +165,16 @@ final class SkillsHubRenderingTests: XCTestCase {
         let detail: [String: Any] = ["id": "preview", "kind": "VStack", "variant": "skill-preview", "children": [
             ["id": "preview-close", "kind": "IconButton", "label": "关闭预览", "icon": "xmark", "action": "close"],
             ["id": "preview-title", "kind": "Heading", "text": "研究与文档制作助手"],
-            ["id": "description", "kind": "VStack", "variant": "skill-detail-value", "label": "说明", "text": "搜索资料、检查来源，然后编写文稿和表格。"],
-            ["id": "content", "kind": "Markdown", "text": "## 工作步骤\n\n- 搜索资料\n- 制作表格\n\n```swift\nlet result = 42\n```"],
-            ["id": "truncated", "kind": "Banner", "status": "paused", "label": "文件内容已截断，只显示前 10000 个字符。"],
+            ["id": "preview-controls", "kind": "HStack", "variant": "extension-preview-controls", "children": [
+                ["id": "preview-enable", "kind": "Switch", "label": "启用研究与文档制作助手", "value": true, "action": "preview-enable"]]],
+            ["id": "preview-body", "kind": "VStack", "variant": "extension-preview-body", "children": [
+                ["id": "description", "kind": "Text", "text": "搜索资料、检查来源，然后编写文稿和表格。"],
+                ["id": "content", "kind": "Markdown", "text": String(repeating: "## 工作步骤\n\n- 搜索资料\n- 制作表格\n\n```swift\nlet result = 42\n```\n\n", count: 40)],
+                ["id": "truncated", "kind": "Banner", "status": "paused", "label": "文件内容已截断，只显示前 10000 个字符。"],
+                ["id": "preview-details", "kind": "Collapsible", "label": "详细信息", "children": [
+                    ["id": "preview-path", "kind": "Text", "text": "/workspace/skills/research/SKILL.md"]]]]],
+            ["id": "preview-footer", "kind": "HStack", "variant": "extension-preview-footer", "children": [
+                ["id": "preview-copy", "kind": "Button", "label": "复制文件内容", "action": "copy"]]],
         ]]
         #if os(iOS)
         let factor = "mobile"

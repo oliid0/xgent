@@ -16,8 +16,16 @@ struct XgentDesktopSheetSizing: ViewModifier {
                       height: min(height * 0.866, max(1, height - 32)))
     }
 
+    static func extensionPreviewSize(in available: CGSize) -> CGSize {
+        CGSize(width: min(704, max(1, available.width - 32)),
+               height: min(736, max(1, available.height - 32)))
+    }
+
     @ViewBuilder func body(content: Content) -> some View {
-        if document.nodes.contains(where: { $0.kind == .settingsLayout || $0.variant == "mcp-registry-preview" }) {
+        if document.nodes.contains(where: { $0.variant == "mcp-registry-preview" || $0.variant == "provider-model-settings" }) {
+            let size = Self.extensionPreviewSize(in: availableSize)
+            content.frame(width: size.width, height: size.height).presentationSizing(.fitted)
+        } else if document.nodes.contains(where: { $0.kind == .settingsLayout }) {
             let size = Self.settingsSize(in: availableSize)
             content.frame(width: size.width, height: size.height).presentationSizing(.fitted)
         } else if document.nodes.contains(where: { $0.variant == "workspace-search-palette" }) {

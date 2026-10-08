@@ -106,6 +106,9 @@ function providerEditorForPanel(panel) {
   ])) };
   const { ProvidersSection: Section } = createTsModuleLoader({ mocks: {
     ...vendor, react: editorReact, "react/jsx-runtime": jsx,
+    "@astryxdesign/core/Dialog": { ...vendor["@astryxdesign/core/Dialog"], Dialog: props =>
+      React.createElement(vendor["@astryxdesign/core/Dialog"].Dialog, { ...props, isInline: true,
+        style: { ...props.style, position: "absolute", inset: 0, width: "100%", blockSize: "100%" } }) },
     "../../components/icons": icons,
     "../../i18n": { useLocale: () => capturing ? editorLocale ?? { t: key => key } : useLocale() },
     "@astryxdesign/core/hooks": { useMediaQuery: () => true },
@@ -357,6 +360,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
   ${builtCss ? "" : `.workspace-project-row, .chat-history-row { display:grid; min-width:0; grid-template-columns:minmax(0,1fr) auto; }
   @layer utilities { .opacity-0 {opacity:0;} .chat-history-row:hover .sidebar-row-actions, .chat-history-row:focus-within .sidebar-row-actions {opacity:1;} .max-w-16 {max-width:64px;} }`}
   .workspace-project-row .astryx-more-menu { flex-shrink:0; }
+  .fixture-provider-editor { position:relative; }
   .fixture * { box-sizing:border-box; } .fixture .astryx-text { font-size:inherit; }
   .fixture-system-details .astryx-text[data-type="body"] { font-size:calc(var(--text-body-size) * var(--zone-font-scale)); }
   .fixture-system-details .astryx-text[data-type="supporting"] { font-size:calc(var(--text-supporting-size) * var(--zone-font-scale)); }
@@ -401,14 +405,22 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       }
       if (panel.getBoundingClientRect().bottom > bounds.bottom + 1 || section.scrollWidth > section.clientWidth + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,panel:section.dataset.panel,editorSurfaceOverflow:true});
       if (section.dataset.panel === 'model') {
-        const limits = panel.querySelectorAll('input[inputmode="numeric"]');
-        const costs = panel.querySelectorAll('input[inputmode="decimal"]');
+        const dialog = section.querySelector('.settings-provider-model-dialog');
+        const dialogPanel = dialog.querySelector('.settings-provider-model-dialog-body');
+        const dialogFooter = dialog.querySelector('.settings-provider-model-dialog-footer');
+        const dialogBounds = dialog.getBoundingClientRect();
+        for (const button of dialogFooter.querySelectorAll('button')) {
+          const rect = button.getBoundingClientRect();
+          if (rect.top < dialogPanel.getBoundingClientRect().bottom - 1 || rect.bottom > dialogBounds.bottom + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,coveredModelAction:button.textContent});
+        }
+        const limits = dialogPanel.querySelectorAll('input[inputmode="numeric"]');
+        const costs = dialogPanel.querySelectorAll('input[inputmode="decimal"]');
         if (limits.length !== 2 || costs.length !== 4) failures.push({width:section.dataset.width,missingModelParameters:{limits:limits.length,costs:costs.length}});
-        panel.scrollTop = panel.scrollHeight;
+        dialogPanel.scrollTop = dialogPanel.scrollHeight;
         const last = costs[costs.length - 1]?.closest('.astryx-field') ?? costs[costs.length - 1];
-        const lastBounds = last?.getBoundingClientRect(), port = panel.getBoundingClientRect();
+        const lastBounds = last?.getBoundingClientRect(), port = dialogPanel.getBoundingClientRect();
         if (!lastBounds || lastBounds.top < port.top - 1 || lastBounds.bottom > port.bottom + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,unreachableModelParameters:true});
-        panel.scrollTop = 0;
+        dialogPanel.scrollTop = 0;
       }
       providerEvidence.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,editor:true,panel:section.dataset.panel,controls:controls.length});
     }

@@ -44,6 +44,32 @@ test("native terminal output stays bounded without splitting transport offsets",
   assert.throws(() => new NativeTerminalOutputBuffer({ ...snapshot(), outputStartOffset: -1 }), /offsets/);
 });
 
+test("backpressure and document refresh reuse encoded output until new bytes arrive", () => {
+  const buffer = new NativeTerminalOutputBuffer(snapshot("one", "x".repeat(NATIVE_TERMINAL_OUTPUT_BYTES)));
+  const previousBtoa = globalThis.btoa;
+  let encodes = 0;
+  globalThis.btoa = (value) => { encodes++; return previousBtoa(value); };
+  try {
+    const first = JSON.parse(buffer.packet(true, 1));
+    const paused = JSON.parse(buffer.packet(false, 1));
+    const reconnect = JSON.parse(buffer.packet(true, 2));
+    assert.equal(encodes, 1);
+    assert.equal(paused.bytes, first.bytes);
+    assert.equal(paused.enabled, false);
+    assert.equal(reconnect.generation, 2);
+    assert.equal(buffer.append(chunk("x", NATIVE_TERMINAL_OUTPUT_BYTES - 1)), false);
+    buffer.packet(true, 2);
+    assert.equal(encodes, 1);
+    buffer.append(chunk("!", NATIVE_TERMINAL_OUTPUT_BYTES));
+    const next = JSON.parse(buffer.packet(true, 2));
+    assert.equal(encodes, 2);
+    assert.equal(Buffer.from(next.bytes, "base64").subarray(-1).toString(), "!");
+    assert.equal(next.startOffset, 1);
+    assert.equal(next.endOffset, NATIVE_TERMINAL_OUTPUT_BYTES + 1);
+    assert.equal(Buffer.from(first.bytes, "base64").subarray(-1).toString(), "x");
+  } finally { globalThis.btoa = previousBtoa; }
+});
+
 test("native terminal rejects malformed, oversized and ambiguous input or resize events", () => {
   assert.deepEqual(Array.from(parseNativeTerminalEvent(input()).bytes), [0, 27, 255]);
   assert.equal(parseNativeTerminalEvent(JSON.stringify({ sessionId: "one", type: "resize", cols: 80, rows: 24 })).cols, 80);

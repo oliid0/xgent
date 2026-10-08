@@ -9,7 +9,7 @@ import AppKit
 /// Handwritten terminal palette matching the shared XTermViewport light/dark styles.
 struct XgentTerminalColors {
     let dark: Bool
-    private var foreground: String { dark ? "#4ade80" : "#1f2933" }
+    private var foreground: String { dark ? "#cbd5e1" : "#1f2933" }
     private var background: String { dark ? "#0b0f14" : "#fcfcfd" }
     private var cursor: String { dark ? "#f8fafc" : "#111827" }
     private var selection: String { dark ? "#2c3e57" : "#bfdbfe" }

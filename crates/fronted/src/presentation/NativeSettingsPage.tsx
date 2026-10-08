@@ -242,12 +242,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const providerModels = useNativeProviderModels(
     providerProps,
     page === "providers" ? provider : undefined,
-    page === "providers" &&
-      !!provider &&
-      !providerModelId &&
-      !providerRuntimeOpen &&
-      !providerRequestOpen,
-    busy,
+    page === "providers" && !!provider && !providerRuntimeOpen && !providerRequestOpen,
+    busy || !!providerModelId,
     work,
     setProviderModelId,
     t,
@@ -582,18 +578,6 @@ export function NativeSettingsPage(props: SettingsPageProps) {
         }}
         handlers={providerImports.handlers}
         onError={providerImports.notice}
-      />
-    );
-  if (page === "providers" && providerModelId && provider)
-    return (
-      <NativeProviderModelSettings
-        key={`${provider.id}:${providerModelId}`}
-        settings={providerEditor.settings}
-        setSettings={providerEditor.setSettings}
-        providerId={provider.id}
-        modelId={providerModelId}
-        onBack={() => setProviderModelId("")}
-        nativeSettingsSurfaceId={sessionSurface}
       />
     );
   if (page === "providers" && providerRuntimeOpen)
@@ -1860,6 +1844,17 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       }}
       handlers={c.handlers}
       onError={setFailure}
-    />
+    >
+      {page === "providers" && providerModelId && provider ? (
+        <NativeProviderModelSettings
+          key={`${provider.id}:${providerModelId}`}
+          settings={providerEditor.settings}
+          setSettings={providerEditor.setSettings}
+          providerId={provider.id}
+          modelId={providerModelId}
+          onBack={() => setProviderModelId("")}
+        />
+      ) : null}
+    </NativeSurface>
   );
 }

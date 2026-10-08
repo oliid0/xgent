@@ -37,11 +37,11 @@ struct XgentDesktopSidebar: View {
             .padding(.bottom, 14)
             Divider()
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 4) {
+                LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(history) { item in historyItem(item) }
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 16)
+                .padding(.vertical, 8)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider()

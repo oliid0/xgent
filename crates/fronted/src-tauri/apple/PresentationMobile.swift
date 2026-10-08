@@ -551,6 +551,9 @@ struct XgentIOSSheetPresentation: View {
     private var detents: Set<PresentationDetent> {
         list == nil ? [.large] : [.fraction(0.62), .large]
     }
+    private var ownsDetailShell: Bool {
+        contentNodes.contains { $0.variant == "mcp-registry-preview" || $0.variant == "provider-model-settings" }
+    }
 
     @ViewBuilder private var leadingNavigation: some View {
         if let back {
@@ -629,15 +632,17 @@ struct XgentIOSSheetPresentation: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if isSettingsIndex {
-                HStack {
-                    Spacer(minLength: 0)
-                    trailingNavigation
+            if !ownsDetailShell {
+                if isSettingsIndex {
+                    HStack {
+                        Spacer(minLength: 0)
+                        trailingNavigation
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                } else {
+                    header
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-            } else {
-                header
             }
             if let saveStatus {
                 statusText(saveStatus)
@@ -647,7 +652,7 @@ struct XgentIOSSheetPresentation: View {
             }
             if grouped {
                 XgentIOSSettingsForm(nodes: contentNodes, document: document, model: model)
-            } else if contentNodes.contains(where: { $0.kind == .terminalLayout || $0.variant == "workspace-search-palette" }) {
+            } else if ownsDetailShell || contentNodes.contains(where: { $0.kind == .terminalLayout || $0.variant == "workspace-search-palette" }) {
                 XgentIOSNodes(nodes: contentNodes, document: document, model: model)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {

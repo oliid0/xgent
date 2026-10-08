@@ -49,7 +49,7 @@ extension XgentNodeView {
                 XgentSkillTags(node: node, document: document, model: model)
             } else if node.variant == "skill-store-grid" {
                 XgentSkillStoreGrid(node: node, document: document, model: model)
-            } else if node.variant == "skill-preview" {
+            } else if node.variant == "skill-preview" || node.variant == "mcp-registry-preview" || node.variant == "provider-model-settings" {
                 XgentSkillPreview(node: node, document: document, model: model)
             } else if node.variant == "skill-detail-value" {
                 XgentSkillDetailValue(node: node)

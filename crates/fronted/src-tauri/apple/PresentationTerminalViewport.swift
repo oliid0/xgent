@@ -15,7 +15,7 @@ struct XgentTerminalViewport: View {
 
     var body: some View {
         XgentPlatformTerminal(
-            value: node.value?.text ?? "", fontSize: 13 * CGFloat(theme.fontScale),
+            value: node.value?.text ?? "", fontSize: 14 * CGFloat(theme.fontScale),
             fontFamily: theme.codeFontFamily,
             colors: XgentTerminalColors(dark: colorScheme == .dark),
             label: node.label ?? "Terminal", emit: { value in
@@ -40,6 +40,7 @@ struct XgentPlatformTerminal: UIViewRepresentable {
 
     func makeUIView(context: Context) -> TerminalView {
         let view = TerminalView(frame: .zero)
+        view.lineSpacing = 1.1
         view.terminalDelegate = context.coordinator
         view.accessibilityLabel = label
         return view
@@ -73,6 +74,7 @@ struct XgentPlatformTerminal: NSViewRepresentable {
 
     func makeNSView(context: Context) -> TerminalView {
         let view = TerminalView(frame: .zero)
+        view.lineSpacing = 1.1
         view.terminalDelegate = context.coordinator
         view.setAccessibilityLabel(label)
         return view

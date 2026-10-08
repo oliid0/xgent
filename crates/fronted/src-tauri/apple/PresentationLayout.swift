@@ -286,7 +286,9 @@ extension XgentNodeView {
 
     var nativeToolCall: some View {
         Group {
-            if node.variant == "timeline" || node.status == "running" {
+            if node.variant == "timeline" {
+                XgentTranscriptToolCall(node: node, document: document, model: model)
+            } else if node.status == "running" {
                 VStack(alignment: .leading, spacing: 8) {
                     nativeToolCallLabel
                     nativeToolCallContent

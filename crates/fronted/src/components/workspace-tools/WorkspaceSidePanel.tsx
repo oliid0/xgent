@@ -406,6 +406,9 @@ export function WorkspaceSidePanel(props: WorkspaceSidePanelProps) {
                     client={props.client}
                     session={activeLocalSession}
                     theme={props.theme}
+                    fontScale={
+                      props.fontScale ?? props.settings.customSettings.fontScale.workspaceTools
+                    }
                     isActive
                     initialSnapshot={
                       sessions.initialTerminalSnapshotsRef.current.get(activeLocalSession.id) ??

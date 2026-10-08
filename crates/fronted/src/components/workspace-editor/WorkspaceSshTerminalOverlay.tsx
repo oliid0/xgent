@@ -37,6 +37,7 @@ type WorkspaceSshTerminalOverlayProps = {
   sftpClient: SftpClient;
   localForwardClient?: SshLocalForwardClient;
   theme: "light" | "dark";
+  fontScale?: number;
   isOpen: boolean;
   onHide: () => void;
 };
@@ -623,6 +624,7 @@ export function WorkspaceSshTerminalOverlay(props: WorkspaceSshTerminalOverlayPr
                     client={client}
                     session={session}
                     theme={theme}
+                    fontScale={props.fontScale}
                     isActive={isActiveTerminal}
                     onError={(_sessionId, message) => setError(message)}
                   />

@@ -6,6 +6,7 @@ import {
 } from "../lib/skills/clawHub";
 import { getInstallProgressPercent, installPhaseLabel } from "../lib/skills/installPresentation";
 import type { presentationControls } from "./controls";
+import { compactExtensionPreview } from "./nativeExtensionPreview";
 import type { PresentationNode } from "./types";
 
 export function nativeSkillInstallState(
@@ -143,77 +144,90 @@ export function nativeSkillStorePreview(options: {
     (data.ownerHandle
       ? `https://clawhub.ai/${encodeURIComponent(data.ownerHandle)}/${encodeURIComponent(data.slug)}`
       : "");
-  return {
-    id: "skill-store-preview",
-    kind: "VStack",
-    variant: "skill-preview",
-    label: data.displayName,
-    children: [
-      {
-        ...c.action("skill-store-preview-close", t("settings.close"), options.close),
-        kind: "IconButton",
-        icon: "xmark",
-        variant: "ghost",
-      },
-      { id: "skill-store-detail-title", kind: "Heading", text: data.displayName },
-      ...(card.children ?? []).filter((node) => !node.id.endsWith(":preview")),
-      ...(options.loading
-        ? [{ id: "skill-store-detail-loading", kind: "Progress" as const, label: t("app.loading") }]
-        : []),
-      ...(options.error
-        ? [
-            {
-              id: "skill-store-detail-error",
-              kind: "Banner" as const,
-              status: "error" as const,
-              label: t("settings.skillsStorePreviewDetailUnavailable"),
-              text: options.error,
-            },
-          ]
-        : []),
-      value("slug", "settings.skillsStorePreviewSlug", data.slug),
-      value(
-        "owner",
-        "settings.skillsStorePreviewOwner",
-        detail?.ownerDisplayName || data.ownerHandle || "",
-      ),
-      value("installs", "settings.skillsStorePreviewInstalls", String(data.installsCurrent)),
-      ...(
-        [
-          ["updated", "settings.skillsStorePreviewUpdated", date(data.updatedAt)],
-          ["created", "settings.skillsStorePreviewCreated", date(detail?.createdAt)],
+  return compactExtensionPreview(
+    {
+      id: "skill-store-preview",
+      kind: "VStack",
+      variant: "skill-preview",
+      label: data.displayName,
+      children: [
+        {
+          ...c.action("skill-store-preview-close", t("settings.close"), options.close),
+          kind: "IconButton",
+          icon: "xmark",
+          variant: "ghost",
+        },
+        { id: "skill-store-detail-title", kind: "Heading", text: data.displayName },
+        ...(card.children ?? []).filter((node) => !node.id.endsWith(":preview")),
+        ...(options.loading
+          ? [
+              {
+                id: "skill-store-detail-loading",
+                kind: "Progress" as const,
+                label: t("app.loading"),
+              },
+            ]
+          : []),
+        ...(options.error
+          ? [
+              {
+                id: "skill-store-detail-error",
+                kind: "Banner" as const,
+                status: "error" as const,
+                label: t("settings.skillsStorePreviewDetailUnavailable"),
+                text: options.error,
+              },
+            ]
+          : []),
+        value("slug", "settings.skillsStorePreviewSlug", data.slug),
+        value(
+          "owner",
+          "settings.skillsStorePreviewOwner",
+          detail?.ownerDisplayName || data.ownerHandle || "",
+        ),
+        value("installs", "settings.skillsStorePreviewInstalls", String(data.installsCurrent)),
+        ...(
           [
-            "published",
-            "settings.skillsStorePreviewPublished",
-            date(detail?.latestVersionCreatedAt),
-          ],
-          ["license", "settings.skillsStorePreviewLicense", detail?.license],
-          ["os", "settings.skillsStorePreviewOs", detail?.supportedOs.join(", ")],
-          ["systems", "settings.skillsStorePreviewSystems", detail?.supportedSystems.join(", ")],
-          ["moderation", "settings.skillsStorePreviewModeration", detail?.moderationStatus],
-        ] as const
-      ).flatMap(([id, key, text]) => (text ? [value(id, key, text)] : [])),
-      ...(detail?.latestVersionChangelog
-        ? [
-            {
-              id: "skill-store-changelog-title",
-              kind: "Heading" as const,
-              text: t("settings.skillsStorePreviewChangelog"),
-            },
-            {
-              id: "skill-store-changelog",
-              kind: "Markdown" as const,
-              text: detail.latestVersionChangelog,
-            },
-          ]
-        : []),
-      ...(link
-        ? [
-            c.action("skill-store-open-link", t("settings.skillsStoreOpenInClawHub"), () =>
-              options.open(link),
-            ),
-          ]
-        : []),
-    ],
-  };
+            ["updated", "settings.skillsStorePreviewUpdated", date(data.updatedAt)],
+            ["created", "settings.skillsStorePreviewCreated", date(detail?.createdAt)],
+            [
+              "published",
+              "settings.skillsStorePreviewPublished",
+              date(detail?.latestVersionCreatedAt),
+            ],
+            ["license", "settings.skillsStorePreviewLicense", detail?.license],
+            ["os", "settings.skillsStorePreviewOs", detail?.supportedOs.join(", ")],
+            ["systems", "settings.skillsStorePreviewSystems", detail?.supportedSystems.join(", ")],
+            ["moderation", "settings.skillsStorePreviewModeration", detail?.moderationStatus],
+          ] as const
+        ).flatMap(([id, key, text]) => (text ? [value(id, key, text)] : [])),
+        ...(detail?.latestVersionChangelog
+          ? [
+              {
+                id: "skill-store-changelog-title",
+                kind: "Heading" as const,
+                text: t("settings.skillsStorePreviewChangelog"),
+              },
+              {
+                id: "skill-store-changelog",
+                kind: "Markdown" as const,
+                text: detail.latestVersionChangelog,
+              },
+            ]
+          : []),
+        ...(link
+          ? [
+              c.action("skill-store-open-link", t("settings.skillsStoreOpenInClawHub"), () =>
+                options.open(link),
+              ),
+            ]
+          : []),
+      ],
+    },
+    {
+      detailsLabel: t("settings.skillsStorePreviewMetadata"),
+      metadata: (item) => item.variant === "skill-detail-value",
+      footer: (item) => item.id.endsWith(":install") || item.id === "skill-store-open-link",
+    },
+  );
 }

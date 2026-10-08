@@ -6,6 +6,70 @@ import XCTest
 @testable import XgentNativeUI
 
 final class MobileProviderEditorLayoutTests: XCTestCase {
+    @MainActor func testCompactModelAndMCPSheetsOwnTheirHeaderAndKeepLongFooterActionsVisible() async throws {
+        for variant in ["provider-model-settings", "mcp-registry-preview"] {
+            let fields: [[String: Any]] = (0..<20).map { index in
+                ["id": "detail-field-\(index)", "kind": "TextInput", "label": "Model configuration parameter \(index)",
+                 "value": "Editable setting", "action": "edit-\(index)"]
+            }
+            let payload: [String: Any] = [
+                "version": 1, "surface": "detail:\(variant)", "revision": 1, "mode": "sheet",
+                "title": "Model details", "appearance": "light", "formFactor": "mobile", "dismissAction": "close",
+                "nodes": [["id": "detail", "kind": "VStack", "variant": variant, "fill": true, "children": [
+                    ["id": "detail-close", "kind": "IconButton", "label": "Close model details", "icon": "xmark", "action": "close"],
+                    ["id": "detail-title", "kind": "Heading", "text": "Model alias 用户自定义模型"],
+                    ["id": "detail-body", "kind": "VStack", "variant": "extension-preview-body", "children": fields],
+                    ["id": "detail-footer", "kind": "HStack", "variant": "extension-preview-footer", "children": [
+                        ["id": "detail-delete", "kind": "Button", "label": "Delete model configuration", "action": "delete", "destructive": true],
+                        ["id": "detail-cancel", "kind": "Button", "label": "Cancel unsaved changes", "action": "cancel"],
+                        ["id": "detail-save", "kind": "Button", "label": "Save model configuration", "action": "save", "prominent": true]
+                    ]]
+                ]]]
+            ]
+            let document = try JSONDecoder().decode(XgentDocument.self,
+                from: JSONSerialization.data(withJSONObject: payload))
+            try document.validate()
+            for width in [CGFloat(240), 320, 430] {
+                for size in [DynamicTypeSize.large, .accessibility3] {
+                    let model = XgentPresentationModel(); model.update(document)
+                    let content = XgentIOSSheetPresentation(initialDocument: document, model: model)
+                        .frame(width: width, height: 844).dynamicTypeSize(size)
+                    let host = UIHostingController(rootView: content); host.safeAreaRegions = []
+                    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: width, height: 844))
+                    window.rootViewController = host; window.makeKeyAndVisible()
+                    defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
+                    host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(200))
+                    let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
+                    let elements = hierarchy.flattenToElements()
+                    XCTAssertFalse(elements.contains { $0.identifier == "presentation-sheet-title" || $0.identifier == "presentation-sheet-close" },
+                        "The detail shell owns the only title and close control")
+                    let close = try XCTUnwrap(elements.first { $0.identifier == "detail-close" }).shape.bezierPath.bounds
+                    var frames: [CGRect] = []
+                    for id in ["detail-delete", "detail-cancel", "detail-save"] {
+                        let actions = elements.filter { $0.identifier == id && $0.traits.contains(.button) }
+                        XCTAssertEqual(actions.count, 1, "One real action outside the scrolling body")
+                        let frame = try XCTUnwrap(actions.first).shape.bezierPath.bounds
+                        XCTAssertGreaterThanOrEqual(frame.width, 43.5)
+                        XCTAssertGreaterThanOrEqual(frame.height, 43.5)
+                        XCTAssertGreaterThanOrEqual(frame.minX, -0.5)
+                        XCTAssertLessThanOrEqual(frame.maxX, width + 0.5)
+                        XCTAssertLessThanOrEqual(frame.maxY, 844.5)
+                        XCTAssertFalse(frame.intersects(close))
+                        frames.append(frame)
+                    }
+                    for first in frames.indices {
+                        for second in frames.indices where second > first {
+                            XCTAssertTrue(frames[first].intersection(frames[second]).isEmpty)
+                        }
+                    }
+                    let name = "\(variant)-\(Int(width))-\(size)"
+                    try attachNativeAccessibilityEvidence(hierarchy, name: name)
+                    try attachCompositedNativeScreenshot(of: host.view, name: name)
+                }
+            }
+        }
+    }
+
     @MainActor func testLongEditorKeepsTwoCompleteFooterActionsInsideViewport() async throws {
         let fields: [[String: Any]] = (0..<24).map { index in
             ["id": "field-\(index)", "kind": "TextInput", "label": "A provider setting with a long label \(index)",

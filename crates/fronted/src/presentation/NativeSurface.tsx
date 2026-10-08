@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import {
   acknowledgeApplePresentation,
   publishApplePresentation,
@@ -74,6 +74,7 @@ export function NativeSurface(props: {
   handlers: ReadonlyMap<string, PresentationHandler>;
   onError: (error: unknown) => void;
   sessionSurface?: string;
+  children?: ReactNode;
 }) {
   // A route can mount again at the same React position. Its old native
   // document still owns the previous revision, so each mount needs a fresh ID.
@@ -136,5 +137,5 @@ export function NativeSurface(props: {
     };
   }, [surface, channel, props.sessionSurface]);
 
-  return null;
+  return props.children ?? null;
 }

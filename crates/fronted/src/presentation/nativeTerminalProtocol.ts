@@ -64,6 +64,7 @@ export class NativeTerminalOutputBuffer {
   private bytes: Uint8Array;
   private startOffset: number;
   private endOffset: number;
+  private encodedBytes: string | null = null;
 
   constructor(snapshot: TerminalStreamSnapshot) {
     this.sessionId = snapshot.session.id;
@@ -104,16 +105,18 @@ export class NativeTerminalOutputBuffer {
     }
     this.endOffset = chunk.endOffset;
     this.startOffset = this.endOffset - this.bytes.length;
+    this.encodedBytes = null;
     return true;
   }
 
   packet(enabled: boolean, generation: number) {
+    this.encodedBytes ??= terminalBytesToBase64(this.bytes);
     return JSON.stringify({
       sessionId: this.sessionId,
       generation,
       startOffset: this.startOffset,
       endOffset: this.endOffset,
-      bytes: terminalBytesToBase64(this.bytes),
+      bytes: this.encodedBytes,
       enabled,
     });
   }

@@ -73,9 +73,16 @@ final class SidebarConversationRenderingTests: XCTestCase {
                     let selection = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == id })
                     let menu = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "\(id):menu" })
                     XCTAssertLessThanOrEqual(selection.accessibilityFrame().maxX, menu.accessibilityFrame().minX + 1)
+                    XCTAssertGreaterThanOrEqual(selection.accessibilityFrame().height, 31.5)
+                    if size == .large {
+                        XCTAssertLessThanOrEqual(selection.accessibilityFrame().height, 40,
+                            "Desktop history must use compact pointer rows instead of mobile spacing")
+                    }
                     if workspace && !archived {
                         let disclosure = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == "\(id):disclosure" })
-                        XCTAssertGreaterThanOrEqual(disclosure.accessibilityFrame().width, 43.5)
+                        XCTAssertGreaterThanOrEqual(disclosure.accessibilityFrame().width, 31.5)
+                        XCTAssertLessThanOrEqual(disclosure.accessibilityFrame().width, 32.5)
+                        XCTAssertGreaterThanOrEqual(disclosure.accessibilityFrame().height, 31.5)
                         XCTAssertLessThanOrEqual(disclosure.accessibilityFrame().maxX, selection.accessibilityFrame().minX + 1)
                         var actions: [XgentAction] = []
                         model.actionSink = { actions.append($0) }
@@ -144,7 +151,7 @@ final class SidebarConversationRenderingTests: XCTestCase {
             var children: [[String: Any]] = []
             if workspace && !archived {
                 children.append(["id": "\(id):disclosure", "kind": "IconButton", "variant": "sidebar-disclosure",
-                                 "icon": "chevron.forward", "label": "Expand \(id)", "action": "\(id):disclosure"])
+                                 "icon": "folder", "label": "Expand \(id)", "action": "\(id):disclosure"])
             }
             children.append(["id": "\(id):menu", "kind": "Menu", "variant": "compact", "icon": "ellipsis",
                              "label": "Actions for \(id)", "children": [

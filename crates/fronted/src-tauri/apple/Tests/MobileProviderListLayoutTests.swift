@@ -6,6 +6,72 @@ import XCTest
 @testable import XgentNativeUI
 
 final class MobileProviderListLayoutTests: XCTestCase {
+    @MainActor func testModelSwitchSelectionAndOrderingKeepSeparateTargetsInAdaptiveRows() async throws {
+        let rows: [[String: Any]] = [false, true].map { selecting in
+            let id = selecting ? "selection" : "enabled"
+            return ["id": "row:\(id)", "kind": "VStack", "variant": "provider-model-row", "children": [
+                ["id": "model:\(id)", "kind": selecting ? "Button" : "Switch", "variant": "model-selection",
+                 "label": "relay/long-model-identifier-上下文", "value": true, "selected": true, "action": "select:\(id)"],
+                ["id": "model-limits:\(id)", "kind": "Text", "text": "1000K context · 64K output", "size": "small"],
+                ["id": "model-actions:\(id)", "kind": "Menu", "label": "Model settings", "variant": "compact", "children": [
+                    ["id": "edit:\(id)", "kind": "Button", "label": "Edit model", "action": "edit:\(id)"]]],
+                ["id": "model-reorder:\(id)", "kind": "Menu", "label": "Reorder model", "icon": "line.3.horizontal",
+                 "variant": "compact", "children": [["id": "up:\(id)", "kind": "Button", "label": "Move up", "action": "up:\(id)"]]]
+            ]]
+        }
+        let payload: [String: Any] = ["version": 1, "surface": "model-rows", "revision": 1,
+            "mode": "sheet", "title": "Models", "appearance": "light", "formFactor": "mobile", "nodes": rows]
+        let document = try JSONDecoder().decode(XgentDocument.self, from: JSONSerialization.data(withJSONObject: payload))
+        try document.validate()
+        for width in [CGFloat(240), 320, 430, 768] {
+            for size in [DynamicTypeSize.large, .accessibility3] {
+                for direction in [LayoutDirection.leftToRight, .rightToLeft] {
+                    let model = XgentPresentationModel(); model.update(document)
+                    let content = ScrollView {
+                        VStack(spacing: 12) { XgentIOSNodes(nodes: document.nodes, document: document, model: model) }.padding(12)
+                    }.frame(width: width, height: 1600)
+                        .dynamicTypeSize(size).environment(\.layoutDirection, direction)
+                    let host = UIHostingController(rootView: content); host.safeAreaRegions = []
+                    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: width, height: 1600))
+                    window.rootViewController = host; window.makeKeyAndVisible()
+                    defer { model.invalidate(); window.isHidden = true; window.rootViewController = nil }
+                    host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(200))
+                    let hierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
+                    let elements = hierarchy.flattenToElements()
+                    for suffix in ["enabled", "selection"] {
+                        var frames: [CGRect] = []
+                        for id in ["model:\(suffix)", "model-reorder:\(suffix)", "model-actions:\(suffix)"] {
+                            let matches = elements.filter { $0.identifier == id }
+                            XCTAssertEqual(matches.count, 1, "One independent usable control for \(id)")
+                            let frame = try XCTUnwrap(matches.first).shape.bezierPath.bounds
+                            XCTAssertGreaterThanOrEqual(frame.width, 43.5)
+                            XCTAssertGreaterThanOrEqual(frame.height, 43.5)
+                            XCTAssertGreaterThanOrEqual(frame.minX, -0.5)
+                            XCTAssertLessThanOrEqual(frame.maxX, width + 0.5)
+                            XCTAssertLessThanOrEqual(frame.maxY, 1600)
+                            for previous in frames { XCTAssertFalse(previous.intersects(frame)) }
+                            frames.append(frame)
+                        }
+                        if width <= 320 || size.isAccessibilitySize {
+                            XCTAssertGreaterThanOrEqual(frames[1].minY, frames[0].maxY,
+                                "Narrow/accessible layouts put sorting and settings below the model control")
+                            XCTAssertGreaterThanOrEqual(frames[2].minY, frames[0].maxY)
+                        } else if direction == .leftToRight {
+                            XCTAssertLessThanOrEqual(frames[1].maxX, frames[0].minX)
+                            XCTAssertLessThanOrEqual(frames[0].maxX, frames[2].minX)
+                        } else {
+                            XCTAssertGreaterThanOrEqual(frames[1].minX, frames[0].maxX)
+                            XCTAssertGreaterThanOrEqual(frames[0].minX, frames[2].maxX)
+                        }
+                    }
+                    let name = "model-rows-\(Int(width))-\(size)-\(direction)"
+                    try attachNativeAccessibilityEvidence(hierarchy, name: name)
+                    try attachCompositedNativeScreenshot(of: host.view, name: name)
+                }
+            }
+        }
+    }
+
     @MainActor func testProviderDetailsAndSeparateActionsFitNarrowAndLargeTextLayouts() async throws {
         let payload: [String: Any] = [
             "version": 1, "surface": "settings:providers", "revision": 1,

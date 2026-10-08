@@ -54,8 +54,11 @@ function fixture(overrides = {}) {
   let tree;
   const render = () => { activeHooks = editorHooks; tree = editorHooks.render(() => editor.type(editorProps)); return elements(tree); };
   const node = label => elements(tree).find(node => node.props.label === label || node.props.title === label);
+  const modelDialog = () => elements(tree).find(node => node.props.isOpen && node.props["aria-label"] === "settings.modelSettings");
   render();
   return { render, node, requests, usageRequests, saved, utils, hooks: editorHooks, elements: () => elements(tree),
+    modelDialog,
+    modelAction: label => elements(modelDialog()).find(node => node.props.label === label && node.props.onClick).props.onClick(),
     setSaveError: error => { saveError = error; },
     panel: value => { elements(tree).find(node => node.props.role === "tablist").props.onChange(value); render(); },
     refresh: () => node("settings.refreshModels") ?? node("settings.fetching"),
@@ -94,7 +97,7 @@ test("Astryx request cache protocol saves the accepted selection without repaint
   } finally { f.close(); }
 });
 
-test("Astryx inline model editor saves accepted capability, cache protocol and limits without repaint", () => {
+test("Astryx model dialog saves accepted capability, cache protocol and limits without repaint", () => {
   const f = fixture({ type: "codex", models: [{ id: "alias", contextWindow: 8000, maxOutputToken: 1000, ownedBy: "original" }], activeModels: ["alias"] });
   try {
     f.node("settings.modelSettings").props.onClick(); f.render();
@@ -104,7 +107,10 @@ test("Astryx inline model editor saves accepted capability, cache protocol and l
     limit.props.onChange("32000");
     const saves = f.elements().filter(node => node.props.label === "settings.save");
     assert.equal(saves.length, 2);
-    saves[0].props.onClick(); saves[1].props.onClick();
+    assert.ok(f.modelDialog());
+    f.modelAction("settings.save");
+    assert.equal(f.saved.length, 0, "Model Save only changes the outer draft");
+    f.save();
     assert.equal(f.saved[0].models[0].contextWindow, 32000);
     assert.deepEqual(f.saved[0].models[0].inputModalities, ["text", "image"]);
     assert.equal(f.saved[0].models[0].promptCacheHintMode, "none");
@@ -121,7 +127,7 @@ test("Astryx provider Save commits its open model draft without requiring a sepa
     f.change("settings.modelCostInput", "1.5");
     f.change("settings.modelInput", "text-image");
     f.change("settings.promptCacheHintModelOverride", "none");
-    f.elements().filter(node => node.props.label === "settings.save").at(-1).props.onClick();
+    f.save();
     const model = f.saved[0].models[0];
     assert.equal(model.contextWindow, 64000);
     assert.equal(model.maxOutputToken, 16000);
@@ -139,7 +145,7 @@ test("Astryx model navigation preserves accepted edits and rejects invalid draft
     buttons()[0].props.onClick(); f.render();
     const switchModel = buttons()[1].props.onClick;
     f.change("settings.contextWindow", "0");
-    switchModel(); f.elements().filter(node => node.props.label === "settings.save").at(-1).props.onClick();
+    switchModel(); f.save();
     assert.equal(f.saved.length, 0);
     f.render();
     assert.equal(f.node("settings.contextWindow").props.value, "0", "Invalid model draft stays open for correction");
@@ -147,7 +153,7 @@ test("Astryx model navigation preserves accepted edits and rejects invalid draft
     switchModel(); f.render();
     assert.equal(f.node("settings.contextWindow").props.value, "32000", "The second model has its own parameter draft");
     f.change("settings.maxOutputToken", "12000");
-    f.elements().filter(node => node.props.label === "settings.save").at(-1).props.onClick();
+    f.save();
     assert.deepEqual(f.saved[0].models.map(model => [model.id, model.contextWindow, model.maxOutputToken]),
       [["alpha", 64000, 8000], ["beta", 32000, 12000]]);
   } finally { f.close(); }
@@ -158,9 +164,35 @@ test("Astryx cancelling a model draft discards it before the provider Save", () 
   try {
     f.node("settings.modelSettings").props.onClick(); f.render();
     f.change("settings.contextWindow", "64000");
-    f.node("settings.cancel").props.onClick(); f.render(); f.save();
+    f.modelAction("settings.cancel"); f.render(); f.save();
     assert.equal(f.saved[0].models[0].contextWindow, 32000);
     assert.equal(f.saved[0].models[0].limitsSource, "provider");
+  } finally { f.close(); }
+});
+
+test("Astryx closed model dialog controls cannot edit, save or close another or reopened model", () => {
+  const f = fixture({ type: "codex", models: ["alpha", "beta"].map(id => ({ id, contextWindow: 32000, maxOutputToken: 8000 })), activeModels: ["alpha", "beta"] });
+  try {
+    const open = id => {
+      const menu = f.elements().find(node => node.props.button?.label === `settings.modelSettings: ${id}`);
+      menu.props.items.find(item => item.id === "edit").onClick(); f.render();
+    };
+    open("alpha");
+    const oldChange = f.node("settings.contextWindow").props.onChange;
+    const oldClose = f.modelDialog().props.onOpenChange;
+    const oldSave = elements(f.modelDialog()).find(node => node.props.label === "settings.save").props.onClick;
+    f.modelAction("settings.cancel"); f.render();
+    assert.equal(f.modelDialog(), undefined);
+    for (const id of ["beta", "alpha"]) {
+      open(id);
+      oldChange("1"); oldSave(); oldClose(false); f.render();
+      assert.ok(f.modelDialog());
+      assert.equal(f.node("settings.contextWindow").props.value, "32000");
+      assert.equal(f.saved.length, 0);
+      f.modelAction("settings.cancel"); f.render();
+    }
+    f.save();
+    assert.deepEqual(f.saved[0].models.map(model => model.contextWindow), [32000, 32000]);
   } finally { f.close(); }
 });
 

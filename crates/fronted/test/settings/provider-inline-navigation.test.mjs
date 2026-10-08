@@ -43,13 +43,12 @@ test("provider editor and advanced settings drill into the existing settings con
   assert.match(providersSource, /type ProviderSettingsView = "list" \| "editor" \| "advanced"/);
   assert.match(providersSource, /view === "editor"[\s\S]*?<ProviderEditor/);
   assert.match(providersSource, /view === "advanced"[\s\S]*?<ProviderAdvancedSettingsPanel/);
-  assert.doesNotMatch(
-    providersSource.slice(
-      providersSource.indexOf("function ProviderEditor"),
-      providersSource.indexOf("function ProviderAdvancedSettingsPanel"),
-    ),
-    /<Dialog\b/,
-  );
+  const editor = providersSource.slice(providersSource.indexOf("function ProviderEditor"),
+    providersSource.indexOf("function ProviderAdvancedSettingsPanel"));
+  assert.equal((editor.match(/<Dialog\b/g) ?? []).length, 1, "Only model details open a compact dialog");
+  assert.match(editor, /editingModel \? \([\s\S]*?<Dialog[\s\S]*?aria-label=\{t\("settings.modelSettings"\)\}/);
+  assert.match(editor, /<SettingsDetailHeader[\s\S]*?settings\.providerDialogNavigation/,
+    "The outer provider remains a settings content layer");
   assert.doesNotMatch(
     providersSource.slice(
       providersSource.indexOf("function ProviderAdvancedSettingsPanel"),

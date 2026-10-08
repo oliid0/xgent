@@ -1,7 +1,7 @@
 import { Banner } from "@astryxdesign/core/Banner";
-import { BreadcrumbItem, Breadcrumbs } from "@astryxdesign/core/Breadcrumbs";
 import { Button as AstryxCoreButton } from "@astryxdesign/core/Button";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
 import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { FormLayout } from "@astryxdesign/core/FormLayout";
@@ -31,6 +31,7 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Token } from "@astryxdesign/core/Token";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CompactDialogHeader } from "../../components/astryx/CompactDialogHeader";
 import {
   ExternalLink,
   Globe2,
@@ -398,7 +399,7 @@ function McpConfigureModal(props: {
       variant="standard"
       purpose="form"
       aria-label={t("mcpHub.storeConfigureTitle")}
-      width="min(var(--xgent-settings-dialog-width), calc(100dvw - (var(--spacing-4) * 2)))"
+      width="min(var(--xgent-extension-preview-width), calc(100dvw - (var(--spacing-4) * 2)))"
       padding={0}
     >
       <form onSubmit={handleSubmit}>
@@ -720,32 +721,28 @@ function McpRegistryPreviewDrawer(props: {
       aria-label={t("mcpHub.storePreviewTitle")}
       purpose="info"
       variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "var(--xgent-settings-dialog-width)"}
-      maxHeight="var(--xgent-settings-dialog-height)"
+      width={isCompact ? "100dvw" : "var(--xgent-extension-preview-width)"}
+      maxHeight="var(--xgent-extension-preview-height)"
       padding={0}
       style={{
-        blockSize: isCompact ? "100dvh" : "var(--xgent-settings-dialog-height)",
+        blockSize: isCompact ? "100dvh" : "var(--xgent-extension-preview-height)",
       }}
     >
       <Layout
         height="fill"
         header={
-          <DialogHeader
+          <CompactDialogHeader
             title={data.displayName}
             subtitle={data.source}
             startContent={<Icon icon={data.remote ? Globe2 : Server} size="md" color="secondary" />}
-            onOpenChange={(isOpen) => {
-              if (!isOpen) onClose();
-            }}
+            compact={isCompact}
+            closeLabel={t("settings.close")}
+            onClose={onClose}
           />
         }
         content={
           <LayoutContent isScrollable>
-            <VStack gap={5}>
-              <Breadcrumbs variant="supporting" label={t("mcpHub.storePreviewTitle")}>
-                <BreadcrumbItem onClick={onClose}>{t("mcpHub.tabStore")}</BreadcrumbItem>
-                <BreadcrumbItem isCurrent>{data.displayName}</BreadcrumbItem>
-              </Breadcrumbs>
+            <VStack gap={3}>
               <Text color="secondary">{data.description || t("mcpHub.storeNoDescription")}</Text>
 
               <HStack gap={2} vAlign="center" wrap="wrap">
@@ -822,55 +819,60 @@ function McpRegistryPreviewDrawer(props: {
                       collapsible={false}
                     />
                   )}
-                  <MetadataList label={{ position: "start", width: "var(--spacing-28)" }}>
-                    <MetadataListItem label={t("mcpHub.serverName")}>
-                      {server?.id ?? data.name}
-                    </MetadataListItem>
-                    {transports.length > 0 ? (
-                      <MetadataListItem label={t("mcpHub.transport")}>
-                        {transports.join(", ")}
+                  <Collapsible
+                    trigger={t("settings.skillsInstalledPreviewDetails")}
+                    defaultIsOpen={false}
+                  >
+                    <MetadataList label={{ position: "start", width: "var(--spacing-28)" }}>
+                      <MetadataListItem label={t("mcpHub.serverName")}>
+                        {server?.id ?? data.name}
                       </MetadataListItem>
-                    ) : null}
-                    {server?.timeoutMs ? (
-                      <MetadataListItem label={t("mcpHub.timeout")}>
-                        {`${server.timeoutMs} ms`}
-                      </MetadataListItem>
-                    ) : null}
-                    {server?.command ? (
-                      <MetadataListItem label={t("mcpHub.command")}>
-                        {server.command}
-                      </MetadataListItem>
-                    ) : null}
-                    {server?.args?.length ? (
-                      <MetadataListItem label={t("mcpHub.args")}>
-                        {server.args.join(" ")}
-                      </MetadataListItem>
-                    ) : null}
-                    {server?.url ? (
-                      <MetadataListItem
-                        label={
-                          server.transport === "sse" ? t("mcpHub.urlSse") : t("mcpHub.urlHttp")
-                        }
-                      >
-                        {server.url}
-                      </MetadataListItem>
-                    ) : null}
-                    {server?.messageUrl ? (
-                      <MetadataListItem label={t("mcpHub.messageUrl")}>
-                        {server.messageUrl}
-                      </MetadataListItem>
-                    ) : null}
-                    {keyListLabel(server?.env) ? (
-                      <MetadataListItem label={t("mcpHub.env")}>
-                        {keyListLabel(server?.env)}
-                      </MetadataListItem>
-                    ) : null}
-                    {keyListLabel(server?.headers) ? (
-                      <MetadataListItem label={t("mcpHub.headers")}>
-                        {keyListLabel(server?.headers)}
-                      </MetadataListItem>
-                    ) : null}
-                  </MetadataList>
+                      {transports.length > 0 ? (
+                        <MetadataListItem label={t("mcpHub.transport")}>
+                          {transports.join(", ")}
+                        </MetadataListItem>
+                      ) : null}
+                      {server?.timeoutMs ? (
+                        <MetadataListItem label={t("mcpHub.timeout")}>
+                          {`${server.timeoutMs} ms`}
+                        </MetadataListItem>
+                      ) : null}
+                      {server?.command ? (
+                        <MetadataListItem label={t("mcpHub.command")}>
+                          {server.command}
+                        </MetadataListItem>
+                      ) : null}
+                      {server?.args?.length ? (
+                        <MetadataListItem label={t("mcpHub.args")}>
+                          {server.args.join(" ")}
+                        </MetadataListItem>
+                      ) : null}
+                      {server?.url ? (
+                        <MetadataListItem
+                          label={
+                            server.transport === "sse" ? t("mcpHub.urlSse") : t("mcpHub.urlHttp")
+                          }
+                        >
+                          {server.url}
+                        </MetadataListItem>
+                      ) : null}
+                      {server?.messageUrl ? (
+                        <MetadataListItem label={t("mcpHub.messageUrl")}>
+                          {server.messageUrl}
+                        </MetadataListItem>
+                      ) : null}
+                      {keyListLabel(server?.env) ? (
+                        <MetadataListItem label={t("mcpHub.env")}>
+                          {keyListLabel(server?.env)}
+                        </MetadataListItem>
+                      ) : null}
+                      {keyListLabel(server?.headers) ? (
+                        <MetadataListItem label={t("mcpHub.headers")}>
+                          {keyListLabel(server?.headers)}
+                        </MetadataListItem>
+                      ) : null}
+                    </MetadataList>
+                  </Collapsible>
                 </VStack>
               </Section>
 
@@ -949,7 +951,7 @@ function McpRegistryPreviewDrawer(props: {
               <AstryxCoreButton
                 label={actionLabel}
                 variant={installed || draft?.status === "needs_config" ? "secondary" : "primary"}
-                isDisabled={installed || installing}
+                isDisabled={installed || installing || loading}
                 isLoading={installing}
                 onClick={() => onInstall(data)}
               />

@@ -12,6 +12,7 @@ import { isNativeMobileRuntime } from "../../lib/runtimePlatform";
 import type { PromptCacheHintMode } from "../../lib/settings";
 import { presentationControls } from "../../presentation/controls";
 import { NativeSurface } from "../../presentation/NativeSurface";
+import { compactExtensionPreview } from "../../presentation/nativeExtensionPreview";
 import { withNativeSettingsIcons } from "../../presentation/nativeSettingsIcons";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
@@ -51,6 +52,7 @@ export function NativeProviderModelSettings(
   const c = presentationControls(),
     prefix = `model-settings:${props.providerId}:${props.modelId}`;
   const back = () => {
+    if (!alive.current) return;
     alive.current = false;
     props.onBack();
   };
@@ -212,6 +214,46 @@ export function NativeProviderModelSettings(
     });
   }
   const compact = isNativeMobileRuntime();
+  const group = nodes.find((node) => node.kind === "SettingsGroup");
+  const save = group?.children?.find((node) => node.id === `${prefix}:save`);
+  const deleteAction = nodes.find((node) => node.id === `${prefix}:delete`);
+  const preview = compactExtensionPreview(
+    {
+      id: `${prefix}:dialog`,
+      kind: "VStack",
+      variant: "provider-model-settings",
+      children: [
+        {
+          ...nodes[0],
+          kind: "IconButton",
+          label: t("settings.close"),
+          icon: "xmark",
+          variant: "ghost",
+        },
+        { id: `${prefix}:title`, kind: "Heading", text: model?.id ?? props.modelId },
+        ...nodes
+          .slice(1)
+          .filter((node) => node !== deleteAction)
+          .map((node) =>
+            node === group
+              ? {
+                  ...node,
+                  label: t("settings.modelSettings"),
+                  children: node.children?.filter((child) => child !== save),
+                }
+              : node,
+          ),
+        ...(deleteAction ? [deleteAction] : []),
+        c.action(`${prefix}:cancel`, t("settings.cancel"), back, !deleting),
+        ...(save ? [save] : []),
+      ],
+    },
+    {
+      detailsLabel: "",
+      metadata: () => false,
+      footer: (node) => [deleteAction?.id, `${prefix}:cancel`, save?.id].includes(node.id),
+    },
+  );
   return (
     <>
       <NativeSurface
@@ -223,7 +265,7 @@ export function NativeProviderModelSettings(
           formFactor: compact ? "mobile" : "desktop",
           theme: createNativePresentationTheme(settings, compact),
           dismissAction: `${prefix}:back`,
-          nodes: compact ? nodes.map(withNativeSettingsIcons) : nodes,
+          nodes: [compact ? withNativeSettingsIcons(preview) : preview],
         }}
         handlers={c.handlers}
         onError={setFailure}

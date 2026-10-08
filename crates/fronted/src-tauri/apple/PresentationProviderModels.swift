@@ -7,6 +7,9 @@ struct XgentProviderModelRow: View {
     let node: XgentNode
     let document: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    @Environment(\.xgentPresentationTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var selection: XgentNode? { node.children?.first }
     private var limits: XgentNode? { node.children?.first { $0.id.hasPrefix("model-limits:") } }
@@ -59,19 +62,26 @@ struct XgentProviderModelRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
+        XgentProviderRowLayout(minimumDetailsWidth: 200, stacked: dynamicTypeSize.isAccessibilitySize) {
             if let reorder {
                 XgentNativeMenu(node: reorder, document: document, model: model)
                     .accessibilityIdentifier(reorder.id).fixedSize()
-            }
+            } else { Color.clear.frame(width: 0, height: 0) }
             VStack(alignment: .leading, spacing: 4) {
-                modelControl.lineLimit(1).truncationMode(.tail)
-                limitsLabel.lineLimit(2)
+                modelControl.lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3).truncationMode(.tail)
+                limitsLabel.lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            menu.fixedSize()
+            if actions != nil { menu.fixedSize() }
+            else { Color.clear.frame(width: 0, height: 0) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .overlay {
+            RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
+                .strokeBorder(Color(xgentHex: theme.palette(for: colorScheme).border), lineWidth: 1)
+                .allowsHitTesting(false)
+        }
         .accessibilityElement(children: .contain)
     }
 }

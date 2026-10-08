@@ -53,9 +53,11 @@ final class TerminalRenderingTests: XCTestCase {
                 let ink = try XCTUnwrap(view.nativeForegroundColor.usingColorSpace(.sRGB))
                 let red = ink.redComponent, green = ink.greenComponent, blue = ink.blueComponent
                 #endif
-                XCTAssertEqual(red, CGFloat(challenge ? 0x4a : 0x1f) / 255, accuracy: 0.002)
-                XCTAssertEqual(green, CGFloat(challenge ? 0xde : 0x29) / 255, accuracy: 0.002)
-                XCTAssertEqual(blue, CGFloat(challenge ? 0x80 : 0x33) / 255, accuracy: 0.002)
+                XCTAssertEqual(red, CGFloat(challenge ? 0xcb : 0x1f) / 255, accuracy: 0.002)
+                XCTAssertEqual(green, CGFloat(challenge ? 0xd5 : 0x29) / 255, accuracy: 0.002)
+                XCTAssertEqual(blue, CGFloat(challenge ? 0xe1 : 0x33) / 255, accuracy: 0.002)
+                XCTAssertEqual(view.font.pointSize, 14, accuracy: 0.01)
+                XCTAssertEqual(view.lineSpacing, 1.1, accuracy: 0.01)
                 if height == 640 {
                     XCTAssertGreaterThanOrEqual(view.bounds.height, 290, "Forms must leave a usable terminal viewport")
                 } else {

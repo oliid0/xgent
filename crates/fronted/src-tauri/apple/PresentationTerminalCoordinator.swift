@@ -17,6 +17,7 @@ final class XgentTerminalCoordinator: NSObject, @preconcurrency TerminalViewDele
     private var sentSize: (cols: Int, rows: Int)?
     private var retired = false
     private var darkPalette: Bool?
+    private var lastValue: String?
 
     init(emit: @escaping (String) -> Void) { self.emit = emit }
 
@@ -28,6 +29,15 @@ final class XgentTerminalCoordinator: NSObject, @preconcurrency TerminalViewDele
 
     func update(value: String, view: TerminalView) {
         guard !retired else { return }
+        // Unrelated document revisions retain the same bounded replay packet.
+        // Avoid decoding it again, but still report a viewport that became visible.
+        if lastValue == value {
+            if view.bounds.width > 0 && view.bounds.height > 0 {
+                sizeChanged(source: view, newCols: view.getTerminal().cols, newRows: view.getTerminal().rows)
+            }
+            return
+        }
+        lastValue = value
         guard let (packet, bytes) = XgentTerminalPacket.decode(value) else {
             inputEnabled = false
             if sessionId != nil {

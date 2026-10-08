@@ -40,7 +40,7 @@ function fixture() {
   const handler = id => { const node = nodes().find(node => node.id === id); return rendered.props.handlers.get(node?.action ?? id); };
   const action = (id, value = null) => { const result = handler(id).run(value); render(); return result; };
   const child = () => {
-    const parent = rendered;
+    const parent = rendered.props.children ?? rendered;
     assert.equal(typeof parent.type, "function");
     const childHooks = createReactHookHarness(); children.push(childHooks);
     let surface;
@@ -175,6 +175,9 @@ test("native model settings retain an invalid outer name and commit model limits
     f.action("provider:existing"); f.action("provider-name", "");
     f.action("model-id", "manual-model"); f.action("add-model");
     f.action("model-edit:existing:manual-model");
+    assert.ok(f.nodes().some(node => node.id === "provider-name"), "Opening model details retains the live outer provider page");
+    assert.equal(f.rendered().props.children.props.nativeSettingsSurfaceId, undefined,
+      "The model uses a separately retired sheet rather than replacing the provider session");
     const model = f.child();
     const prefix = "model-settings:existing:manual-model:";
     model.action(prefix + "contextWindow", "32000");

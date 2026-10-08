@@ -17,6 +17,7 @@ import {
 import type { AppSettings } from "../lib/settings";
 import { presentationControls } from "./controls";
 import { NativeSurface } from "./NativeSurface";
+import { compactExtensionPreview } from "./nativeExtensionPreview";
 import { createNativePresentationTheme } from "./nativeTheme";
 import type { PresentationNode } from "./types";
 
@@ -262,12 +263,30 @@ export function NativeMcpRegistryPreview(props: {
         theme: createNativePresentationTheme(props.settings, props.compact, "workspaceTools"),
         dismissAction: "close",
         nodes: [
-          {
-            id: "mcp-registry-preview",
-            kind: "VStack",
-            variant: "mcp-registry-preview",
-            children: nodes,
-          },
+          compactExtensionPreview(
+            {
+              id: "mcp-registry-preview",
+              kind: "VStack",
+              variant: "mcp-registry-preview",
+              children: [
+                {
+                  ...c.action("close", t("settings.close"), props.close),
+                  kind: "IconButton",
+                  icon: "xmark",
+                },
+                { id: "mcp-preview-title", kind: "Heading", text: data.displayName },
+                ...nodes,
+              ],
+            },
+            {
+              detailsLabel: t("settings.skillsInstalledPreviewDetails"),
+              metadata: (item) =>
+                item.id.startsWith("mcp-preview:") &&
+                !["mcp-preview:source", "mcp-preview:mode", "mcp-preview:tags"].includes(item.id),
+              footer: (item) =>
+                item.id === "mcp-preview-install" || item.id === "mcp-preview-external",
+            },
+          ),
         ],
       }}
       handlers={c.handlers}

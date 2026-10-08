@@ -7503,6 +7503,7 @@ export function ChatPage(props: ChatPageProps) {
                         client={tauriTerminalClient}
                         session={session}
                         theme={effectiveTheme}
+                        fontScale={settings.customSettings.fontScale.workspaceTools}
                         isActive={
                           desktopAuxiliaryOpen &&
                           resolvedRightSidebarActiveTabId === `${RIGHT_TAB_TERMINAL}:${session.id}`
@@ -7623,6 +7624,7 @@ export function ChatPage(props: ChatPageProps) {
                     client={tauriTerminalClient}
                     session={dockedSession}
                     theme={effectiveTheme}
+                    fontScale={settings.customSettings.fontScale.workspaceTools}
                     isActive
                     onError={(_id, message) => setRightTerminalError(message)}
                   />
@@ -7779,6 +7781,7 @@ export function ChatPage(props: ChatPageProps) {
             sftpClient={tauriSftpClient}
             localForwardClient={tauriSshLocalForwardClient}
             theme={effectiveTheme}
+            fontScale={settings.customSettings.fontScale.workspaceTools}
             isOpen={workspaceSshTerminalOpen}
             onHide={() => setWorkspaceSshTerminalOpen(false)}
           />

@@ -24,7 +24,7 @@ for (const { label, source } of pageSources) {
   });
 
   test(`${label} can copy the displayed installed Skill file preview`, () => {
-    assert.match(source, /<SkillPreviewCopyButton\s+value=\{previewContent\}/);
+    assert.match(source, /<SkillPreviewCopyButton\s+value=\{preview\.loading \? "" : previewContent\}/);
     assert.match(source, /settings\.skillsInstalledPreviewCopyFile/);
   });
 

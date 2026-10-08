@@ -65,6 +65,12 @@ struct XgentProviderListView: View {
                         }
                     }
                     .background(hovered == row.id ? Color(xgentHex: theme.palette(for: colorScheme).accent).opacity(0.12) : .clear)
+                    .clipShape(RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: CGFloat(theme.radius.element), style: .continuous)
+                            .strokeBorder(Color(xgentHex: theme.palette(for: colorScheme).border), lineWidth: 1)
+                            .allowsHitTesting(false)
+                    }
                     .dropDestination(for: String.self, action: { items, point in
                         // The lower half of a row inserts after it; this also
                         // permits moving a provider to the end of the list.
@@ -75,6 +81,11 @@ struct XgentProviderListView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(xgentHex: theme.palette(for: colorScheme).card),
                     in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.container), style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: CGFloat(theme.radius.container), style: .continuous)
+                .strokeBorder(Color(xgentHex: theme.palette(for: colorScheme).border), lineWidth: 1)
+                .allowsHitTesting(false)
+        }
         .onPreferenceChange(XgentProviderRowHeights.self) { heights = $0 }
         .accessibilityElement(children: .contain)
     }

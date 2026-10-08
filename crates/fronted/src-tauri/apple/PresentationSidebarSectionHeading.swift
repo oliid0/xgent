@@ -8,6 +8,14 @@ struct XgentSidebarSectionHeading: View {
     @Environment(\.colorScheme) private var scheme
     @ScaledMetric(relativeTo: .subheadline) private var scale = 1.0
 
+    private var controlSize: CGFloat {
+        #if os(iOS)
+        44
+        #else
+        32
+        #endif
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             Text(node.text ?? node.label ?? "")
@@ -22,7 +30,7 @@ struct XgentSidebarSectionHeading: View {
                 } else if action.kind == .iconButton {
                     Button { model.send(action, in: document) } label: {
                         Image(systemName: action.icon ?? "plus")
-                            .frame(width: 44, height: 44)
+                            .frame(width: controlSize, height: controlSize)
                     }
                     .buttonStyle(.plain)
                     .disabled(action.disabled == true || model.isBusy(action, in: document))
@@ -32,7 +40,7 @@ struct XgentSidebarSectionHeading: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: controlSize, alignment: .leading)
         .accessibilityElement(children: .contain)
     }
 }

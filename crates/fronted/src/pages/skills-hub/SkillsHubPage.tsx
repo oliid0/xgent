@@ -1,11 +1,11 @@
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
-import { BreadcrumbItem, Breadcrumbs } from "@astryxdesign/core/Breadcrumbs";
 import { Button as AstryxButton, Button as AstryxCoreButton } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
-import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
+import { Dialog } from "@astryxdesign/core/Dialog";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
-import { Grid as AstryxGrid, Grid } from "@astryxdesign/core/Grid";
+import { Grid } from "@astryxdesign/core/Grid";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
@@ -30,11 +30,12 @@ import { Stack as AstryxStack } from "@astryxdesign/core/Stack";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Tab, TabList } from "@astryxdesign/core/TabList";
-import { Heading as AstryxHeadingCore, Text as AstryxText, Text } from "@astryxdesign/core/Text";
+import { Text } from "@astryxdesign/core/Text";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Token } from "@astryxdesign/core/Token";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { CompactDialogHeader } from "../../components/astryx/CompactDialogHeader";
 import {
   ConfirmActionPopover,
   ConfirmDeletePopover,
@@ -42,7 +43,6 @@ import {
 import { HubHeader } from "../../components/hub/HubChrome";
 import {
   Activity,
-  AlertTriangle,
   Blend,
   BookOpen,
   Brain,
@@ -75,7 +75,6 @@ import {
 import { Markdown } from "../../components/Markdown";
 import { useLocale } from "../../i18n";
 import { type AppSettings, updateSkills } from "../../lib/settings";
-import { cn } from "../../lib/shared/utils";
 import {
   cancelSkillInstallJob,
   discoverSkills,
@@ -2514,6 +2513,9 @@ export function SkillsHubPage(props: SkillsHubPageProps) {
             selected.has(previewInstalledSkill.name)
           }
           skillsEnabled={skillsEnabled}
+          deleting={deletingSkillName === previewInstalledSkill.name}
+          onToggle={(enabled) => toggleSkill(previewInstalledSkill.name, enabled)}
+          onDelete={() => void deleteSkill(previewInstalledSkill)}
           onClose={() => setPreviewInstalledSkill(null)}
         />
       ) : null}
@@ -2952,321 +2954,190 @@ function InstalledSkillPreviewDrawer(props: {
   preview: InstalledSkillPreviewState;
   checked: boolean;
   skillsEnabled: boolean;
+  deleting: boolean;
+  onToggle: (enabled: boolean) => void;
+  onDelete: () => void;
   onClose: () => void;
 }) {
   const { skill, preview, checked, skillsEnabled, onClose } = props;
   const { t } = useLocale();
+  const lease = useRef({ active: true, skill });
+  lease.current.skill = skill;
+  useEffect(() => {
+    lease.current.active = true;
+    return () => {
+      lease.current.active = false;
+    };
+  }, []);
+  const current = () => lease.current.active && lease.current.skill === skill;
   const alwaysEnabled = isAlwaysEnabledSkillName(skill.name);
   const source = skill.source;
   const description = skill.description.trim();
-  const previewIsMarkdown = /\.(md|mdx|markdown)$/i.test(skill.skillFile);
   const previewContent = stripInstalledSkillPreviewMetadata(preview.content, skill);
-  const statusLabel = alwaysEnabled
-    ? t("settings.skillsInstalledPreviewBuiltIn")
-    : checked
-      ? t("settings.skillsInstalledPreviewSelected")
-      : t("settings.skillsInstalledPreviewUnselected");
-
+  const statusLabel = t(
+    alwaysEnabled
+      ? "settings.skillsInstalledPreviewBuiltIn"
+      : checked
+        ? "settings.skillsInstalledPreviewSelected"
+        : "settings.skillsInstalledPreviewUnselected",
+  );
   const isCompact = useMediaQuery(
     "(max-width: 768px), (max-width: 1024px) and (pointer: coarse) and (hover: none)",
   );
-
   return (
     <Dialog
       isOpen
-      onOpenChange={(isOpen) => {
-        if (!isOpen) onClose();
+      onOpenChange={(open) => {
+        if (!open) onClose();
       }}
       aria-label={t("settings.skillsInstalledPreviewTitle")}
       purpose="info"
       variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "var(--xgent-settings-dialog-width)"}
-      maxHeight="var(--xgent-settings-dialog-height)"
+      width={isCompact ? "100dvw" : "var(--xgent-extension-preview-width)"}
+      maxHeight="var(--xgent-extension-preview-height)"
       padding={0}
-      style={{
-        blockSize: isCompact ? "100dvh" : "var(--xgent-settings-dialog-height)",
-      }}
+      style={{ blockSize: isCompact ? "100dvh" : "var(--xgent-extension-preview-height)" }}
     >
-      <AstryxStack direction="vertical" as="aside" className="flex h-full w-full flex-col">
-        <AstryxStack
-          direction="horizontal"
-          className="flex items-start gap-3 border-b border-border/40 px-5 py-4"
-        >
-          <AstryxStack
-            direction="horizontal"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border/55 bg-background/80 text-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.09] dark:bg-white/[0.06] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]"
-          >
-            {alwaysEnabled ? <Lock className="h-5 w-5" /> : <SkillIcon className="h-7 w-7" />}
-          </AstryxStack>
-          <AstryxStack direction="vertical" className="min-w-0 flex-1">
-            <AstryxStack
-              direction="vertical"
-              className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80"
-            >
-              {t("settings.skillsInstalledPreviewTitle")}
-            </AstryxStack>
-            <AstryxHeadingCore
-              level={2}
-              className="mt-1 truncate text-base font-semibold tracking-tight text-foreground"
-            >
-              {skill.name}
-            </AstryxHeadingCore>
-            <AstryxStack
-              direction="horizontal"
-              className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-[11px] text-muted-foreground"
-            >
-              <AstryxStack
-                as="span"
-                direction="horizontal"
-                className={cn(
-                  "inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-medium ring-1",
-                  alwaysEnabled
-                    ? "bg-foreground/[0.06] text-foreground/75 ring-border/45"
-                    : checked
-                      ? "bg-emerald-500/10 text-emerald-700 ring-emerald-500/25 dark:text-emerald-300"
-                      : "bg-muted/45 text-muted-foreground ring-border/35",
-                )}
-              >
-                {statusLabel}
-              </AstryxStack>
-              {source?.version ? (
-                <AstryxText as="span" type="inherit">
-                  v{source.version}
-                </AstryxText>
+      <Layout
+        height="fill"
+        header={
+          <CompactDialogHeader
+            title={skill.name}
+            subtitle={statusLabel}
+            startContent={
+              <Icon icon={alwaysEnabled ? Lock : SkillIcon} size="md" color="secondary" />
+            }
+            endContent={
+              <Switch
+                label={`${t("skills.select")}: ${skill.name}`}
+                isLabelHidden
+                size={isCompact ? "md" : "sm"}
+                style={isCompact ? { minWidth: 44, minHeight: 44 } : undefined}
+                value={alwaysEnabled || checked}
+                isDisabled={alwaysEnabled || props.deleting}
+                onChange={(enabled) => {
+                  if (current()) props.onToggle(enabled);
+                }}
+              />
+            }
+            compact={isCompact}
+            closeLabel={t("settings.close")}
+            onClose={() => {
+              if (current()) onClose();
+            }}
+          />
+        }
+        content={
+          <LayoutContent isScrollable>
+            <VStack gap={3}>
+              <Text>{description || t("settings.skillsInstalledPreviewNoDescription")}</Text>
+              {!skillsEnabled && !alwaysEnabled ? (
+                <Banner
+                  status="info"
+                  title={t("settings.skillsDisabledHint")}
+                  collapsible={false}
+                />
               ) : null}
-            </AstryxStack>
-          </AstryxStack>
-          <AstryxButton
-            variant="ghost"
-            label={t("settings.cronViewClose")}
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
-            tooltip={t("settings.cronViewClose")}
-          >
-            <X className="h-4 w-4" />
-          </AstryxButton>
-        </AstryxStack>
-
-        <AstryxStack direction="vertical" className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <AstryxStack direction="vertical" className="flex flex-col gap-4">
-            <AstryxGrid className="grid gap-3">
-              <AstryxStack
-                direction="vertical"
-                className="rounded-2xl border border-border/40 bg-background/70 p-3.5 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset] dark:border-white/[0.07] dark:bg-white/[0.05] dark:shadow-[0_1px_0_rgba(255,255,255,0.05)_inset]"
-              >
-                <AstryxStack direction="horizontal" className="flex items-start gap-3">
-                  <AstryxStack
-                    direction="horizontal"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-border/45 bg-background/80 text-foreground/75"
-                  >
-                    <SkillIcon className="h-5 w-5" />
-                  </AstryxStack>
-                  <AstryxStack direction="vertical" className="min-w-0 flex-1">
-                    <AstryxStack
-                      direction="vertical"
-                      className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground/70"
-                    >
-                      {t("settings.skillsInstalledPreviewName")}
-                    </AstryxStack>
-                    <AstryxStack
-                      direction="vertical"
-                      className="mt-1 break-words text-[15px] font-semibold leading-snug text-foreground"
-                    >
-                      {skill.name}
-                    </AstryxStack>
-                  </AstryxStack>
-                </AstryxStack>
-              </AstryxStack>
-
-              <AstryxStack
-                direction="vertical"
-                className="rounded-2xl border border-border/40 bg-background/60 p-3.5 shadow-[0_1px_0_rgba(255,255,255,0.5)_inset] dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]"
-              >
-                <AstryxStack direction="horizontal" className="flex items-start gap-3">
-                  <AstryxStack
-                    direction="horizontal"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-border/40 bg-muted/35 text-muted-foreground"
-                  >
-                    <BookOpen className="h-3.5 w-3.5" />
-                  </AstryxStack>
-                  <AstryxStack direction="vertical" className="min-w-0 flex-1">
-                    <AstryxStack
-                      direction="vertical"
-                      className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground/70"
-                    >
-                      {t("settings.skillsInstalledPreviewDescription")}
-                    </AstryxStack>
-                    <AstryxText
-                      as="p"
-                      type="inherit"
-                      display="block"
-                      className="mt-1.5 text-[13px] leading-6 text-muted-foreground"
-                    >
-                      {description || t("settings.skillsInstalledPreviewNoDescription")}
-                    </AstryxText>
-                    <AstryxStack direction="horizontal" className="mt-2 flex justify-end">
-                      <SkillPreviewCopyButton
-                        value={description}
-                        label={t("settings.skillsInstalledPreviewCopyDescription")}
-                      />
-                    </AstryxStack>
-                  </AstryxStack>
-                </AstryxStack>
-              </AstryxStack>
-            </AstryxGrid>
-
-            {!skillsEnabled ? (
-              <AstryxStack
-                direction="vertical"
-                className="rounded-2xl border border-border/40 bg-muted/35 p-3"
-              >
-                <AstryxStack
-                  direction="horizontal"
-                  className="flex items-start gap-2 text-[12px] text-muted-foreground"
-                >
-                  <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-foreground/65" />
-                  <AstryxText as="span" type="inherit">
-                    {t("settings.skillsDisabledHint")}
-                  </AstryxText>
-                </AstryxStack>
-              </AstryxStack>
-            ) : null}
-
-            <AstryxStack
-              direction="vertical"
-              className="rounded-2xl border border-border/40 bg-background/60 p-3"
-            >
-              <AstryxStack
-                direction="vertical"
-                className="mb-2 text-[12px] font-semibold text-foreground"
-              >
-                {t("settings.skillsInstalledPreviewDetails")}
-              </AstryxStack>
-              <MetadataList>
-                <MetadataListItem label={t("settings.skillsInstalledPreviewBaseDir")}>
-                  {skill.baseDir}
-                </MetadataListItem>
-                <MetadataListItem label={t("settings.skillsInstalledPreviewSkillFile")}>
-                  {skill.skillFile}
-                </MetadataListItem>
-                {source?.registry ? (
-                  <MetadataListItem label={t("settings.skillsInstalledPreviewSource")}>
-                    {source.registry}
-                  </MetadataListItem>
-                ) : null}
-                {source?.slug ? (
-                  <MetadataListItem label={t("settings.skillsStorePreviewSlug")}>
-                    {source.slug}
-                  </MetadataListItem>
-                ) : null}
-                {source?.version ? (
-                  <MetadataListItem label={t("settings.skillsStorePreviewVersion")}>
-                    {source.version}
-                  </MetadataListItem>
-                ) : null}
-                {source?.publishedAt ? (
-                  <MetadataListItem label={t("settings.skillsInstalledPreviewPublished")}>
-                    {formatFullStoreDate(source.publishedAt)}
-                  </MetadataListItem>
-                ) : null}
-              </MetadataList>
-            </AstryxStack>
-
-            <AstryxStack
-              direction="vertical"
-              className="rounded-2xl border border-border/40 bg-background/60 p-3"
-            >
-              <AstryxStack
-                direction="horizontal"
-                className="mb-2 flex items-center justify-between gap-3"
-              >
-                <AstryxStack
-                  direction="vertical"
-                  className="text-[12px] font-semibold text-foreground"
-                >
-                  {t("settings.skillsInstalledPreviewFilePreview")}
-                </AstryxStack>
-                <AstryxStack direction="horizontal" className="flex min-w-0 items-center gap-1">
-                  <AstryxStack
-                    direction="vertical"
-                    className="truncate text-[10.5px] text-muted-foreground/70"
-                  >
-                    {preview.skillFile || skill.skillFile}
-                  </AstryxStack>
-                  <SkillPreviewCopyButton
-                    value={previewContent}
-                    label={t("settings.skillsInstalledPreviewCopyFile")}
-                  />
-                </AstryxStack>
-              </AstryxStack>
-
-              {preview.loading ? (
-                <InstalledPreviewSkeleton />
-              ) : (
-                <>
-                  {preview.error ? (
-                    <AstryxStack
-                      direction="vertical"
-                      className="rounded-xl border border-border/35 bg-muted/35 p-3"
-                    >
-                      <AstryxStack
-                        direction="horizontal"
-                        className="flex items-start gap-2 text-[12px] text-muted-foreground"
-                      >
-                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-foreground/65" />
-                        <AstryxStack direction="vertical" className="min-w-0">
-                          <AstryxStack direction="vertical">
-                            {t("settings.skillsInstalledPreviewUnavailable")}
-                          </AstryxStack>
-                          <AstryxStack
-                            direction="vertical"
-                            className="mt-1 break-words text-[11px] opacity-75"
-                          >
-                            {preview.error}
-                          </AstryxStack>
-                        </AstryxStack>
-                      </AstryxStack>
-                    </AstryxStack>
-                  ) : null}
-
-                  {previewContent ? (
-                    previewIsMarkdown ? (
-                      <Markdown
-                        content={previewContent}
-                        className="text-[12px] leading-5 text-muted-foreground"
-                      />
-                    ) : (
-                      <pre className="max-h-[24rem] overflow-auto whitespace-pre-wrap break-words rounded-xl bg-muted/35 p-3 font-mono text-[11px] leading-5 text-muted-foreground">
-                        {previewContent}
-                      </pre>
-                    )
-                  ) : preview.error ? null : (
-                    <AstryxStack
-                      direction="vertical"
-                      className="rounded-xl border border-border/35 bg-muted/30 p-3 text-[12px] text-muted-foreground"
-                    >
-                      {t("settings.skillsInstalledPreviewEmpty")}
-                    </AstryxStack>
+              {preview.loading ? <InstalledPreviewSkeleton /> : null}
+              {preview.error ? (
+                <Banner
+                  status="error"
+                  title={t("settings.skillsInstalledPreviewUnavailable")}
+                  description={preview.error}
+                  collapsible={false}
+                />
+              ) : null}
+              {!preview.loading && previewContent ? (
+                /\.(md|mdx|markdown)$/i.test(skill.skillFile) ? (
+                  <Markdown content={previewContent} renderMode="static" />
+                ) : (
+                  <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-xl bg-muted/35 p-3 font-mono text-sm leading-relaxed">
+                    {previewContent}
+                  </pre>
+                )
+              ) : !preview.loading && !preview.error ? (
+                <Text color="secondary">{t("settings.skillsInstalledPreviewEmpty")}</Text>
+              ) : null}
+              {preview.truncated ? (
+                <Banner
+                  status="info"
+                  collapsible={false}
+                  title={t("settings.skillsInstalledPreviewTruncated").replace(
+                    "{count}",
+                    String(INSTALLED_SKILL_PREVIEW_LINES),
                   )}
-
-                  {preview.truncated ? (
-                    <AstryxStack
-                      direction="vertical"
-                      className="mt-2 rounded-xl border border-border/35 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"
-                    >
-                      {t("settings.skillsInstalledPreviewTruncated").replace(
-                        "{count}",
-                        String(INSTALLED_SKILL_PREVIEW_LINES),
-                      )}
-                    </AstryxStack>
+                />
+              ) : null}
+              <Collapsible
+                trigger={t("settings.skillsInstalledPreviewDetails")}
+                defaultIsOpen={false}
+              >
+                <MetadataList>
+                  <MetadataListItem label={t("settings.skillsInstalledPreviewBaseDir")}>
+                    {skill.baseDir}
+                  </MetadataListItem>
+                  <MetadataListItem label={t("settings.skillsInstalledPreviewSkillFile")}>
+                    {skill.skillFile}
+                  </MetadataListItem>
+                  {source?.registry ? (
+                    <MetadataListItem label={t("settings.skillsInstalledPreviewSource")}>
+                      {source.registry}
+                    </MetadataListItem>
                   ) : null}
-                </>
-              )}
-            </AstryxStack>
-          </AstryxStack>
-        </AstryxStack>
-      </AstryxStack>
+                  {source?.slug ? (
+                    <MetadataListItem label={t("settings.skillsStorePreviewSlug")}>
+                      {source.slug}
+                    </MetadataListItem>
+                  ) : null}
+                  {source?.version ? (
+                    <MetadataListItem label={t("settings.skillsStorePreviewVersion")}>
+                      {source.version}
+                    </MetadataListItem>
+                  ) : null}
+                  {source?.publishedAt ? (
+                    <MetadataListItem label={t("settings.skillsInstalledPreviewPublished")}>
+                      {formatFullStoreDate(source.publishedAt)}
+                    </MetadataListItem>
+                  ) : null}
+                </MetadataList>
+              </Collapsible>
+            </VStack>
+          </LayoutContent>
+        }
+        footer={
+          <LayoutFooter hasDivider>
+            <HStack gap={2} vAlign="center" wrap="wrap">
+              {!alwaysEnabled ? (
+                <ConfirmDeletePopover
+                  name={skill.name}
+                  onConfirm={() => {
+                    if (current()) props.onDelete();
+                  }}
+                >
+                  {(open) => (
+                    <AstryxCoreButton
+                      label={t("settings.skillsHubDeleteSkill")}
+                      variant="secondary"
+                      isDisabled={props.deleting}
+                      isLoading={props.deleting}
+                      onClick={open}
+                    />
+                  )}
+                </ConfirmDeletePopover>
+              ) : null}
+              <StackItem size="fill" />
+              <SkillPreviewCopyButton
+                value={description}
+                label={t("settings.skillsInstalledPreviewCopyDescription")}
+              />
+              <SkillPreviewCopyButton
+                value={preview.loading ? "" : previewContent}
+                label={t("settings.skillsInstalledPreviewCopyFile")}
+              />
+            </HStack>
+          </LayoutFooter>
+        }
+      />
     </Dialog>
   );
 }
@@ -3802,33 +3673,28 @@ function SkillsStorePreviewDrawer(props: {
       aria-label={t("settings.skillsStorePreviewTitle")}
       purpose="info"
       variant={isCompact ? "fullscreen" : "standard"}
-      width={isCompact ? "100dvw" : "var(--xgent-settings-dialog-width)"}
-      maxHeight="var(--xgent-settings-dialog-height)"
+      width={isCompact ? "100dvw" : "var(--xgent-extension-preview-width)"}
+      maxHeight="var(--xgent-extension-preview-height)"
       padding={0}
       style={{
-        blockSize: isCompact ? "100dvh" : "var(--xgent-settings-dialog-height)",
+        blockSize: isCompact ? "100dvh" : "var(--xgent-extension-preview-height)",
       }}
     >
       <Layout
         height="fill"
         header={
-          <DialogHeader
+          <CompactDialogHeader
             title={data.displayName}
             subtitle={owner ? `@${owner} · v${version}` : `v${version}`}
             startContent={<Icon icon={SkillIcon} size="md" color="secondary" />}
-            onOpenChange={(isOpen) => {
-              if (!isOpen) onClose();
-            }}
+            compact={isCompact}
+            closeLabel={t("settings.close")}
+            onClose={onClose}
           />
         }
         content={
           <LayoutContent isScrollable>
-            <VStack gap={5}>
-              <Breadcrumbs variant="supporting" label={t("settings.skillsStorePreviewTitle")}>
-                <BreadcrumbItem onClick={onClose}>{t("settings.skillsHubStoreTab")}</BreadcrumbItem>
-                <BreadcrumbItem isCurrent>{data.displayName}</BreadcrumbItem>
-              </Breadcrumbs>
-
+            <VStack gap={3}>
               {data.summary ? <Text color="secondary">{data.summary}</Text> : null}
 
               <MetadataList orientation="horizontal">
@@ -3885,57 +3751,62 @@ function SkillsStorePreviewDrawer(props: {
                 </VStack>
               ) : (
                 <Section padding={0} variant="transparent">
-                  <MetadataList
-                    title={t("settings.skillsStorePreviewMetadata")}
-                    label={{ position: "start", width: "var(--spacing-28)" }}
+                  <Collapsible
+                    trigger={t("settings.skillsStorePreviewMetadata")}
+                    defaultIsOpen={false}
                   >
-                    <MetadataListItem label={t("settings.skillsStorePreviewSlug")}>
-                      {data.slug}
-                    </MetadataListItem>
-                    {owner ? (
-                      <MetadataListItem label={t("settings.skillsStorePreviewOwner")}>
-                        {owner}
+                    <MetadataList
+                      title={t("settings.skillsStorePreviewMetadata")}
+                      label={{ position: "start", width: "var(--spacing-28)" }}
+                    >
+                      <MetadataListItem label={t("settings.skillsStorePreviewSlug")}>
+                        {data.slug}
                       </MetadataListItem>
-                    ) : null}
-                    <MetadataListItem label={t("settings.skillsStorePreviewVersion")}>
-                      {version}
-                    </MetadataListItem>
-                    {data.updatedAt ? (
-                      <MetadataListItem label={t("settings.skillsStorePreviewUpdated")}>
-                        {formatFullStoreDate(data.updatedAt)}
+                      {owner ? (
+                        <MetadataListItem label={t("settings.skillsStorePreviewOwner")}>
+                          {owner}
+                        </MetadataListItem>
+                      ) : null}
+                      <MetadataListItem label={t("settings.skillsStorePreviewVersion")}>
+                        {version}
                       </MetadataListItem>
-                    ) : null}
-                    {detail?.createdAt ? (
-                      <MetadataListItem label={t("settings.skillsStorePreviewCreated")}>
-                        {formatFullStoreDate(detail.createdAt)}
-                      </MetadataListItem>
-                    ) : null}
-                    {detail?.latestVersionCreatedAt ? (
-                      <MetadataListItem label={t("settings.skillsStorePreviewPublished")}>
-                        {formatFullStoreDate(detail.latestVersionCreatedAt)}
-                      </MetadataListItem>
-                    ) : null}
-                    {detail?.license ? (
-                      <MetadataListItem label={t("settings.skillsStorePreviewLicense")}>
-                        {detail.license}
-                      </MetadataListItem>
-                    ) : null}
-                    {supportedOs.length > 0 ? (
-                      <MetadataListItem label={t("settings.skillsStorePreviewOs")}>
-                        {supportedOs.join(", ")}
-                      </MetadataListItem>
-                    ) : null}
-                    {supportedSystems.length > 0 ? (
-                      <MetadataListItem label={t("settings.skillsStorePreviewSystems")}>
-                        {supportedSystems.join(", ")}
-                      </MetadataListItem>
-                    ) : null}
-                    {detail?.moderationStatus ? (
-                      <MetadataListItem label={t("settings.skillsStorePreviewModeration")}>
-                        {detail.moderationStatus}
-                      </MetadataListItem>
-                    ) : null}
-                  </MetadataList>
+                      {data.updatedAt ? (
+                        <MetadataListItem label={t("settings.skillsStorePreviewUpdated")}>
+                          {formatFullStoreDate(data.updatedAt)}
+                        </MetadataListItem>
+                      ) : null}
+                      {detail?.createdAt ? (
+                        <MetadataListItem label={t("settings.skillsStorePreviewCreated")}>
+                          {formatFullStoreDate(detail.createdAt)}
+                        </MetadataListItem>
+                      ) : null}
+                      {detail?.latestVersionCreatedAt ? (
+                        <MetadataListItem label={t("settings.skillsStorePreviewPublished")}>
+                          {formatFullStoreDate(detail.latestVersionCreatedAt)}
+                        </MetadataListItem>
+                      ) : null}
+                      {detail?.license ? (
+                        <MetadataListItem label={t("settings.skillsStorePreviewLicense")}>
+                          {detail.license}
+                        </MetadataListItem>
+                      ) : null}
+                      {supportedOs.length > 0 ? (
+                        <MetadataListItem label={t("settings.skillsStorePreviewOs")}>
+                          {supportedOs.join(", ")}
+                        </MetadataListItem>
+                      ) : null}
+                      {supportedSystems.length > 0 ? (
+                        <MetadataListItem label={t("settings.skillsStorePreviewSystems")}>
+                          {supportedSystems.join(", ")}
+                        </MetadataListItem>
+                      ) : null}
+                      {detail?.moderationStatus ? (
+                        <MetadataListItem label={t("settings.skillsStorePreviewModeration")}>
+                          {detail.moderationStatus}
+                        </MetadataListItem>
+                      ) : null}
+                    </MetadataList>
+                  </Collapsible>
                 </Section>
               )}
 

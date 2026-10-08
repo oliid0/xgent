@@ -6,6 +6,7 @@ import {
   Button,
 } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Dialog } from "@astryxdesign/core/Dialog";
 import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Grid as AstryxGrid } from "@astryxdesign/core/Grid";
@@ -29,6 +30,7 @@ import { ToggleButton } from "@astryxdesign/core/ToggleButton";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { invoke } from "@xgent/runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CompactDialogHeader } from "../../components/astryx/CompactDialogHeader";
 import { ConfirmActionPopover } from "../../components/astryx/ConfirmActionPopover";
 import {
   ChevronLeft,
@@ -336,11 +338,14 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
   const [modelBulkSelection, setModelBulkSelection] = useState<Set<string>>(new Set());
   const [editingModel, publishEditingModel] = useState<ModelEditDraft | null>(null);
   const acceptedModelEdit = useRef(editingModel);
+  const modelEditGeneration = useRef(0);
   acceptedModelEdit.current = editingModel;
   function setEditingModel(
     next: ModelEditDraft | null | ((previous: ModelEditDraft | null) => ModelEditDraft | null),
   ) {
-    acceptedModelEdit.current = typeof next === "function" ? next(acceptedModelEdit.current) : next;
+    const previous = acceptedModelEdit.current;
+    acceptedModelEdit.current = typeof next === "function" ? next(previous) : next;
+    if (previous?.model.id !== acceptedModelEdit.current?.model.id) modelEditGeneration.current++;
     publishEditingModel(acceptedModelEdit.current);
   }
   const [activePanel, setActivePanel] = useState<ProviderDialogPanel>("general");
@@ -684,6 +689,17 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
     ? parsePositiveInteger(editingModel.maxOutputToken)
     : null;
   const canSaveEditingModel = editedProviderModel(editingModel) !== null;
+  const presentedModelGeneration = modelEditGeneration.current;
+  const presentedModelId = editingModel?.model.id;
+  const ownsModelDialog = () =>
+    !!presentedModelId &&
+    usageRequest.current.active &&
+    usageRequest.current.session === usageSession &&
+    modelEditGeneration.current === presentedModelGeneration &&
+    acceptedModelEdit.current?.model.id === presentedModelId;
+  const updatePresentedModel = (next: Parameters<typeof setEditingModel>[0]) => {
+    if (ownsModelDialog()) setEditingModel(next);
+  };
 
   function modelsWithEditingDraft(): ProviderModelConfig[] | null {
     const draft = acceptedModelEdit.current;
@@ -695,8 +711,8 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
     );
   }
 
-  function saveInlineModelSettings() {
-    if (!usageRequest.current.active || usageRequest.current.session !== usageSession) return;
+  function saveModelSettings() {
+    if (!ownsModelDialog()) return;
     const nextModels = modelsWithEditingDraft();
     if (!nextModels) return;
     setModels(nextModels);
@@ -1504,7 +1520,7 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                             <AstryxStack
                               direction="vertical"
                               key={model.id}
-                              className="group hover:bg-accent/30"
+                              className="settings-provider-model-item group hover:bg-accent/30"
                             >
                               <AstryxStack
                                 direction="horizontal"
@@ -1617,208 +1633,6 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                                   />
                                 </StackItem>
                               </AstryxStack>
-
-                              {isEditingModel && editingModel ? (
-                                <AstryxStack direction="vertical" gap={3} padding={3} width="100%">
-                                  {supportsModelInputOverride(providerType) ? (
-                                    <Selector
-                                      size={isCompact ? "lg" : "md"}
-                                      label={t("settings.modelInput")}
-                                      width="100%"
-                                      value={modelInputMode(editingModel.model)}
-                                      options={MODEL_INPUT_OPTIONS.map((option) => ({
-                                        value: option.value,
-                                        label: t(option.labelKey),
-                                      }))}
-                                      onChange={(value) =>
-                                        setEditingModel((previous) =>
-                                          previous
-                                            ? {
-                                                ...previous,
-                                                model: withModelInputMode(
-                                                  previous.model,
-                                                  value as ModelInputMode,
-                                                ),
-                                              }
-                                            : previous,
-                                        )
-                                      }
-                                    />
-                                  ) : null}
-                                  {providerType === "codex" ? (
-                                    <Selector
-                                      size={isCompact ? "lg" : "md"}
-                                      label={t("settings.promptCacheHintModelOverride")}
-                                      width="100%"
-                                      value={editingModel.model.promptCacheHintMode ?? "inherit"}
-                                      options={[
-                                        {
-                                          value: "inherit",
-                                          label: t("settings.promptCacheHintMode.inherit"),
-                                        },
-                                        ...PROVIDER_CACHE_HINT_OPTIONS.map((option) => ({
-                                          value: option.value,
-                                          label: t(option.labelKey),
-                                        })),
-                                      ]}
-                                      onChange={(value) =>
-                                        setEditingModel((previous) =>
-                                          previous
-                                            ? {
-                                                ...previous,
-                                                model: {
-                                                  ...previous.model,
-                                                  promptCacheHintMode:
-                                                    value === "inherit"
-                                                      ? undefined
-                                                      : (value as PromptCacheHintMode),
-                                                },
-                                              }
-                                            : previous,
-                                        )
-                                      }
-                                    />
-                                  ) : null}
-                                  <AstryxGrid
-                                    columns={{ minWidth: 240, max: 2 }}
-                                    gap={3}
-                                    width="100%"
-                                  >
-                                    <AstryxStack direction="vertical" gap={2}>
-                                      <Input
-                                        size={isCompact ? "lg" : "md"}
-                                        width="100%"
-                                        label={t("settings.contextWindow")}
-                                        {...({ inputMode: "numeric" } as const)}
-                                        type="text"
-                                        aria-invalid={
-                                          editingModelContextWindow === null ? true : undefined
-                                        }
-                                        status={
-                                          editingModelContextWindow === null
-                                            ? { type: "error" }
-                                            : undefined
-                                        }
-                                        value={editingModel.contextWindow}
-                                        onChange={(nextValue) => {
-                                          const value = nextValue;
-                                          setEditingModel((prev) =>
-                                            prev ? { ...prev, contextWindow: value } : prev,
-                                          );
-                                        }}
-                                      />
-                                    </AstryxStack>
-                                    <AstryxStack direction="vertical" gap={2}>
-                                      <Input
-                                        size={isCompact ? "lg" : "md"}
-                                        width="100%"
-                                        label={t("settings.maxOutputToken")}
-                                        {...({ inputMode: "numeric" } as const)}
-                                        type="text"
-                                        aria-invalid={
-                                          editingModelMaxOutputToken === null ? true : undefined
-                                        }
-                                        status={
-                                          editingModelMaxOutputToken === null
-                                            ? { type: "error" }
-                                            : undefined
-                                        }
-                                        value={editingModel.maxOutputToken}
-                                        onChange={(nextValue) => {
-                                          const value = nextValue;
-                                          setEditingModel((prev) =>
-                                            prev ? { ...prev, maxOutputToken: value } : prev,
-                                          );
-                                        }}
-                                      />
-                                    </AstryxStack>
-                                  </AstryxGrid>
-
-                                  <Text type="body" weight="medium" wordBreak="break-word">
-                                    {t("settings.modelCost")}
-                                  </Text>
-                                  <Text type="supporting" color="secondary" wordBreak="break-word">
-                                    {t("settings.modelCostHint")}
-                                  </Text>
-                                  <AstryxGrid
-                                    columns={{ minWidth: 240, max: 2 }}
-                                    gap={3}
-                                    width="100%"
-                                  >
-                                    {(
-                                      [
-                                        ["costInput", "settings.modelCostInput"],
-                                        ["costOutput", "settings.modelCostOutput"],
-                                        ["costCacheRead", "settings.modelCostCacheRead"],
-                                        ["costCacheWrite", "settings.modelCostCacheWrite"],
-                                      ] as const
-                                    ).map(([field, labelKey]) => (
-                                      <AstryxStack direction="vertical" key={field} gap={2}>
-                                        <Input
-                                          size={isCompact ? "lg" : "md"}
-                                          width="100%"
-                                          label={t(labelKey)}
-                                          {...({ inputMode: "decimal" } as const)}
-                                          type="text"
-                                          placeholder="0"
-                                          aria-invalid={
-                                            parseCostRate(editingModel[field]) === null
-                                              ? true
-                                              : undefined
-                                          }
-                                          status={
-                                            parseCostRate(editingModel[field]) === null
-                                              ? { type: "error" }
-                                              : undefined
-                                          }
-                                          value={editingModel[field]}
-                                          onChange={(nextValue) => {
-                                            const value = nextValue;
-                                            setEditingModel((prev) =>
-                                              prev ? { ...prev, [field]: value } : prev,
-                                            );
-                                          }}
-                                        />
-                                      </AstryxStack>
-                                    ))}
-                                  </AstryxGrid>
-
-                                  {!canSaveEditingModel ? (
-                                    <Banner
-                                      status="error"
-                                      title={t("settings.modelParametersInvalid")}
-                                      collapsible={false}
-                                    />
-                                  ) : null}
-
-                                  <AstryxStack
-                                    direction="horizontal"
-                                    gap={2}
-                                    hAlign="end"
-                                    wrap="wrap"
-                                  >
-                                    <Button
-                                      label={t("settings.cancel")}
-                                      type="button"
-                                      variant="secondary"
-                                      size={isCompact ? "lg" : "sm"}
-                                      onClick={() => setEditingModel(null)}
-                                    >
-                                      {t("settings.cancel")}
-                                    </Button>
-                                    <Button
-                                      variant="primary"
-                                      label={t("settings.save")}
-                                      type="button"
-                                      size={isCompact ? "lg" : "sm"}
-                                      isDisabled={!canSaveEditingModel}
-                                      onClick={saveInlineModelSettings}
-                                    >
-                                      {t("settings.save")}
-                                    </Button>
-                                  </AstryxStack>
-                                </AstryxStack>
-                              ) : null}
                             </AstryxStack>
                           );
                         })
@@ -2521,6 +2335,222 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
           </AstryxGrid>
         </HStack>
       </Section>
+      {editingModel ? (
+        <Dialog
+          isOpen
+          className="settings-provider-model-dialog"
+          onOpenChange={(open) => {
+            if (!open) updatePresentedModel(null);
+          }}
+          aria-label={t("settings.modelSettings")}
+          purpose="info"
+          variant={isCompact ? "fullscreen" : "standard"}
+          width={isCompact ? "100dvw" : "var(--xgent-extension-preview-width)"}
+          maxHeight="var(--xgent-extension-preview-height)"
+          padding={0}
+          style={{ blockSize: isCompact ? "100dvh" : "var(--xgent-extension-preview-height)" }}
+        >
+          <VStack height="100%" minHeight={0} gap={0}>
+            <CompactDialogHeader
+              title={editingModel.model.id}
+              subtitle={t("settings.modelSettings")}
+              compact={isCompact}
+              closeLabel={t("settings.close")}
+              onClose={() => updatePresentedModel(null)}
+            />
+            <StackItem size="fill" isScrollable className="settings-provider-model-dialog-body">
+              <VStack gap={3} padding={4} width="100%">
+                {supportsModelInputOverride(providerType) ? (
+                  <Selector
+                    size={isCompact ? "lg" : "md"}
+                    label={t("settings.modelInput")}
+                    width="100%"
+                    value={modelInputMode(editingModel.model)}
+                    options={MODEL_INPUT_OPTIONS.map((option) => ({
+                      value: option.value,
+                      label: t(option.labelKey),
+                    }))}
+                    onChange={(value) =>
+                      updatePresentedModel((previous) =>
+                        previous
+                          ? {
+                              ...previous,
+                              model: withModelInputMode(previous.model, value as ModelInputMode),
+                            }
+                          : previous,
+                      )
+                    }
+                  />
+                ) : null}
+                {providerType === "codex" ? (
+                  <Selector
+                    size={isCompact ? "lg" : "md"}
+                    label={t("settings.promptCacheHintModelOverride")}
+                    width="100%"
+                    value={editingModel.model.promptCacheHintMode ?? "inherit"}
+                    options={[
+                      {
+                        value: "inherit",
+                        label: t("settings.promptCacheHintMode.inherit"),
+                      },
+                      ...PROVIDER_CACHE_HINT_OPTIONS.map((option) => ({
+                        value: option.value,
+                        label: t(option.labelKey),
+                      })),
+                    ]}
+                    onChange={(value) =>
+                      updatePresentedModel((previous) =>
+                        previous
+                          ? {
+                              ...previous,
+                              model: {
+                                ...previous.model,
+                                promptCacheHintMode:
+                                  value === "inherit" ? undefined : (value as PromptCacheHintMode),
+                              },
+                            }
+                          : previous,
+                      )
+                    }
+                  />
+                ) : null}
+                <AstryxGrid columns={{ minWidth: 240, max: 2 }} gap={3} width="100%">
+                  <AstryxStack direction="vertical" gap={2}>
+                    <Input
+                      size={isCompact ? "lg" : "md"}
+                      width="100%"
+                      label={t("settings.contextWindow")}
+                      {...({ inputMode: "numeric" } as const)}
+                      type="text"
+                      aria-invalid={editingModelContextWindow === null ? true : undefined}
+                      status={editingModelContextWindow === null ? { type: "error" } : undefined}
+                      value={editingModel.contextWindow}
+                      onChange={(nextValue) => {
+                        const value = nextValue;
+                        updatePresentedModel((prev) =>
+                          prev ? { ...prev, contextWindow: value } : prev,
+                        );
+                      }}
+                    />
+                  </AstryxStack>
+                  <AstryxStack direction="vertical" gap={2}>
+                    <Input
+                      size={isCompact ? "lg" : "md"}
+                      width="100%"
+                      label={t("settings.maxOutputToken")}
+                      {...({ inputMode: "numeric" } as const)}
+                      type="text"
+                      aria-invalid={editingModelMaxOutputToken === null ? true : undefined}
+                      status={editingModelMaxOutputToken === null ? { type: "error" } : undefined}
+                      value={editingModel.maxOutputToken}
+                      onChange={(nextValue) => {
+                        const value = nextValue;
+                        updatePresentedModel((prev) =>
+                          prev ? { ...prev, maxOutputToken: value } : prev,
+                        );
+                      }}
+                    />
+                  </AstryxStack>
+                </AstryxGrid>
+
+                <Text type="body" weight="medium" wordBreak="break-word">
+                  {t("settings.modelCost")}
+                </Text>
+                <Text type="supporting" color="secondary" wordBreak="break-word">
+                  {t("settings.modelCostHint")}
+                </Text>
+                <AstryxGrid columns={{ minWidth: 240, max: 2 }} gap={3} width="100%">
+                  {(
+                    [
+                      ["costInput", "settings.modelCostInput"],
+                      ["costOutput", "settings.modelCostOutput"],
+                      ["costCacheRead", "settings.modelCostCacheRead"],
+                      ["costCacheWrite", "settings.modelCostCacheWrite"],
+                    ] as const
+                  ).map(([field, labelKey]) => (
+                    <AstryxStack direction="vertical" key={field} gap={2}>
+                      <Input
+                        size={isCompact ? "lg" : "md"}
+                        width="100%"
+                        label={t(labelKey)}
+                        {...({ inputMode: "decimal" } as const)}
+                        type="text"
+                        placeholder="0"
+                        aria-invalid={
+                          parseCostRate(editingModel[field]) === null ? true : undefined
+                        }
+                        status={
+                          parseCostRate(editingModel[field]) === null
+                            ? { type: "error" }
+                            : undefined
+                        }
+                        value={editingModel[field]}
+                        onChange={(nextValue) => {
+                          const value = nextValue;
+                          updatePresentedModel((prev) =>
+                            prev ? { ...prev, [field]: value } : prev,
+                          );
+                        }}
+                      />
+                    </AstryxStack>
+                  ))}
+                </AstryxGrid>
+
+                {!canSaveEditingModel ? (
+                  <Banner
+                    status="error"
+                    title={t("settings.modelParametersInvalid")}
+                    collapsible={false}
+                  />
+                ) : null}
+              </VStack>
+            </StackItem>
+            <Section
+              className="settings-provider-model-dialog-footer"
+              padding={3}
+              width="100%"
+              dividers={["top"]}
+            >
+              <AstryxStack direction="horizontal" gap={2} hAlign="end" wrap="wrap">
+                <ConfirmDeletePopover
+                  name={editingModel.model.id}
+                  onConfirm={() => {
+                    if (ownsModelDialog() && presentedModelId) removeModel(presentedModelId);
+                  }}
+                >
+                  {(open) => (
+                    <Button
+                      label={t("settings.delete")}
+                      variant="destructive"
+                      size={isCompact ? "lg" : "sm"}
+                      onClick={open}
+                    />
+                  )}
+                </ConfirmDeletePopover>
+                <Button
+                  label={t("settings.cancel")}
+                  type="button"
+                  variant="secondary"
+                  size={isCompact ? "lg" : "sm"}
+                  onClick={() => updatePresentedModel(null)}
+                >
+                  {t("settings.cancel")}
+                </Button>
+                <Button
+                  variant="primary"
+                  label={t("settings.save")}
+                  type="button"
+                  size={isCompact ? "lg" : "sm"}
+                  isDisabled={!canSaveEditingModel}
+                  onClick={saveModelSettings}
+                >
+                  {t("settings.save")}
+                </Button>
+              </AstryxStack>
+            </Section>
+          </VStack>
+        </Dialog>
+      ) : null}
     </VStack>
   );
 }

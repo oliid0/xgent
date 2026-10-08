@@ -72,6 +72,8 @@
     --xgent-settings-sidebar-width: 14rem;
     --xgent-settings-dialog-width: min(86.6dvw, calc(100dvw - (var(--spacing-4) * 2)));
     --xgent-settings-dialog-height: min(86.6dvh, calc(100dvh - (var(--spacing-4) * 2)));
+    --xgent-extension-preview-width: min(44rem, calc(100dvw - (var(--spacing-4) * 2)));
+    --xgent-extension-preview-height: min(46rem, calc(100dvh - (var(--spacing-4) * 2)));
     --xgent-settings-header-height: 3.75rem;
     --xgent-settings-control-width: 18rem;
     --xgent-http-method-width: 6.25rem;
@@ -4549,6 +4551,15 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 .settings-provider-tabs-toolbar .astryx-tab-list {
   width: 100%;
   min-width: 0;
+}
+.settings-provider-list {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+}
+.settings-provider-row,
+.settings-provider-model-item {
+  border-radius: var(--radius-element);
+  box-shadow: inset 0 0 0 1px var(--color-border);
 }
 .settings-provider-usage,
 .settings-provider-proxy {

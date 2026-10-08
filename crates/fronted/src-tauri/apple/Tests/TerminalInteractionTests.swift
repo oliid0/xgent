@@ -57,6 +57,26 @@ final class TerminalInteractionTests: XCTestCase {
     }
 
     @MainActor
+    func testUnchangedReplayStillReportsAViewportThatBecameVisible() async throws {
+        var events: [String] = []
+        let view = TerminalView(frame: .zero)
+        let coordinator = XgentTerminalCoordinator { events.append($0) }
+        let replay = try packet("late-layout", bytes: Array("ready".utf8))
+        coordinator.update(value: replay, view: view)
+        view.frame = CGRect(x: 0, y: 0, width: 640, height: 300)
+        coordinator.update(value: replay, view: view)
+        await Task.yield()
+        try await Task.sleep(nanoseconds: 10_000_000)
+        let resize = try events.map { try XCTUnwrap(JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any]) }
+        XCTAssertEqual(resize.count, 1)
+        XCTAssertEqual(resize.first?["cols"] as? Int, view.getTerminal().cols)
+        XCTAssertEqual(resize.first?["rows"] as? Int, view.getTerminal().rows)
+        coordinator.send(source: view, data: [UInt8(13)][...])
+        XCTAssertEqual(events.count, 2, "Skipping repeated output must retain input readiness")
+        coordinator.retire()
+    }
+
+    @MainActor
     func testContinuousActionsDoNotLockKeyboardOrReplaceTerminalOutput() throws {
         let json: [String: Any] = [
             "version": 1, "surface": "terminal", "revision": 1, "mode": "root",

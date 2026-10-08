@@ -48,6 +48,11 @@ test("native MCP details are a dismissible sheet with shared metadata, protected
       headers: { Authorization: "secret-value" }, env: { TOKEN: "another-secret" }, args: [] } } };
   pending.resolve(detail); await settle();
   const nodes = h.nodes();
+  const preview = h.render().document.nodes[0];
+  const footer = preview.children.find(node => node.variant === "extension-preview-footer");
+  assert.ok(footer.children.some(node => node.id === "mcp-preview-install"));
+  assert.ok(!flatten([preview.children.find(node => node.variant === "extension-preview-body")]).some(node => node.id === "mcp-preview-install"));
+  assert.ok(nodes.find(node => node.id === "mcp-registry-preview:details").children.some(node => node.id === "mcp-preview:headers"));
   assert.equal(nodes.find(node => node.id === "mcp-preview:message-url:value").text, "https://example.test/message");
   assert.equal(nodes.find(node => node.id === "mcp-preview:timeout:value").text, "43210 ms");
   assert.equal(nodes.find(node => node.id === "mcp-preview:headers:value").text, "Authorization");

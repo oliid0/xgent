@@ -919,10 +919,16 @@ test("native workspace disclosures collapse history without selecting a workspac
       const disclosure = () => rows().find(node => node.id === "project:a").children
         .find(node => node.id === "project-disclosure:a");
       assert.equal(disclosure().value, false);
+      assert.equal(disclosure().icon, "folder");
+      assert.equal(rows().find(node => node.id === "project:a").icon, undefined,
+        "The folder disclosure owns the only leading workspace icon");
       assert.match(disclosure().label, /workspaceExpand/);
       assert.equal((await h.dispatch(disclosure().action, null, "sidebar")).ok, true);
       assert.equal(disclosure().value, true);
+      assert.equal(disclosure().icon, "folder.fill");
       assert.ok(rows().some(node => node.id === "workspace-conversation:work"));
+      assert.equal(rows().find(node => node.id === "workspace-conversation:work").icon, undefined,
+        "Conversation titles retain space for their running indicator and independent menu");
       assert.match(disclosure().label, /workspaceCollapse/);
       assert.equal((await h.dispatch(disclosure().action, null, "sidebar")).ok, true);
       assert.equal(disclosure().value, false);
@@ -951,6 +957,7 @@ test("native archived workspaces start folded, reject selection and retain worki
   assert.equal((await h.dispatch("archived-projects-label", null, "sidebar")).ok, true);
   const row = rows().find(node => node.id === "project:archived");
   assert.ok(!row.children.some(node => node.variant === "sidebar-disclosure"));
+  assert.equal(row.icon, "folder", "Archived workspaces retain their folder beside the disabled title");
   assert.equal(row.secondary, true);
   assert.notEqual(row.disabled, true, "only selection is disabled, rather than the entire row and its restore menu");
   assert.equal((await h.dispatch("project:archived", null, "sidebar")).ok, false);

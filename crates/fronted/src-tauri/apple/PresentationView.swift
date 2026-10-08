@@ -544,6 +544,9 @@ struct XgentAlerts: ViewModifier {
 struct XgentSheetView: View {
     let initialDocument: XgentDocument
     @ObservedObject var model: XgentPresentationModel
+    #if os(macOS)
+    @State private var availableSize = CGSize(width: 1156, height: 700)
+    #endif
 
     init(document: XgentDocument, model: XgentPresentationModel) {
         self.initialDocument = document
@@ -569,6 +572,7 @@ struct XgentSheetView: View {
     }
     private var usesFullHeightContainer: Bool {
         visibleNodes.contains { $0.variant == "workspace-search-palette" } ||
+            visibleNodes.contains { $0.variant == "mcp-registry-preview" || $0.variant == "provider-model-settings" } ||
             visibleNodes.contains { $0.kind == .settingsLayout } ||
             visibleNodes.contains { $0.kind == .terminalLayout } ||
             (visibleNodes.count == 1 && visibleNodes.first?.kind == .list)
@@ -594,8 +598,8 @@ struct XgentSheetView: View {
     }
 
     @ViewBuilder private var navigationContent: some View {
-        if visibleNodes.contains(where: { $0.kind == .settingsLayout }) {
-            // The desktop settings shell owns its fixed title and close button.
+        if visibleNodes.contains(where: { $0.kind == .settingsLayout || $0.variant == "mcp-registry-preview" || $0.variant == "provider-model-settings" }) {
+            // These layouts own their fixed title, close and scrolling body.
             sheetContent
         } else {
           NavigationStack {
@@ -632,8 +636,16 @@ struct XgentSheetView: View {
         .background { XgentThemeBackground().ignoresSafeArea() }
         .preferredColorScheme(document.colorScheme)
         .interactiveDismissDisabled(document.dismissAction == nil)
+        #if os(macOS)
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { availableSize = $0 }
+        #endif
         .sheet(item: Binding(get: { nextSheet }, set: { if $0 == nil, let nextSheet { model.dismiss(nextSheet) } })) { next in
+            #if os(macOS)
             AnyView(XgentSheetView(document: next, model: model))
+                .modifier(XgentDesktopSheetSizing(document: next, availableSize: availableSize))
+            #else
+            AnyView(XgentSheetView(document: next, model: model))
+            #endif
         }
         .modifier(XgentAlerts(model: model, enabled: nextSheet == nil))
         .modifier(XgentNotificationOverlay(model: model, enabled: nextSheet == nil))

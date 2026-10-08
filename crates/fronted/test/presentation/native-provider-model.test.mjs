@@ -4,6 +4,7 @@ import { createReactHookHarness } from "../helpers/react-hook-harness.mjs";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 function deferred() { let resolve; const promise = new Promise(yes => { resolve = yes; }); return { promise, resolve }; }
+const allNodes = (nodes) => nodes.flatMap(node => [node, ...allNodes(node.children ?? [])]);
 function harness(options = {}) {
   const hooks = createReactHookHarness(), confirmations = [];
   const loader = createTsModuleLoader({ mocks: {
@@ -51,7 +52,7 @@ test("native model settings keep untouched provider limits current and only mark
     h.update(previous => ({ ...previous, customProviders: previous.customProviders.map(provider => ({ ...provider,
       models: provider.models.map(model => ({ ...model, limitsSource: "provider" })) })) }));
     const surface = h.render();
-    const fields = surface.document.nodes[1].children;
+    const fields = allNodes(surface.document.nodes);
     assert.equal(fields.find(node => node.id.endsWith(":contextWindow")).variant, "integer-input");
     assert.equal(fields.find(node => node.id.endsWith(":costInput")).variant, "decimal-input");
     await h.send("costInput", "1.5");
@@ -91,7 +92,12 @@ test("native model editor uses shared limits/cost rules and preserves current pr
   for (const mobile of [true, false]) {
     const h = harness({ mobile }); const surface = h.render();
     assert.equal(surface.sessionSurface, "model-editor"); assert.equal(surface.document.formFactor, mobile ? "mobile" : "desktop");
-    assert.ok(surface.document.nodes[1].children.some(node => node.text === "settings.modelCost"));
+    assert.ok(allNodes(surface.document.nodes).some(node => node.text === "settings.modelCost"));
+    const shell = surface.document.nodes[0];
+    assert.equal(shell.variant, "provider-model-settings");
+    const footer = shell.children.find(node => node.variant === "extension-preview-footer");
+    assert.deepEqual(footer.children.map(node => node.id), [h.prefix + ":delete", h.prefix + ":cancel", h.prefix + ":save"]);
+    assert.ok(!allNodes(shell.children.find(node => node.variant === "extension-preview-body").children).some(node => node.id.endsWith(":save")));
     await h.dispatch("contextWindow", "32000.9"); await h.dispatch("maxOutputToken", "8000");
     await h.dispatch("costInput", "1.25"); await h.dispatch("costCacheRead", "");
     assert.equal(h.settings.customProviders[0].models[0].contextWindow, 8192, "draft does not persist before Save");
@@ -112,7 +118,7 @@ test("invalid edits block Save, including an accepted edit before the next nativ
   assert.equal((await h.send("save")).ok, false);
   assert.equal(h.settings.customProviders[0].models[0].contextWindow, 8192);
   let surface = h.render(); assert.equal(surface.handlers.get(`${h.prefix}:save`).enabled, false);
-  assert.ok(surface.document.nodes[1].children.some(node => node.id.endsWith(":invalid")));
+  assert.ok(allNodes(surface.document.nodes).some(node => node.id.endsWith(":invalid")));
   await h.dispatch("contextWindow", "1000"); await h.dispatch("costOutput", "-1");
   assert.equal((await h.dispatch("save")).ok, false);
   await h.dispatch("costOutput", "NaN"); assert.equal((await h.dispatch("save")).ok, false);
@@ -151,6 +157,6 @@ test("cancelled, duplicate and retired delete confirmations cannot delete a mode
 test("model deleted by another view produces a recoverable empty editor and is never recreated by its old draft", () => {
   const h = harness(); h.render(); const draft = h.helpers.createModelEditDraft(h.settings.customProviders[0].models[0]);
   h.update(previous => h.helpers.removeProviderModel(previous, "provider", "model"));
-  const surface = h.render(); assert.ok(surface.document.nodes.some(node => node.id.endsWith(":missing")));
+  const surface = h.render(); assert.ok(allNodes(surface.document.nodes).some(node => node.id.endsWith(":missing")));
   assert.ok(!surface.handlers.has(`${h.prefix}:save`)); assert.equal(h.helpers.applyModelEdit(h.settings, "provider", draft), h.settings); h.unmount();
 });

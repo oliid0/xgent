@@ -17,6 +17,7 @@ type XTermViewportProps = {
   client: TerminalClient;
   session: TerminalSession;
   theme: "light" | "dark";
+  fontScale?: number;
   isActive: boolean;
   initialSnapshot?: TerminalSnapshot;
   className?: string;
@@ -33,7 +34,7 @@ function terminalTheme(theme: "light" | "dark") {
   if (theme === "dark") {
     return {
       background: "#0b0f14",
-      foreground: "#4ade80",
+      foreground: "#cbd5e1",
       cursor: "#f8fafc",
       cursorAccent: "#0b0f14",
       selectionBackground: "#2c3e57",
@@ -99,6 +100,7 @@ export function XTermViewport({
   client,
   session,
   theme,
+  fontScale = 1,
   isActive,
   initialSnapshot,
   className,
@@ -109,11 +111,14 @@ export function XTermViewport({
   const resizeTimerRef = useRef<number | null>(null);
   const sessionRef = useRef(session);
   const themeRef = useRef(theme);
+  const fontSize = 14 * fontScale;
+  const fontSizeRef = useRef(fontSize);
   const onErrorRef = useRef(onError);
   const initialSnapshotRef = useRef(initialSnapshot);
   const onInitialSnapshotConsumedRef = useRef(onInitialSnapshotConsumed);
   sessionRef.current = session;
   themeRef.current = theme;
+  fontSizeRef.current = fontSize;
   onErrorRef.current = onError;
   onInitialSnapshotConsumedRef.current = onInitialSnapshotConsumed;
 
@@ -127,6 +132,14 @@ export function XTermViewport({
     if (!termRef.current) return;
     termRef.current.options.theme = terminalTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term || term.options.fontSize === fontSize) return;
+    term.options.fontSize = fontSize;
+    const timer = window.setTimeout(() => fitAndResizeRef.current?.(), 0);
+    return () => window.clearTimeout(timer);
+  }, [fontSize]);
 
   useEffect(() => {
     if (!isActive) {
@@ -164,7 +177,7 @@ export function XTermViewport({
       cursorInactiveStyle: "outline",
       disableStdin: true,
       fontFamily: getCodeFontFamily(),
-      fontSize: 13,
+      fontSize: fontSizeRef.current,
       fontWeight: "normal",
       fontWeightBold: "bold",
       lineHeight: 1.3,

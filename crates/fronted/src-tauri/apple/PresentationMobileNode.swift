@@ -311,7 +311,7 @@ struct XgentIOSNode: View {
                 XgentSkillTags(node: node, document: document, model: model)
             } else if node.variant == "skill-store-grid" {
                 XgentSkillStoreGrid(node: node, document: document, model: model)
-            } else if node.variant == "skill-preview" {
+            } else if node.variant == "skill-preview" || node.variant == "mcp-registry-preview" || node.variant == "provider-model-settings" {
                 XgentSkillPreview(node: node, document: document, model: model)
             } else if node.variant == "skill-detail-value" {
                 XgentSkillDetailValue(node: node)
@@ -826,7 +826,9 @@ struct XgentIOSNode: View {
 
     private var toolCall: some View {
         Group {
-            if node.variant == "timeline" || node.status == "running" {
+            if node.variant == "timeline" {
+                XgentTranscriptToolCall(node: node, document: document, model: model)
+            } else if node.status == "running" {
                 VStack(alignment: .leading, spacing: 8) {
                     toolCallLabel
                     toolCallContent

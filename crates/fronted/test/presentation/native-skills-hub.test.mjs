@@ -20,6 +20,9 @@ const t = key => { assert.ok(translations["zh-CN"][key], `Missing translation: $
 
 function controller(options = {}) {
   const hooks = createReactHookHarness();
+  const previewHooks = createReactHookHarness();
+  let activeHooks = hooks;
+  const react = Object.fromEntries(Object.keys(hooks.react).map(key => [key, (...args) => activeHooks.react[key](...args)]));
   let settings = normalizeSettings({ skills: { enabled: true, selected: [] } });
   const timers = new Map(); let timerID = 0;
   const oldWindow = globalThis.window, oldDocument = globalThis.document, oldReader = globalThis.FileReader;
@@ -34,9 +37,9 @@ function controller(options = {}) {
   };
   const calls = [];
   const mocks = {
-    react: { ...hooks.react, useLayoutEffect: hooks.react.useEffect },
+    react: { ...react, useLayoutEffect: react.useEffect },
     "../../i18n": { useLocale: () => ({ t }) },
-    "../../runtime/applePresentation": { isApplePresentationRuntime: () => true },
+    "../../runtime/applePresentation": { isApplePresentationRuntime: () => options.native ?? true },
     "../../presentation/NativeSkillsHub": { NativeSkillsHub: "NativeSkillsHub" },
     "../../components/icons": {}, "../../components/Markdown": {},
     "../../components/hub/HubChrome": {}, "../../components/astryx/ConfirmActionPopover": {},
@@ -55,15 +58,19 @@ function controller(options = {}) {
     },
   };
   for (const name of ["Badge", "Banner", "Breadcrumbs", "Button", "CheckboxInput", "Dialog", "EmptyState", "Grid", "hooks", "Icon", "IconButton", "Item", "Layout", "Link", "List", "MetadataList", "ProgressBar", "Selector", "Skeleton", "Spinner", "Stack", "StatusDot", "Switch", "TabList", "Text", "TextInput", "ToggleButton", "Token"]) mocks[`@astryxdesign/core/${name}`] = {};
+  mocks["@astryxdesign/core/hooks"] = { useMediaQuery: () => false };
   const loader = createTsModuleLoader({ mocks });
   const { SkillsHubPage } = loader.loadModule("src/pages/skills-hub/SkillsHubPage.tsx");
   const props = { settings, setSettings: update => { settings = update(settings); props.settings = settings; },
     initialSkills: options.initial ?? [skill("research"), skill("creative"), skill("skills-creator")],
     initialRootDir: "/skills", isAgentMode: true, sidebarOpen: false, onOpenSidebar: () => {} };
-  const render = () => hooks.render(() => SkillsHubPage(props)).props;
+  const tree = () => { activeHooks = hooks; return hooks.render(() => SkillsHubPage(props)); };
+  const render = () => tree().props;
   render();
-  return { render, calls, settings: () => settings, props, timers,
-    unmount() { hooks.unmount(); globalThis.window = oldWindow; globalThis.document = oldDocument; globalThis.FileReader = oldReader; } };
+  return { render, tree, calls, settings: () => settings, props, timers,
+    preview(element) { activeHooks = previewHooks; return previewHooks.render(() => element.type(element.props)); },
+    replayPreview: () => previewHooks.replayEffects(),
+    unmount() { previewHooks.unmount(); hooks.unmount(); globalThis.window = oldWindow; globalThis.document = oldDocument; globalThis.FileReader = oldReader; } };
 }
 
 function surface(options = {}) {
@@ -114,8 +121,52 @@ function surface(options = {}) {
     render();
     return result;
   };
-  render(); return { props, calls, render, action, nodes: () => flatten(render().document.nodes), unmount: () => hooks.unmount() };
+  render(); return { props, calls, render, action, nodes: () => flatten(render().document.nodes), replay: () => hooks.replayEffects(), unmount: () => hooks.unmount() };
 }
+
+test("displayed Skill previews remain interactive after effect replay on both renderers", async () => {
+  for (const mobile of [false, true]) {
+    const h = surface({ mobile });
+    try {
+      h.props.preview.skill = skill(); h.render(); h.replay();
+      await h.action("skill-preview-enabled", false);
+      assert.deepEqual(h.calls.at(-1), ["toggle", "research", false]);
+      await h.action("skill-preview-delete");
+      assert.deepEqual(h.calls.at(-1), ["delete", "research"]);
+    } finally { h.unmount(); }
+  }
+  const options = { native: true };
+  const h = controller(options);
+  const elements = value => Array.isArray(value) ? value.flatMap(elements)
+    : value?.props ? [value, ...Object.values(value.props).flatMap(elements)] : [];
+  try {
+    h.render().installed.onOpen(skill());
+    options.native = false;
+    const preview = elements(h.tree()).find(node => node.type?.name === "InstalledSkillPreviewDrawer");
+    assert.ok(preview, "The actual public Skills page supplies the installed preview");
+    h.preview(preview); h.replayPreview();
+    let dialog = h.preview(preview);
+    const copyButton = (element, label) => elements(element).find(node =>
+      node.type?.name === "SkillPreviewCopyButton" && node.props.label === label);
+    assert.equal(copyButton(dialog, "settings.skillsInstalledPreviewCopyFile").props.value, "",
+      "Loading content cannot be copied as a stale file preview");
+    await settle();
+    const loadedPreview = elements(h.tree()).find(node => node.type?.name === "InstalledSkillPreviewDrawer");
+    dialog = h.preview(loadedPreview);
+    assert.equal(copyButton(dialog, "settings.skillsInstalledPreviewCopyFile").props.value, "# Instructions");
+    assert.equal(copyButton(dialog, "settings.skillsInstalledPreviewCopyDescription").props.value, "Search and cite source material");
+    const toggle = elements(dialog).find(node => node.props.onChange && node.props.label === "skills.select: research");
+    assert.ok(toggle, "The real installed preview has a working selection switch");
+    toggle.props.onChange(true);
+    assert.ok(h.settings().skills.selected.includes("research"));
+    const header = elements(dialog).find(node => node.type?.name === "CompactDialogHeader");
+    header.props.onClose();
+    assert.ok(!elements(h.tree()).some(node => node.type?.name === "InstalledSkillPreviewDrawer"));
+    h.unmount();
+    toggle.props.onChange(false);
+    assert.ok(h.settings().skills.selected.includes("research"), "Final disposal still retires Astryx preview callbacks");
+  } finally { h.unmount(); }
+});
 
 test("native desktop Skills uses shared full controller and merges rapid toggles against current settings", () => {
   const h = controller();
@@ -286,4 +337,34 @@ test("deletion dispatches once before re-render and preserves unrelated settings
     assert.equal(deletes, 1); pending.resolve({}); await Promise.all([first, second]);
     assert.ok(!h.settings().skills.selected.includes("research")); assert.ok(h.settings().skills.selected.includes("creative"));
   } finally { h.unmount(); }
+});
+
+
+test("installed preview exposes real selection and confirmed delete while retired details stay inert", async () => {
+  const approval = deferred();
+  const h = surface({ confirm: approval.promise });
+  try {
+    h.props.preview.skill = skill();
+    const published = h.render();
+    await h.action("skill-preview-enabled", false);
+    assert.deepEqual(h.calls.at(-1), ["toggle", "research", false]);
+    const deletion = h.action("skill-preview-delete", null, published);
+    h.props.preview.skill = skill("another"); h.render();
+    approval.resolve(true); await deletion;
+    assert.ok(!h.calls.some(call => call[0] === "delete"));
+    await published.handlers.get("skill-preview-enabled").run(true);
+    assert.equal(h.calls.filter(call => call[0] === "toggle").length, 1);
+    h.props.preview.skill = skill("skills-creator");
+    assert.equal(h.nodes().find(node => node.id === "skill-preview-enabled").disabled, true);
+    assert.ok(!h.nodes().some(node => node.id === "skill-preview-delete"));
+  } finally { h.unmount(); }
+  const accepted = surface();
+  try {
+    accepted.props.preview.skill = skill();
+    await accepted.action("skill-preview-delete");
+    assert.deepEqual(accepted.calls.at(-1), ["delete", "research"]);
+    const handler = accepted.render().handlers.get("skill-preview-enabled");
+    accepted.unmount(); await handler.run(false);
+    assert.equal(accepted.calls.length, 1);
+  } finally { accepted.unmount(); }
 });

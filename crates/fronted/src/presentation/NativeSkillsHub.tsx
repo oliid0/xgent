@@ -136,6 +136,15 @@ export function NativeSkillsHub(props: NativeSkillsHubProps) {
   const [copied, setCopied] = useState("");
   const [error, setError] = useState("");
   const lifetime = useRef(0);
+  const previewLease = useRef({
+    active: true,
+    skill: props.preview.skill,
+    root: props.rootDir,
+    view: props.view,
+  });
+  previewLease.current.skill = props.preview.skill;
+  previewLease.current.root = props.rootDir;
+  previewLease.current.view = props.view;
   const copyRevision = useRef(0);
   const requestedCategoryPage = useRef("");
   const categorizedStore = useMemo(
@@ -151,8 +160,10 @@ export function NativeSkillsHub(props: NativeSkillsHubProps) {
       storeCounts.set(category, (storeCounts.get(category) ?? 0) + 1);
   useEffect(() => {
     lifetime.current += 1;
+    previewLease.current.active = true;
     return () => {
       lifetime.current += 1;
+      previewLease.current.active = false;
     };
   }, []);
   useEffect(() => {
@@ -228,15 +239,16 @@ export function NativeSkillsHub(props: NativeSkillsHubProps) {
   const close =
     props.preview.skill || storePreview ? closePreview : (props.onClose ?? props.onOpenSidebar);
   c.handlers.set("close", { enabled: true, accepts: (value) => value === null, run: close });
-  const remove = async (skill: SkillSummary) => {
+  const remove = async (skill: SkillSummary, current: () => boolean = () => true) => {
     if (
-      await confirm({
+      (await confirm({
         title: t("settings.deleteConfirm"),
         description: skill.name,
         confirmLabel: t("settings.delete"),
         cancelLabel: t("settings.cancel"),
         tone: "destructive",
-      })
+      })) &&
+      current()
     )
       await props.installed.onDelete(skill);
   };
@@ -476,13 +488,28 @@ export function NativeSkillsHub(props: NativeSkillsHubProps) {
       children: [c.action("skill-bulk-undo", t("settings.skillsBulkUndo"), props.bulk.onUndo)],
     });
   let preview: PresentationNode | undefined;
-  if (props.preview.skill)
+  if (props.preview.skill) {
+    const skill = props.preview.skill;
+    const root = props.rootDir;
+    const view = props.view;
+    const current = () =>
+      previewLease.current.active &&
+      previewLease.current.skill === skill &&
+      previewLease.current.root === root &&
+      previewLease.current.view === view;
     preview = nativeSkillPreview({
       c,
       t,
       skill: props.preview.skill,
       preview: props.preview.state,
       checked: props.installed.selected.has(props.preview.skill.name),
+      deleting: props.installed.deleting === props.preview.skill.name,
+      onDelete: async () => {
+        if (current()) await remove(skill, current);
+      },
+      onToggle: (enabled) => {
+        if (current()) props.installed.onToggle(skill.name, enabled);
+      },
       skillsEnabled: props.settings.skills.enabled,
       close: closePreview,
       copied,
@@ -493,7 +520,7 @@ export function NativeSkillsHub(props: NativeSkillsHubProps) {
         if (epoch === lifetime.current && revision === copyRevision.current) setCopied(id);
       },
     });
-  else if (storePreview)
+  } else if (storePreview)
     preview = nativeSkillStorePreview({
       c,
       t,
