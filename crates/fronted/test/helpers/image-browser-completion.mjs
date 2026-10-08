@@ -156,5 +156,8 @@ export async function imageBrowserCompletion(browser, fileURL, directory, option
       if (!ended) child.kill();
     }
     await exited;
+    // An exited Windows launcher can leave inherited stderr open in a
+    // browser helper. The fixture is complete; release the owned pipe too.
+    child.stderr?.destroy();
   }
 }

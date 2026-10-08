@@ -24,6 +24,9 @@ struct XgentDesktopSettingsLayout: View {
     private var providerEditorFooter: XgentNode? {
         detail?.children?.first { $0.kind == .hStack && $0.variant == "provider-editor-actions" }
     }
+    private var providerNavigation: XgentNode? {
+        detail?.children?.first { $0.kind == .hStack && $0.variant == "provider-category-toolbar" }
+    }
     private var sectionTitle: String { navigation.first { $0.selected == true }?.label ?? document.title }
 
     var body: some View {
@@ -135,11 +138,20 @@ struct XgentDesktopSettingsLayout: View {
                     .padding(.vertical, 12)
                     .frame(minHeight: 60, alignment: .leading)
                 Divider()
+                if let navigation = providerNavigation {
+                    VStack(spacing: 0) {
+                        XgentProviderCategoryToolbar(node: navigation, document: document, model: model)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                        Divider()
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                }
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: CGFloat(theme.spacing.md)) {
                         ForEach((detail.children ?? []).filter {
                             $0.id != "settings-detail-title" && $0.id != "save-status" &&
-                            $0.id != providerEditorFooter?.id
+                            $0.id != providerEditorFooter?.id && $0.id != providerNavigation?.id
                         }) { child in
                             XgentNodeView(node: child, document: document, model: model, parentAxis: .vertical)
                         }

@@ -80,6 +80,7 @@ test("native Save validates an empty draft and commits final accepted fields onc
   const f = fixture();
   try {
     f.action("add-provider");
+    assert.equal(f.rendered().props.document.title, "settings.addProvider");
     assert.equal(f.nodes().find(node => node.id === "provider-name").value, "");
     assert.ok(!f.nodes().some(node => node.id === "provider-delete"));
     f.action("provider-editor-save");
@@ -118,6 +119,8 @@ test("native save failure keeps the same draft for retry and preserves concurren
   const f = fixture();
   try {
     f.action("provider:existing"); f.action("provider-key", "replacement-key");
+    assert.equal(f.rendered().props.document.title, "settings.editProvider");
+    assert.equal(f.nodes().find(node => node.id === "provider-details").label, "");
     f.external(previous => ({ ...previous, theme: "dark", customProviders: [...previous.customProviders, { ...previous.customProviders[0], id: "other", name: "External provider" }] }));
     f.failSave(true); f.action("provider-editor-save");
     assert.equal(f.nodes().find(node => node.id === "provider-editor-error").label, "save rejected");

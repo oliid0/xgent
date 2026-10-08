@@ -275,6 +275,72 @@ final class DesktopSettingsRenderingTests: XCTestCase {
         XCTAssertEqual(actions.count, count)
     }
 
+    @MainActor
+    func testProviderNavigationAndFinalActionsStayVisibleWhileLongFieldsScroll() async throws {
+        let accessibility = try NativeMacAccessibilitySession()
+        defer { accessibility.restore() }
+        for width: CGFloat in [640, 1040] {
+            for size in [DynamicTypeSize.large, .accessibility3] {
+                let document = try fixture(providerEditor: true)
+                let model = XgentPresentationModel(); model.update(document)
+                var actions: [XgentAction] = []; model.actionSink = { actions.append($0) }
+                let host = NSHostingView(rootView: XgentDesktopSettingsLayout(
+                    node: document.nodes[0], document: document, model: model)
+                    .frame(width: width, height: 720).dynamicTypeSize(size))
+                let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: 720),
+                                      styleMask: [.titled], backing: .buffered, defer: false)
+                window.isReleasedWhenClosed = false; window.contentView = host; window.makeKeyAndOrderFront(nil)
+                defer { model.invalidate(); window.close() }
+                host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(200))
+                let ids = ["provider-editor-section:general", "provider-runtime", "provider-editor-cancel", "provider-editor-save"]
+                let initial = nativeMacAccessibilityTree(window)
+                let initialFrames = try ids.map { id in
+                    try XCTUnwrap(initial.first { $0.accessibilityIdentifier() == id && $0.accessibilityRole() == .button }, id)
+                        .accessibilityFrame()
+                }
+                func scrolls(_ view: NSView) -> [NSScrollView] {
+                    (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap { scrolls($0) }
+                }
+                let scroll = try XCTUnwrap(scrolls(host).first {
+                    $0.contentView.bounds.height > 100 && ($0.documentView?.bounds.height ?? 0) > $0.contentView.bounds.height + 1
+                }, "The long provider form must scroll")
+                let content = try XCTUnwrap(scroll.documentView)
+                let bottom = max(0, content.bounds.height - scroll.contentView.bounds.height)
+                let initialOffset = scroll.contentView.bounds.minY
+                scroll.contentView.scroll(to: NSPoint(x: 0, y: content.isFlipped ? bottom : 0))
+                scroll.reflectScrolledClipView(scroll.contentView)
+                host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(100))
+                XCTAssertGreaterThan(abs(scroll.contentView.bounds.minY - initialOffset), 1,
+                    "Exercise the actual vertical form before checking pinned controls")
+                let elements = nativeMacAccessibilityTree(window)
+                for (index, id) in ids.enumerated() {
+                    let controls = elements.filter { $0.accessibilityIdentifier() == id && $0.accessibilityRole() == .button }
+                    XCTAssertEqual(controls.count, 1)
+                    let control = try XCTUnwrap(controls.first, id)
+                    let frame = control.accessibilityFrame()
+                    XCTAssertEqual(frame.minY, initialFrames[index].minY, accuracy: 1, id)
+                    XCTAssertGreaterThan(frame.width, 0, id)
+                    XCTAssertTrue(window.frame.insetBy(dx: -1, dy: -1).contains(frame), id)
+                }
+                let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+                host.cacheDisplay(in: host.bounds, to: bitmap)
+                let shot = XCTAttachment(image: NSImage(cgImage: try XCTUnwrap(bitmap.cgImage), size: host.bounds.size))
+                shot.name = "provider-editor-scrolled-\(Int(width))-\(size)"; shot.lifetime = .keepAlways; add(shot)
+                let general = try XCTUnwrap(elements.first { $0.accessibilityIdentifier() == ids[0] && $0.accessibilityRole() == .button })
+                XCTAssertTrue(general.accessibilityPerformPress())
+                try await Task.sleep(for: .milliseconds(80))
+                XCTAssertEqual(actions.last?.action, "section")
+                XCTAssertEqual(actions.last?.value, .string("general"))
+                let cancel = try XCTUnwrap(nativeMacAccessibilityTree(window).first {
+                    $0.accessibilityIdentifier() == "provider-editor-cancel" && $0.accessibilityRole() == .button
+                })
+                XCTAssertTrue(cancel.accessibilityPerformPress())
+                try await Task.sleep(for: .milliseconds(80))
+                XCTAssertEqual(actions.last?.action, "cancel")
+            }
+        }
+    }
+
     private func node(_ id: String, _ kind: String, _ fields: [String: Any] = [:]) -> [String: Any] {
         var value = fields
         value["id"] = id
@@ -282,7 +348,7 @@ final class DesktopSettingsRenderingTests: XCTestCase {
         return value
     }
 
-    private func fixture(section: Section = .providers) throws -> XgentDocument {
+    private func fixture(section: Section = .providers, providerEditor: Bool = false) throws -> XgentDocument {
         let appearanceGroups = [
             node("desktop-appearance", "SettingsGroup", ["label": "Appearance", "children": [
                 node("thinking", "Switch", ["label": "Show reasoning and thinking", "value": true, "action": "thinking"]),
@@ -355,8 +421,8 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                 node("policy:Read:description", "Text", ["text": "Read files from the current workspace without changing their contents.", "secondary": true]),
             ]]),
         ]
-        let groups: [[String: Any]]
-        let title: String
+        var groups: [[String: Any]]
+        var title: String
         switch section {
         case .appearance: groups = desktopGeneralGroups() + appearanceGroups; title = "System"
         case .systemTools: groups = systemGroups; title = "System"
@@ -377,6 +443,25 @@ final class DesktopSettingsRenderingTests: XCTestCase {
                 node("provider-test", "Button", ["label": "Test connection and fetch available models", "action": "test", "prominent": true]),
             ]])]
             title = "Providers"
+        }
+        if providerEditor {
+            title = "Edit provider"
+            groups = [
+                node("provider-editor-navigation", "HStack", ["variant": "provider-category-toolbar", "children": [
+                    node("provider-editor-section", "Selector", ["variant": "provider-editor-tabs", "value": "general",
+                        "label": "Provider settings", "action": "section", "options": [
+                            ["value": "general", "label": "General"], ["value": "request", "label": "Request"],
+                            ["value": "usage", "label": "Usage"]]]),
+                    node("provider-runtime", "IconButton", ["label": "Advanced settings", "icon": "slider.horizontal.3", "action": "advanced"])
+                ]]),
+                node("provider-details", "SettingsGroup", ["children": (0..<24).map { index in
+                    node("field-\(index)", "TextInput", ["label": "Provider configuration field \(index)", "value": "Editable setting", "action": "edit-\(index)"])
+                }]),
+                node("provider-editor-actions", "HStack", ["variant": "provider-editor-actions", "spacing": 8, "children": [
+                    node("provider-editor-cancel", "Button", ["label": "Cancel unsaved changes", "action": "cancel", "size": "large", "fill": true, "variant": "secondary"]),
+                    node("provider-editor-save", "Button", ["label": "Save provider configuration", "action": "save", "size": "large", "fill": true, "variant": "primary"])
+                ]])
+            ]
         }
         let json: [String: Any] = [
             "version": 1, "surface": "settings-manual", "revision": 1, "mode": "sheet",

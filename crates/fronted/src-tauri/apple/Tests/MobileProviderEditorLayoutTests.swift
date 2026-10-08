@@ -96,6 +96,14 @@ final class MobileProviderEditorLayoutTests: XCTestCase {
             "mode": "sheet", "title": "Edit Provider", "appearance": "light", "formFactor": "mobile",
             "nodes": [
                 ["id": "back", "kind": "Button", "label": "Back", "action": "back"],
+                ["id": "provider-editor-navigation", "kind": "HStack", "variant": "provider-category-toolbar", "children": [
+                    ["id": "provider-editor-section", "kind": "Selector", "variant": "provider-editor-tabs",
+                     "label": "Provider settings", "value": "general", "action": "section", "options": [
+                        ["value": "general", "label": "General"], ["value": "request", "label": "Request"],
+                        ["value": "usage", "label": "Usage"]]],
+                    ["id": "provider-runtime", "kind": "IconButton", "label": "Advanced provider settings",
+                     "icon": "slider.horizontal.3", "action": "advanced"]
+                ]],
                 ["id": "provider-details", "kind": "SettingsGroup", "label": "Provider configuration", "children": fields],
                 ["id": "provider-editor-actions", "kind": "HStack", "variant": "provider-editor-actions", "spacing": 8,
                  "children": [
@@ -144,11 +152,41 @@ final class MobileProviderEditorLayoutTests: XCTestCase {
                         "Long scaled actions must stack instead of fragmenting into narrow columns")
                 }
                 XCTAssertGreaterThan(frames[0].minY, 422, "The actions belong below the scrollable form")
+                let pinnedIds = ["provider-editor-section:general", "provider-runtime",
+                                 "provider-editor-cancel", "provider-editor-save"]
+                let initialFrames = try pinnedIds.map { id in
+                    try XCTUnwrap(elements.first { $0.identifier == id }, id).shape.bezierPath.bounds
+                }
+                let scroll = try XCTUnwrap(verticalScrollView(in: host.view), "The long provider form must scroll")
+                let bottom = max(0, scroll.contentSize.height - scroll.bounds.height)
+                scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: bottom), animated: false)
+                host.view.layoutIfNeeded(); try await Task.sleep(for: .milliseconds(100))
+                let scrolledHierarchy = AccessibilityHierarchyParser().parseAccessibilityHierarchy(in: host.view)
+                let scrolledElements = scrolledHierarchy.flattenToElements()
+                XCTAssertGreaterThan(scroll.contentOffset.y, 1, "Exercise the actual vertical form")
+                for (index, id) in pinnedIds.enumerated() {
+                    let controls = scrolledElements.filter { $0.identifier == id }
+                    XCTAssertEqual(controls.count, 1, "Navigation and actions must not repeat in the scrolling body")
+                    let frame = try XCTUnwrap(controls.first, id).shape.bezierPath.bounds
+                    XCTAssertEqual(frame.minY, initialFrames[index].minY, accuracy: 1,
+                        "Provider navigation and final actions remain fixed while fields scroll")
+                    XCTAssertGreaterThanOrEqual(frame.minX, -0.5, id)
+                    XCTAssertLessThanOrEqual(frame.maxX, width + 0.5, id)
+                    XCTAssertGreaterThanOrEqual(frame.minY, -0.5, id)
+                    XCTAssertLessThanOrEqual(frame.maxY, 844.5, id)
+                }
                 let name = "provider-editor-\(Int(width))-\(size)"
-                try attachNativeAccessibilityEvidence(hierarchy, name: name)
+                try attachNativeAccessibilityEvidence(scrolledHierarchy, name: name)
                 try attachCompositedNativeScreenshot(of: host.view, name: name)
             }
         }
+    }
+
+    @MainActor private func verticalScrollView(in view: UIView) -> UIScrollView? {
+        if let scroll = view as? UIScrollView,
+           scroll.bounds.height > 100, scroll.contentSize.height > scroll.bounds.height + 1 { return scroll }
+        for child in view.subviews { if let scroll = verticalScrollView(in: child) { return scroll } }
+        return nil
     }
 }
 #endif

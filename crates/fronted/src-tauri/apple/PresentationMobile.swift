@@ -539,8 +539,13 @@ struct XgentIOSSheetPresentation: View {
     private var providerEditorFooter: XgentNode? {
         visibleNodes.first { $0.kind == .hStack && $0.variant == "provider-editor-actions" }
     }
+    private var providerNavigation: XgentNode? {
+        visibleNodes.first { $0.kind == .hStack && $0.variant == "provider-category-toolbar" }
+    }
     private var contentNodes: [XgentNode] {
-        (list?.children ?? visibleNodes).filter { $0.id != providerEditorFooter?.id }
+        (list?.children ?? visibleNodes).filter {
+            $0.id != providerEditorFooter?.id && $0.id != providerNavigation?.id
+        }
     }
     private var isSettingsIndex: Bool {
         back == nil && contentNodes.contains { $0.kind == .settingsGroup && $0.id == "mobile-theme" }
@@ -649,6 +654,15 @@ struct XgentIOSSheetPresentation: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 12)
+            }
+            if let navigation = providerNavigation {
+                VStack(spacing: 0) {
+                    XgentProviderCategoryToolbar(node: navigation, document: document, model: model)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                    Divider()
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
             if grouped {
                 XgentIOSSettingsForm(nodes: contentNodes, document: document, model: model)

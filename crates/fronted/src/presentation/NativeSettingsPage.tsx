@@ -204,6 +204,9 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   }, [props.initialSection, nativeMobile]);
   const providerEditor = useNativeProviderEditor(props, providerId, page === "providers", t);
   const provider = providerEditor.provider;
+  const providerTitle = provider
+    ? t(providerEditor.isNew ? "settings.addProvider" : "settings.editProvider")
+    : undefined;
   const providerProps = {
     ...props,
     settings: providerEditor.settings,
@@ -1135,7 +1138,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       });
       if (providerEditorSection === "general") {
         nodes.push(
-          c.group("provider-details", provider.name, [
+          c.group("provider-details", "", [
             c.input("provider-name", t("settings.native.name"), provider.name, (name) =>
               patchProvider({ name }),
             ),
@@ -1859,7 +1862,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
                 {
                   id: "settings-detail-title",
                   kind: "Heading",
-                  text: provider?.name || titles[page] || t("settings.title"),
+                  text: providerTitle || titles[page] || t("settings.title"),
                 },
                 ...nodes,
               ],
@@ -1872,7 +1875,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       sessionSurface={sessionSurface}
       document={{
         mode: "sheet",
-        title: provider?.name || titles[page] || t("settings.title"),
+        title: providerTitle || titles[page] || t("settings.title"),
         appearance: settings.theme,
         formFactor: nativeMobile ? "mobile" : "desktop",
         theme: createNativePresentationTheme(settings, nativeMobile),
