@@ -124,11 +124,6 @@ jobs:
         with:
           workspaces: crates/fronted/src-tauri
 
-      # The newly admitted SDK needs stable Argon2. Resolve the old SSH RC lock
-      # on the runner, then retain Cargo's exact output as the lockfile artifact.
-      - name: Resolve Tailscale crypto lock
-        run: cargo update --manifest-path crates/fronted/src-tauri/Cargo.toml -p argon2 --precise 0.6.0
-
       - name: Check Tauri backend tests
         env:
           CARGO_TERM_COLOR: always

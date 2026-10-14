@@ -169,11 +169,12 @@ mod desktop {
         } else { false };
         let probes = [("git", "git", "--version"), ("node", "node", "--version"), ("python", if cfg!(windows) { "python" } else { "python3" }, "--version"),
             ("java", "java", "-version"), ("javac", "javac", "-version"), ("xcode", "xcodebuild", "-version"), ("swift", "swift", "--version")];
-        use futures_util::{stream, StreamExt};
-        let mut capabilities: Vec<_> = stream::iter(probes).map(|(id, program, argument)| async move {
+        use futures_util::{stream, StreamExt, FutureExt};
+        let jobs: Vec<_> = probes.into_iter().map(|(id, program, argument)| async move {
             if (id == "xcode" || (id == "swift" && cfg!(target_os = "macos"))) && !developer { item(id, "unavailable", "version-command", "No active Apple developer directory observed") }
             else { version(id, program, &[argument], developer).await }
-        }).buffer_unordered(4).collect().await;
+        }.boxed()).collect();
+        let mut capabilities: Vec<_> = stream::iter(jobs).buffer_unordered(4).collect().await;
         capabilities.push(disk_read(android).await.unwrap_or_else(|| item("android-sdk", "unknown", "sdk-layout", "SDK observation timed out or filesystem probe slots are occupied")));
         capabilities.sort_by(|a, b| a.id.cmp(&b.id));
         if observed_key != key() { capabilities = CAPABILITIES.iter().map(|id| item(id, "unknown", "policy", "Host environment changed during observation; refresh before choosing")).collect(); }

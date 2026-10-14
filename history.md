@@ -17,6 +17,8 @@
 - Apple 原生编译另证实 PresentationDesktopContent.swift:182 跨文件读取 private palette。已改用现有 presentationTheme.palette(for: colorScheme)，相同环境／颜色，无样式或组件更改；相关原生契约回归即将复验，Swift 编译由下一轮 CI 验证。
 - CI 实际原生编译报告 lib 158／含测试 173 错误。领取并核对 runner Cargo.lock ZIP digest b11bf964a49e05a10c6378575effaaf02149aec4ca31de7296b34eb1011cca3a，唯一成员 Cargo.lock 原样导入。按已发布 crate 源码启用 rusqlite fallible_uint、reqwest form／query，新增 hex 0.4.3，替换 31 文件的 53 处实际 SHA-256 十六进制调用，保持算法／字节／大小写；修正 AppImage OsString→PathBuf、CronApplyResponse.cron.tasks、测试连接可见范围及 receipt 借用。投递／peer 探测使用 owned Send boxed futures，保留 2／2／4 并发及 LAN 优先。418 项后端非 Cargo、17 项原生界面及原生协议通过；即将提交推送并全平台复验，未宣称 Rust 编译通过。
 - xcresult 四处导出要求 Info.plist，保留原 Apple smoke 门槛；旧 provider/cancel 布局修复仍需新 smoke 验证。
+- 942ba8ff 已推送，CI 38587660615／打包 38587677744。Swift device 静态库已成功；Rust 前述兼容错误消除，剩余 33 条均来自 worker_inventory.observe 的同一 Stream map FnOnce 生命周期。已按同一 owned boxed Send 路径改为先收集探测 future 再并发，保留原 4 并发、工具清单／政策／超时／缓存。相关路由回归随后验证，继续领取该轮最终锁文件再提交推送。
+- 工具链／模型路由 22 项通过。领取 942ba8ff 的完整锁 artifact 11906695814，ZIP SHA-256 a4a0f31fd062789bfca2c41a2f43683bf877ea97f8ab31d88133f2feeeed0037，确认含实际 SDK 和直接 hex 依赖后原样导入；移除已经完成使命的临时 CI cargo update 步骤，后续直接从真实锁文件构建。即将提交这三处及本记录并复验。
 
 ## 最新验证
 
