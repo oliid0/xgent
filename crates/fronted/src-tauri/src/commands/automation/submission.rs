@@ -120,7 +120,8 @@ pub(crate) async fn deliver(app: tauri::AppHandle, store: Arc<AutomationStore>, 
     }.await;
     if let Err(error) = &attempt {
         let save = Arc::clone(&store); let error = error.clone();
-        tauri::async_runtime::spawn_blocking(move || save.note_background_submission_error(&request, &error)).await.map_err(|e| e.to_string())??;
+        let failed_request = request.clone();
+        tauri::async_runtime::spawn_blocking(move || save.note_background_submission_error(&failed_request, &error)).await.map_err(|e| e.to_string())??;
     }
     #[cfg(any(target_os="android",target_os="ios"))]
     if attempt.is_ok() {crate::services::result_receiver::provision_submission_result(&result_delivery_app,&store,&registry,&request).await;}

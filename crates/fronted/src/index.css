@@ -4990,6 +4990,9 @@ dialog[open] > [popover][data-layer-ready="true"][data-layer-positioning="anchor
 .autonomy-settings :where(button, input) {
   min-height: 44px;
 }
+.autonomy-settings :where(button) {
+  min-inline-size: 44px;
+}
 .autonomy-settings .astryx-list-item {
   padding-block: 14px;
 }

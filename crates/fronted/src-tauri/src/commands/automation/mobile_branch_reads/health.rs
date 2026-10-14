@@ -1,6 +1,6 @@
 //! A reviewed task metric and fixed range, never a background observer grant.
 use super::*;
-use tauri_plugin_mobile_assistant::HealthMetric;
+use tauri_plugin_mobile_assistant::{HealthMetric, MobileAssistantBackend};
 
 const METRICS: [&str;5]=["heart_rate","blood_glucose","oxygen_saturation","weight","body_temperature"];
 const WEEK: i64=7*24*60*60*1000;
@@ -14,9 +14,9 @@ fn metric(id:&str) -> Result<HealthMetric,String> {
 fn source(app:&tauri::AppHandle) -> Result<(&'static str,&'static str),String> {
     let status=app.mobile_assistant().status().map_err(|e|e.to_string())?;
     if !status.health_available {return Err("Health reads are unavailable on this device".into());}
-    match status.backend.as_str() {
-        "ios-native"=>Ok(("healthkit","HealthKit")),
-        "android-native"=>Ok(("health-connect","Health Connect")),
+    match status.backend {
+        MobileAssistantBackend::IosNative=>Ok(("healthkit","HealthKit")),
+        MobileAssistantBackend::AndroidNative=>Ok(("health-connect","Health Connect")),
         _=>Err("Task health reads require the original native phone".into()),
     }
 }

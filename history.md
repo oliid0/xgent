@@ -33,3 +33,11 @@
 3. Android Home／外部账户、共享 token／金额／精确 HTTP 预算、部分媒体／大输入；文档→方案→真实 PPT／DOCX＋明日行程＋每晚健身实际模型／SDK／产物验收。
 
 目标 active；继续处理构建失败，不宣称完整自主智能已完成。
+
+当前推送 e77088c5fc2ae7a7c9e16666c67f9e28494dcd32：[CI](https://github.com/oliid0/xgent/actions/runs/38588835141)／[全平台打包](https://github.com/oliid0/xgent/actions/runs/38588948016)，smoke=true／publish=false／sign=false。原生 Rust lib／tests 编译检查已成功，前述 173＋33 编译诊断已消除，正在运行原生测试；六平台仍在打包，不能宣称最终通过。旧第二轮打包已取消，释放已知失败的 runner。源代码／完整 runner 锁已推送；此条是本地最新跟踪，不再用纯进度提交打断当前构建。
+
+本轮 Tauri Rust Check 作业整体成功，历史／移动序列化／DOCX／Office 测试通过。Android 另证实 mobile cfg 下 request 被错误回执 closure 移走、Health backend enum 没有 as_str；已按本项目 enum 类型改为实际 variants、失败保存克隆 request，等待移动构建复验。前端 CI 唯一失败为 mobile-branch-review-layout 的 240px 英文小目标，正在查既有 renderer／主题并按组件文档修复；不降低 44px 门槛。新日志 frontend-ci-failure.log／android-first-failure.log。
+
+UI 修正沿用既有 autonomy-settings 最小高度，增加同作用域 button min-inline-size 44px；不替换组件，不变回调／disabled／loading。已核对真实 renderer、安装版 Astryx 0.6.3 类型／源码、Astryx MCP IconButton／DropdownMenu、GitHub 官方源码及 CLI manifest；CLI docs Button 不支持该 topic，转用已确认 MCP／安装包源码，没有安装或构建。开始 400 案例实际浏览器布局及原手机回归／check／lint；移动 Rust 修正和 CSS 验证后一起推送。
+
+实际 400 案例布局零小目标／溢出／裁切／重叠，44 项界面／手机回归＋25 项原路径回归通过，check／lint 0（808 文件）、架构／原生协议通过；日志 autonomy-mobile-platform-fix-{focused,check,lint}.log／autonomy-mobile-platform-native-paths.log，截图 review.png 已查看。CLI component Button 和 build intent（只输出 composition kit 文档，不编译／生成 app）均成功，没有运行本地应用 build。即将提交 mobile health enum／submission request／CSS／本记录并启动全平台复验。
