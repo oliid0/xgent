@@ -5,9 +5,10 @@ use crate::services::local_access::{LocalAccessController, LocalAccessStatus};
 use crate::services::workspace_watch::WorkspaceWatchService;
 
 #[tauri::command]
-pub fn local_access_status(
+pub async fn local_access_status(
     controller: tauri::State<'_, Arc<LocalAccessController>>,
 ) -> Result<LocalAccessStatus, String> {
+    controller.refresh_tailscale_status().await?;
     controller.status()
 }
 

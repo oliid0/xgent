@@ -1,9 +1,17 @@
 import { invoke } from "@xgent/runtime";
 import type { RenderTimelineItem } from "../lib/chat/conversation/conversationState";
 import type { LiveTranscriptState } from "../lib/chat/conversation/liveTranscriptStore";
+import {
+  backgroundChatArtifactKey,
+  backgroundChatArtifactLabel,
+  collectBackgroundChatArtifacts,
+} from "../lib/chat/messages/backgroundArtifacts";
 import { collectChangedFiles } from "../lib/chat/messages/changedFiles";
-import { collectCloudArtifacts } from "../lib/chat/messages/cloudArtifacts";
-import { collectPreviewedFiles } from "../lib/chat/messages/previewedFiles";
+import {
+  collectCloudArtifacts,
+  collectCloudExtractedFiles,
+} from "../lib/chat/messages/cloudArtifacts";
+import { collectPreviewedFiles, type PreviewedFile } from "../lib/chat/messages/previewedFiles";
 import { workDuration } from "../pages/chat/transcript/workRecord";
 import { roundNodes, splitWorkNodes } from "./nativeChatEvidence";
 import { nativeReadOnlyCodeNodes } from "./nativeReadOnlyCode";
@@ -15,9 +23,10 @@ export function createNativeChatTranscript(
   live: LiveTranscriptState,
   showThinking: boolean,
   t: (key: string) => string,
-  action: (id: string, run: () => unknown) => string,
+  action: (id: string, run: () => unknown, enabled?: boolean) => string,
   onOpenWorkspaceFile: (path: string) => void,
   questionNodes?: ReadonlyMap<string, PresentationNode>,
+  onOpenPreviewedFile?: (file: PreviewedFile) => void,
 ): PresentationNode[] {
   const contentLabels = {
     thinking: t("chat.thinking"),
@@ -34,7 +43,19 @@ export function createNativeChatTranscript(
       const artifacts = collectCloudArtifacts(item.rounds);
       const changedSummary = collectChangedFiles(item.rounds);
       const changedFiles = changedSummary?.files.filter((file) => !file.deleted) ?? [];
-      const previewedFiles = collectPreviewedFiles(item.rounds, changedSummary);
+      const previewedFiles = [
+        ...collectPreviewedFiles(item.rounds, changedSummary),
+        ...collectCloudExtractedFiles(item.rounds),
+        ...collectBackgroundChatArtifacts(item.rounds).map((ref) => ({
+          path: ref.artifact.relativePath,
+          toolCallId: backgroundChatArtifactKey(ref),
+          fileSource: null,
+          backgroundArtifact: ref,
+        })),
+      ];
+      const fileCallCounts = new Map<string, number>();
+      for (const file of previewedFiles)
+        fileCallCounts.set(file.toolCallId, (fileCallCounts.get(file.toolCallId) ?? 0) + 1);
       const { work, answer } = splitWorkNodes(
         roundNodes(item.rounds, item.key, showThinking, contentLabels, questionNodes),
       );
@@ -75,15 +96,35 @@ export function createNativeChatTranscript(
             ...(work.length > 0 ? [] : changedFileNodes),
             ...previewedFiles.map((file): PresentationNode => {
               const id = `${item.key}:previewed-file:${file.toolCallId}`;
+              const fileId =
+                (fileCallCounts.get(file.toolCallId) ?? 0) > 1
+                  ? `${id}:${encodeURIComponent(JSON.stringify([file.fileSource?.hostId, file.fileSource?.workdir, file.path]))}`
+                  : id;
               return {
-                id,
+                id: fileId,
                 kind: "Button",
-                label: file.path,
+                label:
+                  "backgroundArtifact" in file && file.backgroundArtifact
+                    ? file.path.split("/").pop() || file.path
+                    : file.fileSource
+                      ? `${file.path} · ${file.fileSource.hostId.slice(0, 8)}`
+                      : file.path,
                 icon: "doc",
-                variant: "secondary",
+                variant:
+                  "backgroundArtifact" in file && file.backgroundArtifact
+                    ? "generated-file"
+                    : "secondary",
+                text:
+                  "backgroundArtifact" in file && file.backgroundArtifact
+                    ? backgroundChatArtifactLabel(file.backgroundArtifact)
+                    : undefined,
                 size: "small",
                 accessibilityHint: t("projectTools.fileTree.openFile"),
-                action: action(id, () => onOpenWorkspaceFile(file.path)),
+                disabled: !onOpenPreviewedFile,
+                accessibilityLabel: file.fileSource
+                  ? `${file.path} · ${file.fileSource.hostId} · ${file.fileSource.workdir}`
+                  : undefined,
+                action: action(fileId, () => onOpenPreviewedFile?.(file), !!onOpenPreviewedFile),
               };
             }),
             ...artifacts.map((artifact): PresentationNode => {
@@ -93,13 +134,26 @@ export function createNativeChatTranscript(
               return {
                 id,
                 kind: "Button",
-                label: name,
+                label:
+                  artifact.runConclusion && artifact.runConclusion !== "success"
+                    ? `${name} · ${t("chat.cloudArtifacts.partial")}`
+                    : name,
                 icon: "doc",
                 variant: "secondary",
                 size: "small",
                 accessibilityHint: t("chat.cloudArtifacts.inline"),
-                action: action(id, () =>
-                  invoke("cloud_task_open_artifact", { localPath: artifact.localPath }),
+                disabled: !!artifact.fileSource && !onOpenPreviewedFile,
+                action: action(
+                  id,
+                  () =>
+                    artifact.fileSource
+                      ? onOpenPreviewedFile?.({
+                          path: artifact.localPath,
+                          toolCallId: artifact.toolCallId,
+                          fileSource: artifact.fileSource,
+                        })
+                      : invoke("cloud_task_open_artifact", { localPath: artifact.localPath }),
+                  !artifact.fileSource || !!onOpenPreviewedFile,
                 ),
               };
             }),

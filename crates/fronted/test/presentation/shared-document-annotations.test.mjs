@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { PDFDocument } from "pdf-lib";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 import { createReactHookHarness } from "../helpers/react-hook-harness.mjs";
@@ -21,7 +22,7 @@ async function harness(initial = {}) {
     "../../i18n": { useLocale: () => ({ t: translate }) },
     "../../lib/shared/utils": { cn: (...values) => values.filter(Boolean).join(" ") },
     "../../lib/system/clipboardText": { writeClipboardText: async () => true },
-    "../../lib/tools/fsBackend": { invokeFs: async (command, args) => {
+    [fileURLToPath(new URL("../../src/lib/tools/fsBackend.ts", import.meta.url))]: { invokeFs: async (command, args) => {
       calls.push([command, args]);
       if (command.startsWith("fs_read")) return { ...disk, path: args.path, mimeType: "application/pdf", sizeBytes: 500, content: null };
       return options.write ? options.write(args) : saveBinary(args);

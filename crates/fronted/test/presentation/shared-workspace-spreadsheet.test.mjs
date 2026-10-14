@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
 import { read, utils, write } from "xlsx";
 import { editPresentationInBrowser, editSpreadsheetInBrowser, presentationFixture, readPresentationInBrowser } from "../helpers/document-annotation-browser.mjs";
@@ -26,7 +27,7 @@ async function harness(image = false, presentation = false) {
     "../../i18n": { useLocale: () => ({ t: translate }) },
     "../../lib/shared/utils": { cn: (...values) => values.filter(Boolean).join(" ") },
     "../../lib/system/clipboardText": { writeClipboardText: async () => true },
-    "../../lib/tools/fsBackend": { invokeFs: async (command, args) => {
+    [fileURLToPath(new URL("../../src/lib/tools/fsBackend.ts", import.meta.url))]: { invokeFs: async (command, args) => {
       calls.push([command, args]);
       if (command.startsWith("fs_read")) return { ...disk, path: args.path, mimeType: options.mimeType ?? (presentation ? "application/vnd.openxmlformats-officedocument.presentationml.presentation" : image ? "image/png" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"), sizeBytes: Buffer.from(disk.data, "base64").length, content: null };
       return options.write ? options.write(args) : saveBinary(args);

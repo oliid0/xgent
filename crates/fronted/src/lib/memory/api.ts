@@ -105,6 +105,28 @@ export type MemoryHistorySearchMatch = {
   updatedAt: number;
 };
 
+export type PersonalHistoryMessageRef = {
+  conversationId: string;
+  segmentIndex: number;
+  segmentId: string;
+  messageIndex: number;
+  messageId: string;
+};
+
+export type PersonalHistoryMessageEvidence = PersonalHistoryMessageRef & {
+  role: "user";
+  contentHash: string;
+  timestamp: number | null;
+  text: string;
+  truncated: boolean;
+};
+
+export async function memoryReadPersonalHistoryEvidence(
+  args: PersonalHistoryMessageRef & { expectedContentHash?: string },
+) {
+  return invoke<PersonalHistoryMessageEvidence>("chat_history_read_personal_evidence", { args });
+}
+
 export type MemorySearchResponse = {
   matches: MemorySearchMatch[];
   historyMatches: MemoryHistorySearchMatch[];

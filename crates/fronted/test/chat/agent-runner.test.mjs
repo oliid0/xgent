@@ -255,7 +255,8 @@ const llmMock = {
     };
   },
   createModelFromConfig(providerId, modelId, baseUrl) {
-    const api = providerId === "claude_code" ? "anthropic-messages" : "openai-responses";
+    const api = providerId === "claude_code" ? "anthropic-messages"
+      : providerId === "gemini" ? "google-generative-ai" : "openai-responses";
     return {
       id: modelId,
       name: modelId,
@@ -349,6 +350,7 @@ const loader = createTsModuleLoader({
 
 const { runAssistantWithTools } = loader.loadModule("src/lib/chat/runner/agentRunner.ts");
 const { createSubagentScheduler } = loader.loadModule("src/lib/subagents/scheduler.ts");
+const { modelCooldowns } = loader.loadModule("src/lib/providers/runtime/modelCooldown.ts");
 
 function resetFakeStreams(...assistants) {
   streamQueue.length = 0;
@@ -425,6 +427,88 @@ function createBaseParams(overrides = {}) {
     textDeltas,
   };
 }
+
+test("real runner captures rejected HTTP responses under the exact configured account/model", async () => {
+  resetFakeStreams(createTextAssistant("done"));
+  const actual = new Response("rate limit", { status: 429, headers: { "Retry-After": "120", "private-header": "never retain" } });
+  const originalFetch = globalThis.fetch;
+  const controller = new AbortController();
+  globalThis.fetch = async (_input, init) => {
+    assert.equal(init.signal, controller.signal); return actual;
+  };
+  try {
+    queueStreamSideEffect(async options => {
+      const observed = await options.fetch("https://relay.test", { signal: controller.signal });
+      assert.equal(observed, actual);
+      assert.equal(observed.bodyUsed, false);
+    });
+    const { params } = createBaseParams({ runtime: {
+      providerConfigId: "account-http-observation", baseUrl: "https://api.example.test/v1", apiKey: "private-key", reasoning: "medium",
+    } });
+    await runAssistantWithTools(params);
+    const cooldown = modelCooldowns.snapshot("account-http-observation::gpt-5");
+    assert.equal(cooldown.httpStatus, 429);
+    assert.ok(cooldown.retryAt > Date.now());
+    assert.equal(modelCooldowns.snapshot("different-account::gpt-5"), undefined);
+    assert.ok(!JSON.stringify(cooldown).includes("private"));
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("Google runner preserves the installed adapter's unsupported-fetch contract", async () => {
+  resetFakeStreams(createTextAssistant("done", "stop", { api: "google-generative-ai", provider: "google", model: "gemini-2.5-pro" }));
+  queueStreamSideEffect(options => { assert.equal(options.fetch, undefined); });
+  const { params } = createBaseParams({ providerId: "gemini", model: "gemini-2.5-pro", runtime: {
+    providerConfigId: "google-account", baseUrl: "https://generativelanguage.googleapis.com", apiKey: "private-key",
+  } });
+  await runAssistantWithTools(params);
+  assert.equal(modelCooldowns.snapshot("google-account::gemini-2.5-pro"), undefined);
+});
+
+test("parent and delegate runners share model admission so a third request cannot execute after two", async () => {
+  const scheduler = createSubagentScheduler({ executionBudget: { maxModelRequests: 2, maxToolCalls: 4 } });
+  resetFakeStreams(createTextAssistant("parent"), createTextAssistant("delegate"), createTextAssistant("must not run"));
+  for (let i = 0; i < 3; i++) queueStreamSideEffect(options => options.beforeModelRequest());
+  const first = createBaseParams({ subagentScheduler: scheduler });
+  await runAssistantWithTools(first.params);
+  const second = createBaseParams({ subagentScheduler: scheduler, sessionId: "child" });
+  await runAssistantWithTools(second.params);
+  const third = createBaseParams({ subagentScheduler: scheduler, sessionId: "child2" });
+  await assert.rejects(runAssistantWithTools(third.params), /Shared execution budget exhausted/);
+  assert.equal(scheduler.executionBudget.snapshot().modelRequests.used, 2);
+  assert.deepEqual(third.executedToolCalls, []);
+});
+
+test("tool budget stops the second real executor and prevents an ungrounded successful final model response", async () => {
+  const calls = [createToolCall("write1", "Write", {}), createToolCall("write2", "Write", {})];
+  const scheduler = createSubagentScheduler({ executionBudget: { maxModelRequests: 8, maxToolCalls: 1 } });
+  resetFakeStreams(createAssistant(calls, "toolUse"), createTextAssistant("false success"));
+  queueStreamSideEffect(options => options.beforeModelRequest());
+  queueStreamSideEffect(options => options.beforeModelRequest());
+  const { params, executedToolCalls } = createBaseParams({ subagentScheduler: scheduler, tools: [{
+    name: "Write", description: "Write", parameters: { type: "object", properties: {} },
+  }] });
+  await assert.rejects(runAssistantWithTools(params), /toolCalls 1\/1/);
+  assert.deepEqual(executedToolCalls.map(call => call.id), ["write1"]);
+  assert.equal(scheduler.executionBudget.snapshot().toolCalls.used, 1);
+});
+
+test("runner awaits durable tool admission and cancellation prevents the actual executor after a late ACK", async () => {
+  let admit, requested;
+  const gate = new Promise(resolve => { admit = resolve; });
+  const waiting = new Promise(resolve => { requested = resolve; });
+  const controller = new AbortController();
+  const scheduler = createSubagentScheduler({ executionBudgetPort: {
+    consume: kind => { assert.equal(kind, "toolCalls"); requested(); return gate; },
+    snapshot: () => ({}),
+  } });
+  resetFakeStreams(createAssistant([createToolCall("write", "Write", {})], "toolUse"));
+  const { params, executedToolCalls } = createBaseParams({ subagentScheduler: scheduler, signal: controller.signal, tools: [{ name: "Write", description: "Write", parameters: { type: "object", properties: {} } }] });
+  const running = runAssistantWithTools(params);
+  const checked = assert.rejects(running, /Cancelled|aborted/i);
+  await waiting; assert.deepEqual(executedToolCalls, []);
+  controller.abort(); admit(); await checked;
+  assert.deepEqual(executedToolCalls, []);
+});
 
 test("runAssistantWithTools returns terminal stop messages without scheduling a next-turn override", async () => {
   resetFakeStreams(createTextAssistant("done"));

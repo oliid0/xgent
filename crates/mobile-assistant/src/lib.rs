@@ -16,6 +16,18 @@ mod models;
 
 pub use error::{Error, Result};
 
+/// Called from the generated iOS main entry before building the Tauri event
+/// loop. BGTask registration cannot wait for a WebView/plugin/page to load.
+#[cfg(target_os="ios")]
+pub fn register_background_results() -> bool {
+    extern "C" {fn xgent_result_delivery_register_v1()->i32;fn xgent_event_delivery_register_v1()->i32;}
+    unsafe {
+        let results=xgent_result_delivery_register_v1()==1;
+        let events=xgent_event_delivery_register_v1()==1;
+        results && events
+    }
+}
+
 #[cfg(desktop)]
 use desktop::MobileAssistant;
 #[cfg(mobile)]
@@ -51,7 +63,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::request_health_metric_permission,
             commands::read_health_samples,
             commands::list_calendar_events,
+            commands::list_calendars,
             commands::list_reminders,
+            commands::list_contacts,
+            commands::list_home_inventory,
             commands::create_calendar_event,
             commands::create_reminder,
             commands::compose_message,

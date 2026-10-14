@@ -2,6 +2,11 @@
 pub mod app_commands;
 #[path = "automation/mod.rs"]
 pub mod automation_commands;
+pub use automation_commands::goal_launch;
+pub use automation_commands::received_children;
+pub use automation_commands::artifact_streams;
+#[cfg(desktop)]
+pub use automation_commands::videos;
 #[path = "config/mod.rs"]
 pub mod config_commands;
 #[path = "history/mod.rs"]
@@ -23,6 +28,29 @@ pub use app_commands::system;
 pub use app_commands::update;
 
 pub use automation_commands::cron;
+pub use automation_commands::proactive;
+pub use automation_commands::goals;
+#[cfg(desktop)]
+pub use automation_commands::children;
+#[cfg(desktop)]
+pub use automation_commands::cloud_waiting;
+#[cfg(desktop)]
+pub use automation_commands::cloud_artifacts;
+#[cfg(desktop)]
+pub use automation_commands::cloud_launch;
+#[cfg(desktop)]
+pub use automation_commands::cloud_recovery;
+pub use automation_commands::submission;
+#[cfg(desktop)]
+pub use automation_commands::device_planning;
+#[cfg(mobile)]
+pub use automation_commands::mobile_device_planning;
+#[cfg(mobile)]
+pub use automation_commands::mobile_connector;
+#[cfg(mobile)]
+pub use automation_commands::mobile_branch;
+#[cfg(mobile)]
+pub use automation_commands::mobile_branch_reads;
 #[cfg(desktop)]
 pub use automation_commands::hook;
 #[cfg(mobile)]
@@ -38,11 +66,13 @@ pub use integration_commands::cloud;
 #[cfg(desktop)]
 pub use integration_commands::cua;
 pub use integration_commands::lan_pc;
+pub use integration_commands::tailscale;
 #[cfg(desktop)]
 pub use integration_commands::local_access;
 pub use integration_commands::mcp;
 pub use integration_commands::memory;
 pub use integration_commands::provider_oauth;
+pub use integration_commands::github_oauth;
 #[cfg(desktop)]
 pub use integration_commands::provider_usage;
 

@@ -38,7 +38,9 @@ Select the smallest runner that supports the task:
 - `windows-latest` for Windows-only packaging or tooling.
 - `macos-latest` for macOS and iOS builds.
 
-Write a self-contained Bash script for Linux/macOS or PowerShell script for Windows. The script starts in the isolated `workspace` directory; read inputs relative to that directory and write every returned file to `../output`.
+Choose either a self-contained `script` or an autonomous `agent` configuration, never both. Use `agent` when the runner must continue planning, invoking tools and verifying generated files after the sender goes offline; read its exact fields, credentials and budgets in the execution contract. Actions must already have matching `XGENT_AGENT_PROVIDER` and `XGENT_AGENT_API_KEY` in secret environment; never upload local chat credentials. Mobile calendar/reminder/health/home operations stay on original-device branches.
+
+Scripts use Bash for Linux/macOS or PowerShell for Windows. Execution starts in the isolated `workspace` directory; read inputs relative to that directory and write every returned file to `../output`.
 
 Keep a task within these upload limits:
 
@@ -51,11 +53,11 @@ Do not depend on files from another task directory. Each retry is a new immutabl
 
 ## Running and returning the result
 
-1. Call the cloud task `start` action with a descriptive task name, runner, entry script, and all required input files.
+1. Call the cloud task `start` action with a descriptive task name, runner, exactly one script or agent, and all required input files.
 2. Preserve the returned task ID.
 3. Call `wait` repeatedly until the task reaches a completed state.
-4. If the run fails, call `failure_log`, fix the task definition, and start a new task. Never mutate or rerun the failed task directory.
-5. When the run succeeds, call `download_artifact`.
-6. Return the downloaded local artifact path and a short description of its contents to the user.
+4. If the run fails, call `failure_log`. When useful, recover existing partial outputs with `extract_artifact` and `include_partial: true`; this does not change the failed job's conclusion. Correct the task definition within the original authority and budgets before starting a new task. Never mutate or rerun the failed task directory.
+5. Call `extract_artifact` to download and import actual files into a new local directory without a shell. The tool uses its captured workspace as the destination, or the native artifact cache if none is configured. Background inbox publication requires files in the task's pinned workspace. Use `download_artifact` when only the ZIP is needed. Both actions require a completed run and an actual unexpired artifact; partial recovery requires explicit opt-in.
+6. Inspect the returned files using their recorded workspace and paths; for agent tasks also read `.xgent-agent/result.json` and its final/partial state. Return actual file links and an accurate description of inspected contents to the user. File source identity is recorded by the native importer, not supplied by the model.
 
-Do not claim success until the workflow completed successfully and the artifact was downloaded.
+Do not claim task success from download/import alone. Check the workflow conclusion, receipts, actual contents and all requested criteria. Label recovered outputs from a failed run as partial.

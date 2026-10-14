@@ -84,7 +84,7 @@ export function buildProviderRequestHeaders(
 export async function prepareProviderRequest(
   providerId: ProviderId,
   runtime: ProviderRuntimeConfig,
-  options?: { sessionId?: string },
+  options?: { sessionId?: string; invoke?: typeof import("@xgent/runtime").invoke },
 ): Promise<PreparedProxyRequest> {
   const upstreamBaseUrl =
     providerId === "deepseek"
@@ -110,6 +110,7 @@ export async function prepareProviderRequest(
       oauthAccountId: runtime.authMode === "oauth-managed" ? runtime.oauthAccountId : undefined,
       providerConfigId: runtime.providerConfigId,
       isFullUrl: runtime.isFullUrl === true,
+      invoke: options?.invoke,
     },
   );
 }

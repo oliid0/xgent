@@ -18,7 +18,11 @@ export type SubagentReportDetails = {
   role?: string;
   prompt: string;
   templateId?: string;
+  providerConfigId?: string;
+  providerId?: string;
+  model?: string;
   mode: SubagentProtocolMode;
+  readOnlyTools?: boolean;
   applyPolicy?: "none" | "explicit" | "auto";
   allowedOutputPaths?: string[];
   status: SubagentProtocolStatus;
@@ -70,9 +74,14 @@ export type SubagentRosterEntry = {
   lastMode: SubagentProtocolMode;
   lastStatus?: string;
   lastSummary?: string;
+  providerConfigId?: string;
+  model?: string;
+  runId?: string;
 };
 
 export type SubagentTemplateEntry = {
+  modelValue?: string;
+  requiredSkills?: string[];
   id: string;
   name: string;
   description?: string;

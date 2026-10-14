@@ -9,10 +9,12 @@ struct XgentSettingsNavigationRow: View {
         HStack(spacing: 12) {
             XgentSettingsValueRow(node: node, showsDescription: node.variant != "settings-index-navigation") {
                 if let value = node.value?.text, !value.isEmpty {
-                    Text(value).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text(value)
+                        .foregroundStyle(node.variant == "device-connector" && node.action != nil ? Color.accentColor : Color.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            if node.action != nil {
+            if node.action != nil && node.variant != "task-read-choice" && node.variant != "device-connector" {
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary).accessibilityHidden(true)
             }

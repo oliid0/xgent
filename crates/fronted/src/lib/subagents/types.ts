@@ -37,9 +37,14 @@ export type SubagentSpec = {
   allowedOutputPaths: string[];
   resume: boolean;
   retainWorktree: boolean;
+  modelValue?: string;
+  requiredSkills?: string[];
 };
 
 export type SubagentTemplate = {
+  persistInstructions?: boolean;
+  modelValue?: string;
+  requiredSkills?: string[];
   id: string;
   name: string;
   description: string;
@@ -70,6 +75,9 @@ export type SubagentRunSummary = {
   mode: SubagentMode;
   status: SubagentRunStatus;
   providerId: string;
+  providerConfigId?: string;
+  batchReceiptJson?: string;
+  readOnlyTools?: boolean;
   model: string;
   sessionId?: string;
   workdir?: string;

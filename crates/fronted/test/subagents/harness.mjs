@@ -165,9 +165,10 @@ export function createFakeStoreIpc(options = {}) {
       return next;
     },
 
-    async listRuns({ parentConversationId }) {
+    async listRuns({ parentConversationId, parentToolCallId }) {
       return [...runs.values()]
-        .filter((record) => record.run.parentConversationId === parentConversationId)
+        .filter((record) => record.run.parentConversationId === parentConversationId &&
+          (parentToolCallId === undefined || record.run.parentToolCallId === parentToolCallId))
         .map((record) => structuredClone(record.run))
         .sort((a, b) => b.updatedAt - a.updatedAt);
     },
@@ -395,6 +396,13 @@ export async function createSubagentHarness(options = {}) {
     },
     [compactionControllerModulePath]:
       options.compactionMock ?? createDefaultCompactionMock(compactionCalls),
+    ...(options.completeAssistantMessage
+      ? {
+          [path.join(rootDir, "src/lib/providers/runtime/textOnlyRuntime.ts")]: {
+            completeAssistantMessage: options.completeAssistantMessage,
+          },
+        }
+      : {}),
   };
 
   const loader = createTsModuleLoader({ mocks });
@@ -439,13 +447,18 @@ export async function createSubagentHarness(options = {}) {
   await store.ready();
 
   const bundle = agentToolModule.createSubagentTools({
+    persistBatchReceipts: options.persistBatchReceipts,
+    forceReadonly: options.forceReadonly,
     providerId: "codex",
     model: "gpt-5",
     runtime: {
+      providerConfigId: options.providerConfigId,
       baseUrl: "https://api.example.test/v1",
       apiKey: "test-key",
       reasoning: "medium",
     },
+    models: options.models,
+    readPersistentModels: options.readPersistentModels,
     workdir: options.workdir ?? "/tmp/xgent-subagent-test",
     sessionId: options.sessionId === null ? undefined : (options.sessionId ?? "parent-session"),
     templates: options.templates ?? [

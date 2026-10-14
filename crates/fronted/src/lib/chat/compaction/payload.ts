@@ -19,10 +19,6 @@ export const COMPACTION_PAYLOAD_TOKEN_CAP = 32_000;
 const COMPACTION_PROMPT_TOKEN_BUDGET = 1_500;
 const COMPACTION_HISTORY_BUDGET_FACTOR = 0.9;
 const COMPACTION_OUTPUT_RESERVE_FACTOR = 0.5;
-const SYSTEM_PROMPT_CHAR_BUDGET = 20_000;
-const PREVIOUS_SUMMARY_CHAR_BUDGET = 24_000;
-const NEXT_USER_MESSAGE_CHAR_BUDGET = 8_000;
-const TOOL_RESULT_CHAR_BUDGET = 8_000 * 4;
 
 export type SerializedAssistantCompactionMessage = {
   index: number;
@@ -52,10 +48,11 @@ export type SerializedGenericCompactionMessage = {
   content: string;
 };
 
-export type SerializedCompactionMessage =
+export type SerializedCompactionMessage = (
   | SerializedAssistantCompactionMessage
   | SerializedToolResultCompactionMessage
-  | SerializedGenericCompactionMessage;
+  | SerializedGenericCompactionMessage
+) & { fragment?: { part: number; continued: boolean } };
 
 export type CompactionReason = {
   trigger: string;
@@ -133,7 +130,7 @@ function summarizeAssistantToolCalls(message: AssistantMessage) {
     if (record.type !== "toolCall") continue;
 
     const name = typeof record.name === "string" ? record.name.trim() : "";
-    const args = trimText(toPlainText(record.arguments), 600);
+    const args = toPlainText(record.arguments);
     if (name && args) {
       out.push(`${name} ${args}`);
     } else if (name) {
@@ -172,8 +169,8 @@ export function serializeMessageForCompaction(
       toolName: message.toolName,
       toolCallId: message.toolCallId,
       isError: Boolean(message.isError),
-      content: trimText(flattenContentBlocks(message.content), TOOL_RESULT_CHAR_BUDGET),
-      details: message.details ? trimText(toPlainText(message.details), 4_000) : undefined,
+      content: flattenContentBlocks(message.content),
+      details: message.details ? toPlainText(message.details) : undefined,
     };
   }
 
@@ -181,7 +178,7 @@ export function serializeMessageForCompaction(
     index,
     role: message.role,
     timestamp: (message as { timestamp?: number }).timestamp ?? null,
-    content: trimText(flattenContentBlocks((message as { content?: unknown }).content), 16_000),
+    content: flattenContentBlocks((message as { content?: unknown }).content),
   };
 }
 
@@ -232,112 +229,7 @@ export function estimateCompactionPayloadTokens(payload: CompactionPayload) {
   return estimateTextTokens(stringifyCompactionPayload(payload));
 }
 
-function markReducedCompactionPayload(
-  payload: CompactionPayload,
-  extras?: Partial<Pick<CompactionReason, "omitted_message_count">>,
-): CompactionPayload {
-  return {
-    ...payload,
-    compaction_reason: {
-      ...payload.compaction_reason,
-      reduced_input: true,
-      ...extras,
-    },
-  };
-}
-
-function trimCompactionPayloadEnvelope(payload: CompactionPayload): CompactionPayload {
-  const nextSystemPrompt = trimText(payload.system_prompt, SYSTEM_PROMPT_CHAR_BUDGET);
-  const nextPreviousSummary = payload.previous_summary
-    ? {
-        ...payload.previous_summary,
-        content: trimText(payload.previous_summary.content, PREVIOUS_SUMMARY_CHAR_BUDGET),
-      }
-    : null;
-  const nextUserMessage = payload.next_user_message
-    ? trimText(payload.next_user_message, NEXT_USER_MESSAGE_CHAR_BUDGET)
-    : payload.next_user_message;
-
-  if (
-    nextSystemPrompt === payload.system_prompt &&
-    nextPreviousSummary?.content === payload.previous_summary?.content &&
-    nextUserMessage === payload.next_user_message
-  ) {
-    return payload;
-  }
-
-  return markReducedCompactionPayload({
-    ...payload,
-    system_prompt: nextSystemPrompt,
-    previous_summary: nextPreviousSummary,
-    next_user_message: nextUserMessage || undefined,
-  });
-}
-
-function aggressivelyTrimSerializedMessage(
-  message: SerializedCompactionMessage,
-): SerializedCompactionMessage {
-  if (message.role === "toolResult") {
-    const toolMessage = message as SerializedToolResultCompactionMessage;
-    return {
-      ...toolMessage,
-      content: trimText(toolMessage.content, 4_000),
-      details:
-        typeof toolMessage.details === "string"
-          ? trimText(toolMessage.details, 1_200)
-          : toolMessage.details,
-    };
-  }
-  if (message.role === "assistant") {
-    const assistantMessage = message as SerializedAssistantCompactionMessage;
-    return {
-      ...assistantMessage,
-      text:
-        typeof assistantMessage.text === "string"
-          ? trimText(assistantMessage.text, 8_000)
-          : assistantMessage.text,
-      toolCalls: Array.isArray(assistantMessage.toolCalls)
-        ? assistantMessage.toolCalls.slice(0, 6)
-        : assistantMessage.toolCalls,
-    };
-  }
-  const genericMessage = message as SerializedGenericCompactionMessage;
-  return {
-    ...genericMessage,
-    content: trimText(genericMessage.content, 8_000),
-  };
-}
-
-function aggressivelyTrimCompactionPayloadMessages(payload: CompactionPayload): CompactionPayload {
-  return markReducedCompactionPayload({
-    ...payload,
-    active_segment_messages: payload.active_segment_messages.map(aggressivelyTrimSerializedMessage),
-  });
-}
-
-export function shrinkCompactionPayload(payload: CompactionPayload): CompactionPayload | null {
-  const messages = payload.active_segment_messages;
-  if (messages.length <= 6) return null;
-
-  const keepHead = payload.previous_summary ? 0 : Math.min(2, Math.floor(messages.length / 4));
-  const keepTail = Math.max(4, Math.floor(messages.length / 2));
-  if (keepHead + keepTail >= messages.length) return null;
-
-  const head = messages.slice(0, keepHead).map(aggressivelyTrimSerializedMessage);
-  const tail = messages.slice(messages.length - keepTail).map(aggressivelyTrimSerializedMessage);
-
-  return {
-    ...payload,
-    compaction_reason: {
-      ...payload.compaction_reason,
-      reduced_input: true,
-      omitted_message_count: messages.length - head.length - tail.length,
-    },
-    active_segment_messages: [...head, ...tail],
-  };
-}
-
-function resolveCompactionPayloadBudget(modelConfig?: ProviderModelConfig) {
+export function resolveCompactionPayloadBudget(modelConfig?: ProviderModelConfig) {
   const contextWindow = Math.max(0, Math.floor(modelConfig?.contextWindow ?? 0));
   const maxOutputToken = Math.max(0, Math.floor(modelConfig?.maxOutputToken ?? 0));
   if (contextWindow <= 0 || maxOutputToken <= 0) {
@@ -372,64 +264,16 @@ export function fitCompactionPayloadToBudget(params: {
     return params.payload;
   }
 
-  let nextPayload = params.payload;
-  let estimatedTokens = estimateCompactionPayloadTokens(nextPayload);
-  let changed = false;
-
-  if (estimatedTokens > budgetTokens) {
-    const trimmedEnvelope = trimCompactionPayloadEnvelope(nextPayload);
-    const trimmedEnvelopeTokens = estimateCompactionPayloadTokens(trimmedEnvelope);
-    if (trimmedEnvelopeTokens < estimatedTokens) {
-      nextPayload = trimmedEnvelope;
-      estimatedTokens = trimmedEnvelopeTokens;
-      changed = true;
-    }
-  }
-
-  if (estimatedTokens > budgetTokens) {
-    const aggressivelyTrimmed = aggressivelyTrimCompactionPayloadMessages(nextPayload);
-    const aggressivelyTrimmedTokens = estimateCompactionPayloadTokens(aggressivelyTrimmed);
-    if (aggressivelyTrimmedTokens < estimatedTokens) {
-      nextPayload = aggressivelyTrimmed;
-      estimatedTokens = aggressivelyTrimmedTokens;
-      changed = true;
-    }
-  }
-
-  while (estimatedTokens > budgetTokens) {
-    const shrunk = shrinkCompactionPayload(nextPayload);
-    if (!shrunk) {
-      break;
-    }
-    const shrunkTokens = estimateCompactionPayloadTokens(shrunk);
-    if (shrunkTokens >= estimatedTokens) {
-      break;
-    }
-    nextPayload = shrunk;
-    estimatedTokens = shrunkTokens;
-    changed = true;
-  }
-
-  if (!changed) {
-    return params.payload;
-  }
-
-  nextPayload = {
-    ...nextPayload,
-    compaction_reason: {
-      ...nextPayload.compaction_reason,
-      reduced_input: true,
-      payload_budget_tokens: budgetTokens,
-    },
-  };
+  if (estimateCompactionPayloadTokens(params.payload) <= budgetTokens) return params.payload;
+  // Carry the complete range to the chunked summarizer. Budgeting must not
+  // silently delete the middle of a conversation or trim the prior checkpoint.
   params.debugLogger?.logResult({
-    event: "compaction_payload_budgeted",
+    event: "compaction_payload_requires_chunks",
     budgetTokens,
-    hardCapTokens: COMPACTION_PAYLOAD_TOKEN_CAP,
-    estimatedTokens,
-    fitsBudget: estimatedTokens <= budgetTokens,
-    omittedMessageCount: nextPayload.compaction_reason.omitted_message_count ?? 0,
+    messageCount: params.payload.active_segment_messages.length,
   });
-
-  return nextPayload;
+  return {
+    ...params.payload,
+    compaction_reason: { ...params.payload.compaction_reason, payload_budget_tokens: budgetTokens },
+  };
 }

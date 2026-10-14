@@ -1,4 +1,5 @@
 import { invoke } from "@xgent/runtime";
+import { executeDurableMobileWrite } from "./connectors/durableMobileWrites";
 
 export type MobileAssistantBackend = "desktop-unavailable" | "android-native" | "ios-native";
 export type MobilePermissionState = "granted" | "denied" | "prompt" | "requested";
@@ -7,10 +8,13 @@ export type MobileAssistantPermission =
   | "microphone"
   | "camera"
   | "calendar"
+  | "contacts"
   | "reminders"
   | "photos"
   | "location"
-  | "health";
+  | "health"
+  | "home"
+  | "notifications";
 
 export type MobileAssistantStatus = {
   backend: MobileAssistantBackend;
@@ -55,6 +59,8 @@ export type MobileCalendarEvent = {
   location?: string | null;
   notes?: string | null;
   calendar?: string | null;
+  calendarId?: string;
+  sourceId?: string;
 };
 
 export type MobileReminder = {
@@ -64,7 +70,46 @@ export type MobileReminder = {
   completed: boolean;
   notes?: string | null;
   list?: string | null;
+  calendarId?: string;
+  sourceId?: string;
 };
+
+export type MobileCalendarKind = "event" | "reminder";
+export type MobileCalendarList = {
+  calendars: Array<{
+    id: string;
+    title: string;
+    source: string;
+    sourceId?: string;
+    isDefault: boolean;
+    writable?: boolean;
+  }>;
+  truncated: boolean;
+};
+
+export function listMobileCalendars(kind: MobileCalendarKind = "event") {
+  if (kind !== "event" && kind !== "reminder")
+    throw new Error("Calendar kind must be event or reminder");
+  return invoke<MobileCalendarList>(`${PLUGIN_COMMAND}list_calendars`, { request: { kind } });
+}
+
+export type MobileContactList = {
+  contacts: Array<{ id: string; name: string; phones: string[]; emails: string[] }>;
+  truncated: boolean;
+  accessLimited: boolean;
+};
+
+export function listMobileContacts(query = "", limit = 50) {
+  if (
+    typeof query !== "string" ||
+    new TextEncoder().encode(query).length > 1024 ||
+    !Number.isInteger(limit) ||
+    limit < 1 ||
+    limit > 200
+  )
+    throw new Error("Contact query exceeds 1024 bytes or limit is outside 1–200");
+  return invoke<MobileContactList>(`${PLUGIN_COMMAND}list_contacts`, { request: { query, limit } });
+}
 
 export type MobileLocation = {
   latitude: number;
@@ -128,6 +173,9 @@ export type MobileActionResult = {
   id?: string | null;
   presented: boolean;
   detail: string;
+  operationId?: string;
+  deviceHostId?: string;
+  completedAt?: number;
 };
 
 const PLUGIN_COMMAND = "plugin:mobile-assistant|";
@@ -245,10 +293,13 @@ export function normalizeMobileAssistantPermissions(
     "microphone",
     "camera",
     "calendar",
+    "contacts",
     "reminders",
     "photos",
     "location",
     "health",
+    "home",
+    "notifications",
   ] satisfies MobileAssistantPermission[]) {
     const alias = status.permissionAliases[permission] ?? permission;
     normalized[permission] = states[alias] ?? states[permission] ?? "prompt";
@@ -313,24 +364,48 @@ export function listMobileReminders(request: { incompleteOnly?: boolean; limit?:
   });
 }
 
-export function createMobileCalendarEvent(request: {
-  title: string;
-  startMs: number;
-  endMs: number;
-  allDay?: boolean;
-  location?: string | null;
-  notes?: string | null;
-}) {
+export function createMobileCalendarEvent(
+  request: {
+    title: string;
+    startMs: number;
+    endMs: number;
+    allDay?: boolean;
+    location?: string | null;
+    notes?: string | null;
+    calendarId?: string;
+  },
+  operationScope?: string,
+) {
+  if (operationScope !== undefined)
+    return executeDurableMobileWrite(
+      "calendar_event",
+      { ...request, allDay: request.allDay ?? false },
+      operationScope,
+    );
   return invoke<MobileActionResult>(`${PLUGIN_COMMAND}create_calendar_event`, {
     request: { ...request, allDay: request.allDay ?? false },
   });
 }
 
-export function createMobileReminder(request: {
-  title: string;
-  dueMs?: number | null;
-  notes?: string | null;
-}) {
+export function createMobileReminder(
+  request: {
+    title: string;
+    dueMs?: number | null;
+    notes?: string | null;
+    recurrence?: "daily" | "weekly";
+    calendarId?: string;
+  },
+  operationScope?: string,
+) {
+  if (
+    request.recurrence &&
+    (!Number.isSafeInteger(request.dueMs) || !["daily", "weekly"].includes(request.recurrence))
+  )
+    throw new Error(
+      "Recurring reminders require their first due time and daily or weekly frequency",
+    );
+  if (operationScope !== undefined)
+    return executeDurableMobileWrite("reminder", request, operationScope);
   return invoke<MobileActionResult>(`${PLUGIN_COMMAND}create_reminder`, { request });
 }
 

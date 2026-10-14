@@ -1,7 +1,7 @@
-use std::collections::BTreeSet;
+﻿use std::collections::BTreeSet;
 use std::fs;
 use std::io::{Cursor, Read};
-use std::path::PathBuf;
+use std::path::{Path,PathBuf};
 use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -12,7 +12,8 @@ use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqwest::{Client, Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tokio::io::AsyncWriteExt;
+use sha2::{Digest,Sha256};
+use tokio::io::{AsyncReadExt,AsyncWriteExt};
 use uuid::Uuid;
 
 const API_ROOT: &str = "https://api.github.com";
@@ -30,7 +31,7 @@ const MAX_ARTIFACT_BYTES: u64 = 1024 * 1024 * 1024;
 const REPOSITORY_MARKER: &str = r#"{
   "product": "xgent-cloud",
   "schemaVersion": 2,
-  "managedPaths": [".github/workflows/xgent-cloud-task.yml", "scripts/xgent-cloud-entry.sh", "scripts/xgent-cloud-entry.ps1", "tasks/"]
+  "managedPaths": [".github/workflows/xgent-cloud-task.yml", "scripts/xgent-cloud-entry.sh", "scripts/xgent-cloud-entry.ps1", "scripts/xgent-cloud-agent/", "tasks/"]
 }
 "#;
 
@@ -70,6 +71,11 @@ jobs:
       XGENT_CLOUD_SECRET_ENV: ${{ secrets.XGENT_CLOUD_ENV }}
     steps:
       - uses: actions/checkout@v6
+      - name: Prepare autonomous agent Node runtime
+        if: hashFiles(format('tasks/{0}/agent.json', inputs.task_id)) != ''
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
       - name: Execute task on Linux or macOS
         if: runner.os != 'Windows'
         shell: bash
@@ -174,12 +180,64 @@ pub struct CloudTaskStartInput {
     pub runner: String,
     #[serde(default)]
     pub label: String,
+    #[serde(default)]
     pub script: String,
+    #[serde(default)]
+    pub agent: Option<CloudAgentInput>,
     #[serde(default)]
     pub files: Vec<CloudTaskFileInput>,
     #[serde(default = "default_retention_days")]
     pub retention_days: u8,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CloudAgentInput {
+    pub prompt: String,
+    pub provider: String,
+    pub model: String,
+    #[serde(default = "default_agent_turns")]
+    pub max_turns: u16,
+    #[serde(default = "default_agent_tools")]
+    pub max_tool_calls: u16,
+    #[serde(default = "default_agent_tokens")]
+    pub max_output_tokens: u16,
+    #[serde(default = "default_agent_timeout")]
+    pub timeout_seconds: u16,
+}
+fn default_agent_turns() -> u16 { 16 }
+fn default_agent_tools() -> u16 { 64 }
+fn default_agent_tokens() -> u16 { 4096 }
+fn default_agent_timeout() -> u16 { 1800 }
+
+impl CloudTaskStartInput {
+    pub(crate) fn validate_execution(&self) -> Result<(), String> {
+        if let Some(agent) = &self.agent {
+            if !self.script.trim().is_empty() { return Err("Cloud task must choose either an autonomous agent or a script".into()); }
+            if agent.prompt.trim().is_empty() || agent.prompt.len() > 128 * 1024
+                || !matches!(agent.provider.as_str(), "openai" | "anthropic")
+                || agent.model.trim().is_empty() || agent.model.len() > 256
+                || !(1..=128).contains(&agent.max_turns) || !(1..=256).contains(&agent.max_tool_calls)
+                || !(128..=16384).contains(&agent.max_output_tokens) || !(30..=3600).contains(&agent.timeout_seconds) {
+                return Err("Invalid bounded cloud agent configuration".into());
+            }
+        } else if self.script.trim().is_empty() { return Err("Cloud task requires an actual script or agent".into()); }
+        Ok(())
+    }
+}
+
+const CLOUD_AGENT_SH: &str = r#"set -euo pipefail
+runtime="../../../scripts/xgent-cloud-agent"
+npm --prefix "$runtime" install --ignore-scripts --no-audit --no-fund
+node "$runtime/runner.mjs" ../agent.json . ../output
+"#;
+const CLOUD_AGENT_PS1: &str = r#"$ErrorActionPreference = "Stop"
+$Runtime = Join-Path ".." "../../scripts/xgent-cloud-agent"
+& npm --prefix $Runtime install --ignore-scripts --no-audit --no-fund
+if ($LASTEXITCODE -ne 0) { throw "Cloud agent dependency preparation failed" }
+& node (Join-Path $Runtime "runner.mjs") ../agent.json . ../output
+if ($LASTEXITCODE -ne 0) { throw "Cloud agent did not complete; inspect its artifact receipts" }
+"#;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -189,6 +247,11 @@ pub struct CloudTaskStartResult {
     pub repository: String,
     pub runner: String,
     pub repository_url: String,
+    pub repository_visibility: String,
+    /// Present only when native GET found the original workflow run. A dispatch
+    /// acknowledgement alone cannot reconcile an already frozen error receipt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observed_run_id: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -220,6 +283,27 @@ pub struct CloudTaskArtifactResult {
     pub artifact_name: String,
     pub local_path: String,
     pub size_bytes: u64,
+    pub run_id: u64,
+    pub run_conclusion: String,
+    #[serde(skip_serializing)]
+    pub(crate) observed_status:CloudTaskStatus,
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub archive_digest:Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloudTaskExtractResult {
+    pub task_id: String,
+    pub artifact_id: u64,
+    pub artifact_name: String,
+    pub local_path: String,
+    pub size_bytes: u64,
+    pub run_id: u64,
+    pub run_conclusion: String,
+    pub output_directory: String,
+    pub files: Vec<super::cloud_artifacts::CloudExtractedFile>,
+    pub file_source: Value,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -239,6 +323,7 @@ struct GitHubUser {
 
 #[derive(Debug, Deserialize)]
 struct GitHubRepository {
+    id: u64,
     name: String,
     owner: GitHubRepositoryOwner,
     default_branch: String,
@@ -308,6 +393,8 @@ struct WorkflowArtifact {
     id: u64,
     name: String,
     expired: bool,
+    #[serde(default)]
+    digest:Option<String>,
 }
 
 pub struct CloudExecutionService {
@@ -339,7 +426,19 @@ impl CloudExecutionService {
         token: &str,
         input: CloudTaskStartInput,
     ) -> Result<CloudTaskStartResult, String> {
+        self.start_task_with_id(token, input, &format!("task-{}", Uuid::new_v4().simple())).await
+    }
+
+    /// The execution host persists this id before permitting any remote effect.
+    pub(crate) async fn start_task_with_id(
+        &self,
+        token: &str,
+        input: CloudTaskStartInput,
+        task_id: &str,
+    ) -> Result<CloudTaskStartResult, String> {
+        let task_id = validate_task_id(task_id)?;
         validate_runner(&input.runner)?;
+        input.validate_execution()?;
         if input.script.len() > MAX_SCRIPT_BYTES {
             return Err("cloud task script is too large".to_string());
         }
@@ -350,23 +449,15 @@ impl CloudExecutionService {
         let _write_guard = self.repository_write_guard.lock().await;
         let retention_days = input.retention_days.clamp(1, 90);
         let repository_name = normalize_repository_name(&input.repository)?;
-        let user = self.current_user(token).await?;
-        let owner = if input.owner.trim().is_empty() {
-            user.login.clone()
-        } else {
-            normalize_owner(&input.owner)?
-        };
-        let (repository, created) = self
-            .ensure_repository(token, &user.login, &owner, &repository_name)
-            .await?;
-        self.ensure_managed_repository(token, &repository, created)
-            .await?;
-
-        let task_id = format!("task-{}", Uuid::new_v4().simple());
         let task_root = format!("tasks/{task_id}");
         let mut total_bytes = input.script.len();
         let mut seen_paths = BTreeSet::new();
         let mut task_files = Vec::with_capacity(input.files.len() + 2);
+        if let Some(agent) = &input.agent {
+            let content = serde_json::to_vec_pretty(agent).map_err(|e| e.to_string())?;
+            total_bytes = total_bytes.saturating_add(content.len());
+            task_files.push(CloudRepositoryFile { path: format!("{task_root}/agent.json"), content });
+        }
 
         for file in &input.files {
             let relative_path = validate_task_path(&file.path)?;
@@ -399,7 +490,9 @@ impl CloudExecutionService {
         };
         task_files.push(CloudRepositoryFile {
             path: script_path,
-            content: input.script.into_bytes(),
+            content: if input.agent.is_some() {
+                (if input.runner == "windows-latest" { CLOUD_AGENT_PS1 } else { CLOUD_AGENT_SH }).as_bytes().to_vec()
+            } else { input.script.into_bytes() },
         });
         let manifest = serde_json::to_vec_pretty(&json!({
             "schemaVersion": 2,
@@ -408,6 +501,7 @@ impl CloudExecutionService {
             "runner": &input.runner,
             "createdAt": Utc::now().to_rfc3339(),
             "inputFileCount": input.files.len(),
+            "executionKind": if input.agent.is_some() { "agent" } else { "script" },
             "outputDirectory": "output",
             "repositoryVisibility": "public"
         }))
@@ -416,6 +510,19 @@ impl CloudExecutionService {
             path: format!("{task_root}/manifest.json"),
             content: manifest,
         });
+
+        // Validate all inputs before creating a repository or updating its workflow.
+        let user = self.current_user(token).await?;
+        let owner = if input.owner.trim().is_empty() {
+            user.login.clone()
+        } else {
+            normalize_owner(&input.owner)?
+        };
+        let (repository, created) = self
+            .ensure_repository(token, &user.login, &owner, &repository_name)
+            .await?;
+        self.ensure_managed_repository(token, &repository, created)
+            .await?;
 
         self.commit_files(
             token,
@@ -439,7 +546,29 @@ impl CloudExecutionService {
             repository: repository.name.clone(),
             runner: input.runner,
             repository_url: repository.html_url.clone(),
+            repository_visibility: "public".to_string(),
+            observed_run_id: None,
         })
+    }
+
+    /// Positive evidence only. An absent/eventually-visible run never authorizes
+    /// a second dispatch of a reserved task id.
+    pub(crate) async fn recover_task_start(
+        &self, token: &str, locator: &CloudTaskLocator, runner: &str,
+    ) -> Result<Option<CloudTaskStartResult>, String> {
+        validate_runner(runner)?;
+        let status = self.task_status(token, locator).await?;
+        if status.run_id.is_none_or(|id| id == 0) { return Ok(None); }
+        let repository = self.resolve_managed_repository(token, locator).await?;
+        Ok(Some(CloudTaskStartResult {
+            task_id: status.task_id,
+            owner: repository.owner.login,
+            repository: repository.name,
+            runner: runner.into(),
+            repository_url: repository.html_url,
+            repository_visibility: if repository.private { "private" } else { "public" }.into(),
+            observed_run_id: status.run_id,
+        }))
     }
 
     pub async fn task_status(
@@ -449,6 +578,12 @@ impl CloudExecutionService {
     ) -> Result<CloudTaskStatus, String> {
         let task_id = validate_task_id(&locator.task_id)?;
         let repository = self.resolve_managed_repository(token, locator).await?;
+        self.task_status_in_repository(token, &repository, &task_id).await
+    }
+
+    async fn task_status_in_repository(
+        &self, token: &str, repository: &GitHubRepository, task_id: &str,
+    ) -> Result<CloudTaskStatus, String> {
         let expected_title = format!("Xgent cloud task {task_id}");
         let mut run = None;
         for page in 1..=10 {
@@ -477,7 +612,7 @@ impl CloudExecutionService {
 
         Ok(match run {
             Some(run) => CloudTaskStatus {
-                task_id,
+                task_id: task_id.to_string(),
                 state: run.status,
                 conclusion: run.conclusion,
                 run_id: Some(run.id),
@@ -485,7 +620,7 @@ impl CloudExecutionService {
                 updated_at: Some(run.updated_at),
             },
             None => CloudTaskStatus {
-                task_id,
+                task_id: task_id.to_string(),
                 state: "queued".to_string(),
                 conclusion: None,
                 run_id: None,
@@ -493,6 +628,41 @@ impl CloudExecutionService {
                 updated_at: None,
             },
         })
+    }
+
+    /// The owning native cancellation collector supplies only its retained
+    /// reservation. The actual run id is obtained by GET, never from IPC/model.
+    /// A successful POST is acceptance, not confirmation that the run stopped.
+    pub(crate) async fn request_task_cancellation(
+        &self, token: &str, locator: &CloudTaskLocator, known_run_id: Option<u64>,
+        authorize: impl FnOnce(&CloudTaskStatus) -> Result<(), String>,
+    ) -> Result<Option<(CloudTaskStatus,bool)>, String> {
+        let task_id = validate_task_id(&locator.task_id)?;
+        let repository = self.resolve_managed_repository(token, locator).await?;
+        let status = if let Some(run_id) = known_run_id {
+            if run_id == 0 || run_id > i64::MAX as u64 { return Err("Invalid retained cloud cancellation run identity".into()); }
+            let endpoint = format!("{API_ROOT}/repos/{}/{}/actions/runs/{run_id}",repository.owner.login,repository.name);
+            let response = self.request(Method::GET,endpoint,token).send().await.map_err(|e| format!("observe original cloud cancellation failed: {e}"))?;
+            let run: WorkflowRun = decode_json(response,"observe original cloud cancellation").await?;
+            if run.id != run_id || run.display_title != format!("Xgent cloud task {task_id}") {
+                return Err("Retained cloud cancellation run no longer matches its original task".into());
+            }
+            CloudTaskStatus { task_id: task_id.clone(),state: run.status,conclusion: run.conclusion,run_id: Some(run.id),run_url: Some(run.html_url),updated_at: Some(run.updated_at) }
+        } else {
+            self.task_status_in_repository(token, &repository, &task_id).await?
+        };
+        let Some(run_id) = status.run_id.filter(|id| *id > 0 && *id <= i64::MAX as u64) else { return Ok(None); };
+        if status.state == "completed" { return Ok(Some((status,false))); }
+        // Revoke replaced credentials/configuration before the external write.
+        authorize(&status)?;
+        let endpoint = format!("{API_ROOT}/repos/{}/{}/actions/runs/{run_id}/cancel", repository.owner.login, repository.name);
+        let response = self.request(Method::POST,endpoint,token).send().await
+            .map_err(|e| format!("request original cloud cancellation failed: {e}"))?;
+        if response.status() != StatusCode::ACCEPTED {
+            ensure_success(response,"request original cloud cancellation").await?;
+            return Err("Original cloud cancellation did not return GitHub acceptance; confirmation remains pending".into());
+        }
+        Ok(Some((status,true)))
     }
 
     pub async fn wait_for_task(
@@ -562,9 +732,11 @@ impl CloudExecutionService {
         token: &str,
         locator: &CloudTaskLocator,
         destination_dir: Option<&str>,
+        include_partial: bool,
     ) -> Result<CloudTaskArtifactResult, String> {
         let status = self.task_status(token, locator).await?;
-        if status.state != "completed" || status.conclusion.as_deref() != Some("success") {
+        if status.state != "completed" || status.conclusion.as_deref().is_none_or(str::is_empty)
+            || (!include_partial && status.conclusion.as_deref() != Some("success")) {
             return Err(format!(
                 "cloud task did not complete successfully (state={}, conclusion={})",
                 status.state,
@@ -592,6 +764,24 @@ impl CloudExecutionService {
             .into_iter()
             .find(|artifact| artifact.name == expected_name && !artifact.expired)
             .ok_or_else(|| "cloud task completed without a downloadable artifact".to_string())?;
+        let expected_digest=artifact.digest.as_deref().map(|raw| {
+            let hash=raw.strip_prefix("sha256:").ok_or("Unsupported GitHub artifact digest")?;
+            if hash.len()!=64 || !hash.bytes().all(|byte|byte.is_ascii_hexdigit()) {return Err("Invalid GitHub artifact digest");}
+            Ok(hash.to_ascii_lowercase())
+        }).transpose()?;
+        let target_dir = destination_dir.map(str::trim).filter(|value|!value.is_empty()).map(PathBuf::from)
+            .unwrap_or_else(||self.artifact_root.join(&status.task_id));
+        tokio::fs::create_dir_all(&target_dir).await.map_err(|error|format!("Create task artifact directory failed: {error}"))?;
+        let target=target_dir.join(format!("{}-{}.zip",artifact.name,artifact.id));
+        // Reusing another entry of this same immutable ZIP does not require
+        // downloading its body again. Only a current API digest permits reuse.
+        if let Some(expected)=expected_digest.as_deref() {
+            if let Some(size_bytes)=verified_cached_archive(&target,expected).await {
+                return Ok(CloudTaskArtifactResult {task_id:status.task_id.clone(),artifact_id:artifact.id,artifact_name:artifact.name,
+                    local_path:target.to_string_lossy().into_owned(),size_bytes,run_id,
+                    run_conclusion:status.conclusion.clone().ok_or("Cloud run conclusion is missing")?,observed_status:status,archive_digest:expected_digest});
+            }
+        }
 
         let endpoint = format!(
             "{API_ROOT}/repos/{}/{}/actions/artifacts/{}/zip",
@@ -607,21 +797,13 @@ impl CloudExecutionService {
             return Err("cloud task artifact exceeds 1 GiB".to_string());
         }
 
-        let target_dir = destination_dir
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-            .unwrap_or_else(|| self.artifact_root.join(&status.task_id));
-        tokio::fs::create_dir_all(&target_dir)
-            .await
-            .map_err(|error| format!("create task artifact directory failed: {error}"))?;
-        let target = target_dir.join(format!("{}-{}.zip", artifact.name, artifact.id));
         let partial = target_dir.join(format!(".{}.part-{}", artifact.name, Uuid::new_v4()));
         let mut file = tokio::fs::File::create(&partial)
             .await
             .map_err(|error| format!("create cloud task artifact file failed: {error}"))?;
         let mut stream = response.bytes_stream();
         let mut size_bytes = 0_u64;
+        let mut archive_hash=Sha256::new();
         let download_result = async {
             while let Some(chunk) = stream.next().await {
                 let chunk =
@@ -630,6 +812,7 @@ impl CloudExecutionService {
                 if size_bytes > MAX_ARTIFACT_BYTES {
                     return Err("cloud task artifact exceeds 1 GiB".to_string());
                 }
+                archive_hash.update(&chunk);
                 file.write_all(&chunk)
                     .await
                     .map_err(|error| format!("save cloud task artifact failed: {error}"))?;
@@ -637,6 +820,9 @@ impl CloudExecutionService {
             file.flush()
                 .await
                 .map_err(|error| format!("flush cloud task artifact failed: {error}"))?;
+            let actual_digest=format!("{:x}",archive_hash.finalize());
+            if expected_digest.as_deref().is_some_and(|expected|expected!=actual_digest) {return Err("Cloud archive failed GitHub SHA-256 digest verification".to_string());}
+            file.sync_all().await.map_err(|error|format!("Sync cloud task artifact failed: {error}"))?;
             drop(file);
             tokio::fs::rename(&partial, &target)
                 .await
@@ -649,11 +835,30 @@ impl CloudExecutionService {
         }
 
         Ok(CloudTaskArtifactResult {
-            task_id: status.task_id,
+            task_id: status.task_id.clone(),
             artifact_id: artifact.id,
             artifact_name: artifact.name,
             local_path: target.to_string_lossy().into_owned(),
             size_bytes,
+            run_id,
+            run_conclusion: status.conclusion.clone().ok_or("Cloud run conclusion is missing")?,
+            observed_status:status,archive_digest:expected_digest,
+        })
+    }
+
+    pub async fn extract_artifact(&self, token: &str, locator: &CloudTaskLocator, destination_dir: Option<&str>, include_partial: bool, host_id: &str) -> Result<CloudTaskExtractResult, String> {
+        let downloaded = self.download_artifact(token, locator, destination_dir, include_partial).await?;
+        let archive = PathBuf::from(&downloaded.local_path).canonicalize().map_err(|e| e.to_string())?;
+        let archive_path = archive.to_string_lossy().into_owned();
+        let base = archive.parent().ok_or("Cloud archive has no workspace parent")?.canonicalize().map_err(|e| e.to_string())?;
+        let workspace = base.to_string_lossy().into_owned();
+        let task = downloaded.task_id.clone(); let artifact = downloaded.artifact_id;
+        let (output, files) = tauri::async_runtime::spawn_blocking(move || super::cloud_artifacts::extract(&archive, &base, &task, artifact)).await.map_err(|e| e.to_string())??;
+        Ok(CloudTaskExtractResult {
+            task_id: downloaded.task_id, artifact_id: artifact, artifact_name: downloaded.artifact_name,
+            local_path: archive_path, size_bytes: downloaded.size_bytes, run_id: downloaded.run_id,
+            run_conclusion: downloaded.run_conclusion, output_directory: output.to_string_lossy().into_owned(), files,
+            file_source: json!({"version":1,"hostId":host_id,"workdir":workspace}),
         })
     }
 
@@ -674,6 +879,7 @@ impl CloudExecutionService {
         repository: &str,
     ) -> Result<(GitHubRepository, bool), String> {
         if let Some(repository) = self.get_repository(token, owner, repository).await? {
+            require_public_repository(&repository)?;
             return Ok((repository, false));
         }
         let endpoint = if owner.eq_ignore_ascii_case(authenticated_login) {
@@ -693,6 +899,7 @@ impl CloudExecutionService {
             .await
             .map_err(|error| format!("create GitHub cloud repository failed: {error}"))?;
         let repository = decode_json(response, "create GitHub cloud repository").await?;
+        require_public_repository(&repository)?;
         Ok((repository, true))
     }
 
@@ -739,24 +946,33 @@ impl CloudExecutionService {
             .map(Some)
     }
 
+    async fn verify_public_repository(
+        &self,
+        token: &str,
+        repository: &GitHubRepository,
+    ) -> Result<(), String> {
+        let current = self
+            .get_repository(token, &repository.owner.login, &repository.name)
+            .await?
+            .ok_or_else(|| "GitHub cloud repository no longer exists".to_string())?;
+        if current.id != repository.id {
+            return Err("GitHub cloud repository was replaced; refusing to write or dispatch this task".to_string());
+        }
+        require_public_repository(&current)
+    }
+
     async fn verify_managed_repository(
         &self,
         token: &str,
         repository: &GitHubRepository,
     ) -> Result<(), String> {
-        if repository.private {
-            return Err(format!(
-                "GitHub repository {}/{} is private; make the Xgent cloud task repository public before using hosted Actions",
-                repository.owner.login, repository.name
-            ));
-        }
         let marker = self
             .get_content(token, repository, REPOSITORY_MARKER_PATH)
             .await?
             .and_then(|(_, content)| content)
             .ok_or_else(|| {
                 format!(
-                    "refusing to use {}/{} because it is not an Xgent-managed repository",
+                    "refusing to use {}/{} because it is not an Xgent-managed repository; choose an unused task repository name in Settings to create one",
                     repository.owner.login, repository.name
                 )
             })?;
@@ -774,18 +990,8 @@ impl CloudExecutionService {
         repository: &GitHubRepository,
         created: bool,
     ) -> Result<(), String> {
-        if repository.private {
-            return Err(format!(
-                "GitHub repository {}/{} is private; make the Xgent cloud task repository public before using hosted Actions",
-                repository.owner.login, repository.name
-            ));
-        }
-        if !created
-            && self
-                .get_content(token, repository, REPOSITORY_MARKER_PATH)
-                .await?
-                .is_some()
-        {
+        require_public_repository(repository)?;
+        if !created {
             self.verify_managed_repository(token, repository).await?;
         }
         self.commit_files_if_changed(
@@ -808,6 +1014,18 @@ impl CloudExecutionService {
                     path: "scripts/xgent-cloud-entry.ps1".to_string(),
                     content: CLOUD_ENTRY_PS1.as_bytes().to_vec(),
                 },
+                CloudRepositoryFile {
+                    path: "scripts/xgent-cloud-agent/package.json".to_string(),
+                    content: include_str!("cloud_agent/package.json").as_bytes().to_vec(),
+                },
+                CloudRepositoryFile {
+                    path: "scripts/xgent-cloud-agent/runner.mjs".to_string(),
+                    content: include_str!("cloud_agent/runner.mjs").as_bytes().to_vec(),
+                },
+                CloudRepositoryFile {
+                    path: "scripts/xgent-cloud-agent/tools.mjs".to_string(),
+                    content: include_str!("cloud_agent/tools.mjs").as_bytes().to_vec(),
+                },
             ],
             "cloud: update managed execution infrastructure",
         )
@@ -822,6 +1040,7 @@ impl CloudExecutionService {
         runner: &str,
         retention_days: u8,
     ) -> Result<(), String> {
+        self.verify_public_repository(token, repository).await?;
         let endpoint = format!(
             "{API_ROOT}/repos/{}/{}/actions/workflows/{}/dispatches",
             repository.owner.login,
@@ -913,6 +1132,7 @@ impl CloudExecutionService {
         if files.is_empty() {
             return Err("cloud task commit contains no files".to_string());
         }
+        self.verify_public_repository(token, repository).await?;
 
         let mut blobs = Vec::with_capacity(files.len());
         for file in files {
@@ -1011,6 +1231,7 @@ impl CloudExecutionService {
             )
             .await?;
 
+            self.verify_public_repository(token, repository).await?;
             let update_reference_endpoint = format!(
                 "{API_ROOT}/repos/{}/{}/git/refs/heads/{branch}",
                 repository.owner.login, repository.name
@@ -1056,11 +1277,11 @@ fn default_retention_days() -> u8 {
     7
 }
 
-fn normalize_owner(value: &str) -> Result<String, String> {
+pub(crate) fn normalize_owner(value: &str) -> Result<String, String> {
     validate_repo_component(value, "GitHub owner")
 }
 
-fn normalize_repository_name(value: &str) -> Result<String, String> {
+pub(crate) fn normalize_repository_name(value: &str) -> Result<String, String> {
     let value = if value.trim().is_empty() {
         "agent-temp"
     } else {
@@ -1093,7 +1314,7 @@ fn validate_runner(value: &str) -> Result<(), String> {
     }
 }
 
-fn validate_task_id(value: &str) -> Result<String, String> {
+pub(crate) fn validate_task_id(value: &str) -> Result<String, String> {
     let value = value.trim();
     if value.len() < 8
         || value.len() > 64
@@ -1165,6 +1386,16 @@ fn extract_log_tail(bytes: &[u8]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&combined).into_owned())
 }
 
+fn require_public_repository(repository: &GitHubRepository) -> Result<(), String> {
+    if repository.private {
+        return Err(format!(
+            "GitHub repository {}/{} is private; new cloud tasks require a public repository. Choose an unused task repository name in Settings to create one. Existing managed task status and artifacts can still be read",
+            repository.owner.login, repository.name
+        ));
+    }
+    Ok(())
+}
+
 fn encode_segment(value: &str) -> String {
     utf8_percent_encode(value, NON_ALPHANUMERIC).to_string()
 }
@@ -1175,6 +1406,22 @@ fn encode_path(value: &str) -> String {
         .map(encode_segment)
         .collect::<Vec<_>>()
         .join("/")
+}
+
+async fn verified_cached_archive(path:&Path,expected:&str)->Option<u64>{
+    let metadata=tokio::fs::symlink_metadata(path).await.ok()?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() || metadata.len()>MAX_ARTIFACT_BYTES {return None;}
+    let mut file=tokio::fs::File::open(path).await.ok()?;
+    let mut buffer=vec![0;256*1024];let mut bytes=0_u64;let mut hash=Sha256::new();
+    loop {
+        let size=file.read(&mut buffer).await.ok()?;
+        if size==0 {break;}
+        bytes=bytes.checked_add(size as u64)?;
+        if bytes>MAX_ARTIFACT_BYTES {return None;}
+        hash.update(&buffer[..size]);
+    }
+    if bytes!=metadata.len() || format!("{:x}",hash.finalize())!=expected {return None;}
+    Some(bytes)
 }
 
 async fn ensure_success(
@@ -1209,4 +1456,59 @@ async fn decode_json<T: for<'de> Deserialize<'de>>(
         .json::<T>()
         .await
         .map_err(|error| format!("decode {action} response failed: {error}"))
+}
+
+#[cfg(test)]
+mod public_repository_tests {
+    use super::*;
+
+    #[test]
+    fn cloud_agent_input_has_exact_public_fields_and_bounded_execution() {
+        let mut raw = json!({"runner":"ubuntu-latest","agent":{"prompt":"Create real slides","provider":"openai","model":"catalog-model"}});
+        let input: CloudTaskStartInput = serde_json::from_value(raw.clone()).unwrap();
+        assert!(input.validate_execution().is_ok());
+        assert_eq!(input.agent.as_ref().unwrap().max_turns, 16);
+        raw["script"] = json!("also run script");
+        assert!(serde_json::from_value::<CloudTaskStartInput>(raw.clone()).unwrap().validate_execution().is_err());
+        raw["script"] = json!(""); raw["agent"]["maxTurns"] = json!(0);
+        assert!(serde_json::from_value::<CloudTaskStartInput>(raw.clone()).unwrap().validate_execution().is_err());
+        raw["agent"]["apiKey"] = json!("must not enter a public task");
+        assert!(serde_json::from_value::<CloudTaskStartInput>(raw).is_err());
+    }
+
+    fn repository(private: bool) -> GitHubRepository {
+        serde_json::from_value(json!({
+            "id": 123,
+            "name": "agent-temp",
+            "owner": { "login": "actual-owner" },
+            "default_branch": "main",
+            "html_url": "https://github.com/actual-owner/agent-temp",
+            "private": private
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn new_tasks_require_actual_public_repository_response() {
+        assert!(require_public_repository(&repository(false)).is_ok());
+        let error = require_public_repository(&repository(true)).unwrap_err();
+        assert!(error.contains("actual-owner/agent-temp"));
+        assert!(error.contains("unused task repository name"));
+    }
+
+    #[test]
+    fn missing_repository_identity_or_visibility_cannot_admit_a_task() {
+        for key in ["id", "private"] {
+            let mut value = json!({
+                "id": 123,
+                "name": "agent-temp",
+                "owner": { "login": "actual-owner" },
+                "default_branch": "main",
+                "html_url": "https://github.com/actual-owner/agent-temp",
+                "private": true
+            });
+            value.as_object_mut().unwrap().remove(key);
+            assert!(serde_json::from_value::<GitHubRepository>(value).is_err());
+        }
+    }
 }

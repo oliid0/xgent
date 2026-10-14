@@ -4,6 +4,7 @@
 // @xgent/runtime imports are allowed here.
 
 import { ContextMenu, type ContextMenuOption } from "@astryxdesign/core/ContextMenu";
+import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { type ReactNode, useCallback } from "react";
 import { useLocale } from "../../../i18n";
 import { writeClipboardText } from "../../../lib/system/clipboardText";
@@ -17,6 +18,7 @@ import {
   FilePenLine,
   Folder,
   FolderOpen,
+  MoreHorizontal,
   Plus,
   RefreshCw,
   Trash2,
@@ -47,16 +49,14 @@ export type FileTreeContextMenuProps = {
   onActionError: (message: string) => void;
 };
 
-export function FileTreeContextMenu(props: FileTreeContextMenuProps) {
+function useFileTreeMenuItems(props: Omit<FileTreeContextMenuProps, "children">) {
   const {
-    children,
     path,
     kind,
     canMutate,
     canOpenFile,
     canInsertMention,
     showHidden,
-    onClose,
     onOpenFile,
     onOpenExternal,
     onOpenContainingDirectory,
@@ -180,6 +180,33 @@ export function FileTreeContextMenu(props: FileTreeContextMenuProps) {
     },
   ];
 
+  return { items, t };
+}
+
+export function FileTreeRowMenu(props: Omit<FileTreeContextMenuProps, "children">) {
+  const { items, t } = useFileTreeMenuItems(props);
+  return (
+    <DropdownMenu
+      button={{
+        label: `${t("sidebar.mobile.more")} · ${props.path}`,
+        icon: <MoreHorizontal />,
+        isIconOnly: true,
+        variant: "ghost",
+        size: "lg",
+      }}
+      items={items}
+      hasChevron={false}
+      presentation="adaptive"
+      alignment="end"
+      onOpenChange={(open) => {
+        if (!open) props.onClose();
+      }}
+    />
+  );
+}
+
+export function FileTreeContextMenu(props: FileTreeContextMenuProps) {
+  const { items, t } = useFileTreeMenuItems(props);
   return (
     <ContextMenu
       items={items}
@@ -187,10 +214,10 @@ export function FileTreeContextMenu(props: FileTreeContextMenuProps) {
       menuWidth="var(--xgent-file-tree-context-menu-width)"
       size="sm"
       onOpenChange={(isOpen) => {
-        if (!isOpen) onClose();
+        if (!isOpen) props.onClose();
       }}
     >
-      {children}
+      {props.children}
     </ContextMenu>
   );
 }

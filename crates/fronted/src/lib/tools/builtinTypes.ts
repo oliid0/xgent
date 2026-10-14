@@ -56,6 +56,7 @@ export type BuiltinToolBundle<TExtra extends object = object> = TExtra & {
   tools: Tool[];
   executeToolCall: BuiltinToolExecutor;
   metadataByName: Map<string, BuiltinToolMetadata>;
+  recoverToolCall?: (call: ToolCall) => Promise<ToolResultMessage | null>;
 };
 
 export type TaskStatus = "pending" | "in_progress" | "completed";

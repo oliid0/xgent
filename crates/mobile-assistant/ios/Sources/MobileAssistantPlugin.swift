@@ -8,6 +8,7 @@ import Network
 import Photos
 import Speech
 import Tauri
+import UserNotifications
 
 private struct ClipboardArgs: Decodable { let text: String }
 
@@ -27,6 +28,21 @@ private struct CalendarRangeArgs: Decodable {
     let startMs: Int64
     let endMs: Int64
     let limit: UInt16
+    let calendarIds: [String]?
+}
+
+private struct CalendarListArgs: Decodable { let kind: String; let writableOnly: Bool?; let calendarIds: [String]? }
+private struct CalendarPayload: Encodable {
+    let id: String
+    let title: String
+    let source: String
+    let sourceId: String
+    let isDefault: Bool
+    let writable: Bool
+}
+private struct CalendarListPayload: Encodable {
+    let calendars: [CalendarPayload]
+    let truncated: Bool
 }
 
 private struct HealthStepsArgs: Decodable {
@@ -62,6 +78,7 @@ private struct HealthSamplesPayload: Encodable {
 private struct ReminderListArgs: Decodable {
     let incompleteOnly: Bool
     let limit: UInt16
+    let calendarIds: [String]?
 }
 
 private struct CreateCalendarEventArgs: Decodable {
@@ -71,12 +88,17 @@ private struct CreateCalendarEventArgs: Decodable {
     let allDay: Bool
     let location: String?
     let notes: String?
+    let calendarId: String?
+    let expectedSourceId: String?
 }
 
 private struct CreateReminderArgs: Decodable {
     let title: String
     let dueMs: Int64?
     let notes: String?
+    let recurrence: String?
+    let calendarId: String?
+    let expectedSourceId: String?
 }
 
 private struct ComposeMessageArgs: Decodable {
@@ -95,6 +117,8 @@ private struct CalendarEventPayload: Encodable {
     let location: String?
     let notes: String?
     let calendar: String?
+    let calendarId: String
+    let sourceId: String
 }
 
 private struct ReminderPayload: Encodable {
@@ -104,6 +128,8 @@ private struct ReminderPayload: Encodable {
     let completed: Bool
     let notes: String?
     let list: String?
+    let calendarId: String
+    let sourceId: String
 }
 
 private struct LocationPayload: Encodable {
@@ -127,10 +153,13 @@ private enum PermissionAlias {
     static let microphone = "microphone"
     static let camera = "camera"
     static let calendar = "calendar"
+    static let contacts = "contacts"
     static let reminders = "reminders"
     static let photos = "photos"
     static let location = "location"
     static let health = "health"
+    static let home = "home"
+    static let notifications = "notifications"
 }
 
 final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
@@ -140,6 +169,8 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
     private let bluetooth = BluetoothDiscovery()
     private let bluetoothGattAccess = BluetoothGattAccess()
     private let healthStore = HKHealthStore()
+    private let healthEvents = HealthEventObserver.shared
+    private let homeAccess = HomeKitAccess()
     private let locationManager = CLLocationManager()
     private let networkMonitor = NWPathMonitor()
     private var networkStatus: [String: Any]?
@@ -216,14 +247,17 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
             var aliases = [
                 "bluetooth": "bluetooth",
                 "microphone": PermissionAlias.microphone,
+                "notifications": PermissionAlias.notifications,
                 "camera": PermissionAlias.camera,
                 "calendar": PermissionAlias.calendar,
+                "contacts": PermissionAlias.contacts,
                 "reminders": PermissionAlias.reminders,
                 "photos": PermissionAlias.photos,
                 "location": PermissionAlias.location,
             ]
             let healthAvailable = HKHealthStore.isHealthDataAvailable()
             if healthAvailable { aliases["health"] = PermissionAlias.health }
+            if self.homeAccess.available { aliases["home"] = PermissionAlias.home }
             let audioOutputs: [[String: Any]] = AVAudioSession.sharedInstance().currentRoute.outputs.compactMap { port in
                 let transport: String
                 switch port.portType {
@@ -250,7 +284,7 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
                 "externalFolderMountAvailable": true,
                 "cloudSyncAvailable": false,
                 "healthAvailable": healthAvailable,
-                "homeAvailable": false,
+                "homeAvailable": self.homeAccess.available,
                 "network": self.networkStatus.map { $0 as Any } ?? NSNull(),
                 "audioOutputs": audioOutputs,
                 "permissionAliases": aliases,
@@ -260,11 +294,28 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
     }
 
     @objc func listPhotos(_ invoke: Invoke) throws { try PhotoLibrary.list(invoke) }
+    @objc func listContacts(_ invoke: Invoke) throws { try ContactsAccess.list(invoke) }
+    @objc func listHomeInventory(_ invoke: Invoke) throws { try homeAccess.list(invoke) }
+    @objc func configureHomeEvents(_ invoke: Invoke) throws { try homeAccess.configureEvents(invoke) }
+    @objc func homeEventSources(_ invoke: Invoke) { homeAccess.eventSources(invoke) }
+    @objc func pendingHomeEvents(_ invoke: Invoke) { HomeEventBuffer.pending(invoke) }
+    @objc func acknowledgeHomeEvents(_ invoke: Invoke) throws { try HomeEventBuffer.acknowledge(invoke) }
+    @objc func resolveHomePowerDestination(_ invoke: Invoke) throws { try homeAccess.resolvePower(invoke) }
+    @objc func setHomePower(_ invoke: Invoke) throws { try homeAccess.setPower(invoke) }
     @objc func readPhoto(_ invoke: Invoke) throws { try PhotoLibrary.read(invoke) }
     @objc func prepareImageAttachment(_ invoke: Invoke) throws { try ImageAttachmentPreparer.run(invoke) }
 
     @objc override public func checkPermissions(_ invoke: Invoke) {
-        let payload = permissionPayload()
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                self.resolvePermissions(invoke, notificationState: ResultNotifications.permissionState(settings))
+            }
+        }
+    }
+
+    private func resolvePermissions(_ invoke: Invoke, notificationState: String) {
+        var payload = permissionPayload()
+        payload[PermissionAlias.notifications] = notificationState
         guard let stepType = stepType(), HKHealthStore.isHealthDataAvailable() else {
             invoke.resolve(payload)
             return
@@ -293,6 +344,13 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
         }
 
         switch alias {
+        case PermissionAlias.home:
+            homeAccess.request(invoke) { self.checkPermissions(invoke) }
+        case PermissionAlias.notifications:
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, error in
+                if let error { invoke.reject(error.localizedDescription); return }
+                self.checkPermissions(invoke)
+            }
         case "bluetooth":
             DispatchQueue.main.async {
                 self.bluetooth.requestPermission { self.checkPermissions(invoke) }
@@ -305,6 +363,8 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
             }
         case PermissionAlias.calendar:
             requestEventPermission(invoke, entity: .event)
+        case PermissionAlias.contacts:
+            ContactsAccess.request { self.checkPermissions(invoke) }
         case PermissionAlias.reminders:
             requestEventPermission(invoke, entity: .reminder)
         case PermissionAlias.photos:
@@ -327,6 +387,12 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
             invoke.reject("Unknown mobile permission: \(alias)")
         }
     }
+
+    @objc func configureResultDelivery(_ invoke: Invoke) throws { try ResultDelivery.configure(invoke) }
+    @objc func configureEventDelivery(_ invoke: Invoke) throws { try EventDelivery.configure(invoke) }
+    @objc func discoverWorkstations(_ invoke: Invoke) { WorkstationDiscovery.discover(invoke) }
+    @objc func postResultNotification(_ invoke: Invoke) throws { try ResultNotifications.post(invoke) }
+    @objc func removeResultNotification(_ invoke: Invoke) throws { try ResultNotifications.remove(invoke) }
 
     @objc func startVoiceInput(_ invoke: Invoke) throws {
         let args = try invoke.parseArgs(VoiceInputArgs.self)
@@ -465,6 +531,12 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
         return (type, unit, label, multiplier)
     }
 
+    // Native service calls only; no public plugin IPC/permissions expose event
+    // injection, ACK or background registration to models or WebViews.
+    @objc func configureHealthEvents(_ invoke: Invoke) throws { try healthEvents.configure(invoke) }
+    @objc func pendingHealthEvents(_ invoke: Invoke) { healthEvents.pending(invoke) }
+    @objc func acknowledgeHealthEvents(_ invoke: Invoke) throws { try healthEvents.acknowledge(invoke) }
+
     @objc func requestHealthMetricPermission(_ invoke: Invoke) throws {
         let args = try invoke.parseArgs(HealthMetricArgs.self)
         guard HKHealthStore.isHealthDataAvailable(), let metric = healthMetric(args.metric) else {
@@ -480,6 +552,19 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
                 // HealthKit deliberately does not disclose read authorization status.
                 invoke.resolve(["health": "requested"])
             }
+        }
+    }
+
+    @objc func checkHealthMetricPermission(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(HealthMetricArgs.self)
+        guard HKHealthStore.isHealthDataAvailable(), let metric = healthMetric(args.metric) else {
+            invoke.reject("Requested HealthKit metric is unavailable"); return
+        }
+        healthStore.getRequestStatusForAuthorization(toShare: [], read: [metric.0]) { status, error in
+            if let error { invoke.reject(error.localizedDescription); return }
+            // unnecessary means the permission sheet was already handled;
+            // it does NOT disclose whether any read access was granted.
+            invoke.resolve(["health": status == .unnecessary ? "requested" : "prompt"])
         }
     }
 
@@ -525,6 +610,43 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
         healthStore.execute(query)
     }
 
+    @objc func listCalendars(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(CalendarListArgs.self)
+        guard args.kind == "event" || args.kind == "reminder" else {
+            invoke.reject("Calendar kind must be event or reminder"); return
+        }
+        let entity: EKEntityType = args.kind == "event" ? .event : .reminder
+        guard canReadEvents(entity) else {
+            invoke.reject("Full access is required to discover calendar or reminder lists"); return
+        }
+        let defaultId = entity == .event ? eventStore.defaultCalendarForNewEvents?.calendarIdentifier
+            : eventStore.defaultCalendarForNewReminders()?.calendarIdentifier
+        let candidates = try scopedCalendars(args.calendarIds, type: entity) ?? eventStore.calendars(for: entity)
+        let calendars = candidates.filter { args.writableOnly == false || $0.allowsContentModifications }
+        var truncated = calendars.count > 200
+        let payload = calendars.prefix(200).map { calendar in
+            if calendar.title.count > 512 || calendar.source.title.count > 512 { truncated = true }
+            return CalendarPayload(id: calendar.calendarIdentifier, title: String(calendar.title.prefix(512)),
+                source: String(calendar.source.title.prefix(512)), sourceId: calendar.source.sourceIdentifier,
+                isDefault: calendar.calendarIdentifier == defaultId, writable: calendar.allowsContentModifications)
+        }
+        invoke.resolve(CalendarListPayload(calendars: payload, truncated: truncated))
+    }
+
+    // nil preserves ordinary single-device reads. An explicit empty, missing
+    // or stale scope never falls back to all calendars in a task read.
+    private func scopedCalendars(_ ids: [String]?, type: EKEntityType) throws -> [EKCalendar]? {
+        guard let ids else { return nil }
+        let available = eventStore.calendars(for: type)
+        let selected = ids.compactMap { id in available.first { $0.calendarIdentifier == id } }
+        guard !ids.isEmpty, ids.count <= 16, Set(ids).count == ids.count,
+            ids.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 4096 }), selected.count == ids.count else {
+            throw NSError(domain: "XgentCalendarScope", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "The selected task calendar scope is empty, invalid or unavailable"])
+        }
+        return selected
+    }
+
     @objc func listCalendarEvents(_ invoke: Invoke) throws {
         let args = try invoke.parseArgs(CalendarRangeArgs.self)
         guard canReadEvents(.event) else {
@@ -537,7 +659,8 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
             invoke.reject("Calendar range end must be after start")
             return
         }
-        let predicate = eventStore.predicateForEvents(withStart: start, end: end, calendars: nil)
+        let calendars = try scopedCalendars(args.calendarIds, type: .event)
+        let predicate = eventStore.predicateForEvents(withStart: start, end: end, calendars: calendars)
         let events = eventStore.events(matching: predicate)
             .sorted { $0.startDate < $1.startDate }
             .prefix(clampedLimit(args.limit))
@@ -550,7 +673,9 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
                     allDay: event.isAllDay,
                     location: event.location,
                     notes: event.notes,
-                    calendar: event.calendar?.title
+                    calendar: event.calendar?.title,
+                    calendarId: event.calendar?.calendarIdentifier ?? "",
+                    sourceId: event.calendar?.source.sourceIdentifier ?? ""
                 )
             }
         // The Encodable overload supports an array root; dictionaries with
@@ -564,13 +689,17 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
             invoke.reject("Full reminders access is required before reading reminders")
             return
         }
-        let predicate = eventStore.predicateForReminders(in: nil)
+        let calendars = try scopedCalendars(args.calendarIds, type: .reminder)
+        let predicate = eventStore.predicateForReminders(in: calendars)
         eventStore.fetchReminders(matching: predicate) { [weak self] reminders in
             guard let self else {
                 invoke.reject("The reminders service is unavailable")
                 return
             }
-            let payload = (reminders ?? [])
+            guard let reminders else {
+                invoke.reject("The reminders provider did not return records"); return
+            }
+            let payload = reminders
                 .filter { !args.incompleteOnly || !$0.isCompleted }
                 .sorted { lhs, rhs in
                     let left = self.reminderDueDate(lhs) ?? .distantFuture
@@ -586,7 +715,9 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
                         dueMs: self.reminderDueDate(reminder).map { self.milliseconds($0) },
                         completed: reminder.isCompleted,
                         notes: reminder.notes,
-                        list: reminder.calendar?.title
+                        list: reminder.calendar?.title,
+                        calendarId: reminder.calendar?.calendarIdentifier ?? "",
+                        sourceId: reminder.calendar?.source.sourceIdentifier ?? ""
                     )
                 }
             invoke.resolve(Array(payload))
@@ -602,7 +733,10 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
             invoke.reject("A title and an end after the start are required")
             return
         }
-        guard canWriteEvents(.event), let calendar = eventStore.defaultCalendarForNewEvents else {
+        let selected = args.calendarId.flatMap { id in eventStore.calendars(for: .event).first { $0.calendarIdentifier == id } }
+        guard canWriteEvents(.event), let calendar = args.calendarId == nil ? eventStore.defaultCalendarForNewEvents : selected,
+            calendar.allowsContentModifications,
+            args.expectedSourceId == nil || (args.calendarId != nil && calendar.source.sourceIdentifier == args.expectedSourceId) else {
             invoke.reject("Calendar write access and a writable default calendar are required")
             return
         }
@@ -633,16 +767,26 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
             invoke.reject("A reminder title is required")
             return
         }
-        guard canWriteEvents(.reminder), let calendar = eventStore.defaultCalendarForNewReminders()
+        let selected = args.calendarId.flatMap { id in eventStore.calendars(for: .reminder).first { $0.calendarIdentifier == id } }
+        guard canWriteEvents(.reminder), let calendar = args.calendarId == nil ? eventStore.defaultCalendarForNewReminders() : selected,
+            calendar.allowsContentModifications,
+            args.expectedSourceId == nil || (args.calendarId != nil && calendar.source.sourceIdentifier == args.expectedSourceId)
         else {
             invoke.reject("Reminders write access and a writable default list are required")
             return
         }
         let reminder = EKReminder(eventStore: eventStore)
+        if let recurrence = args.recurrence {
+            guard args.dueMs != nil, recurrence == "daily" || recurrence == "weekly" else {
+                invoke.reject("Recurring reminders require a due time and daily or weekly frequency"); return
+            }
+            reminder.addRecurrenceRule(EKRecurrenceRule(recurrenceWith: recurrence == "daily" ? .daily : .weekly, interval: 1, end: nil))
+        }
         reminder.calendar = calendar
         reminder.title = title
         reminder.notes = normalized(args.notes)
         if let dueMs = args.dueMs {
+            reminder.addAlarm(EKAlarm(absoluteDate: date(milliseconds: dueMs)))
             reminder.dueDateComponents = Calendar.current.dateComponents(
                 [.calendar, .timeZone, .year, .month, .day, .hour, .minute, .second],
                 from: date(milliseconds: dueMs)
@@ -895,6 +1039,8 @@ final class MobileAssistantPlugin: Plugin, CLLocationManagerDelegate,
             PermissionAlias.microphone: combinedVoicePermissionState(),
             PermissionAlias.camera: cameraPermissionState(),
             PermissionAlias.calendar: eventPermissionState(.event),
+            PermissionAlias.contacts: ContactsAccess.permissionState,
+            PermissionAlias.home: homeAccess.permissionState,
             PermissionAlias.reminders: eventPermissionState(.reminder),
             PermissionAlias.photos: photoPermissionState(),
             PermissionAlias.location: locationPermissionState(),

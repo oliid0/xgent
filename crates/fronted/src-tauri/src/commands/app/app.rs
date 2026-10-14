@@ -37,6 +37,7 @@ pub fn app_window_pinned(pin_state: State<'_, Arc<WindowPinState>>) -> bool {
 pub fn app_frontend_ready(
     window: tauri::Window,
     ready_state: State<'_, Arc<FrontendReadyState>>,
+    startup_state: State<'_, Arc<crate::services::agent_startup::AgentStartupState>>,
 ) -> Result<(), String> {
     let mut fitted_size = None;
     if !ready_state.sized.swap(true, Ordering::SeqCst) && !window.is_maximized().unwrap_or(false) {
@@ -53,6 +54,7 @@ pub fn app_frontend_ready(
         }
     }
     ready_state.painted.store(true, Ordering::SeqCst);
+    if !startup_state.should_show() { return Ok(()); }
     if window.is_visible().unwrap_or(false) {
         return Ok(());
     }
@@ -68,6 +70,22 @@ pub fn app_frontend_ready(
     window
         .set_focus()
         .map_err(|error| format!("failed to focus frontend-ready window: {error}"))
+}
+
+#[tauri::command]
+pub async fn app_agent_startup_status(window: tauri::Window, app: AppHandle)
+    -> Result<crate::services::agent_startup::AgentStartupStatus, String> {
+    if window.label() != "main" { return Err("Startup settings belong to this computer's main client".into()); }
+    tauri::async_runtime::spawn_blocking(move || crate::services::agent_startup::status(&app))
+        .await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn app_agent_startup_set(window: tauri::Window, app: AppHandle, enabled: bool)
+    -> Result<crate::services::agent_startup::AgentStartupStatus, String> {
+    if window.label() != "main" { return Err("Startup registration requires this computer's main client".into()); }
+    tauri::async_runtime::spawn_blocking(move || crate::services::agent_startup::set_registered(&app, enabled))
+        .await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

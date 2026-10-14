@@ -24,6 +24,8 @@ include!("db.rs");
 include!("repository.rs");
 include!("message_ref.rs");
 include!("fts.rs");
+include!("personal_evidence.rs");
+include!("background_results.rs");
 include!("segments.rs");
 include!("search.rs");
 include!("trajectory.rs");

@@ -18,6 +18,18 @@ function harness(context, mobile, backend) {
   let request = 0;
   const loader = createTsModuleLoader({ mocks: {
     react: {
+      useRef(current) {
+        const index = cursor++;
+        if (!(index in states)) states[index] = { current };
+        return states[index];
+      },
+      useCallback(callback, dependencies) {
+        const index = cursor++;
+        const previous = states[index];
+        if (!previous || !previous.dependencies.every((value, i) => Object.is(value, dependencies[i])))
+          states[index] = { dependencies, callback };
+        return states[index].callback;
+      },
       useState(initial) {
         const index = cursor++;
         if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
@@ -38,6 +50,10 @@ function harness(context, mobile, backend) {
       invoke: async (command, args) => { calls.push({ command, args }); return backend(command, args); },
       listen: async (_event, callback) => { statusEvent = callback; return () => unlistened++; },
     },
+    "@tauri-apps/api/core": {
+      invoke: async (command,args) => command.startsWith("tailscale_") ? backend(command,args) : ({ revision: 0, supported: true, registered: false, reason: null, backgroundLaunch: false, workerReady: true, observedAtMs: 1700000000000 }),
+    },
+    "@tauri-apps/api/event": { listen: async () => () => {} },
     "../lib/browser/browserSessionController": {
       browserSessionController: {
         ensureSession: async (options) => panels.push(options),
@@ -82,11 +98,53 @@ function harness(context, mobile, backend) {
 }
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+test("native cloud settings preserve working namespace controls without explanatory paragraphs", async (context) => {
+  const h = harness(context, true, async (command) => {
+    if (command === "cloud_secret_vault_status") return { githubTokenConfigured: false };
+    throw new Error(`Unexpected native call: ${command}`);
+  });
+  h.enabled = true;
+  h.render();
+  await settle();
+  h.render();
+  assert.equal(h.node("cloud-repository-hint"), undefined);
+  assert.equal((await h.dispatch("github-owner", "my-owner")).ok, true);
+  assert.equal((await h.dispatch("github-repository", "my-private-tasks")).ok, true);
+  assert.equal(h.settings.access.githubOwner, "my-owner");
+  assert.equal(h.settings.access.githubRepository, "my-private-tasks");
+  assert.equal(h.node("github-repository").value, "my-private-tasks");
+  assert.equal(h.calls.some(({ command }) => command === "cloud_task_start"), false);
+});
 const localStatus = (patch = {}) => ({
   enabled: true, running: true, bindAddress: "0.0.0.0", port: 28367,
   urls: ["http://192.168.1.2:28367", "http://127.0.0.1:28367"],
   pairedDevices: 1, devices: [{ deviceId: "phone", label: "iPhone", lastSeenAt: 1720000000000 }],
   ...patch,
+});
+
+test("native Tailscale observation refresh shows client state and own addresses while preserving LAN pairing URLs", async context => {
+  let state = "login-required";
+  const h = harness(context, false, async command => {
+    if (command === "tailscale_install_status") return { id:"",phase:"idle",version:null,package:null,sha256:null,error:null,updatedAt:0 };
+    if (command === "tailscale_setup_status") return { state, addresses: state === "running" ? ["100.70.1.2"] : [], observedAt: 1720000000000 };
+    if (command === "cloud_secret_vault_status") return { githubTokenConfigured: false };
+    if (command === "worker_peer_list") return { peers: [] };
+    if (command === "local_access_status") return localStatus({ tailscale: {
+      state, addresses: state === "running" ? ["100.70.1.2"] : [], observedAt: 1720000000000,
+    } });
+    throw new Error(`Unexpected command ${command}`);
+  });
+  h.enabled = true; h.render(); await settle(); h.render();
+  assert.match(h.node("tailscale-observed").text, /settings.tailscaleLoginRequired/);
+  assert.equal(h.node("tailscale-hint"), undefined);
+  state = "running";
+  assert.equal((await h.dispatch("tailscale-refresh")).ok, true);
+  assert.match(h.node("tailscale-observed").text, /settings.tailscaleRunning · 100.70.1.2/);
+  assert.equal(h.node("web-ui-url:0").text, "http://192.168.1.2:28367");
+  state = "offline"; await h.dispatch("tailscale-refresh");
+  assert.match(h.node("tailscale-observed").text, /settings.tailscaleOffline/);
+  assert.doesNotMatch(h.node("tailscale-observed").text, /100.70.1.2/);
 });
 
 test("native macOS access shows live Rust addresses, pairing and revocation without stale polling overwrites", async (context) => {

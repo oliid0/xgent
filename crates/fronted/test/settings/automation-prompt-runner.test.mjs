@@ -35,10 +35,10 @@ const {
   MANUAL_CRON_RUN_TIMEOUT_MS,
 } = loader.loadModule("src/lib/automation/types.ts");
 const { createCompletePromptRunInput, PROMPT_RUN_RECONCILE_INTERVAL_MS } = loader.loadModule(
-  "src/components/cron/promptRunProtocol.ts",
+  "src/lib/automation/promptRunProtocol.ts",
 );
 const runnerSource = readFileSync(
-  new URL("../../src/components/cron/CronPromptRunner.tsx", import.meta.url),
+  new URL("../../src/lib/automation/promptExecution.ts", import.meta.url),
   "utf8",
 );
 const guiCronViewSource = readFileSync(
@@ -146,12 +146,10 @@ test("Cron manual run remains locked until its non-skip run reaches a terminal s
 });
 
 test("Auto Prompt reconciles pending runs without relying only on events", () => {
-  assert.equal(PROMPT_RUN_RECONCILE_INTERVAL_MS, 15_000);
-  assert.match(
-    runnerSource,
-    /window\.setInterval\(requestClaim, PROMPT_RUN_RECONCILE_INTERVAL_MS\)/,
-  );
-  assert.match(runnerSource, /window\.clearInterval\(reconcileTimer\)/);
+  assert.equal(PROMPT_RUN_RECONCILE_INTERVAL_MS, 5_000);
+  const hostSource = readFileSync(new URL("../../src/lib/automation/promptRunHost.ts", import.meta.url), "utf8");
+  assert.match(hostSource, /setInterval\(requestClaim, PROMPT_RUN_RECONCILE_INTERVAL_MS\)/);
+  assert.match(hostSource, /clearInterval\(reconcileTimer\)/);
 });
 
 test("Auto Prompt run prefers the queue-time workdir with a global fallback", () => {
@@ -200,8 +198,11 @@ test("Cron workspace pin stays wired in the unified frontend", () => {
     assert.match(source, /else \{[\s\S]*setCustomWorkdir\(false\);[\s\S]*setWorkdir\(value\)/);
   }
   for (const source of [guiCronViewSource]) {
-    assert.match(source, /\{task\.workdir \? \(/);
+    assert.match(source, /nativeCronTaskDetails\(task, t\)/);
   }
+  const { nativeCronTaskDetails } = loader.loadModule("src/presentation/nativeCronTaskDetails.ts");
+  const details = nativeCronTaskDetails({ id: "task-one", type: "bash", cron: "0 * * * *", workdir: "/actual/workspace", script: "echo ok" }, key => key);
+  assert.equal(details.flatMap(node => node.children ?? []).find(node => node.id === "cron-detail:workdir").text, "/actual/workspace");
 });
 
 test("CronTaskManager create pins the agent's current workspace by default", () => {
@@ -219,6 +220,6 @@ test("CronTaskManager create pins the agent's current workspace by default", () 
   // The registry wires the runtime workdir into the tool bundle.
   assert.match(
     builtinRegistrySource,
-    /createCronTools\(\{\s*currentChatModel: params\.currentChatModel,\s*workdir: params\.workdir,\s*\}\)/,
+    /createCronTools\(\{\s*commandPort: params\.commandPort,\s*currentChatModel: params\.currentChatModel,\s*workdir: params\.workdir,\s*\}\)/,
   );
 });

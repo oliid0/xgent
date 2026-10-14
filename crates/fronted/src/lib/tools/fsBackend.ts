@@ -75,9 +75,13 @@ function toFsBackendError(error: unknown): FsBackendError {
   return new FsBackendError({ code: "other", message });
 }
 
-export async function invokeFs<T>(command: string, args: Record<string, unknown>): Promise<T> {
+export async function invokeFs<T>(
+  command: string,
+  args: Record<string, unknown>,
+  invoker = invoke,
+): Promise<T> {
   try {
-    return await invoke<T>(command, args);
+    return await invoker<T>(command, args);
   } catch (error) {
     throw toFsBackendError(error);
   }

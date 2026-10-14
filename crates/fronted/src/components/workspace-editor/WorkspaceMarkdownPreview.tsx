@@ -15,6 +15,7 @@ import {
 import type { Components, ExtraProps } from "streamdown";
 import { useLocale } from "../../i18n";
 import { invokeFs } from "../../lib/tools/fsBackend";
+import type { PreviewCommandPort } from "../../lib/tools/previewExecution";
 import { ExternalLinkModal, Markdown } from "../Markdown";
 import {
   classifyWorkspaceMarkdownTarget,
@@ -22,6 +23,7 @@ import {
 } from "./workspaceMarkdownAssets";
 
 type WorkspaceMarkdownPreviewContextValue = {
+  commandPort?: PreviewCommandPort;
   workdir: string;
   markdownPath: string;
   onOpenWorkspacePath?: (path: string) => void;
@@ -50,14 +52,22 @@ type WorkspaceImageState =
   | { status: "loaded"; url: string }
   | { status: "error" };
 
-function useWorkspaceImageObjectUrl(workdir: string, path: string): WorkspaceImageState {
+function useWorkspaceImageObjectUrl(
+  workdir: string,
+  path: string,
+  commandPort?: PreviewCommandPort,
+): WorkspaceImageState {
   const [state, setState] = useState<WorkspaceImageState>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
     let objectUrl: string | null = null;
     setState({ status: "loading" });
-    invokeFs<WorkspacePreviewFileResponse>("fs_read_workspace_image", { workdir, path })
+    invokeFs<WorkspacePreviewFileResponse>(
+      "fs_read_workspace_image",
+      { workdir, path },
+      commandPort?.invoke,
+    )
       .then((response) => {
         if (cancelled) return;
         const bytes = base64ToBytes(response.data);
@@ -72,7 +82,7 @@ function useWorkspaceImageObjectUrl(workdir: string, path: string): WorkspaceIma
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [workdir, path]);
+  }, [workdir, path, commandPort]);
 
   return state;
 }
@@ -115,13 +125,14 @@ function PreviewImage(props: { url: string; alt?: string; title?: string }) {
 }
 
 function WorkspacePreviewImage(props: {
+  commandPort?: PreviewCommandPort;
   workdir: string;
   path: string;
   alt?: string;
   title?: string;
 }) {
   const { workdir, path, alt, title } = props;
-  const state = useWorkspaceImageObjectUrl(workdir, path);
+  const state = useWorkspaceImageObjectUrl(workdir, path, props.commandPort);
   if (state.status === "loading") {
     return (
       <AstryxStack
@@ -160,6 +171,7 @@ function WorkspaceMarkdownPreviewImage(props: MarkdownPreviewImageProps) {
   if (target.kind === "workspace" && context?.workdir) {
     return (
       <WorkspacePreviewImage
+        commandPort={context.commandPort}
         workdir={context.workdir}
         path={target.path}
         alt={altText}
@@ -284,6 +296,7 @@ const workspaceMarkdownPreviewComponents: Components = {
 };
 
 type WorkspaceMarkdownPreviewProps = {
+  commandPort?: PreviewCommandPort;
   workdir: string;
   markdownPath: string;
   content: string;
@@ -294,10 +307,10 @@ type WorkspaceMarkdownPreviewProps = {
 export const WorkspaceMarkdownPreview = memo(function WorkspaceMarkdownPreview(
   props: WorkspaceMarkdownPreviewProps,
 ) {
-  const { workdir, markdownPath, content, className, onOpenWorkspacePath } = props;
+  const { workdir, markdownPath, content, className, onOpenWorkspacePath, commandPort } = props;
   const contextValue = useMemo(
-    () => ({ workdir, markdownPath, onOpenWorkspacePath }),
-    [markdownPath, onOpenWorkspacePath, workdir],
+    () => ({ workdir, markdownPath, onOpenWorkspacePath, commandPort }),
+    [markdownPath, onOpenWorkspacePath, workdir, commandPort],
   );
   return (
     <AstryxStack direction="vertical" data-workspace-markdown-preview="">

@@ -14,23 +14,24 @@ struct XgentCronRunRow: View {
         VStack(alignment: .leading, spacing: 12) {
             if let summary {
                 Button { model.send(summary, in: document) } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Image(systemName: node.status == "running" ? "clock" : node.status == "completed" ? "checkmark.circle" : "exclamationmark.circle")
-                            .foregroundStyle(node.status == "error" ? Color.red : Color.secondary)
-                            .accessibilityHidden(true)
+                    HStack(alignment: .center, spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(summary.label ?? "").fixedSize(horizontal: false, vertical: true)
                             Text(summary.text ?? "").foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 0)
+                        Text(summary.value?.text ?? "")
+                            .foregroundStyle(node.status == "error" ? Color(xgentHex: theme.palette(for: scheme).error ?? "#E3193B") : Color.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                         Image(systemName: summary.selected == true ? "chevron.down" : "chevron.right").accessibilityHidden(true)
                     }
-                    .frame(minHeight: 44, alignment: .leading).contentShape(Rectangle())
+                    .frame(minHeight: 70, alignment: .leading).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(summary.disabled == true || model.isBusy(summary, in: document))
                 .accessibilityIdentifier(summary.id)
+                .accessibilityAddTraits(summary.selected == true ? .isSelected : [])
             }
             ForEach(details) { detail in
                 #if os(iOS)
@@ -41,10 +42,29 @@ struct XgentCronRunRow: View {
             }
         }
         .modifier(XgentControlTypography(node: node))
-        .padding(CGFloat(theme.spacing.md))
+        .padding(.horizontal, CGFloat(theme.spacing.lg))
+        .padding(.bottom, details.isEmpty ? 0 : CGFloat(theme.spacing.md))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(xgentHex: theme.palette(for: scheme).surface),
-                    in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.element)))
+        .accessibilityElement(children: .contain)
+    }
+}
+
+struct XgentCronRunList: View {
+    let node: XgentNode
+    let document: XgentDocument
+    @ObservedObject var model: XgentPresentationModel
+    @Environment(\.xgentPresentationTheme) private var theme
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array((node.children ?? []).enumerated()), id: \.element.id) { index, item in
+                if index > 0 { Divider().padding(.horizontal, CGFloat(theme.spacing.lg)) }
+                XgentCronRunRow(node: item, document: document, model: model)
+            }
+        }
+        .background(Color(xgentHex: theme.palette(for: scheme).muted),
+                    in: RoundedRectangle(cornerRadius: CGFloat(theme.radius.container)))
         .accessibilityElement(children: .contain)
     }
 }

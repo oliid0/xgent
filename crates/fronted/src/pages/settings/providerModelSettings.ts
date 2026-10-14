@@ -12,6 +12,8 @@ export type ModelEditDraft = {
   costOutput: string;
   costCacheRead: string;
   costCacheWrite: string;
+  delegationSkills: string;
+  delegationMaxConcurrency: string;
 };
 
 // These are the provider dialog's existing parsing rules, shared by both renderers.
@@ -42,7 +44,28 @@ export function createModelEditDraft(model: ProviderModelConfig): ModelEditDraft
     costOutput: formatCostRate(model.cost?.output),
     costCacheRead: formatCostRate(model.cost?.cacheRead),
     costCacheWrite: formatCostRate(model.cost?.cacheWrite),
+    delegationSkills: (model.delegationSkills ?? []).join(", "),
+    delegationMaxConcurrency: String(model.delegationMaxConcurrency ?? 2),
   };
+}
+
+export function parseDelegationSkills(input: string): string[] | null {
+  const tags = [
+    ...new Set(
+      input
+        .trim()
+        .toLowerCase()
+        .split(/[,，\s]+/)
+        .filter(Boolean),
+    ),
+  ];
+  return tags.length <= 16 && tags.every((tag) => /^[a-z][a-z0-9_-]{0,47}$/.test(tag))
+    ? tags
+    : null;
+}
+
+export function parseDelegationConcurrency(input: string): number | null {
+  return /^[1-8]$/.test(input.trim()) ? Number(input.trim()) : null;
 }
 
 export function editedProviderModel(draft: ModelEditDraft | null): ProviderModelConfig | null {
@@ -53,17 +76,26 @@ export function editedProviderModel(draft: ModelEditDraft | null): ProviderModel
     output = parseCostRate(draft.costOutput);
   const cacheRead = parseCostRate(draft.costCacheRead),
     cacheWrite = parseCostRate(draft.costCacheWrite);
+  const skills = parseDelegationSkills(draft.delegationSkills);
+  const concurrency = parseDelegationConcurrency(draft.delegationMaxConcurrency);
   if (
     contextWindow === null ||
     maxOutputToken === null ||
     input === null ||
     output === null ||
     cacheRead === null ||
-    cacheWrite === null
+    cacheWrite === null ||
+    skills === null ||
+    concurrency === null
   )
     return null;
   return {
     ...draft.model,
+    delegationSkills: skills.length ? skills : undefined,
+    delegationMaxConcurrency:
+      concurrency === 2 && draft.model.delegationMaxConcurrency === undefined
+        ? undefined
+        : concurrency,
     contextWindow,
     maxOutputToken,
     limitsSource:
@@ -93,6 +125,15 @@ export function mergeModelEdit(
     cost: edited.cost,
     promptCacheHintMode: edited.promptCacheHintMode,
     inputModalities: edited.inputModalities,
+    delegationSkills:
+      JSON.stringify(edited.delegationSkills ?? []) ===
+      JSON.stringify(original.delegationSkills ?? [])
+        ? current.delegationSkills
+        : edited.delegationSkills,
+    delegationMaxConcurrency:
+      edited.delegationMaxConcurrency === original.delegationMaxConcurrency
+        ? current.delegationMaxConcurrency
+        : edited.delegationMaxConcurrency,
   };
 }
 

@@ -19,8 +19,10 @@ struct XgentSettingsValueRow<Content: View>: View {
     let showsDescription: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.xgentPresentationTheme) private var theme
+    @Environment(\.colorScheme) private var scheme
     @ScaledMetric(relativeTo: .subheadline) private var detailScale = 1.0
     @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 22
+    private var isConnector: Bool { node.variant?.hasPrefix("device-connector") == true }
 
     init(node: XgentNode, showsDescription: Bool = true, @ViewBuilder content: () -> Content) {
         self.node = node
@@ -29,11 +31,19 @@ struct XgentSettingsValueRow<Content: View>: View {
     }
 
     private var label: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: isConnector ? .center : .firstTextBaseline, spacing: 10) {
             if let icon = node.icon {
                 Image(systemName: icon)
                     .font(.system(size: iconSize, weight: .regular))
-                    .frame(width: max(24, iconSize))
+                    .foregroundStyle(isConnector ? connectorColor : Color.primary)
+                    .frame(width: isConnector ? max(40, iconSize) : max(24, iconSize),
+                           height: isConnector ? max(40, iconSize) : nil)
+                    .background {
+                        if isConnector {
+                            RoundedRectangle(cornerRadius: 11)
+                                .fill(Color(xgentHex: theme.palette(for: scheme).muted))
+                        }
+                    }
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 4) {
@@ -47,6 +57,14 @@ struct XgentSettingsValueRow<Content: View>: View {
                         .accessibilityHidden(true)
                 }
             }
+        }
+    }
+
+    private var connectorColor: Color {
+        switch node.icon {
+        case "heart.fill": return Color(xgentHex: scheme == .dark ? "#ff375f" : "#ff2d55")
+        case "house.fill": return Color(xgentHex: scheme == .dark ? "#ff9f0a" : "#ff9500")
+        default: return .accentColor
         }
     }
 
@@ -79,7 +97,7 @@ struct XgentSettingsValueRow<Content: View>: View {
             }
             #endif
         }
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: isConnector ? 60 : 44, alignment: .leading)
         .accessibilityElement(children: .contain)
     }
 }

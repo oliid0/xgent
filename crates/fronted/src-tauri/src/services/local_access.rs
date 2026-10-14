@@ -1,11 +1,12 @@
 use std::collections::{HashMap, VecDeque};
 use std::convert::Infallible;
+use std::future::IntoFuture;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use axum::body::{to_bytes, Body};
-use axum::extract::{ConnectInfo, DefaultBodyLimit, OriginalUri, Path, State};
+use axum::extract::{ConnectInfo, DefaultBodyLimit, OriginalUri, Path, Query, State};
 use axum::http::header::{
     CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE, COOKIE, HOST, ORIGIN, REFERER, SET_COOKIE,
 };
@@ -18,12 +19,30 @@ use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tokio::sync::{broadcast, oneshot};
 use uuid::Uuid;
 
 use crate::commands::settings::{load_access_settings, open_db, AccessSettingsPayload};
 use crate::services::proxy::ProxyServerInfo;
+mod result_delivery;
+
+/// Both listener implementations preserve the actual network peer. In
+/// particular, pairing limits must not collapse all overlay peers to loopback.
+#[derive(Clone, Copy)]
+pub(crate) struct LocalAccessPeerAddr(pub SocketAddr);
+
+impl axum::extract::connect_info::Connected<axum::serve::IncomingStream<'_, tokio::net::TcpListener>> for LocalAccessPeerAddr {
+    fn connect_info(stream: axum::serve::IncomingStream<'_, tokio::net::TcpListener>) -> Self {
+        Self(*stream.remote_addr())
+    }
+}
+
+impl axum::extract::connect_info::Connected<axum::serve::IncomingStream<'_, tailscale::axum::Listener>> for LocalAccessPeerAddr {
+    fn connect_info(stream: axum::serve::IncomingStream<'_, tailscale::axum::Listener>) -> Self {
+        Self(*stream.remote_addr())
+    }
+}
 
 const DEFAULT_PORT: u16 = 28_367;
 const PAIRING_CODE_TTL: Duration = Duration::from_secs(10 * 60);
@@ -50,6 +69,8 @@ pub struct LocalAccessStatus {
     pub bind_address: String,
     pub port: u16,
     pub urls: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tailscale: Option<super::tailscale_status::TailscaleStatus>,
     pub paired_devices: usize,
     pub devices: Vec<LocalAccessDevice>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -91,6 +112,7 @@ pub struct LocalAccessController {
     pair_attempts: Mutex<PairAttemptWindow>,
     pending_rpc: Mutex<HashMap<String, oneshot::Sender<Result<Value, String>>>>,
     subscriptions: Mutex<HashMap<String, LocalEventSubscription>>,
+    event_streams: Mutex<HashMap<String, String>>,
     latest_conversation_selection: Mutex<Option<Value>>,
     event_tx: broadcast::Sender<LocalBrowserEvent>,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
@@ -144,8 +166,17 @@ struct LocalRpcRequestEvent {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct SubscribeRequest {
     event: String,
+    #[serde(default)]
+    stream_id: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EventStreamQuery {
+    stream_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -158,6 +189,33 @@ struct SubscribeResponse {
 struct LocalEventSubscription {
     device_id: String,
     event: String,
+    stream_id: Option<String>,
+}
+
+// Native clients give each stream an identity. Dropping its HTTP response
+// removes only its listeners; browser EventSource subscriptions keep their
+// existing lifecycle and other streams of this same device stay connected.
+struct EventStreamGuard {
+    controller: Arc<LocalAccessController>,
+    stream_id: String,
+}
+
+impl Drop for EventStreamGuard {
+    fn drop(&mut self) {
+        if let Ok(mut streams) = self.controller.event_streams.lock() {
+            streams.remove(&self.stream_id);
+            let removed = if let Ok(mut subscriptions) = self.controller.subscriptions.lock() {
+                let ids: Vec<_> = subscriptions.iter().filter_map(|(id, subscription)|
+                    (subscription.stream_id.as_deref() == Some(&self.stream_id)).then(|| id.clone())).collect();
+                for id in &ids { subscriptions.remove(id); }
+                ids
+            } else { Vec::new() };
+            for subscription_id in removed {
+                let _ = self.controller.app_handle.emit(LOCAL_ACCESS_UNSUBSCRIBE_EVENT,
+                    LocalEventUnsubscribeRequest { subscription_id });
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -210,6 +268,7 @@ impl LocalAccessController {
                 bind_address: String::new(),
                 port: DEFAULT_PORT,
                 urls: Vec::new(),
+                tailscale: None,
                 paired_devices: 0,
                 devices: Vec::new(),
                 pairing_code: None,
@@ -220,6 +279,7 @@ impl LocalAccessController {
             pair_attempts: Mutex::new(PairAttemptWindow::default()),
             pending_rpc: Mutex::new(HashMap::new()),
             subscriptions: Mutex::new(HashMap::new()),
+            event_streams: Mutex::new(HashMap::new()),
             latest_conversation_selection: Mutex::new(None),
             event_tx,
             shutdown: Mutex::new(None),
@@ -310,12 +370,56 @@ impl LocalAccessController {
             .map_err(|_| "local access status lock poisoned".to_string())?
             .clone();
         status.enabled = enabled;
+        let config = self.config.lock().map_err(|_| "local access config lock poisoned".to_string())?.clone();
+        if status.running {
+            status.urls = local_access_urls(&config, status.port);
+            if config.web_ui_scope == "lan" {
+                if let Some(observed) = status.tailscale.as_ref() {
+                    if observed.engine.as_deref() == Some("embedded-rust") {
+                        for ip in observed.addresses.iter().filter_map(|raw|raw.parse::<IpAddr>().ok()) {
+                            let host = SocketAddr::new(ip,status.port).to_string();
+                            if is_allowed_tailscale_host(&host,status.port,observed,now_ms()) {
+                                let index = status.urls.len().saturating_sub(1);
+                                status.urls.insert(index,format!("http://{host}"));
+                            }
+                        }
+                    }
+                    if let Some(name) = observed.dns_name.as_deref() {
+                        let host = format!("{name}:{}", status.port);
+                        if is_allowed_tailscale_host(&host, status.port, observed, now_ms()) {
+                            // Keep the existing first LAN endpoint and loopback-last convention.
+                            let index = status.urls.len().saturating_sub(1);
+                            status.urls.insert(index, format!("http://{host}"));
+                        }
+                    }
+                }
+            }
+        }
         status.devices = list_paired_devices()?;
         status.paired_devices = status.devices.len();
         let pairing = self.current_pairing_code()?;
         status.pairing_code = pairing.as_ref().map(|value| value.plaintext.clone());
         status.pairing_code_expires_at = pairing.map(|value| value.expires_at_ms);
         Ok(status)
+    }
+
+    pub async fn refresh_tailscale_status(&self) -> Result<(), String> {
+        let observed = super::tailscale_status::observe().await;
+        self.status.lock().map_err(|_| "local access status lock poisoned".to_string())?.tailscale = Some(observed);
+        Ok(())
+    }
+
+    async fn monitor_tailscale(&self) -> Result<(), String> {
+        let mut interval = tokio::time::interval(Duration::from_secs(3));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            interval.tick().await;
+            let lan = self.config.lock().map_err(|_| "local access config lock poisoned".to_string())?.web_ui_scope == "lan";
+            if lan {
+                self.refresh_tailscale_status().await?;
+                self.publish_status();
+            }
+        }
     }
 
     pub fn rotate_pairing_code(&self) -> Result<LocalAccessStatus, String> {
@@ -462,6 +566,15 @@ impl LocalAccessController {
             .local_addr()
             .map_err(|error| format!("read local Web UI address failed: {error}"))?;
         self.update_server_status(true, address.ip().to_string(), actual.port(), None)?;
+        #[cfg(desktop)]
+        let _advertisement=if address.ip().is_unspecified() {
+            let identity=self.app_handle.try_state::<Arc<crate::services::automation::AutomationStore>>()
+                .and_then(|store|store.background_worker_identity().ok());
+            match identity.and_then(|id|crate::services::worker_discovery::Advertisement::start(&id,actual.port(),lan_ipv4_addresses()).ok()) {
+                Some(advertisement)=>Some(advertisement),
+                None=>{eprintln!("LAN workstation advertisement unavailable; paired task routes remain available");None},
+            }
+        } else {None};
 
         let router = Router::new()
             .route("/api/local-access/status", get(public_status))
@@ -471,6 +584,7 @@ impl LocalAccessController {
             )
             .route("/api/local-access/session", post(refresh_session))
             .route("/api/local-access/rpc", post(local_rpc))
+            .route("/api/local-access/task-result/{request_id}", get(result_delivery::read_result))
             .route(
                 "/api/local-access/proxy/{provider}",
                 axum::routing::any(local_provider_proxy),
@@ -494,15 +608,30 @@ impl LocalAccessController {
             .layer(DefaultBodyLimit::max(MAX_RPC_BODY_BYTES))
             .with_state(Arc::clone(self));
 
-        axum::serve(
+        let server = axum::serve(
             listener,
-            router.into_make_service_with_connect_info::<SocketAddr>(),
+            router.clone().into_make_service_with_connect_info::<LocalAccessPeerAddr>(),
         )
         .with_graceful_shutdown(async move {
             let _ = shutdown.await;
         })
-        .await
-        .map_err(|error| format!("local Web UI server failed: {error}"))?;
+        .into_future();
+        // Both transports share the original pairing/session/CSRF/result router.
+        // The overlay is exposed only under the existing explicit LAN scope.
+        let overlay = async {
+            if address.ip().is_unspecified() {
+                if let Some(identity) = self.app_handle.try_state::<Arc<crate::services::automation::AutomationStore>>()
+                    .and_then(|store| store.background_worker_identity().ok()) {
+                    super::embedded_tailnet::serve_worker(actual.port(), identity, router).await;
+                }
+            }
+            std::future::pending::<()>().await;
+        };
+        tokio::select! {
+            result = server => result.map_err(|error| format!("local Web UI server failed: {error}"))?,
+            result = self.monitor_tailscale() => result?,
+            _ = overlay => {},
+        }
         self.update_server_status(false, address.ip().to_string(), actual.port(), None)?;
         Ok(())
     }
@@ -524,6 +653,7 @@ impl LocalAccessController {
             .lock()
             .map_err(|_| "local access status lock poisoned".to_string())?;
         status.running = running;
+        if !running { status.tailscale = None; }
         status.bind_address = bind_address;
         status.port = port;
         status.urls = if running {
@@ -548,7 +678,11 @@ impl LocalAccessController {
             .get(HOST)
             .and_then(|value| value.to_str().ok())
             .ok_or_else(|| "missing Host header".to_string())?;
-        if !is_allowed_host(host, self.status()?.port) {
+        let status = self.status()?;
+        let allowed_alias = status.running && status.bind_address == "0.0.0.0"
+            && status.tailscale.as_ref().is_some_and(|observed|
+                is_allowed_tailscale_host(host, status.port, observed, now_ms()));
+        if !is_allowed_host(host, status.port) && !allowed_alias {
             return Err("Host is not a local Xgent address".to_string());
         }
         let expected_origin = format!("http://{host}");
@@ -755,6 +889,80 @@ impl LocalAccessController {
             .map_err(|_| "local access config lock poisoned".to_string())?
             .clone();
         authorize_local_command(command, &config)?;
+        if command.starts_with("automation_background_") {
+            let args = payload.args;
+            let app = self.app_handle.clone();
+            let command = command.to_string();
+            return tauri::async_runtime::spawn_blocking(move || {
+                let store = app.state::<Arc<crate::services::automation::AutomationStore>>();
+                let required_id = || args.get("request_id").and_then(Value::as_str)
+                    .ok_or_else(|| "request_id is required".to_string());
+                match command.as_str() {
+                    "automation_background_host_info" => serde_json::to_value(crate::commands::cron::background_host_info(&app)?).map_err(|e| e.to_string()),
+                    "automation_background_submit" => {
+                        let input = serde_json::from_value(args.get("input").cloned()
+                            .ok_or_else(|| "input is required".to_string())?).map_err(|e| e.to_string())?;
+                        let channel: Option<crate::services::automation::BackgroundDeviceChannelProof> = args.get("device_channel").cloned().map(serde_json::from_value).transpose().map_err(|_| "Invalid native device channel frame".to_string())?;
+                        serde_json::to_value(crate::commands::cron::submit_background_with_channel_on_host(&app, input, channel.as_ref())?).map_err(|e| e.to_string())
+                    }
+                    "automation_background_device_branches" => {
+                        let channel: crate::services::automation::BackgroundDeviceChannelProof = serde_json::from_value(args.get("device_channel").cloned().ok_or_else(|| "Native device channel required".to_string())?).map_err(|_| "Invalid native device channel frame".to_string())?;
+                        store.background_device_branches(required_id()?, &channel)
+                    }
+                    "automation_background_device_planning_exchange" => {
+                        let channel=serde_json::from_value(args.get("device_channel").cloned().ok_or("Native device channel required")?).map_err(|_|"Invalid native device channel")?;
+                        let branch=args.get("branch_id").and_then(Value::as_str).ok_or("Original device branch required")?;
+                        let scope=args.get("scope").cloned().ok_or("Native read scope required")?;
+                        let response=args.get("response").filter(|value|!value.is_null()).cloned();
+                        store.exchange_device_planning(required_id()?,branch,&channel,scope,response,|conn,input|crate::commands::cron::background_configuration_on_connection(&app,conn,input))
+                    }
+                    "automation_background_device_plan" | "automation_background_device_complete" => {
+                        let channel: crate::services::automation::BackgroundDeviceChannelProof = serde_json::from_value(args.get("device_channel").cloned().ok_or_else(|| "Native device channel required".to_string())?).map_err(|_| "Invalid native device channel frame".to_string())?;
+                        if command == "automation_background_device_plan" {
+                            let plan = serde_json::from_value(args.get("plan").cloned().ok_or_else(|| "Device action plan required".to_string())?).map_err(|_| "Invalid device action plan".to_string())?;
+                            store.register_device_branch_plan(plan, &channel)
+                        } else {
+                            let receipt = serde_json::from_value(args.get("receipt").cloned().ok_or_else(|| "Native device receipts required".to_string())?).map_err(|_| "Invalid device receipts".to_string())?;
+                            store.accept_device_branch_receipt(receipt, &channel, |conn, input| crate::commands::cron::background_configuration_on_connection(&app, conn, input))
+                        }
+                    }
+                    "automation_background_get" => serde_json::to_value(store.background_task(required_id()?)?).map_err(|e| e.to_string()),
+                    "automation_background_children" => {
+                        let offset = args.get("offset").map(|value|value.as_u64().and_then(|offset|usize::try_from(offset).ok()).ok_or("Invalid child chunk offset")).transpose()?.unwrap_or(0);
+                        let call = args.get("call_id").filter(|value|!value.is_null()).map(|value|value.as_str().ok_or("Invalid child call ID")).transpose()?;
+                        let hash = args.get("snapshot_hash").filter(|value|!value.is_null()).map(|value|value.as_str().ok_or("Invalid child snapshot hash")).transpose()?;
+                        store.read_background_children(required_id()?,call,offset,hash)
+                    },
+                    "automation_background_list" => serde_json::to_value(store.list_background_tasks(args.get("limit").and_then(Value::as_u64).unwrap_or(50).min(100) as usize)?).map_err(|e| e.to_string()),
+                    "automation_background_cancel" => serde_json::to_value(store.cancel_background_task(required_id()?)?).map_err(|e| e.to_string()),
+                    "automation_background_resume" => {
+                        let input: crate::services::automation::ResumeBackgroundTaskInput = serde_json::from_value(args.get("input").cloned().ok_or_else(|| "input is required".to_string())?).map_err(|e| e.to_string())?;
+                        if input.request_id != required_id()? { return Err("Resume request does not match its bound owner".into()); }
+                        serde_json::to_value(crate::commands::cron::resume_background_on_host(&app, input)?).map_err(|e| e.to_string())
+                    }
+                    "automation_background_resume_receipt" => {
+                        let input: crate::services::automation::ResumeBackgroundTaskInput = serde_json::from_value(args.get("input").cloned().ok_or("input is required")?).map_err(|e|e.to_string())?;
+                        if input.request_id != required_id()? { return Err("Resume receipt does not match its bound owner".into()); }
+                        serde_json::to_value(store.background_resume_receipt(&input)?).map_err(|e|e.to_string())
+                    }
+                    "automation_background_operations" => serde_json::to_value(store.list_background_operations(
+                        required_id()?, args.get("cursor").and_then(Value::as_i64).unwrap_or(0),
+                        args.get("limit").and_then(Value::as_u64).unwrap_or(10).min(10) as usize,
+                    )?).map_err(|e| e.to_string()),
+                    "automation_background_read_artifact" => {
+                        let artifact_id = args.get("artifact_id").and_then(Value::as_str).ok_or_else(|| "artifact_id is required".to_string())?;
+                        serde_json::to_value(store.read_background_artifact(required_id()?, artifact_id)?).map_err(|e| e.to_string())
+                    }
+                    "automation_background_read_artifact_chunk" => {
+                        let artifact=args["artifact_id"].as_str().ok_or("Missing artifact identity")?;
+                        let offset=args["offset"].as_u64().ok_or("Missing artifact cursor")?;
+                        let length=usize::try_from(args["length"].as_u64().ok_or("Missing artifact chunk bound")?).map_err(|e|e.to_string())?;
+                        serde_json::to_value(store.read_background_artifact_chunk(required_id()?,artifact,offset,length)?).map_err(|e|e.to_string())
+                    }
+                    _ => Err("Background executor commands are not available to paired clients".to_string()),
+                }
+            }).await.map_err(|e| e.to_string())?;
+        }
         if command == "settings_load_all" {
             return tauri::async_runtime::spawn_blocking(|| {
                 let conn = open_db()?;
@@ -1050,6 +1258,7 @@ fn replace_secret_sentinel(
 
 async fn event_stream(
     State(controller): State<Arc<LocalAccessController>>,
+    Query(query): Query<EventStreamQuery>,
     headers: HeaderMap,
 ) -> Response {
     if let Err(error) = controller.validate_request_origin(&headers) {
@@ -1060,8 +1269,21 @@ async fn event_stream(
         Err(error) => return error_response(StatusCode::UNAUTHORIZED, error),
     };
     let device_id = session.device_id;
+    let guard = if let Some(stream_id) = query.stream_id {
+        let Ok(stream_id) = Uuid::parse_str(&stream_id).map(|id| id.to_string()) else {
+            return error_response(StatusCode::BAD_REQUEST, "invalid event stream identity".into());
+        };
+        let Ok(mut streams) = controller.event_streams.lock() else {
+            return error_response(StatusCode::INTERNAL_SERVER_ERROR, "event stream lock poisoned".into());
+        };
+        if streams.contains_key(&stream_id) {
+            return error_response(StatusCode::CONFLICT, "event stream identity is already connected".into());
+        }
+        streams.insert(stream_id.clone(), device_id.clone());
+        Some(EventStreamGuard { controller: Arc::clone(&controller), stream_id })
+    } else { None };
     let receiver = controller.event_tx.subscribe();
-    let stream = futures_util::stream::unfold(receiver, move |mut receiver| {
+    let stream = futures_util::stream::unfold((receiver, guard), move |(mut receiver, guard)| {
         let device_id = device_id.clone();
         async move {
             loop {
@@ -1071,7 +1293,7 @@ async fn event_stream(
                             Ok(data) => data,
                             Err(_) => continue,
                         };
-                        return Some((Ok::<Event, Infallible>(Event::default().data(data)), receiver));
+                        return Some((Ok::<Event, Infallible>(Event::default().data(data)), (receiver, guard)));
                     }
                     Ok(_) | Err(broadcast::error::RecvError::Lagged(_)) => continue,
                     Err(broadcast::error::RecvError::Closed) => return None,
@@ -1118,10 +1340,27 @@ async fn subscribe_event(
     if let Err(error) = authorize_local_event(event, &config) {
         return error_response(StatusCode::FORBIDDEN, error);
     }
+    let stream_id = match payload.stream_id {
+        Some(id) => match Uuid::parse_str(&id) {
+            Ok(id) => Some(id.to_string()),
+            Err(_) => return error_response(StatusCode::BAD_REQUEST, "invalid event stream identity".into()),
+        },
+        None => None,
+    };
+    // Serialize acceptance against stream teardown: a POST arriving after its
+    // stream closed cannot leave a remote listener with no receiver.
+    let streams = match controller.event_streams.lock() {
+        Ok(streams) => streams,
+        Err(_) => return error_response(StatusCode::INTERNAL_SERVER_ERROR, "event stream lock poisoned".into()),
+    };
+    if stream_id.as_ref().is_some_and(|id| streams.get(id) != Some(&session.device_id)) {
+        return error_response(StatusCode::CONFLICT, "original event stream is no longer connected".into());
+    }
     let subscription_id = Uuid::new_v4().to_string();
     let subscription = LocalEventSubscription {
         device_id: session.device_id,
         event: event.to_string(),
+        stream_id,
     };
     if let Ok(mut subscriptions) = controller.subscriptions.lock() {
         subscriptions.insert(subscription_id.clone(), subscription);
@@ -1197,6 +1436,9 @@ async fn public_status(
     Json(json!({
         "service": "xgent-local-access",
         "protocolVersion": 1,
+        "hostId": controller.app_handle.try_state::<Arc<crate::services::automation::AutomationStore>>()
+            .and_then(|store| store.background_worker_identity().ok()),
+        "platform": std::env::consts::OS,
         "running": status.running,
         "pairingRequired": true
     }))
@@ -1205,7 +1447,7 @@ async fn public_status(
 
 async fn pair_device(
     State(controller): State<Arc<LocalAccessController>>,
-    ConnectInfo(remote): ConnectInfo<SocketAddr>,
+    ConnectInfo(LocalAccessPeerAddr(remote)): ConnectInfo<LocalAccessPeerAddr>,
     headers: HeaderMap,
     Json(payload): Json<PairDeviceRequest>,
 ) -> Response {
@@ -1273,8 +1515,12 @@ async fn local_rpc(
     if let Err(error) = controller.validate_request_origin(&headers) {
         return error_response(StatusCode::FORBIDDEN, error);
     }
-    if let Err(error) = controller.authenticate(&headers, true) {
-        return error_response(StatusCode::UNAUTHORIZED, error);
+    let session=match controller.authenticate(&headers,true) {
+        Ok(session)=>session,
+        Err(error)=>return error_response(StatusCode::UNAUTHORIZED,error),
+    };
+    if payload.command=="automation_background_result_grant" {
+        return result_delivery::issue_grant(&controller,&session,payload.args).await;
     }
     match controller.dispatch_rpc(payload).await {
         Ok(result) => Json(json!({ "ok": true, "result": result })).into_response(),
@@ -1286,8 +1532,16 @@ fn authorize_local_command(
     command: &str,
     config: &AccessSettingsPayload,
 ) -> Result<(), String> {
+    if command.starts_with("tailscale_") {
+        return Err("Tailscale identity and transport controls belong to this native device's settings".into());
+    }
+    if matches!(command, "app_agent_startup_status" | "app_agent_startup_set") {
+        return Err("OS login registration belongs to the local computer's settings".into());
+    }
     const FILE_WRITE_COMMANDS: &[&str] = &[
         "fs_write_text",
+        "fs_write_binary",
+        "fs_create_binary",
         "fs_create_office_document",
         "fs_edit_text",
         "fs_delete",
@@ -1311,11 +1565,28 @@ fn authorize_local_command(
             .any(|value| value == capability)
     };
 
+    if matches!(command, "automation_claim_prompt_runs" | "automation_release_prompt_run" | "automation_complete_prompt_run") {
+        return Err("Prompt execution leases belong to the local execution host".to_string());
+    }
+    if command.starts_with("worker_peer_") || command.starts_with("lan_pc_") {
+        return Err("Worker peer credentials and routing belong to this native client; pair each destination directly".to_string());
+    }
+    if command.starts_with("automation_result_") {
+        return Err("The result inbox and its peer sessions belong to this native device".into());
+    }
+    if command == "automation_foreground_attention" {
+        return Err("Foreground attention belongs to this device's native main client".into());
+    }
+    // Background execution can invoke all project tools internally. Never use it
+    // to bypass a paired client's narrower direct-RPC capability restrictions.
+    if matches!(command, "automation_background_submit" | "automation_background_resume") && !config.blocked_local_capabilities.is_empty() {
+        return Err("Background delegation requires project execution capabilities on this paired host".to_string());
+    }
     if command.starts_with("cloud_task_") {
         if !config.cloud_execution_enabled {
             return Err("cloud execution is disabled for paired devices".to_string());
         }
-        if command == "cloud_task_download_artifact" && blocked("file_write") {
+        if matches!(command, "cloud_task_download_artifact" | "cloud_task_extract_artifact") && blocked("file_write") {
             return Err("file writes are disabled for paired devices".to_string());
         }
         return Ok(());
@@ -1333,6 +1604,9 @@ fn authorize_local_command(
         || matches!(
             command,
             "automation_cron_apply"
+                | "automation_proactive_apply"
+                | "automation_goal_apply"
+                | "automation_goal_launch"
                 | "automation_hooks_apply"
                 | "automation_clear_runs"
                 | "automation_run_cron_now"
@@ -1600,6 +1874,19 @@ fn is_allowed_host(host: &str, expected_port: u16) -> bool {
     is_allowed_host_for_addresses(host, expected_port, &lan_ipv4_addresses())
 }
 
+fn is_allowed_tailscale_host(host: &str, expected_port: u16,
+    observed: &super::tailscale_status::TailscaleStatus, now: i64) -> bool {
+    let (hostname, port) = split_host_port(host, expected_port);
+    let age = now.checked_sub(observed.observed_at).unwrap_or(-1);
+    if observed.engine.as_deref() != Some("embedded-rust") || port != expected_port
+        || observed.state != "running" || !(0..=60_000).contains(&age) { return false; }
+    // Only this live SDK node assigns overlay identity. A separately installed
+    // system client or a local NIC cannot authorize another app-owned node.
+    hostname.parse::<IpAddr>().ok().is_some_and(|ip| observed.addresses.iter().any(|raw|
+        raw.parse::<IpAddr>().ok()==Some(ip))) || super::tailscale_status::normalize_magic_dns_name(&hostname)
+        .is_some_and(|name| observed.dns_name.as_deref()==Some(name.as_str()))
+}
+
 fn is_allowed_host_for_addresses(
     host: &str,
     expected_port: u16,
@@ -1694,6 +1981,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn embedded_addresses_are_scoped_to_the_live_sdk_node_without_an_os_tun() {
+        let mut observed=super::super::tailscale_status::TailscaleStatus {
+            engine:Some("embedded-rust".into()),can_authenticate:Some(false),can_logout:Some(true),
+            state:"running".into(),addresses:vec!["100.70.1.2".into(),"fd7a:115c:a1e0::2".into()],
+            dns_name:Some("pc.tail123.ts.net".into()),observed_at:1_000,
+        };
+        for host in ["100.70.1.2:28367","[fd7a:115c:a1e0::2]:28367","pc.tail123.ts.net:28367"] {
+            assert!(is_allowed_tailscale_host(host,28367,&observed,2_000));
+            assert!(!is_allowed_tailscale_host(host,28367,&observed,61_001));
+        }
+        for host in ["100.70.1.3:28367","100.70.1.2:28368","other.tail123.ts.net:28367","127.0.0.1:28367","192.168.1.2:28367"] {
+            assert!(!is_allowed_tailscale_host(host,28367,&observed,2_000));
+        }
+        observed.state="offline".into();
+        assert!(!is_allowed_tailscale_host("100.70.1.2:28367",28367,&observed,2_000));
+    }
+
+    #[test]
+    fn legacy_system_client_status_cannot_authorize_the_embedded_node() {
+        let observed = super::super::tailscale_status::TailscaleStatus {
+            engine: None, can_authenticate: None, can_logout: None,
+            state: "running".into(), addresses: vec!["100.70.1.2".into()],
+            dns_name: Some("mac.tail123.ts.net".into()), observed_at: 1_000,
+        };
+        assert!(!is_allowed_tailscale_host("mac.tail123.ts.net:28367", 28367, &observed, 2_000));
+        assert!(!is_allowed_tailscale_host("100.70.1.2:28367", 28367, &observed, 2_000));
+    }
+
+    #[test]
     fn physical_lan_interfaces_sort_before_tunnels() {
         let addresses = rank_lan_addresses([
             ("Wintun Userspace Tunnel".to_string(), Ipv4Addr::new(192, 168, 50, 2)),
@@ -1739,8 +2055,26 @@ mod tests {
     }
 
     #[test]
+    fn system_tailnet_interfaces_do_not_advertise_or_authorize_the_embedded_node() {
+        let addresses = rank_lan_addresses([
+            ("Tailscale".into(), Ipv4Addr::new(100, 70, 1, 2)),
+            ("Wi-Fi".into(), Ipv4Addr::new(10, 0, 0, 42)),
+            ("ChromeOS".into(), Ipv4Addr::new(100, 115, 92, 1)),
+        ]).into_iter().map(|address| address.ip).collect::<Vec<_>>();
+        assert_eq!(addresses, vec![Ipv4Addr::new(10, 0, 0, 42)]);
+        assert!(!is_allowed_host_for_addresses("100.70.1.2:28367", 28367, &addresses));
+        assert!(!is_allowed_host_for_addresses("100.70.1.99:28367", 28367, &addresses));
+        assert!(!is_allowed_host_for_addresses("100.70.1.2:8080", 28367, &addresses));
+        assert!(!is_allowed_host_for_addresses("foreign.tail123.ts.net:28367", 28367, &addresses));
+    }
+
+    #[test]
     fn paired_devices_default_to_full_non_cloud_access_with_explicit_blocks() {
         let mut config = AccessSettingsPayload::default();
+
+        for command in ["tailscale_setup_status","tailscale_authenticate","tailscale_logout"] {
+            assert!(authorize_local_command(command,&config).is_err());
+        }
 
         assert!(authorize_local_command("system_clipboard_read_text", &config).is_ok());
         assert!(authorize_local_event("custom:desktop-event", &config).is_ok());

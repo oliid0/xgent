@@ -599,6 +599,7 @@ export async function completeAssistantMessage(params: {
   signal?: AbortSignal;
   debugLogger?: StreamDebugLogger;
   allowJsonOutput?: boolean;
+  beforeModelRequest?: StreamOptionsEx["beforeModelRequest"];
 }) {
   const modelId = params.model.trim();
   if (!modelId) throw new Error("No model selected");
@@ -645,6 +646,8 @@ export async function completeAssistantMessage(params: {
     cacheRetention: params.cacheRetention,
     debugLogger: params.debugLogger,
   });
+
+  options.beforeModelRequest = params.beforeModelRequest;
 
   params.debugLogger?.logRequest(
     buildStreamRequestDebugPayload({

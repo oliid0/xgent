@@ -34,10 +34,10 @@ import {
 import type { WorkspaceFileTreeStatePatch } from "../../../lib/settings";
 import { useConfirmDialog } from "../../astryx/useConfirmDialog";
 import { getFileTypeIcon } from "../../chat/fileTypeIcons";
-import { Check, FolderOpen, RefreshCw, Trash2, X } from "../../icons";
+import { Check, FileText, Folder, FolderOpen, RefreshCw, Trash2, X } from "../../icons";
 import { isWorkspaceImagePath } from "../../workspace-editor/workspaceImagePreview";
 import { useWorkspaceToolsContext } from "../WorkspaceToolsContext";
-import { FileTreeContextMenu } from "./ContextMenu";
+import { FileTreeContextMenu, FileTreeRowMenu } from "./ContextMenu";
 import {
   addExpandedPaths,
   ancestorDirsOfPath,
@@ -526,9 +526,13 @@ export function FileTreePanel(props: {
       const node = nodes[path];
       if (!node || visited.has(path)) return null;
       visited.add(path);
-      const TypeIcon = getFileTypeIcon(node.path, node.kind, {
-        expanded: expandedSet.has(node.path),
-      });
+      const TypeIcon = touchActions
+        ? node.kind === "dir"
+          ? expandedSet.has(node.path)
+            ? FolderOpen
+            : Folder
+          : FileText
+        : getFileTypeIcon(node.path, node.kind, { expanded: expandedSet.has(node.path) });
       const loadedChildren = node.children
         .map(buildItem)
         .filter((item): item is TreeListItemData => item !== null);
@@ -574,10 +578,43 @@ export function FileTreePanel(props: {
             {node.name}
           </span>
         ),
-        description: node.error,
-        startContent: <TypeIcon />,
+        description:
+          node.error ||
+          (touchActions
+            ? node.kind === "dir"
+              ? t("workspaceSftp.entry.folder")
+              : node.name.includes(".")
+                ? node.name.slice(node.name.lastIndexOf(".") + 1).toUpperCase()
+                : t("workspaceSftp.entry.file")
+            : undefined),
+        startContent: touchActions ? (
+          <span className={`workspace-file-icon workspace-file-icon-${node.kind}`}>
+            <TypeIcon />
+          </span>
+        ) : (
+          <TypeIcon />
+        ),
         endContent: node.loading ? (
           <Spinner size="sm" label={t("projectTools.loading")} />
+        ) : touchActions && node.path !== ROOT_PATH ? (
+          <FileTreeRowMenu
+            path={node.path}
+            kind={node.kind}
+            canMutate={canMutate && !busyAction}
+            canOpenFile={Boolean(fileTree.onOpenFile)}
+            canInsertMention={Boolean(fileTree.onInsertFileMention)}
+            showHidden={syncState.showHidden}
+            onClose={() => setContextMenu(null)}
+            onOpenFile={handleOpenFile}
+            onOpenExternal={handleOpenExternal}
+            onOpenContainingDirectory={handleOpenContainingDirectory}
+            onStartAction={startAction}
+            onDelete={(path) => void deletePath(path)}
+            onInsertMention={handleInsertMention}
+            onRefresh={handleMenuRefresh}
+            onToggleHidden={() => emitState({ showHidden: !syncState.showHidden })}
+            onActionError={setActionError}
+          />
         ) : undefined,
         children,
         isExpanded: expandedSet.has(node.path),
@@ -597,12 +634,24 @@ export function FileTreePanel(props: {
     return root ? [root] : [];
   }, [
     cwd,
+    busyAction,
+    canMutate,
+    deletePath,
+    emitState,
     expandedSet,
     handleOpenFile,
+    handleOpenExternal,
+    handleOpenContainingDirectory,
+    handleInsertMention,
+    handleMenuRefresh,
     nodes,
     projectPathKey,
     selectPath,
     selectedPath,
+    startAction,
+    syncState.showHidden,
+    fileTree.onOpenFile,
+    fileTree.onInsertFileMention,
     t,
     toggleDirectory,
     touchActions,
@@ -615,7 +664,6 @@ export function FileTreePanel(props: {
           isCompact
           icon={<FolderOpen />}
           title={t("projectTools.newFileTree")}
-          description={t("projectTools.fileTreeDescription")}
           actions={
             <Button
               label={t("projectTools.newFileTree")}
@@ -636,7 +684,12 @@ export function FileTreePanel(props: {
     nodes[contextMenu?.path ?? selectedPath] ?? nodes[selectedPath] ?? nodes[ROOT_PATH];
 
   return (
-    <VStack ref={panelRef} height="100%" gap={0} className="workspace-file-tree-panel">
+    <VStack
+      ref={panelRef}
+      height="100%"
+      gap={0}
+      className={`workspace-file-tree-panel${touchActions ? " workspace-file-tree-touch" : ""}`}
+    >
       <Section variant="transparent" padding={2} dividers={["bottom"]}>
         <HStack gap={2} vAlign="center">
           <StackItem size="fill">

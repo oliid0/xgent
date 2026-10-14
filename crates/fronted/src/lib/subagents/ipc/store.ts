@@ -54,6 +54,7 @@ export type SubagentRunStateRecord = {
 
 export type SubagentRunListInput = {
   parentConversationId: string;
+  parentToolCallId?: string;
   limit?: number;
 };
 
@@ -115,7 +116,7 @@ export type SubagentStoreIpc = {
   listMessages: (input: SubagentMessageListInput) => Promise<SubagentMessageRecord[]>;
 };
 
-export function createTauriSubagentStoreIpc(): SubagentStoreIpc {
+export function createTauriSubagentStoreIpc(invokePort: typeof invoke = invoke): SubagentStoreIpc {
   // Writes for one run are serialized so an incremental turn-boundary save can
   // never overtake the final completed/failed save.
   const runWriteQueues = new Map<string, Promise<void>>();
@@ -132,17 +133,17 @@ export function createTauriSubagentStoreIpc(): SubagentStoreIpc {
 
   return {
     upsertIdentity: async (input) =>
-      stripNulls(await invoke<SubagentIdentity>("subagent_identity_upsert", { input })),
+      stripNulls(await invokePort<SubagentIdentity>("subagent_identity_upsert", { input })),
     listIdentities: async (input) =>
-      (await invoke<SubagentIdentity[]>("subagent_identity_list", { input })).map(stripNulls),
+      (await invokePort<SubagentIdentity[]>("subagent_identity_list", { input })).map(stripNulls),
     saveRun: (input) =>
       enqueueRunWrite(input.run.id, async () => {
-        await invoke("subagent_run_save", { input });
+        await invokePort("subagent_run_save", { input });
       }),
     listRuns: async (input) =>
-      (await invoke<SubagentRunSummary[]>("subagent_run_list", { input })).map(stripNulls),
+      (await invokePort<SubagentRunSummary[]>("subagent_run_list", { input })).map(stripNulls),
     loadRun: async (id) => {
-      const record = await invoke<SubagentRunStateRecord | null>("subagent_run_load", {
+      const record = await invokePort<SubagentRunStateRecord | null>("subagent_run_load", {
         input: { id },
       });
       if (!record) return null;
@@ -151,11 +152,13 @@ export function createTauriSubagentStoreIpc(): SubagentStoreIpc {
         segments: record.segments.map(stripNulls),
       };
     },
-    pruneRuns: (input) => invoke<SubagentPruneResult>("subagent_run_prune", { input }),
+    pruneRuns: (input) => invokePort<SubagentPruneResult>("subagent_run_prune", { input }),
     appendMessage: async (input) =>
-      stripNulls(await invoke<SubagentMessageRecord>("subagent_message_append", { input })),
+      stripNulls(await invokePort<SubagentMessageRecord>("subagent_message_append", { input })),
     listMessages: async (input) =>
-      (await invoke<SubagentMessageRecord[]>("subagent_message_list", { input })).map(stripNulls),
+      (await invokePort<SubagentMessageRecord[]>("subagent_message_list", { input })).map(
+        stripNulls,
+      ),
   };
 }
 

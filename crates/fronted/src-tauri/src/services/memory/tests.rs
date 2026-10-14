@@ -120,6 +120,63 @@ mod tests {
     }
 
     #[test]
+    fn event_recall_opens_only_an_existing_original_profile_without_creating_or_migrating_it() {
+        let absent=tempfile::tempdir().expect("empty installation");
+        assert!(MemoryStore::open_existing_readonly_at(absent.path()).is_err());
+        assert!(!absent.path().join(MEMORY_ROOT_DIR).exists());
+        fs::create_dir(absent.path().join(MEMORY_ROOT_DIR)).expect("existing empty memory directory");
+        assert!(MemoryStore::open_existing_readonly_at(absent.path()).is_err());
+        assert!(!absent.path().join(MEMORY_ROOT_DIR).join(DB_FILENAME).exists());
+        let original=test_store();
+        original.write(MemoryWriteArgs {
+            slug:"fitness-time".into(),scope:"global".into(),workdir:None,memory_type:"user".into(),
+            description:"健身时间".into(),body:"晚上九点健身。".into(),actor:Some("manual".into()),
+            conversation_id:None,model:None,evidence:None,
+        }).expect("actual source preference");
+        let storage=original.root.parent().expect("original installation").to_path_buf();
+        drop(original);
+        let reopened=MemoryStore::open_existing_readonly_at(&storage).expect("existing readonly profile");
+        let captured=crate::services::automation::origin_memory::capture(&reopened,"提醒今晚健身时间")
+            .expect("real readonly MemoryStore recall");
+        assert!(captured.contains("晚上九点健身。"));
+        assert!(reopened.lock_conn().expect("readonly connection")
+            .execute("DELETE FROM memory_meta",[]).is_err());
+        assert!(crate::services::automation::origin_memory::capture(&reopened,"提醒今晚健身时间").is_some());
+    }
+
+    #[test]
+    fn remote_goal_recall_matches_a_long_task_against_real_personal_metadata_without_exporting_references() {
+        let store=test_store();
+        for (slug,kind,description,body) in [
+            ("report-style","feedback","PPT 汇报格式","PPT 用简洁中文字体，保留图表。"),
+            ("report-code","reference","PPT API 示例","代码与 API 参考不能作为个人偏好导出。"),
+            ("music","user","爵士音乐","我喜欢爵士音乐。"),
+        ] {
+            store.write(MemoryWriteArgs {
+                slug:slug.into(),scope:"global".into(),workdir:None,memory_type:kind.into(),
+                description:description.into(),body:body.into(),actor:Some("manual".into()),
+                conversation_id:None,model:None,evidence:None,
+            }).expect("write real original memory");
+        }
+        let captured=crate::services::automation::origin_memory::capture(&store,
+            "处理产品文档，输出实施方案和 PPT，完成网站以及安排日历。")
+            .expect("long task matches a relevant actual preference");
+        assert!(captured.len()<=6400);
+        let (_,raw)=captured.split_once('\n').expect("snapshot header");
+        let snapshot:Value=serde_json::from_str(raw).expect("snapshot JSON");
+        let records=snapshot["records"].as_array().expect("records");
+        assert_eq!(records.len(),1);
+        assert_eq!(records[0]["slug"],"report-style");
+        assert_eq!(records[0]["scope"],"global");
+        assert_eq!(records[0]["excerpt"],"PPT 用简洁中文字体，保留图表。");
+        assert!(records[0]["confidence"].is_string());
+        assert!(records[0]["unreviewed"].is_boolean());
+        assert!(records[0]["updatedAt"].is_i64());
+        assert!(!captured.contains("report-code"));
+        assert!(!captured.contains("爵士"));
+    }
+
+    #[test]
     fn organize_run_clear_history_deletes_finished_and_retains_active() {
         let store = test_store();
         {

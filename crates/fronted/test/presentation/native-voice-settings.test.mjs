@@ -54,7 +54,12 @@ function fixture(service = { update: async value => value, test: async () => ({ 
   render();
   return {
     props, hooks, normalizeSettings, render,
-    run: (id, value = null) => rendered.props.handlers.get(id).run(value),
+    run: (id, value = null) => {
+      const action = allNodes(rendered.props.document.nodes).find(node => node.id === id)?.action ?? id;
+      const handler = rendered.props.handlers.get(action);
+      assert.ok(handler, `Current rendered action missing: ${id}`);
+      return handler.run(value);
+    },
     nodes: () => allNodes(rendered.props.document.nodes),
   };
 }
@@ -78,6 +83,7 @@ test("native mobile voice describes device speech, preserves credentials and ret
     assert.equal(f.props.settings.stt.providers.aliyun_dashscope.apiKey, "desktop-secret");
     await f.run("voice-permissions"); f.render();
     assert.ok(f.nodes().some(node => node.id === "permission:microphone"));
+    assert.notEqual(f.nodes().find(node => node.id === "back").action, "back", "Permission route keeps its current scoped action identity");
     await f.run("back"); f.render();
     assert.equal(f.nodes().find(node => node.id === "voice-enabled").value, true);
   } finally {

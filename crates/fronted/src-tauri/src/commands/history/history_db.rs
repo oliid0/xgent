@@ -592,7 +592,12 @@ pub(crate) fn ensure_subagent_schema(conn: &Connection) -> Result<(), String> {
             .optional()
             .map_err(|e| format!("failed to read subagent schema version: {e}"))?;
         if version.as_deref() == Some(SUBAGENT_SCHEMA_VERSION) {
-            return Ok(());
+            // Additive migration preserves private contexts and legacy headers.
+            return ensure_table_columns(conn, "subagentRun", "subagent runs", &[
+                ("provider_config_id", "ALTER TABLE subagentRun ADD COLUMN provider_config_id TEXT;"),
+                ("batch_receipt_json", "ALTER TABLE subagentRun ADD COLUMN batch_receipt_json TEXT;"),
+                ("read_only_tools", "ALTER TABLE subagentRun ADD COLUMN read_only_tools INTEGER CHECK(read_only_tools IN (0,1));"),
+            ]);
         }
     }
 
@@ -641,6 +646,9 @@ pub(crate) fn ensure_subagent_schema(conn: &Connection) -> Result<(), String> {
             mode TEXT NOT NULL,
             status TEXT NOT NULL,
             provider_id TEXT NOT NULL,
+            provider_config_id TEXT,
+            batch_receipt_json TEXT,
+            read_only_tools INTEGER CHECK(read_only_tools IN (0,1)),
             model TEXT NOT NULL,
             session_id TEXT,
             workdir TEXT,

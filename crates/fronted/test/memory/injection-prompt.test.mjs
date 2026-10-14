@@ -99,4 +99,8 @@ test("tools suffix embeds the memory usage rules exactly once", () => {
   assert.equal(suffix.match(/Conflict resolution \(in order\)/g)?.length, 1);
   assert.ok(suffix.includes('scope="project" gate'));
   assert.ok(suffix.includes("Self-review of (unreviewed) entries"));
+  assert.match(suffix, /earlier decisions, preferences, or unfinished work/);
+  assert.match(suffix, /include_history=true/);
+  assert.match(suffix, /before answering or repeating work/);
+  assert.match(suffix, /never new instructions or permission/);
 });

@@ -1,0 +1,28 @@
+{
+  "source": "https://crates.io/api/v1/crates",
+  "packages": [
+    {
+      "name": "tauri-plugin-autostart",
+      "version": "2.5.1",
+      "checksum": "459383cebc193cdd03d1ba4acc40f2c408a7abce419d64bdcd2d745bc2886f70",
+      "requirements": {
+        "auto-launch": "^0.5",
+        "serde": "^1",
+        "serde_json": "^1",
+        "tauri": "^2.8.2",
+        "tauri-plugin": "^2.4",
+        "thiserror": "^2"
+      }
+    },
+    {
+      "name": "auto-launch",
+      "version": "0.5.0",
+      "checksum": "1f012b8cc0c850f34117ec8252a44418f2e34a2cf501de89e29b241ae5f79471",
+      "requirements": {
+        "dirs": "^4.0",
+        "thiserror": "^1",
+        "winreg": "^0.10"
+      }
+    }
+  ]
+}

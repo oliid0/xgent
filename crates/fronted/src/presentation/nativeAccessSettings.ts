@@ -1,6 +1,10 @@
 import { invoke, listen } from "@xgent/runtime";
 import { useEffect, useState } from "react";
+import { useAgentStartup } from "../lib/automation/useAgentStartup";
+import { useWorkerPeers } from "../lib/automation/useWorkerPeers";
+import { discoveredWorkerLabel } from "../lib/automation/workerDiscovery";
 import { browserSessionController } from "../lib/browser/browserSessionController";
+import { useGitHubAuthorization } from "../lib/connectors/useGitHubAuthorization";
 import {
   type CloudSecretVaultStatus,
   type LanPcClientStatus,
@@ -10,8 +14,12 @@ import {
 } from "../lib/localAccess";
 import { type AppSettings, updateAccessSettings } from "../lib/settings";
 import { writeClipboardText } from "../lib/system/clipboardText";
+import { useTailscaleSetup } from "../lib/useTailscaleSetup";
 import type { SettingsSectionProps } from "../pages/settings/types";
+import { agentStartupNodes } from "./agentStartupNodes";
 import { presentationControls } from "./controls";
+import { githubAuthorizationNodes } from "./githubAuthorizationNodes";
+import { tailscaleSetupNodes } from "./tailscaleSetupNodes";
 import type { PresentationNode } from "./types";
 
 /** Shared Rust services; SwiftUI owns the native page and each form control. */
@@ -22,6 +30,25 @@ export function useNativeAccessSettings(
   t: (key: string) => string,
   onOpenComputer: () => void,
 ) {
+  const startup = useAgentStartup(enabled && !mobile);
+  const tailscale = useTailscaleSetup(enabled, mobile);
+  const github = useGitHubAuthorization(enabled, async () => {
+    const revision = operation.revision;
+    const vaultRevision = ++operation.vaultRevision;
+    const status = await invoke<CloudSecretVaultStatus>("cloud_secret_vault_status");
+    if (
+      operation.active &&
+      revision === operation.revision &&
+      vaultRevision === operation.vaultRevision
+    )
+      setVault(status);
+  });
+  const workers = useWorkerPeers(enabled, async () => {
+    if (!mobile) return;
+    const revision = operation.revision;
+    const current = () => operation.active && operation.revision === revision;
+    await refreshLan(current);
+  });
   const [local, setLocal] = useState<LocalAccessStatus>({
     enabled: false,
     running: false,
@@ -34,7 +61,7 @@ export function useNativeAccessSettings(
   const [lan, setLan] = useState<LanPcClientStatus>({ paired: false });
   const [vault, setVault] = useState<CloudSecretVaultStatus>({ githubTokenConfigured: false });
   const [pairingCode, setPairingCode] = useState("");
-  const [deviceName, setDeviceName] = useState("Xgent mobile");
+  const [deviceName, setDeviceName] = useState(mobile ? "Xgent mobile" : "Xgent desktop");
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -90,9 +117,27 @@ export function useNativeAccessSettings(
       setLan(status);
       const address = normalizeComparableLanUrl(status.baseUrl);
       if (status.paired && address) patch({ lanControlUrl: `${address}/` });
+      else if (!status.paired) patch({ preferLanPcExecution: false });
     } catch (cause) {
       if (current() && revision === operation.lanRevision) throw cause;
     }
+  }
+
+  async function pairComputer(current: () => boolean) {
+    operation.lanRevision++;
+    const baseUrl = normalizeLanControlUrl(settings.access.lanControlUrl);
+    const status = await invoke<LanPcClientStatus>("lan_pc_pair", {
+      baseUrl,
+      code: pairingCode,
+      deviceName: deviceName.trim(),
+    });
+    if (!current()) return;
+    operation.lanRevision++;
+    setLan(status);
+    setPairingCode((previous) => (previous === pairingCode ? "" : previous));
+    patch({ lanControlUrl: status.baseUrl ? normalizeLanControlUrl(status.baseUrl) : baseUrl });
+    if (status.workerRegistrationError) setError(status.workerRegistrationError);
+    void workers.refresh().catch(() => {});
   }
 
   useEffect(() => {
@@ -187,7 +232,6 @@ export function useNativeAccessSettings(
     const ready = lan.paired && !!normalizeComparableLanUrl(lan.baseUrl);
     nodes.push(
       c.group("lan-computer", t("settings.accessLanControl"), [
-        note("lan-description", t("settings.accessLanControlHint")),
         {
           id: "lan-status",
           kind: "StatusDot",
@@ -213,24 +257,7 @@ export function useNativeAccessSettings(
         c.action(
           "lan-pair",
           t("settings.accessPairComputer"),
-          () =>
-            run("lan-pair", async (current) => {
-              operation.lanRevision++;
-              const baseUrl = normalizeLanControlUrl(settings.access.lanControlUrl);
-              const status = await invoke<LanPcClientStatus>("lan_pc_pair", {
-                baseUrl,
-                code: pairingCode,
-                deviceName: deviceName.trim(),
-              });
-              if (current()) {
-                operation.lanRevision++;
-                setLan(status);
-                setPairingCode((previous) => (previous === pairingCode ? "" : previous));
-                patch({
-                  lanControlUrl: status.baseUrl ? normalizeLanControlUrl(status.baseUrl) : baseUrl,
-                });
-              }
-            }),
+          () => run("lan-pair", pairComputer),
           available &&
             !!settings.access.lanControlUrl.trim() &&
             pairingCode.length === 6 &&
@@ -255,6 +282,7 @@ export function useNativeAccessSettings(
                       operation.lanRevision++;
                       setLan(status);
                       patch({ preferLanPcExecution: false });
+                      void workers.refresh().catch(() => {});
                     }
                   }),
                 available,
@@ -269,7 +297,6 @@ export function useNativeAccessSettings(
             (preferLanPcExecution) => patch({ preferLanPcExecution }),
             ready,
           ),
-          text: t("settings.accessPreferLanPcHint"),
           icon: "desktopcomputer",
         },
         c.action(
@@ -298,10 +325,8 @@ export function useNativeAccessSettings(
             settings.access.iosAShellEnabled,
             (iosAShellEnabled) => patch({ iosAShellEnabled }),
           ),
-          text: t("settings.accessIosAShellHint"),
           icon: "terminal",
         },
-        note("lan-pairing-hint", t("settings.accessLanPairingHint")),
       ]),
     );
   } else {
@@ -314,7 +339,6 @@ export function useNativeAccessSettings(
           : "Stopped";
     nodes.push(
       c.group("local-web-ui", t("settings.accessWebUi"), [
-        note("web-ui-description", t("settings.accessWebUiHint")),
         {
           id: "web-ui-status",
           kind: "StatusDot",
@@ -445,6 +469,173 @@ export function useNativeAccessSettings(
   }
 
   nodes.push(
+    c.group("worker-peers", t("settings.workerPeersTitle"), [
+      ...(workers.discover
+        ? [
+            c.action(
+              "worker-discovery-scan",
+              t("settings.workerDiscoveryScan"),
+              workers.discover,
+              available && !workers.busy,
+            ),
+            ...(workers.discovered ?? []).flatMap((service) =>
+              service.urls.map((url) => ({
+                ...c.action(
+                  `worker-discovery:${service.hostId}:${encodeURIComponent(url)}`,
+                  discoveredWorkerLabel(service),
+                  () => {
+                    if (!workers.hasDiscoveredEndpoint(service.hostId, url)) return;
+                    patch({ lanControlUrl: url });
+                    setPairingCode("");
+                  },
+                  available && !workers.busy,
+                ),
+                kind: "NavigationRow" as const,
+                text: url,
+              })),
+            ),
+            ...(workers.discoveryAttempted && !workers.discovered.length && !workers.busy
+              ? [note("worker-discovery-empty", t("settings.workerDiscoveryEmpty"))]
+              : []),
+          ]
+        : []),
+      ...(!mobile
+        ? [
+            input(
+              "worker-pair-url",
+              t("settings.accessComputerAddress"),
+              settings.access.lanControlUrl,
+              (lanControlUrl) => patch({ lanControlUrl }),
+            ),
+            input(
+              "worker-pair-code",
+              t("settings.accessLanPairingCode"),
+              pairingCode,
+              setPairingCode,
+              false,
+              available,
+              (value) => value.replace(/\D/g, "").slice(0, 6),
+            ),
+            input("worker-pair-name", t("settings.accessLanDeviceName"), deviceName, setDeviceName),
+            c.action(
+              "worker-pair",
+              t("settings.accessPairComputer"),
+              () => run("worker-pair", pairComputer),
+              available &&
+                !!settings.access.lanControlUrl.trim() &&
+                pairingCode.length === 6 &&
+                !!deviceName.trim(),
+            ),
+          ]
+        : []),
+      c.action(
+        "worker-peers-refresh",
+        t("settings.workerPeersRefresh"),
+        workers.refresh,
+        available && !workers.busy,
+      ),
+      ...(workers.busy
+        ? [
+            {
+              id: "worker-peers-loading",
+              kind: "StatusDot" as const,
+              status: "running" as const,
+              label: t("settings.workerPeersRefresh"),
+            },
+          ]
+        : []),
+      ...(workers.registrationError
+        ? [
+            {
+              id: "worker-peers-registration-error",
+              kind: "Banner" as const,
+              status: "error" as const,
+              label: workers.registrationError,
+            },
+          ]
+        : []),
+      ...(workers.error
+        ? [
+            {
+              id: "worker-peers-error",
+              kind: "Banner" as const,
+              status: "error" as const,
+              label: workers.error,
+            },
+          ]
+        : []),
+      ...(!workers.peers.length && !workers.busy && !workers.error
+        ? [note("worker-peers-empty", t("settings.workerPeersEmpty"))]
+        : []),
+      ...workers.peers.map((peer) =>
+        c.group(`worker-peer:${peer.peerId}`, `${peer.host.platform} · ${peer.peerId}`, [
+          {
+            id: `worker-peer:${peer.peerId}:status`,
+            kind: "StatusDot" as const,
+            status: peer.online ? ("completed" as const) : ("paused" as const),
+            label: t(peer.online ? "settings.workerPeerOnline" : "settings.workerPeerOffline"),
+          },
+          ...(peer.online
+            ? [
+                note(
+                  `worker-peer:${peer.peerId}:ready`,
+                  t(
+                    peer.host.executorReady &&
+                      peer.host.acceptsBackgroundTasks &&
+                      peer.host.workspaceAvailable
+                      ? "settings.workerPeerReady"
+                      : "settings.workerPeerNotReady",
+                  ),
+                ),
+              ]
+            : []),
+          ...(
+            peer.endpoints ?? [
+              { baseUrl: peer.baseUrl, network: "other", online: peer.online, error: peer.error },
+            ]
+          ).flatMap((endpoint, index) => [
+            note(
+              `worker-peer:${peer.peerId}:endpoint:${index}`,
+              `${endpoint.baseUrl}\n${t(`settings.workerNetwork${endpoint.network}`)} · ${t(endpoint.online ? "settings.workerPeerOnline" : "settings.workerPeerOffline")}${endpoint.online && peer.online && endpoint.baseUrl === peer.baseUrl ? ` · ${t("settings.workerPeerSelected")}` : ""}`,
+            ),
+            ...(endpoint.error
+              ? [note(`worker-peer:${peer.peerId}:endpoint:${index}:error`, endpoint.error)]
+              : []),
+            {
+              ...c.action(
+                `worker-peer:${peer.peerId}:endpoint:${index}:forget`,
+                t("settings.workerEndpointForget"),
+                () => workers.forgetEndpoint(peer.peerId, endpoint.baseUrl),
+                available && !workers.busy,
+              ),
+              destructive: true,
+            },
+          ]),
+          ...(peer.error
+            ? [
+                {
+                  id: `worker-peer:${peer.peerId}:error`,
+                  kind: "Banner" as const,
+                  status: "error" as const,
+                  label: peer.error,
+                },
+              ]
+            : []),
+          {
+            ...c.action(
+              `worker-peer:${peer.peerId}:forget`,
+              t("settings.workerPeerForget"),
+              () => workers.forget(peer.peerId),
+              available && !workers.busy,
+            ),
+            destructive: true,
+          },
+        ]),
+      ),
+    ]),
+  );
+
+  nodes.push(
     c.group(
       "local-capabilities",
       t("settings.accessDevicePermissions"),
@@ -470,7 +661,6 @@ export function useNativeAccessSettings(
             });
           },
         ),
-        text: t(`settings.accessBlock${key}Hint`),
         icon,
       })),
     ),
@@ -484,7 +674,6 @@ export function useNativeAccessSettings(
           settings.access.cloudExecutionEnabled,
           (cloudExecutionEnabled) => patch({ cloudExecutionEnabled }),
         ),
-        text: t("settings.accessCloudExecutionHint"),
         icon: "cloud",
       },
       input(
@@ -500,7 +689,6 @@ export function useNativeAccessSettings(
         (githubRepository) => patch({ githubRepository }),
       ),
     ]),
-    note("cloud-environment-hint", t("settings.accessCloudEnvironmentHint")),
     c.group("cloud-credentials", t("settings.accessSecureVault"), [
       {
         id: "github-token-status",
@@ -564,10 +752,12 @@ export function useNativeAccessSettings(
           ]
         : []),
     ]),
-    note("github-vault-hint", t("settings.accessVaultHint")),
   );
   if (busy)
     nodes.push({ id: "access-busy", kind: "Progress", label: t("settings.accessConnecting") });
   if (error) nodes.push({ id: "access-error", kind: "Banner", label: error, status: "error" });
+  if (!mobile) nodes.push(...agentStartupNodes(c, startup, t));
+  nodes.push(...githubAuthorizationNodes(c, github, t));
+  nodes.push(...tailscaleSetupNodes(c, tailscale, t, mobile, enabled));
   return { nodes, handlers: c.handlers };
 }

@@ -4130,6 +4130,7 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
 }
 .generated-file-cards {
   width: 100%;
+  container: generated-file-cards / inline-size;
 }
 .generated-file-card {
   display: flex;
@@ -4150,11 +4151,32 @@ body > div:not(#root) [data-streamdown="mermaid"] svg {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+  min-height: 44px;
 }
 .generated-file-card-name span {
   display: block;
   color: var(--color-text-secondary);
   font-size: 12px;
+}
+.generated-file-card-actions {
+  min-width: 0;
+  flex-shrink: 0;
+}
+.generated-file-card-actions button {
+  min-height: 44px;
+  min-width: 44px;
+}
+@container generated-file-cards (max-width: 420px) {
+  .generated-file-card {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: start;
+  }
+  .generated-file-card-actions {
+    grid-column: 2;
+    justify-self: start;
+    max-width: 100%;
+  }
 }
 .assistant-footer-message {
   width: 100%;
@@ -4940,4 +4962,460 @@ dialog[open] > [popover][data-layer-ready="true"][data-layer-positioning="anchor
 .browser-start-tool {
   justify-content: flex-start;
   text-align: start;
+}
+
+.subagent-team-settings {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.subagent-team-settings :where(.astryx-text, button) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.subagent-team-settings button {
+  min-height: 44px;
+}
+
+/* Preserve navigation and library controls while keeping autonomy rows concise. */
+.autonomy-settings {
+  min-width: 0;
+  container: autonomy-settings / inline-size;
+}
+.autonomy-settings :where(.astryx-list-item, .astryx-section, .astryx-text) {
+  min-width: 0;
+  max-width: 100%;
+}
+.autonomy-settings :where(button, input) {
+  min-height: 44px;
+}
+.autonomy-settings .astryx-list-item {
+  padding-block: 14px;
+}
+.autonomy-detail-group {
+  border: 0;
+  box-shadow: none;
+}
+.autonomy-detail-group + .autonomy-detail-group {
+  border-top: 1px solid var(--color-border);
+  padding-block-start: 16px;
+}
+.task-read-list {
+  border-radius: 0;
+  background: transparent;
+}
+.task-read-list .astryx-list-item {
+  min-height: 56px;
+  padding-inline: 0;
+}
+.connector-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--color-background-muted);
+  color: var(--color-accent);
+}
+.connector-data-list {
+  border-radius: var(--radius-container);
+  background: var(--color-background-muted);
+  overflow: hidden;
+}
+.connector-data-list .connector-data-row {
+  position: relative;
+  min-height: 70px;
+  padding-block: 12px;
+  gap: 14px;
+}
+.connector-data-row + .connector-data-row::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 70px;
+  inset-inline-end: 0;
+  top: 0;
+  border-top: 1px solid var(--color-border);
+}
+.connector-data-list .connector-data-row span,
+.connector-data-list .connector-data-row p {
+  overflow-wrap: anywhere;
+}
+.connector-data-list .connector-data-action {
+  min-inline-size: 44px;
+  min-block-size: 44px;
+}
+.connector-data-icon {
+  display: inline-flex;
+  flex: 0 0 40px;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--color-text-secondary);
+}
+.connector-data-icon svg {
+  width: 24px;
+  height: 24px;
+}
+.connector-data-icon-calendar {
+  color: #ff3b30;
+}
+.connector-data-icon-reminders {
+  color: #007aff;
+}
+.connector-data-icon-home,
+.connector-data-icon-room,
+.connector-data-icon-accessory,
+.connector-data-icon-scene {
+  color: #f5a623;
+}
+.connector-icon-health {
+  color: light-dark(#ff2d55, #ff375f);
+}
+.connector-icon-home {
+  color: light-dark(#ff9500, #ff9f0a);
+}
+button.connector-connect:not(:disabled) {
+  color: var(--color-text-accent);
+}
+.schedule-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: var(--color-background-muted);
+  color: var(--color-text-secondary);
+}
+.schedule-icon svg {
+  width: 24px;
+  height: 24px;
+}
+.schedule-icon-paused {
+  opacity: 0.5;
+}
+.connector-empty {
+  display: block;
+  padding: 16px;
+}
+.workspace-file-tree-touch .astryx-tree-list-item {
+  min-height: 60px;
+  padding-block: 10px;
+}
+.workspace-file-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 38px;
+}
+.workspace-file-icon svg {
+  width: 28px;
+  height: 28px;
+}
+.workspace-file-icon-dir {
+  color: var(--color-accent);
+}
+.workspace-file-icon-file {
+  color: var(--color-text-secondary);
+}
+.settings-cron-view-tabs {
+  margin: 0 16px 12px;
+}
+.cron-detail-header,
+.cron-history-header {
+  flex-shrink: 0;
+  padding: 16px 20px;
+  gap: 8px;
+}
+.cron-detail-heading,
+.cron-detail-actions,
+.cron-history-status {
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.cron-detail-heading {
+  justify-content: space-between;
+}
+.cron-detail-heading > .astryx-heading {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cron-detail-actions {
+  flex-shrink: 0;
+}
+.cron-task-status {
+  background: var(--color-background-muted);
+  color: var(--color-text-secondary);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.cron-detail-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 20px 20px;
+  gap: 20px;
+  container-type: inline-size;
+}
+.cron-detail-section {
+  min-width: 0;
+  gap: 8px;
+}
+.cron-detail-fields {
+  gap: 0;
+  min-width: 0;
+}
+.cron-detail-field {
+  min-height: 44px;
+  align-items: flex-start;
+  gap: 16px;
+  padding-block: 8px;
+}
+.cron-detail-field + .cron-detail-field {
+  border-top: 1px solid var(--color-border);
+}
+.cron-detail-field-label,
+.cron-history-counts {
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.cron-detail-field > .cron-detail-field-label {
+  flex: 0 0 110px;
+}
+.cron-detail-field-value {
+  min-width: 0;
+  flex: 1;
+  text-align: end;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.cron-detail-code {
+  gap: 8px;
+  padding-block: 12px;
+  min-width: 0;
+}
+.cron-detail-code pre {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--color-background-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-family-code);
+}
+.cron-history-list {
+  gap: 0;
+  border-radius: var(--radius-container, 20px);
+  background: var(--color-background-muted);
+}
+.cron-history-entry {
+  gap: 0;
+  min-width: 0;
+  margin-inline: 16px;
+}
+.cron-history-entry + .cron-history-entry {
+  border-top: 1px solid var(--color-border);
+}
+.cron-history-entry .astryx-list-item {
+  min-height: 70px;
+  padding-inline: 0;
+  padding-block: 0;
+}
+.cron-history-entry .astryx-list-item button {
+  min-height: 70px;
+}
+.cron-history-status {
+  flex-shrink: 0;
+  width: max-content;
+  max-width: 140px;
+  white-space: normal;
+}
+.cron-history-status svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+.cron-history-status .astryx-text {
+  overflow-wrap: anywhere;
+  color: var(--color-text-secondary);
+}
+.cron-history-status .cron-status-error {
+  color: var(--color-error);
+}
+.cron-history-output {
+  gap: 8px;
+  padding-bottom: 16px;
+}
+.cron-running-icon {
+  animation: spin 1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cron-running-icon {
+    animation: none;
+  }
+}
+@container (max-width: 250px) {
+  .cron-detail-field {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .cron-detail-field > .cron-detail-field-label {
+    flex-basis: auto;
+  }
+  .cron-detail-field-value {
+    text-align: start;
+  }
+}
+@container autonomy-settings (max-width: 340px) {
+  .autonomy-cron .astryx-list-item {
+    padding-inline: 8px;
+  }
+}
+
+.goals-components {
+  min-width: 0;
+  container: goals / inline-size;
+}
+.goals-panel-content {
+  padding: 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.goals-components > .astryx-hstack > h1 {
+  flex: 1;
+  min-width: 0;
+}
+.goal-section {
+  min-width: 0;
+  gap: 0;
+}
+.goal-section > h3 {
+  margin-block: 16px 8px;
+}
+.goal-tracking .goal-row,
+.goal-section .goal-category {
+  min-height: 70px;
+  padding-inline: 0;
+}
+.goal-tracking .astryx-list + .astryx-list,
+.goal-section .astryx-list + .astryx-list {
+  border-top: 1px solid var(--color-border);
+}
+.goals-components .astryx-list {
+  border-radius: 0;
+  background: transparent;
+}
+.goal-tracking > h3 {
+  color: var(--color-success);
+}
+.goal-tracking > h3::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-inline-end: 12px;
+  background: currentColor;
+}
+.goal-check {
+  width: 44px;
+  height: 44px;
+  justify-content: center;
+}
+.goal-check > span {
+  min-width: 44px;
+  min-height: 44px;
+}
+.goal-step {
+  min-height: 44px;
+  padding-block: 6px;
+}
+.goal-step .astryx-field-label {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.goal-category svg {
+  width: 24px;
+  height: 24px;
+}
+.goal-activity-row {
+  position: relative;
+  margin-inline-start: 7px;
+  padding: 16px 0 16px 22px;
+  border-inline-start: 1px solid var(--color-border);
+  gap: 4px;
+}
+.goal-activity-row::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: -5px;
+  top: 22px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-text-secondary);
+  background: var(--color-background);
+  box-shadow: inset 0 0 0 3px var(--color-background);
+}
+.goal-activity-row::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: -1px;
+  top: 26px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-text-secondary);
+}
+.goal-activity-entry {
+  padding: 0;
+}
+.goal-association-row {
+  min-height: 70px;
+  padding-inline: 0;
+}
+.goal-association-row svg {
+  width: 24px;
+  height: 24px;
+}
+.goal-output {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--color-background-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-family-code);
+}
+.goals-components :is(.astryx-list, .astryx-list-item, .astryx-text) {
+  min-width: 0;
+}
+.goals-components button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.goals-components :is(.goal-row, .goal-category) > button {
+  min-height: 70px;
+  justify-content: center;
+}
+.goals-components .goal-file-row {
+  min-height: 70px;
+  padding-inline: 0;
+}
+.goals-components .goal-file-row > button {
+  min-height: 70px;
+  justify-content: center;
+}
+.goal-file-row svg {
+  width: 24px;
+  height: 24px;
 }

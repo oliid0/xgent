@@ -8,7 +8,9 @@ import {
   EXTRACTION_MESSAGE_CHAR_CAP,
   EXTRACTION_TURN_WINDOW,
   EXTRACTION_WINDOW_CHAR_CAP,
+  PERSONAL_PATTERN_MAX_REPORT_AGE_MS,
 } from "../config";
+import type { UserMemoryObservation } from "./personalEvidence";
 
 function textOfContent(content: unknown): string {
   if (typeof content === "string") return content;
@@ -72,6 +74,50 @@ function windowStartIndex(messages: readonly Message[], turns: number): number {
     }
   }
   return 0;
+}
+
+export function collectUserMemoryObservations(
+  messages: readonly Message[],
+  nowMs: number = Date.now(),
+  timeZone: string = Intl.DateTimeFormat().resolvedOptions().timeZone,
+): UserMemoryObservation[] {
+  const result: UserMemoryObservation[] = [];
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  for (let i = windowStartIndex(messages, EXTRACTION_TURN_WINDOW); i < messages.length; i++) {
+    const message = messages[i];
+    if (message?.role !== "user") continue;
+    const displayContent = (message as { xgentDisplayContent?: unknown }).xgentDisplayContent;
+    const text = Array.from(
+      (typeof displayContent === "string" ? displayContent : textOfContent(message.content)).trim(),
+    )
+      .slice(0, EXTRACTION_MESSAGE_CHAR_CAP)
+      .join("");
+    if (!text) continue;
+    const timestamp =
+      Number.isFinite(message.timestamp) &&
+      message.timestamp > 0 &&
+      message.timestamp <= nowMs &&
+      Number.isFinite(new Date(message.timestamp).getTime())
+        ? message.timestamp
+        : null;
+    const parts = timestamp === null ? [] : formatter.formatToParts(new Date(timestamp));
+    const value = (type: string) => parts.find((part) => part.type === type)?.value;
+    result.push({
+      id: `user-${i}`,
+      text,
+      timestamp,
+      timeZone,
+      inferenceEligible:
+        timestamp !== null && nowMs - timestamp <= PERSONAL_PATTERN_MAX_REPORT_AGE_MS,
+      localDate: timestamp === null ? null : `${value("year")}-${value("month")}-${value("day")}`,
+    });
+  }
+  return result;
 }
 
 /** Render the trailing conversation window as a fenced evidence block. The

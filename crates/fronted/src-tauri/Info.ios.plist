@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>BGTaskSchedulerPermittedIdentifiers</key>
+  <array><string>xgent.result.refresh.v1</string><string>xgent.event.refresh.v1</string></array>
+  <key>UIBackgroundModes</key>
+  <array><string>fetch</string></array>
   <key>NSBluetoothAlwaysUsageDescription</key>
   <string>Xgent discovers nearby Bluetooth devices only when you request a device task.</string>
   <key>NSMicrophoneUsageDescription</key>
@@ -10,6 +14,8 @@
   <string>XGent converts speech to text when you start voice input.</string>
   <key>NSCameraUsageDescription</key>
   <string>XGent uses the camera only when you choose to take a photo for a conversation.</string>
+  <key>NSContactsUsageDescription</key>
+  <string>Xgent searches authorized contact names, phone numbers and email addresses only for tasks you request.</string>
   <key>NSCalendarsFullAccessUsageDescription</key>
   <string>XGent can read and manage calendar events after you grant access.</string>
   <key>NSCalendarsUsageDescription</key>
@@ -24,6 +30,8 @@
   <string>XGent uses your location only for tasks you explicitly request.</string>
   <key>NSHealthShareUsageDescription</key>
   <string>XGent reads step totals only for time ranges you explicitly ask it to analyze or summarize.</string>
+  <key>NSHomeKitUsageDescription</key>
+  <string>Xgent reads your authorized homes, rooms, accessories and scene names only when you request Home access.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsLocalNetworking</key>
@@ -33,5 +41,7 @@
     </dict>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Xgent connects to your paired computer on the local network for WebUI control and task execution.</string>
+  <key>NSBonjourServices</key>
+  <array><string>_xgent._tcp</string></array>
 </dict>
 </plist>

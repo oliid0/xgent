@@ -59,7 +59,12 @@ import { WorkspaceSyntaxController } from "../components/workspace-editor/worksp
 import { useLocale } from "../i18n";
 import { isNativeMobileRuntime } from "../lib/runtimePlatform";
 import type { AppSettings } from "../lib/settings";
-import { invokeFs, isFsBackendError } from "../lib/tools/fsBackend";
+import { isFsBackendError } from "../lib/tools/fsBackend";
+import {
+  bindPreviewExecution,
+  invokePreviewFs,
+  type PreviewExecution,
+} from "../lib/tools/previewExecution";
 import { NativeSurface } from "./NativeSurface";
 import { createNativePresentationTheme } from "./nativeTheme";
 import {
@@ -109,7 +114,7 @@ type ReadWorkspacePreviewResponse = {
 };
 
 type LoadedFile = {
-  request: WorkspaceCodeEditorOpenRequest | WorkspaceFilePreviewOpenRequest;
+  request: (WorkspaceCodeEditorOpenRequest | WorkspaceFilePreviewOpenRequest) & PreviewExecution;
   mode: "editor" | "preview";
   path: string;
   mimeType: string;
@@ -280,8 +285,15 @@ export function NativeWorkspaceFilePage(props: NativeWorkspaceFilePageProps) {
   const [imageNavigation, setImageNavigation] = useState<{ source: string; path: string } | null>(
     null,
   );
+  const previewRequest = useMemo(
+    () => (props.previewRequest ? bindPreviewExecution(props.previewRequest) : null),
+    [props.previewRequest],
+  );
+  const previewOwner = previewRequest
+    ? [previewRequest.ownerId ?? "", previewRequest.executionKey ?? ""]
+    : [];
   const activeRequest = props.previewOpen
-    ? props.previewRequest
+    ? previewRequest
     : props.editorOpen
       ? (tabs.active?.request ?? null)
       : null;
@@ -296,6 +308,7 @@ export function NativeWorkspaceFilePage(props: NativeWorkspaceFilePageProps) {
     activeRequest.projectPathKey,
     activeRequest.workdir,
     activeRequest.path,
+    ...(activeMode === "preview" ? previewOwner : []),
   ]);
   const imagePaths = workspaceImagePaths(props.previewRequest?.imagePaths, activeRequest.path);
   const effectiveRequest =
@@ -307,7 +320,19 @@ export function NativeWorkspaceFilePage(props: NativeWorkspaceFilePageProps) {
     effectiveRequest.projectPathKey,
     effectiveRequest.workdir,
     effectiveRequest.path,
+    ...(activeMode === "preview" ? previewOwner : []),
   ]);
+  const editorDraftKey = JSON.stringify([
+    effectiveRequest.projectPathKey,
+    effectiveRequest.workdir,
+    effectiveRequest.path,
+  ]);
+  const sharedEditor = cache.current.editors.get(editorDraftKey);
+  // An editor draft may be reused only when its actual read used this same source.
+  const sharesEditorSource =
+    activeMode === "preview" &&
+    !!sharedEditor?.request.executionKey &&
+    sharedEditor.request.executionKey === previewRequest?.executionKey;
   if (
     !lifetime.current ||
     lifetime.current.file !== file ||
@@ -331,11 +356,18 @@ export function NativeWorkspaceFilePage(props: NativeWorkspaceFilePageProps) {
           setImageNavigation({ source, path });
       }}
       activeMode={activeMode}
-      draftKey={JSON.stringify([
-        effectiveRequest.projectPathKey,
-        effectiveRequest.workdir,
-        effectiveRequest.path,
-      ])}
+      draftKey={
+        activeMode === "editor" || sharesEditorSource
+          ? editorDraftKey
+          : previewRequest?.commandPort?.fileSource
+            ? JSON.stringify(["source-preview", ...previewOwner, effectiveRequest.path])
+            : JSON.stringify([
+                effectiveRequest.projectPathKey,
+                effectiveRequest.workdir,
+                effectiveRequest.path,
+                ...(activeMode === "preview" ? previewOwner : []),
+              ])
+      }
       draftCache={cache.current}
       cacheVersion={cacheVersion}
       bulk={bulk}
@@ -449,6 +481,8 @@ function NativeWorkspaceFileSession(
   const fileApplications = useWorkspaceFileApplications({
     workdir: activeRequest.workdir,
     path: loaded?.path ?? activeRequest.path,
+    commandPort:
+      loaded?.request.commandPort ?? (activeRequest as WorkspaceFilePreviewOpenRequest).commandPort,
     enabled: !compact && !!loaded,
     onError: setFailure,
   });
@@ -550,6 +584,13 @@ function NativeWorkspaceFileSession(
       mode: LoadedFile["mode"],
       forceRead = false,
     ) => {
+      const cachedSource = mode === "editor" ? draftCache.editors.get(draftKey) : undefined;
+      request = bindPreviewExecution({
+        ...request,
+        commandPort:
+          cachedSource?.request.commandPort ??
+          (request as WorkspaceFilePreviewOpenRequest).commandPort,
+      });
       const generation = ++readGeneration.current;
       const previous = forceRead ? loadedRef.current : null;
       const version = sourceVersion.current;
@@ -593,10 +634,14 @@ function NativeWorkspaceFileSession(
             );
           }
         } else if (mode === "editor" || isWorkspaceEditablePreviewPath(request.path)) {
-          const response = await invokeFs<ReadEditableTextResponse>("fs_read_editable_text", {
-            workdir: request.workdir,
-            path: request.path,
-          });
+          const response = await invokePreviewFs<ReadEditableTextResponse>(
+            request,
+            "fs_read_editable_text",
+            {
+              workdir: request.workdir,
+              path: request.path,
+            },
+          );
           if (!current() || sourceChanged()) return;
           setLoaded(
             restoreDraft({
@@ -614,10 +659,14 @@ function NativeWorkspaceFileSession(
             }),
           );
         } else {
-          const response = await invokeFs<ReadWorkspacePreviewResponse>("fs_read_workspace_image", {
-            workdir: request.workdir,
-            path: request.path,
-          });
+          const response = await invokePreviewFs<ReadWorkspacePreviewResponse>(
+            request,
+            "fs_read_workspace_image",
+            {
+              workdir: request.workdir,
+              path: request.path,
+            },
+          );
           if (!current() || sourceChanged()) return;
           setLoaded(
             restoreDraft({
@@ -741,66 +790,86 @@ function NativeWorkspaceFileSession(
               normalizeImageRotation(snapshot.rotation.angle - snapshot.rotation.saved),
             ),
           );
-          response = await invokeFs<WriteDocumentResponse>("fs_write_binary", {
-            workdir: snapshot.request.workdir,
-            path: snapshot.path,
-            content_base64: binaryData,
-            expected_mtime_ms: snapshot.mtimeMs,
-            expected_content_hash: snapshot.contentHash,
-          });
+          response = await invokePreviewFs<WriteDocumentResponse>(
+            snapshot.request,
+            "fs_write_binary",
+            {
+              workdir: snapshot.request.workdir,
+              path: snapshot.path,
+              content_base64: binaryData,
+              expected_mtime_ms: snapshot.mtimeMs,
+              expected_content_hash: snapshot.contentHash,
+            },
+          );
         } else if (snapshot.highlights?.length) {
           if (!snapshot.data || !isEditablePdf(snapshot.path, snapshot.mimeType))
             throw new Error(t("workspaceEditor.saveFailed"));
           binaryData = previewBytesBase64(
             await writePdfHighlights(previewBytes(snapshot.data), snapshot.highlights),
           );
-          response = await invokeFs<WriteDocumentResponse>("fs_write_binary", {
-            workdir: snapshot.request.workdir,
-            path: snapshot.path,
-            content_base64: binaryData,
-            expected_mtime_ms: snapshot.mtimeMs,
-            expected_content_hash: snapshot.contentHash,
-          });
+          response = await invokePreviewFs<WriteDocumentResponse>(
+            snapshot.request,
+            "fs_write_binary",
+            {
+              workdir: snapshot.request.workdir,
+              path: snapshot.path,
+              content_base64: binaryData,
+              expected_mtime_ms: snapshot.mtimeMs,
+              expected_content_hash: snapshot.contentHash,
+            },
+          );
         } else if (presentationHasEdits(snapshot.texts)) {
           if (!snapshot.data || workspacePathExtension(snapshot.path) !== "pptx")
             throw new Error(t("workspaceEditor.saveFailed"));
           binaryData = previewBytesBase64(
             await writePresentationText(previewBytes(snapshot.data), snapshot.texts ?? {}),
           );
-          response = await invokeFs<WriteDocumentResponse>("fs_write_binary", {
-            workdir: snapshot.request.workdir,
-            path: snapshot.path,
-            content_base64: binaryData,
-            expected_mtime_ms: snapshot.mtimeMs,
-            expected_content_hash: snapshot.contentHash,
-          });
+          response = await invokePreviewFs<WriteDocumentResponse>(
+            snapshot.request,
+            "fs_write_binary",
+            {
+              workdir: snapshot.request.workdir,
+              path: snapshot.path,
+              content_base64: binaryData,
+              expected_mtime_ms: snapshot.mtimeMs,
+              expected_content_hash: snapshot.contentHash,
+            },
+          );
         } else if (spreadsheetHasEdits(snapshot.cells)) {
           if (!snapshot.data || workspacePathExtension(snapshot.path) !== "xlsx")
             throw new Error(t("workspaceEditor.saveFailed"));
           binaryData = previewBytesBase64(
             await writeSpreadsheetEdits(previewBytes(snapshot.data), snapshot.cells ?? {}),
           );
-          response = await invokeFs<WriteDocumentResponse>("fs_write_binary", {
-            workdir: snapshot.request.workdir,
-            path: snapshot.path,
-            content_base64: binaryData,
-            expected_mtime_ms: snapshot.mtimeMs,
-            expected_content_hash: snapshot.contentHash,
-          });
+          response = await invokePreviewFs<WriteDocumentResponse>(
+            snapshot.request,
+            "fs_write_binary",
+            {
+              workdir: snapshot.request.workdir,
+              path: snapshot.path,
+              content_base64: binaryData,
+              expected_mtime_ms: snapshot.mtimeMs,
+              expected_content_hash: snapshot.contentHash,
+            },
+          );
         } else if (
           snapshot.mode === "preview" &&
           getWorkspacePreviewKind(snapshot.path) === "document" &&
           workspacePathExtension(snapshot.path) === "docx"
         ) {
-          response = await invokeFs<WriteDocumentResponse>("fs_write_docx_text", {
-            workdir: snapshot.request.workdir,
-            path: snapshot.path,
-            content: snapshot.content,
-            expected_mtime_ms: snapshot.mtimeMs,
-            expected_content_hash: snapshot.contentHash,
-          });
+          response = await invokePreviewFs<WriteDocumentResponse>(
+            snapshot.request,
+            "fs_write_docx_text",
+            {
+              workdir: snapshot.request.workdir,
+              path: snapshot.path,
+              content: snapshot.content,
+              expected_mtime_ms: snapshot.mtimeMs,
+              expected_content_hash: snapshot.contentHash,
+            },
+          );
         } else {
-          response = await invokeFs<WriteTextResponse>("fs_write_text", {
+          response = await invokePreviewFs<WriteTextResponse>(snapshot.request, "fs_write_text", {
             workdir: snapshot.request.workdir,
             path: snapshot.path,
             content: snapshot.content,
@@ -841,7 +910,8 @@ function NativeWorkspaceFileSession(
         if (snapshot.mode === "preview" && workspacePathExtension(snapshot.path) === "docx") {
           setLoaded((current) => (current ? { ...current, data: null } : current));
           try {
-            const preview = await invokeFs<ReadWorkspacePreviewResponse>(
+            const preview = await invokePreviewFs<ReadWorkspacePreviewResponse>(
+              snapshot.request,
               "fs_read_workspace_image",
               {
                 workdir: snapshot.request.workdir,

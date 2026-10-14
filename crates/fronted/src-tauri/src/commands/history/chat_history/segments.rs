@@ -470,7 +470,7 @@ fn upsert_chat_history_header(
             active_segment_index = excluded.active_segment_index,
             total_segment_count = excluded.total_segment_count,
             total_message_count = excluded.total_message_count,
-            updated_at = excluded.updated_at
+            updated_at = MAX(chatHistory.updated_at, excluded.updated_at)
         ",
         params![
             input.id.trim(),
@@ -633,6 +633,8 @@ fn upsert_single_segment(
     conversation_id: &str,
     segment: &ChatHistorySegmentInput,
 ) -> Result<(), String> {
+    let retained=preserve_background_results(conn,conversation_id,segment)?;
+    let segment=retained.as_ref().unwrap_or(segment);
     conn.execute(
         "
         INSERT INTO chatHistorySegment (
@@ -731,6 +733,8 @@ fn sync_segments(
     let conversation = load_chat_history_fts_conversation_info(conn, conversation_id)?;
 
     for segment in segments {
+        let retained=preserve_background_results(conn,conversation_id,segment)?;
+        let segment=retained.as_ref().unwrap_or(segment);
         let existing_matches = existing_by_index
             .get(&segment.segment_index)
             .map(|record| segment_record_matches_input(record, segment))

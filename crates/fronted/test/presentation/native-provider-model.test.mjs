@@ -21,7 +21,7 @@ function harness(options = {}) {
   const { createPresentationActionRegistry } = loader.loadModule("src/presentation/actionRegistry.ts");
   const { validatePresentationDocument } = loader.loadModule("src/presentation/validateDocument.ts");
   let settings = updateCustomProviders(getDefaultSettings(), [normalizeCustomProvider({ id: "provider", type: "codex", name: "Relay", apiKey: "secret", customHeaders: [{ key: "X-Environment", value: "staging" }], models: [{ id: "model", contextWindow: 8192, maxOutputToken: 4096, cost: { input: 1, output: 2, cacheRead: 0.2, cacheWrite: 0.4 }, ownedBy: "original" }, { id: "other" }], activeModels: ["model", "other"] })]), backs = 0, request = 0;
-  settings = { ...settings, selectedModel: { customProviderId: "provider", model: "model" } };
+  settings = { ...settings, customProviders: settings.customProviders.map(provider => ({ ...provider, baseUrl: "https://relay.example/v1" })), selectedModel: { customProviderId: "provider", model: "model" } };
   const registry = createPresentationActionRegistry(), prefix = "model-settings:provider:model";
   const setSettings = update => { settings = update(settings); };
   const render = () => {
@@ -33,6 +33,7 @@ function harness(options = {}) {
   const send = (field, value = null) => registry.dispatch({ surface: "model-editor", action: `${prefix}:${field}`, value, requestId: String(++request) });
   const dispatch = async (field, value = null) => { render(); const result = await send(field, value); render(); return result; };
   return { render, send, dispatch, confirmations, helpers, prefix, update: setSettings,
+    routing: loader.loadModule("src/lib/subagents/modelRouting.ts"),
     unmount: () => hooks.unmount(), get settings() { return settings; }, get backs() { return backs; } };
 }
 
@@ -109,6 +110,56 @@ test("native model editor uses shared limits/cost rules and preserves current pr
     assert.deepEqual(model.cost, { input: 1.25, output: 2, cacheRead: 0, cacheWrite: 0.4 });
     assert.equal(provider.apiKey, "secret"); assert.deepEqual(provider.customHeaders, [{ key: "X-Environment", value: "staging" }]);
     assert.deepEqual(h.settings.selectedModel, { customProviderId: "provider", model: "model" }); assert.equal(h.backs, 1); h.unmount();
+  }
+});
+
+test("both native model surfaces save capability declarations into the real model routing candidates", async () => {
+  for (const mobile of [true, false]) {
+    const h = harness({ mobile });
+    const nodes = allNodes(h.render().document.nodes);
+    assert.ok(nodes.some(node => node.id.endsWith(":delegationSkills") && node.kind === "TextInput"));
+    assert.equal(nodes.find(node => node.id.endsWith(":delegationMaxConcurrency")).variant, "integer-input");
+    await h.send("delegationSkills", "Coding，research coding");
+    await h.send("delegationMaxConcurrency", "1");
+    assert.equal((await h.send("save")).ok, true);
+    const candidate = h.routing.configuredSubagentModels(h.settings.customProviders).find(item => item.value === "provider::model");
+    assert.deepEqual(Array.from(candidate.skills), ["coding", "research"]);
+    assert.equal(candidate.maxConcurrency, 1);
+    assert.equal(h.settings.customProviders[0].models[1].delegationSkills, undefined);
+    assert.equal(h.settings.customProviders[0].apiKey, "secret");
+    h.unmount();
+  }
+});
+
+test("invalid skills or fractional/out-of-range concurrency disable native Save without persisting", async () => {
+  for (const [field, value] of [["delegationSkills", "../invalid"], ["delegationSkills", Array.from({ length: 17 }, (_, i) => `tag${i}`).join(",")],
+    ["delegationMaxConcurrency", "0"], ["delegationMaxConcurrency", "9"], ["delegationMaxConcurrency", "1.5"], ["delegationMaxConcurrency", "Infinity"]]) {
+    const h = harness(); const before = h.settings; h.render();
+    await h.send(field, value);
+    const nodes = allNodes(h.render().document.nodes);
+    assert.equal(nodes.find(node => node.id.endsWith(":save")).disabled, true);
+    assert.equal((await h.send("save")).ok, false);
+    assert.equal(h.settings, before); assert.equal(h.backs, 0); h.unmount();
+  }
+});
+
+test("model discovery preserves untouched delegation settings, while an explicit edit or clear wins", async () => {
+  for (const mode of ["untouched", "edit", "clear"]) {
+    const h = harness();
+    h.update(previous => ({ ...previous, customProviders: previous.customProviders.map(provider => ({ ...provider,
+      models: provider.models.map(model => ({ ...model, delegationSkills: ["coding"], delegationMaxConcurrency: 2 })) })) }));
+    h.render();
+    if (mode !== "untouched") {
+      await h.send("delegationSkills", mode === "edit" ? "research" : "");
+      await h.send("delegationMaxConcurrency", "1");
+    }
+    h.update(previous => ({ ...previous, customProviders: previous.customProviders.map(provider => ({ ...provider,
+      models: provider.models.map(model => ({ ...model, delegationSkills: ["documents"], delegationMaxConcurrency: 4, ownedBy: "fresh" })) })) }));
+    assert.equal((await h.send("save")).ok, true);
+    const model = h.settings.customProviders[0].models[0];
+    assert.deepEqual(model.delegationSkills, mode === "untouched" ? ["documents"] : mode === "edit" ? ["research"] : undefined);
+    assert.equal(model.delegationMaxConcurrency, mode === "untouched" ? 4 : 1);
+    assert.equal(model.ownedBy, "fresh"); h.unmount();
   }
 });
 

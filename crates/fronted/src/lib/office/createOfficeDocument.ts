@@ -1,6 +1,7 @@
 import {
   Document,
   HeadingLevel,
+  ImageRun,
   Packer,
   Paragraph,
   Table,
@@ -12,10 +13,34 @@ import PptxGenJS from "pptxgenjs";
 import { utils, write } from "xlsx";
 
 export type OfficeCell = string | number | boolean | null | { formula: string };
+export type OfficeImageReference = {
+  path: string;
+  width: number;
+  height: number;
+  altText?: string;
+};
+export type OfficeImageSnapshot = { data: string; mimeType: string };
+type SlidePosition = { x: number; y: number; width: number; height: number };
+type OfficeSlideElement = SlidePosition &
+  (
+    | {
+        type: "text" | "rectangle";
+        text?: string;
+        color?: string;
+        fontSize?: number;
+        bold?: boolean;
+      }
+    | { type: "image"; path: string; altText?: string }
+  );
 export type OfficeDocument =
   | {
       format: "docx";
-      paragraphs: Array<{ text: string; heading?: 1 | 2 | 3; bold?: boolean }>;
+      paragraphs: Array<{
+        text: string;
+        heading?: 1 | 2 | 3;
+        bold?: boolean;
+        image?: OfficeImageReference;
+      }>;
       tables?: string[][][];
     }
   | { format: "xlsx"; sheets: Array<{ name: string; rows: OfficeCell[][] }> }
@@ -24,21 +49,12 @@ export type OfficeDocument =
       slides: Array<{
         background?: string;
         notes?: string;
-        elements: Array<{
-          type: "text" | "rectangle";
-          x: number;
-          y: number;
-          width: number;
-          height: number;
-          text?: string;
-          color?: string;
-          fontSize?: number;
-          bold?: boolean;
-        }>;
+        elements: OfficeSlideElement[];
       }>;
     };
 
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 function text(value: unknown, label: string) {
   if (typeof value !== "string" || value.length > 32767)
     throw new Error(`${label} must be valid text of at most 32767 characters`);
@@ -66,27 +82,105 @@ function list<T>(value: T[], label: string, max: number) {
 }
 
 /** Generates native editable OOXML in the shared runtime, with no subprocess or file download. */
-export async function createOfficeDocument(document: OfficeDocument): Promise<Uint8Array> {
+export async function createOfficeDocument(
+  document: OfficeDocument,
+  options: { readImage?: (path: string) => Promise<OfficeImageSnapshot> } = {},
+): Promise<Uint8Array> {
   if (!document || new TextEncoder().encode(JSON.stringify(document)).length > MAX_SOURCE_BYTES)
     throw new Error("Office document specification exceeds 2 MiB");
+  let imageCount = 0,
+    imageBytes = 0;
+  const images = new Map<
+    string,
+    OfficeImageSnapshot & { bytes: Uint8Array; type: "png" | "jpg" }
+  >();
+  const image = async (path: string) => {
+    text(path, "Image path");
+    if (!path.trim() || /^https?:|^data:|^file:/i.test(path.trim()))
+      throw new Error("Office images require an authorized local workspace path");
+    if (++imageCount > 16) throw new Error("Office documents support at most 16 image placements");
+    let saved = images.get(path);
+    if (!saved) {
+      if (!options.readImage) throw new Error("Office image access requires a scoped file reader");
+      const source = await options.readImage(path);
+      if (
+        !source ||
+        typeof source.data !== "string" ||
+        !source.data ||
+        source.data.length % 4 !== 0 ||
+        source.data.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4 ||
+        !/^[A-Za-z0-9+/]*={0,2}$/.test(source.data)
+      ) {
+        throw new Error("Office image bytes are missing, invalid or exceed 8 MiB");
+      }
+      const binary = atob(source.data),
+        bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      const png =
+        bytes.length >= 24 &&
+        [137, 80, 78, 71, 13, 10, 26, 10].every((byte, index) => bytes[index] === byte);
+      const jpeg =
+        bytes.length >= 4 &&
+        bytes[0] === 255 &&
+        bytes[1] === 216 &&
+        bytes[2] === 255 &&
+        bytes.at(-2) === 255 &&
+        bytes.at(-1) === 217;
+      if (!(png && source.mimeType === "image/png") && !(jpeg && source.mimeType === "image/jpeg"))
+        throw new Error(
+          "Office images must contain actual PNG or JPEG bytes matching their MIME type",
+        );
+      saved = { ...source, bytes, type: png ? "png" : "jpg" };
+      images.set(path, saved);
+    }
+    imageBytes += saved.bytes.length;
+    if (imageBytes > MAX_IMAGE_BYTES)
+      throw new Error("Office image placements exceed the combined 8 MiB byte budget");
+    return saved;
+  };
   if (document.format === "docx") {
     const headings = {
       1: HeadingLevel.HEADING_1,
       2: HeadingLevel.HEADING_2,
       3: HeadingLevel.HEADING_3,
     };
-    const children: Array<Paragraph | Table> = list(document.paragraphs, "Paragraphs", 10000).map(
-      (paragraph) => {
-        if (paragraph.heading !== undefined && ![1, 2, 3].includes(paragraph.heading))
-          throw new Error("Unsupported heading level");
-        return new Paragraph({
+    const children: Array<Paragraph | Table> = [];
+    for (const paragraph of list(document.paragraphs, "Paragraphs", 10000)) {
+      if (paragraph.heading !== undefined && ![1, 2, 3].includes(paragraph.heading))
+        throw new Error("Unsupported heading level");
+      if (paragraph.image) {
+        const { width, height, path, altText } = paragraph.image;
+        if (
+          ![width, height].every(Number.isFinite) ||
+          width <= 0 ||
+          height <= 0 ||
+          width > 600 ||
+          height > 800
+        )
+          throw new Error("Document images must fit a 600 × 800 pixel content area");
+        const source = await image(path),
+          description = text(altText ?? "", "Image alt text");
+        children.push(
+          new Paragraph({
+            children: [
+              new ImageRun({
+                data: source.bytes,
+                type: source.type,
+                transformation: { width, height },
+                altText: { name: description, title: description, description },
+              }),
+            ],
+          }),
+        );
+      }
+      children.push(
+        new Paragraph({
           heading: paragraph.heading ? headings[paragraph.heading] : undefined,
           children: [
             new TextRun({ text: text(paragraph.text, "Paragraph"), bold: paragraph.bold }),
           ],
-        });
-      },
-    );
+        }),
+      );
+    }
     for (const table of document.tables ?? []) {
       list(table, "Table rows", 1000);
       children.push(
@@ -160,6 +254,18 @@ export async function createOfficeDocument(document: OfficeDocument): Promise<Ui
           y + height > 7.5
         )
           throw new Error("Slide element lies outside the 13.333 × 7.5 inch slide");
+        if (element.type === "image") {
+          const source = await image(element.path);
+          slide.addImage({
+            x,
+            y,
+            w: width,
+            h: height,
+            data: `${source.mimeType};base64,${source.data}`,
+            altText: text(element.altText ?? "", "Image alt text"),
+          });
+          continue;
+        }
         const options = { x, y, w: width, h: height, color: color(element.color) };
         if (element.type === "text") {
           if (

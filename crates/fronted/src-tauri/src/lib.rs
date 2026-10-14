@@ -55,6 +55,7 @@ macro_rules! app_invoke_handler {
             commands::chat_history::chat_history_list,
             commands::chat_history::chat_history_workdirs,
             commands::chat_history::chat_history_search,
+            commands::chat_history::chat_history_read_personal_evidence,
             commands::chat_history::chat_history_get,
             commands::chat_history::chat_history_get_active_segment,
             commands::chat_history::chat_history_get_window,
@@ -92,6 +93,8 @@ macro_rules! app_invoke_handler {
             commands::fs::fs_read_workspace_image,
             commands::fs::fs_write_text,
             commands::fs::fs_write_binary,
+            commands::fs::fs_create_binary,
+            commands::fs::fs_snapshot_binary,
             commands::fs::fs_create_office_document,
             commands::fs::fs_import_file,
             commands::fs::fs_write_docx_text,
@@ -192,6 +195,8 @@ macro_rules! app_invoke_handler {
             commands::update::app_restart,
             commands::app::app_runtime_platform,
             commands::app::app_frontend_ready,
+            commands::app::app_agent_startup_status,
+            commands::app::app_agent_startup_set,
             commands::app::app_set_close_window_behavior,
             commands::app::app_set_global_shortcuts,
             commands::app::app_window_pinned,
@@ -206,11 +211,76 @@ macro_rules! app_invoke_handler {
             // Automation (cron tasks + hooks store)
             commands::cron::cron_validate_expression,
             commands::cron::automation_snapshot,
+            commands::proactive::automation_proactive_snapshot,
+            commands::proactive::automation_proactive_apply,
+            commands::proactive::automation_foreground_attention,
+            commands::goals::automation_goal_snapshot,
+            commands::goal_launch::automation_goal_executors,
+            commands::goal_launch::automation_goal_launch,
+            commands::goals::automation_goal_apply,
+            commands::goals::automation_goal_activity,
+            commands::goals::automation_goal_artifacts,
+            commands::goals::automation_goal_artifact_content,
             commands::cron::automation_cron_apply,
             commands::cron::automation_hooks_apply,
             commands::cron::automation_list_runs,
             commands::cron::automation_clear_runs,
             commands::cron::automation_run_cron_now,
+            commands::cron::automation_background_submit,
+            commands::cron::automation_background_get,
+            commands::cron::automation_background_list,
+            commands::cron::automation_background_cancel,
+            commands::cron::automation_background_host_heartbeat,
+            commands::cron::automation_background_host_info,
+            commands::cron::automation_background_publish_artifact,
+            commands::cron::automation_background_prepare_inputs,
+            commands::cron::automation_background_execution_settings,
+            commands::cron::automation_background_read_artifact,
+            commands::cron::automation_background_read_artifact_chunk,
+            commands::videos::automation_video_models,
+            commands::videos::automation_video_start,
+            commands::videos::automation_video_result,
+            commands::videos::automation_video_wait,
+            commands::cron::automation_background_execution_read_artifact,
+            commands::cron::automation_background_save_checkpoint,
+            commands::cron::automation_background_restore_checkpoint,
+            commands::cron::automation_background_budget,
+            commands::cron::automation_background_budget_consume,
+            commands::cron::automation_background_outcomes,
+            commands::cron::automation_background_wait,
+            commands::device_planning::automation_background_device_planning,
+            commands::cron::automation_background_due_waits,
+            commands::cron::automation_background_defer_wait,
+            commands::cron::automation_background_waiting_settings,
+            commands::cron::automation_background_wake_ready,
+            commands::cloud_waiting::automation_background_cloud_wait,
+            commands::children::automation_background_children,
+            commands::children::automation_background_child_wait,
+            commands::children::automation_background_child_park,
+            commands::children::automation_background_child_resume,
+            commands::children::automation_background_child_resume_receipt,
+            commands::children::automation_background_model_submit,
+            commands::children::automation_background_child_import_artifact,
+            commands::cloud_artifacts::automation_background_cloud_import_artifact,
+            commands::cloud_waiting::automation_background_cloud_probe,
+            commands::cloud_launch::automation_background_cloud_start,
+            commands::cloud_launch::automation_background_cloud_reconcile,
+            commands::cloud_launch::automation_background_cloud_park,
+            commands::cloud_recovery::automation_background_cloud_recover_interrupted,
+            commands::cloud_recovery::automation_background_cloud_reconcile_cancellations,
+            commands::cron::automation_background_resume,
+            commands::cron::automation_background_resume_receipt,
+            commands::cron::automation_background_evidence_options,
+            commands::cron::automation_background_save_plan,
+            commands::cron::automation_background_resolve_plan,
+            commands::cron::automation_background_record_outcome,
+            commands::cron::automation_background_compact_context,
+            commands::cron::automation_background_compactions,
+            commands::cron::automation_background_read_context_archive,
+            commands::cron::automation_background_source_context,
+            commands::cron::automation_background_begin_operation,
+            commands::cron::automation_background_complete_operation,
+            commands::cron::automation_background_operations,
             commands::cron::automation_claim_prompt_runs,
             commands::cron::automation_release_prompt_run,
             commands::cron::automation_complete_prompt_run,
@@ -338,6 +408,10 @@ macro_rules! app_invoke_handler {
             commands::app_commands::soul::system_delete_soul,
             commands::custom_tools::system_http_get_test,
             commands::cloud::cloud_secret_vault_status,
+            commands::github_oauth::github_oauth_status,
+            commands::github_oauth::github_oauth_start,
+            commands::github_oauth::github_oauth_cancel,
+            commands::github_oauth::github_oauth_open,
             commands::cloud::cloud_secret_vault_set_github_token,
             commands::cloud::cloud_secret_vault_remove_github_token,
             commands::lan_pc::lan_pc_status,
@@ -347,6 +421,37 @@ macro_rules! app_invoke_handler {
             commands::lan_pc::lan_pc_invoke,
             commands::lan_pc::lan_pc_subscribe,
             commands::lan_pc::lan_pc_unsubscribe,
+            commands::lan_pc::worker_peer_list,
+            commands::lan_pc::worker_peer_discover,
+            commands::cron::automation_result_sync,
+            commands::submission::automation_device_identity,
+            commands::submission::automation_result_device_branches,
+            commands::submission::automation_result_submission_submit,
+            commands::submission::automation_result_submission_list,
+            commands::submission::automation_result_submission_state,
+            commands::submission::automation_result_chat_context,
+            commands::submission::automation_result_chat_project,
+            commands::artifact_streams::automation_result_chat_artifact,
+            commands::submission::automation_result_submission_cancel,
+            commands::submission::automation_result_submission_current,
+            commands::cron::automation_result_list,
+            commands::cron::automation_result_notify,
+            commands::cron::automation_result_read,
+            commands::cron::automation_result_ack,
+            commands::cron::automation_result_artifact,
+            commands::artifact_streams::automation_result_artifact_prepare,
+            commands::artifact_streams::automation_result_artifact_abort,
+            commands::artifact_streams::automation_result_artifact_commit,
+            commands::cron::automation_result_current,
+            commands::received_children::automation_result_child,
+            commands::cron::automation_result_resume,
+            commands::cron::automation_result_response_state,
+            commands::lan_pc::worker_peer_probe,
+            commands::lan_pc::worker_peer_resolve_request,
+            commands::lan_pc::worker_peer_resolve_endpoint,
+            commands::lan_pc::worker_peer_invoke,
+            commands::lan_pc::worker_peer_file_invoke,
+            commands::lan_pc::worker_peer_forget,
             commands::provider_oauth::provider_oauth_start_codex,
             commands::provider_oauth::provider_oauth_poll_codex,
             commands::provider_oauth::provider_oauth_cancel_codex,
@@ -359,7 +464,11 @@ macro_rules! app_invoke_handler {
             commands::cloud::cloud_task_wait,
             commands::cloud::cloud_task_failure_log,
             commands::cloud::cloud_task_download_artifact,
+            commands::cloud::cloud_task_extract_artifact,
             commands::cloud::cloud_task_open_artifact,
+            commands::tailscale::tailscale_setup_status,
+            commands::tailscale::tailscale_authenticate,
+            commands::tailscale::tailscale_logout,
             commands::local_access::local_access_status,
             commands::local_access::local_access_rotate_pairing_code,
             commands::local_access::local_access_revoke_all_devices,
@@ -380,12 +489,31 @@ macro_rules! app_invoke_handler {
 macro_rules! app_invoke_handler {
     () => {
         tauri::generate_handler![
+            commands::mobile_connector::automation_mobile_connector_execute,
+            commands::mobile_connector::automation_mobile_connector_read,
+            commands::mobile_branch::automation_mobile_branch_prepare,
+            commands::mobile_branch::automation_mobile_branch_read,
+            commands::mobile_branch::automation_mobile_branch_pending,
+            commands::mobile_branch::automation_mobile_branch_context,
+            commands::mobile_device_planning::automation_mobile_branch_planning_exchange,
+            commands::mobile_branch::automation_mobile_branch_execute,
+            commands::mobile_branch::automation_mobile_branch_complete,
+            commands::mobile_branch::automation_mobile_branch_inspect,
+            commands::mobile_branch::automation_mobile_branch_error,
+            commands::mobile_branch::automation_mobile_branch_retry,
+            commands::mobile_branch::automation_mobile_branch_authorization,
+            commands::mobile_branch::automation_mobile_branch_decide,
+            commands::mobile_branch_reads::automation_mobile_branch_read_authorization,
+            commands::mobile_branch_reads::automation_mobile_branch_read_choices,
+            commands::mobile_branch_reads::automation_mobile_branch_read_decide,
+            commands::mobile_branch_reads::automation_mobile_branch_read_data,
             commands::app_commands::apple_ui::apple_ui_update,
             commands::app_commands::apple_ui::apple_ui_action_result,
             commands::app_commands::apple_ui::apple_ui_font_families,
             commands::chat_history::chat_history_list,
             commands::chat_history::chat_history_workdirs,
             commands::chat_history::chat_history_search,
+            commands::chat_history::chat_history_read_personal_evidence,
             commands::chat_history::chat_history_get,
             commands::chat_history::chat_history_get_active_segment,
             commands::chat_history::chat_history_get_window,
@@ -414,6 +542,8 @@ macro_rules! app_invoke_handler {
             commands::fs::fs_read_workspace_image,
             commands::fs::fs_write_text,
             commands::fs::fs_write_binary,
+            commands::fs::fs_create_binary,
+            commands::fs::fs_snapshot_binary,
             commands::fs::fs_create_office_document,
             commands::fs::fs_import_file,
             commands::fs::fs_write_docx_text,
@@ -471,6 +601,16 @@ macro_rules! app_invoke_handler {
             commands::settings::settings_save_model_failover,
             commands::cron::cron_validate_expression,
             commands::cron::automation_snapshot,
+            commands::proactive::automation_proactive_snapshot,
+            commands::proactive::automation_foreground_attention,
+            commands::proactive::automation_proactive_apply,
+            commands::goals::automation_goal_snapshot,
+            commands::goal_launch::automation_goal_executors,
+            commands::goal_launch::automation_goal_launch,
+            commands::goals::automation_goal_apply,
+            commands::goals::automation_goal_activity,
+            commands::goals::automation_goal_artifacts,
+            commands::goals::automation_goal_artifact_content,
             commands::cron::automation_cron_apply,
             commands::cron::automation_hooks_apply,
             commands::cron::automation_list_runs,
@@ -490,6 +630,10 @@ macro_rules! app_invoke_handler {
             commands::mcp::mcp_test_server,
             commands::mcp::mcp_restart_server,
             commands::cloud::cloud_secret_vault_status,
+            commands::github_oauth::github_oauth_status,
+            commands::github_oauth::github_oauth_start,
+            commands::github_oauth::github_oauth_cancel,
+            commands::github_oauth::github_oauth_open,
             commands::cloud::cloud_secret_vault_set_github_token,
             commands::cloud::cloud_secret_vault_remove_github_token,
             commands::lan_pc::lan_pc_status,
@@ -499,6 +643,37 @@ macro_rules! app_invoke_handler {
             commands::lan_pc::lan_pc_invoke,
             commands::lan_pc::lan_pc_subscribe,
             commands::lan_pc::lan_pc_unsubscribe,
+            commands::lan_pc::worker_peer_list,
+            commands::lan_pc::worker_peer_discover,
+            commands::cron::automation_result_sync,
+            commands::submission::automation_device_identity,
+            commands::submission::automation_result_device_branches,
+            commands::submission::automation_result_submission_submit,
+            commands::submission::automation_result_submission_list,
+            commands::submission::automation_result_submission_state,
+            commands::submission::automation_result_chat_context,
+            commands::submission::automation_result_chat_project,
+            commands::artifact_streams::automation_result_chat_artifact,
+            commands::submission::automation_result_submission_cancel,
+            commands::submission::automation_result_submission_current,
+            commands::cron::automation_result_list,
+            commands::cron::automation_result_notify,
+            commands::cron::automation_result_read,
+            commands::cron::automation_result_ack,
+            commands::cron::automation_result_artifact,
+            commands::artifact_streams::automation_result_artifact_prepare,
+            commands::artifact_streams::automation_result_artifact_abort,
+            commands::artifact_streams::automation_result_artifact_commit,
+            commands::cron::automation_result_current,
+            commands::received_children::automation_result_child,
+            commands::cron::automation_result_resume,
+            commands::cron::automation_result_response_state,
+            commands::lan_pc::worker_peer_probe,
+            commands::lan_pc::worker_peer_resolve_request,
+            commands::lan_pc::worker_peer_resolve_endpoint,
+            commands::lan_pc::worker_peer_invoke,
+            commands::lan_pc::worker_peer_file_invoke,
+            commands::lan_pc::worker_peer_forget,
             commands::provider_oauth::provider_oauth_start_codex,
             commands::provider_oauth::provider_oauth_poll_codex,
             commands::provider_oauth::provider_oauth_cancel_codex,
@@ -511,7 +686,11 @@ macro_rules! app_invoke_handler {
             commands::cloud::cloud_task_wait,
             commands::cloud::cloud_task_failure_log,
             commands::cloud::cloud_task_download_artifact,
+            commands::cloud::cloud_task_extract_artifact,
             commands::cloud::cloud_task_open_artifact,
+            commands::tailscale::tailscale_setup_status,
+            commands::tailscale::tailscale_authenticate,
+            commands::tailscale::tailscale_logout,
             commands::shell::shell_run,
             commands::shell::shell_cancel,
             commands::shell::mobile_ssh_exec,
@@ -551,6 +730,9 @@ macro_rules! app_invoke_handler {
 
 #[cfg(desktop)]
 fn show_main_window(app: &tauri::AppHandle) -> tauri::Result<()> {
+    if let Some(state) = app.try_state::<Arc<services::agent_startup::AgentStartupState>>() {
+        state.request_show();
+    }
     // Tray, shortcuts and a second instance must not expose an unpainted WebView.
     // The frontend-ready command will show it once its surface is ready.
     if !app
@@ -800,6 +982,9 @@ fn configure_system_tray(app: &tauri::App) -> tauri::Result<()> {
 
 #[cfg(desktop)]
 pub fn run() {
+    // Both ring and aws-lc are enabled by the existing app and embedded SDK.
+    // Choose the app's ring provider before the first HTTP/TLS client is built.
+    let _ = rustls::crypto::ring::default_provider().install_default();
     #[cfg(target_os = "windows")]
     runtime::windows_sandbox::run_sandbox_launcher_if_requested();
 
@@ -845,9 +1030,11 @@ pub fn run() {
 
     let builder = tauri::Builder::default();
     #[cfg(not(debug_assertions))]
-    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-        if let Err(error) = show_main_window(app) {
-            eprintln!("failed to focus existing Xgent instance: {error}");
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+        if !services::agent_startup::is_background_launch(&argv) {
+            if let Err(error) = show_main_window(app) {
+                eprintln!("failed to focus existing Xgent instance: {error}");
+            }
         }
     }));
 
@@ -884,6 +1071,10 @@ pub fn run() {
         .manage(Arc::clone(&close_window_behavior))
         .manage(Arc::clone(&automation_store))
         .manage(Arc::clone(&automation_scheduler))
+        .manage(Arc::new(services::agent_worker::AgentWorkerState::default()))
+        .manage(Arc::new(services::agent_startup::AgentStartupState::new(
+            services::agent_startup::is_background_launch(std::env::args_os()),
+        )))
         .manage(Arc::new(commands::hook::HookScopeRegistry::default()))
         .manage(stt_manager)
         .on_page_load(|webview, payload| {
@@ -910,8 +1101,16 @@ pub fn run() {
             let terminal_registry = Arc::clone(&terminal_registry);
             let sftp_registry = Arc::clone(&sftp_registry);
             let managed_process_registry = Arc::clone(&managed_process_registry);
+            let worker_quitting = Arc::clone(&allow_exit);
             move |app| {
                 commands::history_db::initialize_history_db()?;
+                #[cfg(not(debug_assertions))]
+                if let Err(error) = app.handle().plugin(tauri_plugin_autostart::init(
+                    tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                    Some(vec![services::agent_startup::BACKGROUND_ARG]),
+                )) {
+                    eprintln!("Optional login registration unavailable; existing chat/worker remain usable: {error}");
+                }
                 configure_system_tray(app)?;
                 if let Err(error) = commands::settings::initialize_system_proxy_from_db() {
                     eprintln!("failed to initialize system proxy state: {error}");
@@ -920,16 +1119,37 @@ pub fn run() {
                 let cloud_secret_vault = Arc::new(
                     services::cloud_secret_vault::CloudSecretVault::new(app_data_dir.clone())?,
                 );
+                let worker_identity_ready = match cloud_secret_vault.worker_host_identity().and_then(|identity|
+                    app.state::<Arc<services::automation::AutomationStore>>().bind_worker_identity(&identity)) {
+                    Ok(()) => true,
+                    Err(error) => {
+                        eprintln!("background worker identity unavailable; chat remains usable: {error}");
+                        false
+                    }
+                };
                 let provider_oauth = Arc::new(
                     services::provider_oauth::ProviderOAuthService::new(Arc::clone(
                         &cloud_secret_vault,
                     ))?,
                 );
+                if services::embedded_tailnet::initialize(Arc::clone(&cloud_secret_vault)).is_err() {
+                    eprintln!("Optional embedded Tailscale unavailable; local chat and LAN remain usable");
+                }
                 let lan_pc_client = Arc::new(services::lan_pc_client::LanPcClient::new(
                     Arc::clone(&cloud_secret_vault),
                 )?);
                 app.manage(Arc::clone(&cloud_secret_vault));
+                match services::github_oauth::GitHubAuthorizationService::new(Arc::clone(&cloud_secret_vault)) {
+                    Ok(service) => {let service=Arc::new(service);service.start_worker();app.manage(service);},
+                    Err(_) => eprintln!("Optional GitHub device authorization unavailable; existing credentials remain usable"),
+                }
                 app.manage(Arc::clone(&provider_oauth));
+                match services::worker_peers::WorkerPeerRegistry::new(Arc::clone(&cloud_secret_vault)) {
+                    Ok(registry) => { app.manage(Arc::new(registry)); }
+                    // Never replace unreadable protected ownership with an
+                    // empty registry or invent a new destination for its tasks.
+                    Err(error) => eprintln!("persistent worker registry unavailable; existing chat and LAN session remain usable: {error}"),
+                }
                 app.manage(lan_pc_client);
                 app.manage(Arc::new(
                     services::cloud_execution::CloudExecutionService::new(app_data_dir)?,
@@ -969,7 +1189,25 @@ pub fn run() {
                     app_handle: app.handle().clone(),
                     scheduler: Arc::downgrade(&automation_scheduler),
                 });
-                Arc::clone(&automation_scheduler).start();
+                if worker_identity_ready {
+                    match Arc::clone(&automation_scheduler).start() {
+                        Ok(()) => app.state::<Arc<services::agent_worker::AgentWorkerState>>().enable_execution(),
+                        Err(error) => eprintln!("background execution disabled after startup recovery failed: {error}"),
+                    }
+                }
+                // Execution and admitted LAN RPC survive the visible UI's lifecycle.
+                // An optional worker must never turn an otherwise usable chat
+                // application into a fatal startup error. No heartbeat means
+                // background_host_info and task admission remain unavailable.
+                let worker_state = Arc::clone(app.state::<Arc<services::agent_worker::AgentWorkerState>>().inner());
+                if let Err(error) = services::worker_supervisor::initialize(app.handle(), &automation_store, &worker_state) {
+                    let _ = worker_state.restart_failed(services::automation::db::now_ms() as u64);
+                    eprintln!("background worker window unavailable; chat remains usable: {error}");
+                }
+                services::worker_supervisor::start(app.handle().clone(), Arc::clone(&automation_store), worker_state, Arc::clone(&worker_quitting));
+                services::child_tasks::start_if_available(app.handle(), Arc::clone(&automation_store), Arc::clone(&worker_quitting));
+                services::video_generation::start(app.handle().clone(), Arc::clone(&automation_store), Arc::clone(&worker_quitting));
+                services::result_receiver::start_if_available(app.handle(), Some(Arc::clone(&worker_quitting)));
                 Ok(())
             }
         })
@@ -1117,12 +1355,13 @@ fn initialize_mobile_services(
         }
     };
 
-    let cloud_secret_vault = match services::cloud_secret_vault::CloudSecretVault::new(
-        app_data_dir.clone(),
-    ) {
+    let cloud_secret_vault = match services::mobile_worker_runtime::vault(&app_data_dir,true) {
         Ok(vault) => {
-            let vault = Arc::new(vault);
             app.manage(Arc::clone(&vault));
+            match services::github_oauth::GitHubAuthorizationService::new(Arc::clone(&vault)) {
+                Ok(service) => {let service=Arc::new(service);service.start_worker();app.manage(service);},
+                Err(_) => eprintln!("Optional GitHub device authorization unavailable; existing credentials remain usable"),
+            }
             Some(vault)
         }
         Err(error) => {
@@ -1176,6 +1415,21 @@ fn initialize_mobile_services(
         }
     }
 
+    if let Some(vault) = cloud_secret_vault.as_ref() {
+        if services::embedded_tailnet::initialize(Arc::clone(vault)).is_err() {
+            eprintln!("Optional embedded Tailscale unavailable; original local chat and LAN remain usable");
+        }
+        if let Some(store) = automation_store.as_ref() {
+            let identity = vault.worker_host_identity().and_then(|id| store.bind_worker_identity(&id));
+            if let Err(error) = identity {
+                record_mobile_startup_failure(&mut failures, "bind worker installation identity failed", error);
+            }
+        }
+        match services::mobile_worker_runtime::peers(vault) {
+            Ok(registry) => { app.manage(registry); }
+            Err(error) => record_mobile_startup_failure(&mut failures, "initialize worker peer registry failed", error),
+        }
+    }
     let lan_pc_client = cloud_secret_vault.as_ref().and_then(|vault| {
         match services::lan_pc_client::LanPcClient::new(Arc::clone(vault)) {
             Ok(client) => {
@@ -1195,6 +1449,10 @@ fn initialize_mobile_services(
     });
 
     if let Some(automation_store) = automation_store {
+        #[cfg(any(target_os="ios",target_os="android"))]
+        services::health_events::start(app.clone(),Arc::clone(&automation_store));
+        #[cfg(target_os="ios")]
+        services::home_events::start(app.clone(),Arc::clone(&automation_store));
         let automation_scheduler = Arc::new(services::automation::AutomationScheduler::new(
             Arc::clone(&automation_store),
             app.clone(),
@@ -1205,12 +1463,16 @@ fn initialize_mobile_services(
             scheduler: Arc::downgrade(&automation_scheduler),
         });
         app.manage(Arc::clone(&automation_scheduler));
-        automation_scheduler.start();
+        if let Err(error) = automation_scheduler.start() {
+            record_mobile_startup_failure(&mut failures, "start automation scheduler failed", error);
+        }
     }
 
     if let Err(error) = services::skills::ensure_builtin_agent_skills_sync() {
         record_mobile_startup_failure(&mut failures, "seed builtin skills failed", error);
     }
+
+    services::result_receiver::start_if_available(&app, None);
 
     (failures, core_ready)
 }
@@ -1218,6 +1480,11 @@ fn initialize_mobile_services(
 #[cfg(mobile)]
 #[tauri::mobile_entry_point]
 pub fn run() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    #[cfg(target_os="ios")]
+    if !tauri_plugin_mobile_assistant::register_background_results(){
+        eprintln!("iOS result refresh registration unavailable; original reopen recovery remains");
+    }
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_browser_automation::init())

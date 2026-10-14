@@ -4,6 +4,7 @@ import type {
   RenderUserMessage,
 } from "../../../lib/chat/conversation/conversationState";
 import type { LiveTranscriptState } from "../../../lib/chat/conversation/liveTranscriptStore";
+import { collectBackgroundChatArtifacts } from "../../../lib/chat/messages/backgroundArtifacts";
 import { isChangedFileToolResult } from "../../../lib/chat/messages/changedFiles";
 import { getRoundText, type LiveRound, type UiRound } from "../../../lib/chat/messages/uiMessages";
 import { isTaskToolBlock } from "../../../lib/chat/taskProgress";
@@ -388,20 +389,21 @@ function buildAssistantUnits(input: BuildAssistantUnitsInput): AssistantUnitRow[
     });
   } else {
     const changedFilesCandidate = hasChangedFilesCandidate(rounds);
+    const backgroundFileCount = collectBackgroundChatArtifacts(rounds).length;
     const contentTailIndex = rows.length - 1;
     const contentTail = rows[contentTailIndex];
     if (contentTail) {
       rows[contentTailIndex] = {
         ...contentTail,
-        gapAfter: changedFilesCandidate ? ASSISTANT_UNIT_GAP_PX : 0,
+        gapAfter: changedFilesCandidate || backgroundFileCount ? ASSISTANT_UNIT_GAP_PX : 0,
       };
     }
     rows.push({
       kind: "assistant-unit",
       key: `${replyKey}:footer`,
       replyKey,
-      estimate: changedFilesCandidate ? 272 : 32,
-      renderCost: changedFilesCandidate ? 2 : 1,
+      estimate: (changedFilesCandidate ? 272 : 32) + backgroundFileCount * 128,
+      renderCost: (changedFilesCandidate ? 2 : 1) + backgroundFileCount,
       gapAfter: TRANSCRIPT_ROW_GAP_PX,
       anchorUserKey,
       live: false,

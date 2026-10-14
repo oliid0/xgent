@@ -101,7 +101,7 @@ test("runCompaction produces a zero-usage checkpoint and appends a new segment",
   const checkpoint = outcome.checkpointMessage;
   assert.equal(checkpoint.api, "xgent-compaction");
   assert.equal(checkpoint.model, "claude-x");
-  assert.equal(checkpoint.promptVersion, "summary-v3");
+  assert.equal(checkpoint.promptVersion, "summary-v4");
 
   assert.equal(checkpoint.usage.totalTokens, 0);
   assert.equal(checkpoint.usage.input, 0);
@@ -121,7 +121,7 @@ test("runCompaction produces a zero-usage checkpoint and appends a new segment",
   assert.ok(summary.content.startsWith("## Task"));
   assert.equal(summary.summaryMeta.strategy, "cumulative-checkpoint");
   assert.equal(summary.summaryMeta.generatedBy.providerId, "anthropic");
-  assert.equal(summary.summaryMeta.generatedBy.promptVersion, "summary-v3");
+  assert.equal(summary.summaryMeta.generatedBy.promptVersion, "summary-v4");
   assert.equal(summary.summaryMeta.stats.estimatedInputTokens, 190_000);
   assert.deepEqual(summary.summaryMeta.stats.summarizer, { inputTokens: 5000, outputTokens: 300 });
 });
@@ -179,28 +179,17 @@ test("an unrepairable summary rejects after the single repair attempt", async ()
   assert.equal(calls, 2);
 });
 
-test("overflow errors shrink the payload once and retry", async () => {
+test("overflow repartitions the same complete range once without omitting messages", async () => {
   const extra = Array.from({ length: 12 }, (_, i) => user(`filler message ${i}`, 10 + i));
   const calls = [];
-  await runCompaction(
-    runParams(
-      async (params) => {
-        calls.push(JSON.parse(params.context.messages[0].content));
-        if (calls.length === 1) {
-          throw new Error("input is too large: maximum context length exceeded");
-        }
-        return summaryResponse();
-      },
-      { state: buildState(extra) },
-    ),
-  );
-
+  await runCompaction(runParams(async (params) => {
+    calls.push(JSON.parse(params.context.messages[0].content));
+    if (calls.length === 1) throw new Error("input is too large: maximum context length exceeded");
+    return summaryResponse();
+  }, { state: buildState(extra) }));
   assert.equal(calls.length, 2);
-  assert.equal(calls[0].compaction_reason.omitted_message_count ?? 0, 0);
-  assert.ok(calls[1].compaction_reason.omitted_message_count > 0);
-  assert.ok(
-    calls[1].active_segment_messages.length < calls[0].active_segment_messages.length,
-  );
+  assert.deepEqual(calls[1].active_segment_messages, calls[0].active_segment_messages);
+  assert.equal(calls[1].compaction_reason.omitted_message_count ?? 0, 0);
 });
 
 test("transient errors get one backoff retry; permanent errors do not", async () => {

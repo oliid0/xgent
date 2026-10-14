@@ -35,6 +35,8 @@ const STT_SETTINGS_TABLE: &str = "stt_settings";
 const BACKUP_SYNC_SETTINGS_TABLE: &str = "backup_sync_settings";
 
 const SYSTEM_EXECUTION_MODE_KEY: &str = "executionMode";
+const SYSTEM_SUBAGENT_TEMPLATES_KEY: &str = "subagentTemplates";
+const SYSTEM_SCHEDULING_BUDGET_KEY: &str = "schedulingBudget";
 const SYSTEM_WORKDIR_KEY: &str = "workdir";
 const SYSTEM_SELECTED_TOOLS_KEY: &str = "selectedSystemTools";
 const SYSTEM_TOOL_POLICIES_KEY: &str = "toolPolicies";
@@ -175,6 +177,7 @@ include!("cherry_import.rs");
 include!("agents.rs");
 include!("system.rs");
 include!("mcp.rs");
+include!("background_execution.rs");
 include!("memory_settings.rs");
 include!("model_failover.rs");
 include!("secret_redaction.rs");

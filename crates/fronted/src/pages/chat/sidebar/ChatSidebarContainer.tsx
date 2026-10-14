@@ -88,6 +88,7 @@ type ChatSidebarContainerProps = {
   workspaceToolsAvailable?: boolean;
   fileTreeAvailable?: boolean;
   onOpenWorkspaceTool?: (target: WorkspaceToolTarget, shell?: string) => void;
+  onOpenGoals?: () => void;
 };
 
 function selectMutations(snapshot: SidebarSnapshot) {
@@ -357,6 +358,7 @@ export function ChatSidebarContainer(props: ChatSidebarContainerProps) {
         workspaceToolsAvailable={props.workspaceToolsAvailable}
         fileTreeAvailable={props.fileTreeAvailable}
         onOpenWorkspaceTool={props.onOpenWorkspaceTool}
+        onOpenGoals={props.onOpenGoals}
       />
     </Fragment>
   );

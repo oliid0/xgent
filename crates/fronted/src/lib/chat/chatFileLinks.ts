@@ -1,11 +1,13 @@
 export type ChatFileLinkSource = "relative" | "absolute" | "file-url";
 
 export type ChatFileLink = {
+  backgroundArtifact?: BackgroundChatArtifact;
   path: string;
   source: ChatFileLinkSource;
   line?: number;
   endLine?: number;
   column?: number;
+  fileSource?: WorkspaceFileSource | null;
 };
 
 const EXTERNAL_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
@@ -82,3 +84,6 @@ export function parseChatFileLink(href: string | undefined): ChatFileLink | null
       : "relative";
   return { path, source, ...location };
 }
+
+import type { WorkspaceFileSource } from "../tools/workspaceFileSource";
+import type { BackgroundChatArtifact } from "./messages/backgroundArtifacts";

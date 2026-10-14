@@ -1,6 +1,6 @@
 import { Divider } from "@astryxdesign/core/Divider";
 import { StackItem, VStack } from "@astryxdesign/core/Layout";
-import { Heading, Text } from "@astryxdesign/core/Text";
+import { Heading } from "@astryxdesign/core/Text";
 import { type ReactNode, useCallback, useState } from "react";
 import { useLocale } from "../../i18n";
 import { CronSection } from "./CronSection";
@@ -16,7 +16,6 @@ function OtherAreaScope(props: {
   activeArea: OtherArea | null;
   onDetailChange: (id: OtherArea, delta: 1 | -1) => void;
   title: string;
-  description: string;
   children: ReactNode;
 }) {
   const active = props.activeArea === props.id;
@@ -45,9 +44,6 @@ function OtherAreaScope(props: {
         {!active ? (
           <VStack gap={0.5}>
             <Heading level={4}>{props.title}</Heading>
-            <Text type="supporting" color="secondary">
-              {props.description}
-            </Text>
           </VStack>
         ) : null}
         <SettingsDetailLayerProvider onLayerChange={handleLayerChange}>
@@ -72,7 +68,6 @@ export function OtherSettingsSection({ settings, setSettings }: SettingsSectionP
         activeArea={activeArea}
         onDetailChange={handleDetailChange}
         title={t("settings.navHooks")}
-        description={t("settings.mobile.hooksDescription")}
       >
         <HooksSection settings={settings} setSettings={setSettings} />
       </OtherAreaScope>
@@ -82,7 +77,6 @@ export function OtherSettingsSection({ settings, setSettings }: SettingsSectionP
         activeArea={activeArea}
         onDetailChange={handleDetailChange}
         title={t("settings.navCron")}
-        description={t("settings.mobile.cronDescription")}
       >
         <CronSection settings={settings} setSettings={setSettings} />
       </OtherAreaScope>
@@ -92,7 +86,6 @@ export function OtherSettingsSection({ settings, setSettings }: SettingsSectionP
         activeArea={activeArea}
         onDetailChange={handleDetailChange}
         title={t("settings.navSsh")}
-        description={t("settings.mobile.sshDescription")}
       >
         <SshSettingsSection settings={settings} setSettings={setSettings} />
       </OtherAreaScope>

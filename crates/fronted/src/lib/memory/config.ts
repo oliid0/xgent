@@ -20,6 +20,12 @@ export const EXTRACTION_CANDIDATE_LIMIT = 30;
 export const EXTRACTION_REJECTION_DAYS = 7;
 /** Max plan items accepted from a single SubmitMemoryPlan call. */
 export const EXTRACTION_PLAN_ITEM_LIMIT = 8;
+/** Inferred personal patterns require corroboration across distinct local dates. */
+export const PERSONAL_PATTERN_MIN_DATES = 3;
+/** Quotes are bounded before attaching provenance to the existing memory body. */
+export const PERSONAL_EVIDENCE_QUOTE_CHARS = 80;
+export const PERSONAL_PATTERN_MAX_REPORT_AGE_MS = 30 * 24 * 60 * 60_000;
+export const PERSONAL_HISTORY_OBSERVATION_LIMIT = 12;
 /** Ring cap of slugs written this turn (feeds already-written dedup). */
 export const EXTRACTION_WRITTEN_SLUG_LIMIT = 16;
 /** LRU cap on tracked conversations before oldest state is pruned. */
@@ -101,6 +107,17 @@ export const GATING_CONFIRMATION_WORDS: readonly string[] = [
 
 export const INDEX_MAX_PROMPT_CHARS = 16_000;
 export const INDEX_MAX_ENTRIES_PER_BUCKET = 30;
+
+// Scheduled/event turns recall personal evidence without expanding foreground
+// coding context or consuming an extra model request.
+export const SCHEDULED_RECALL_QUERY_CHARS = 512;
+export const SCHEDULED_RECALL_ENTRY_LIMIT = 4;
+export const SCHEDULED_RECALL_READ_LINES = 16;
+export const SCHEDULED_RECALL_EXCERPT_CHARS = 600;
+export const SCHEDULED_RECALL_SOURCE_CHARS = 300;
+export const SCHEDULED_RECALL_PROMPT_CHARS = 6_400;
+export const RECALL_MIN_WORD_CHARS = 2;
+export const RECALL_CJK_TOKEN_CHARS = 2;
 
 // --- Store limits (mirrors Rust constants; Rust enforces) --------------------
 

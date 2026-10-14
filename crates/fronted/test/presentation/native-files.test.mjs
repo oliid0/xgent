@@ -81,6 +81,26 @@ function harness(options = {}) {
     get refreshes() { return refreshes; } };
 }
 
+test("native file-row menus freeze their own mutation target even when another file is selected", async t => {
+  const h = harness();t.after(h.unmount);
+  h.props.fileTreeState.query="";
+  h.data.nodes[""].children=["nested/report.md"];
+  h.data.nodes["nested/report.md"]={path:"nested/report.md",name:"report.md",kind:"file",children:[],loaded:true};
+  h.props.fileTreeState.selectedPath="unrelated.md";
+  const flatten=nodes=>nodes.flatMap(node=>[node,...flatten(node.children??[])]);
+  let nodes=flatten(h.render().document.nodes);
+  assert.ok(nodes.find(node=>node.id==="file-menu:nested/report.md"&&node.kind==="Menu"));
+  assert.equal(nodes.find(node=>node.id==="file-delete:nested/report.md").destructive,true);
+  await h.dispatch("file-rename:nested/report.md");
+  h.props.fileTreeState.selectedPath="another.md";
+  await h.dispatch("files-name","renamed.md");await h.dispatch("files-save-action");
+  assert.deepEqual(h.calls.at(-1),["rename","nested/report.md","renamed.md"]);
+  await h.dispatch("file-delete:nested/report.md");
+  assert.equal(h.calls.filter(call=>call[0]==="delete").length,0);
+  await h.dispatch("files-confirm-delete");
+  assert.deepEqual(h.calls.at(-1),["delete","nested/report.md"]);
+});
+
 test("native Files renames and deletes a search result without loading its parent tree", async () => {
   const h = harness();
   await h.dispatch("file-search:file:nested/report.md");

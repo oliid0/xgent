@@ -21,8 +21,9 @@ function harness(options = {}) {
   const same = (a, b) => a?.length === b?.length && a.every((item, index) => Object.is(item, b[index]));
   const fsBackend = {
     isFsBackendError: error => typeof error?.code === "string",
-    invokeFs: async (command, args) => {
+    invokeFs: async (command, args, invoker) => {
       calls.push([command, { ...args }]);
+      if (options.owned && invoker) return invoker(command, args);
       if (command === "fs_file_applications") return options.applications ? options.applications(args) : [];
       if (command.startsWith("fs_read")) {
         if (options.read) return options.read(command, args);
@@ -89,7 +90,7 @@ function harness(options = {}) {
     "../lib/runtimePlatform": { isNativeMobileRuntime: () => options.compact !== false },
     "./NativeSurface": { NativeSurface: "NativeSurface" },
     "./nativeTheme": { createNativePresentationTheme: () => undefined },
-    "../lib/tools/fsBackend": fsBackend,
+    [fileURLToPath(new URL("../../src/lib/tools/fsBackend.ts", import.meta.url))]: fsBackend,
     "../../lib/tools/fsBackend": fsBackend,
   } });
   const { NativeWorkspaceFilePage } = loader.loadModule("src/presentation/NativeWorkspaceFilePage.tsx");
@@ -157,6 +158,115 @@ function writeResult(content) {
 }
 
 const sourcePayload = content => JSON.stringify({ kind: "source", content });
+
+test("native preview recovers a same-source draft from a mapped live path into the persisted physical workspace", async () => {
+  const source = { version: 1, hostId: "22222222-2222-4222-8222-222222222222", workdir: "/pc/project" };
+  const calls = [], port = () => ({ fileSource: { ...source }, async invoke(command, args) {
+    calls.push([command, args]);
+    return command.startsWith("fs_read") ? readResult(args.path, "Original") : writeResult(args.content);
+  } });
+  const h = harness({ owned: true });
+  try {
+    h.props.editorOpen = false; h.props.previewOpen = true;
+    h.props.previewRequest = { id: 2, ownerId: "chat", projectPathKey: "/phone/alias", workdir: "/phone/alias", path: "notes.md", commandPort: port(), fileSource: source };
+    h.render(); await h.flush();
+    await h.dispatch("workspace-file-view-mode", "source"); h.render();
+    await h.dispatch("workspace-file-editor", "Recoverable original-device draft"); h.render();
+    h.props.previewOpen = false; h.render();
+    h.props.previewOpen = true;
+    h.props.previewRequest = { ...h.props.previewRequest, id: 3, projectPathKey: source.workdir, workdir: source.workdir, commandPort: port() };
+    h.render(); await h.flush();
+    await h.dispatch("workspace-file-view-mode", "source"); h.render();
+    assert.equal(h.node("workspace-file-editor").value, "Recoverable original-device draft");
+    await h.dispatch("workspace-file-save");
+    assert.equal(calls.at(-1)[1].workdir, source.workdir);
+    assert.equal(calls.at(-1)[1].expected_content_hash, "initial");
+  } finally { h.unmount(); }
+});
+
+test("native preview isolates same-path device drafts, pending writes and retired actions", async () => {
+  const calls = [], wait = Promise.withResolvers();
+  const port = id => ({ async invoke(command, args) {
+    calls.push([id, command, args]);
+    if (command.startsWith("fs_read")) return readResult(args.path, `${id} original`);
+    if (id === "a") await wait.promise;
+    return writeResult(args.content);
+  } });
+  const a = port("a"), b = port("b"), h = harness({ owned: true });
+  const open = async (commandPort, id) => {
+    h.props.editorOpen = false; h.props.previewOpen = true;
+    h.props.previewRequest = { id, ownerId: "chat", projectPathKey: "/project", workdir: "/project", path: "notes.md", commandPort };
+    h.render(); await h.flush();
+    await h.dispatch("workspace-file-view-mode", "source"); h.render();
+  };
+  try {
+    await open(a, 2);
+    assert.equal(h.node("workspace-file-editor").value, "a original");
+    await h.dispatch("workspace-file-editor", "A edit"); h.render();
+    const saving = h.dispatch("workspace-file-save"); await Promise.resolve();
+    const retired = h.surface;
+    await open(b, 2);
+    assert.equal(h.node("workspace-file-editor").value, "b original", "Same id and path on another device must create a new lifetime");
+    assert.equal((await h.dispatch("workspace-file-save", null, retired)).ok, false);
+    await h.dispatch("workspace-file-editor", "B edit"); h.render();
+    await h.dispatch("workspace-file-save");
+    assert.deepEqual(calls.filter(([, command]) => command.startsWith("fs_write")).map(([id, , args]) => [id, args.content, args.expected_content_hash]),
+      [["a", "A edit", "initial"], ["b", "B edit", "initial"]]);
+    wait.resolve(); await saving; await h.flush();
+    assert.equal(h.node("workspace-file-editor").value, "B edit");
+    await open(a, 3);
+    assert.equal(h.node("workspace-file-editor").value, "a original");
+  } finally { wait.resolve(); h.unmount(); }
+});
+
+test("native preview close retires a delayed owned read and exposes peer failure without another route", async () => {
+  const wait = Promise.withResolvers(), calls = [];
+  const h = harness({ owned: true });
+  try {
+    h.props.editorOpen = false; h.props.previewOpen = true;
+    h.props.previewRequest = { ...h.props.editorRequest, ownerId: "chat", path: "notes.md", commandPort: {
+      invoke(command) { calls.push(command); return wait.promise; },
+    } };
+    h.render(); await h.flush();
+    h.props.previewOpen = false; assert.equal(h.render(), null);
+    wait.resolve(readResult("notes.md", "obsolete")); await h.flush();
+    assert.equal(h.render(), null);
+    h.props.previewOpen = true;
+    h.props.previewRequest = { ...h.props.previewRequest, id: 2, commandPort: {
+      invoke() { throw new Error("owning PC offline"); },
+    } };
+    h.render(); await h.flush();
+    assert.match(h.node("workspace-file-error").label, /owning PC offline/);
+    assert.deepEqual(calls, ["fs_read_editable_text"]);
+  } finally { wait.resolve(readResult("notes.md", "obsolete")); h.unmount(); }
+});
+
+test("native editor and preview share a verified source draft while another device stays isolated", async () => {
+  const calls = [], port = id => ({ async invoke(command, args) {
+    calls.push([id, command, args]);
+    return command.startsWith("fs_read") ? readResult(args.path, `${id} original`) : writeResult(args.content);
+  } });
+  const a = port("a"), b = port("b"), h = harness({ owned: true });
+  try {
+    h.props.editorRequest = { ...h.props.editorRequest, id: 2, path: "notes.md", commandPort: a };
+    h.render(); await h.flush();
+    await h.dispatch("workspace-file-editor", "A unsaved draft"); h.render();
+    h.props.editorOpen = false; h.props.previewOpen = true;
+    h.props.previewRequest = { ...h.props.editorRequest, ownerId: "chat", id: 3 };
+    h.render(); await h.flush();
+    await h.dispatch("workspace-file-view-mode", "source"); h.render();
+    assert.equal(h.node("workspace-file-editor").value, "A unsaved draft");
+    h.props.previewRequest = { ...h.props.previewRequest, commandPort: b, id: 4 };
+    h.render(); await h.flush();
+    await h.dispatch("workspace-file-view-mode", "source"); h.render();
+    assert.equal(h.node("workspace-file-editor").value, "b original");
+    h.props.previewOpen = false; h.props.editorOpen = true; h.render(); await h.flush();
+    assert.equal(h.node("workspace-file-editor").value, "A unsaved draft");
+    await h.dispatch("workspace-file-save");
+    assert.deepEqual(calls.filter(([, command]) => command.startsWith("fs_write")).map(([id, , args]) => [id, args.content]),
+      [["a", "A unsaved draft"]]);
+  } finally { h.unmount(); }
+});
 
 test("native source views publish canonical language and exact shared syntax for current drafts and cached sessions", async () => {
   const h = harness();

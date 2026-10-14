@@ -85,7 +85,7 @@ test("native cron details distinguish pending runs, expose full metadata and gua
   const flatten = nodes => nodes.flatMap(node => [node, ...flatten(node.children ?? [])]);
   const result = render(), nodes = flatten(result.nodes);
   assert.equal(nodes.find(node => node.id === "cron-run:pending").status, "running");
-  assert.match(nodes.find(node => node.id === "pending:expand").text, /cronViewLogRunning/);
+  assert.match(nodes.find(node => node.id === "pending:expand").value, /cronViewLogRunning/);
   assert.equal(nodes.find(node => node.id === "cron-detail:workdir").text, "/workspace");
   assert.equal(nodes.find(node => node.id === "cron-detail:timeout").text, "450");
   assert.equal(nodes.find(node => node.id === "cron-detail:model").text, "model");

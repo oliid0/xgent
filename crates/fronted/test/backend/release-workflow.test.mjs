@@ -353,7 +353,13 @@ test("mobile health steps use platform authorization contracts and least privile
   );
   assert.doesNotMatch(mobileAssistantAndroidBuild, /kotlinx-coroutines-android:1\.10/);
   assert.match(mobileAssistantManifest, /android\.permission\.health\.READ_STEPS/);
-  assert.doesNotMatch(mobileAssistantManifest, /WRITE_STEPS|READ_HEALTH_DATA_IN_BACKGROUND/);
+  assert.doesNotMatch(mobileAssistantManifest, /WRITE_STEPS/);
+  assert.match(mobileAssistantManifest, /READ_HEALTH_DATA_IN_BACKGROUND/);
+  const healthEvents = readFileSync(path.join(repoRoot,
+    "crates/mobile-assistant/android/src/main/java/com/ohi/xgent/mobileassistant/HealthEventCollector.kt"), "utf8");
+  assert.match(healthEvents, /FEATURE_READ_HEALTH_DATA_IN_BACKGROUND/);
+  assert.match(healthEvents, /PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND in granted/);
+  assert.match(healthEvents, /Background health permission was revoked/);
   assert.match(mobileAssistantManifest, /ACTION_SHOW_PERMISSIONS_RATIONALE/);
   assert.match(mobileAssistantManifest, /android\.intent\.action\.VIEW_PERMISSION_USAGE/);
 });

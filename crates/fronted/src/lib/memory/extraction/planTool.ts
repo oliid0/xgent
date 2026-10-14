@@ -20,6 +20,7 @@ import type {
   ValidatedPlanItem,
 } from "../schema";
 import { EXTRACTION_PLAN_ACTIONS, isMemoryScope, isMemoryType } from "../schema";
+import { type UserMemoryObservation, validatePersonalEvidence } from "./personalEvidence";
 
 export const SUBMIT_MEMORY_PLAN_TOOL_NAME = "SubmitMemoryPlan";
 
@@ -74,6 +75,18 @@ const PLAN_ITEM_SCHEMA = Type.Object({
   ),
   source_quote: Type.Optional(
     Type.String({ description: "Verbatim user quote supporting this item, max 80 chars." }),
+  ),
+  evidence_basis: Type.Optional(
+    Type.Union([Type.Literal("explicit"), Type.Literal("inferred")], {
+      description:
+        "For personal user/feedback memories: explicit user statement or an unconfirmed inferred pattern. Inference is always low confidence and needs dated observation references.",
+    }),
+  ),
+  observations: Type.Optional(
+    Type.Array(Type.Object({ id: Type.String(), quote: Type.String() }), {
+      description:
+        "For inferred personal patterns only: distinct host-provided user observation IDs and exact quotes. Never supply dates, assistant text or fabricated observations.",
+    }),
   ),
   reasoning: Type.Optional(
     Type.String({
@@ -154,6 +167,11 @@ export type PlanValidationContext = {
   rejectedSlugs: ReadonlySet<string>;
   /** Slugs already mutated by an earlier pass in this turn (dropped as duplicates). */
   alreadyWrittenSlugs: ReadonlySet<string>;
+  /** Host-owned real user evidence; absent only for legacy/manual validation. */
+  userObservations?: readonly UserMemoryObservation[];
+  existingMemoryTypes?: ReadonlyMap<string, string>;
+  protectedPersonalIds?: ReadonlySet<string>;
+  allowInferredPersonal?: boolean;
 };
 
 export type PlanValidationResult = {
@@ -194,6 +212,7 @@ export function validateSubmittedPlan(
   // other work on the slug.
   const mutatedSlugs = new Set<string>();
   const deletedSlugs = new Set<string>();
+  const inferredSlugs = new Set<string>();
 
   const reject = (index: number, code: PlanItemRejection["code"], message: string) => {
     rejected.push({ index, code, message });
@@ -273,6 +292,55 @@ export function validateSubmittedPlan(
       }
     }
 
+    let personal: ReturnType<typeof validatePersonalEvidence> | undefined;
+    const existingType = ctx.existingMemoryTypes?.get(`${scope ?? "auto"}:${slug}`);
+    const personalType = isMemoryType(asTrimmedString(item.type))
+      ? asTrimmedString(item.type)
+      : existingType;
+    if (
+      ctx.userObservations &&
+      (action === "write" || action === "update") &&
+      (personalType === "user" || personalType === "feedback" || item.evidence_basis === "inferred")
+    ) {
+      if (personalType !== "user" && personalType !== "feedback") {
+        reject(
+          index,
+          "invalid-personal-evidence",
+          "Inferred patterns are restricted to known personal memory types",
+        );
+        return;
+      }
+      if (
+        item.evidence_basis === "inferred" &&
+        ctx.protectedPersonalIds?.has(`${scope ?? "auto"}:${slug}`)
+      ) {
+        reject(
+          index,
+          "invalid-personal-evidence",
+          "An inferred pattern cannot overwrite known reviewed or high/medium confidence personal memory",
+        );
+        return;
+      }
+      personal = validatePersonalEvidence(
+        item,
+        ctx.userObservations,
+        ctx.allowInferredPersonal !== false,
+        evidenceFromItem(item),
+      );
+      if ("code" in personal) {
+        reject(index, personal.code, personal.message);
+        return;
+      }
+    }
+    if (action === "accept" && inferredSlugs.has(slug)) {
+      reject(
+        index,
+        "inferred-awaiting-confirmation",
+        "A newly inferred pattern cannot be confirmed by the same extraction plan",
+      );
+      return;
+    }
+
     if (action === "write") {
       const type = asTrimmedString(item.type);
       if (!isMemoryType(type)) {
@@ -294,14 +362,15 @@ export function validateSubmittedPlan(
         return;
       }
       mutatedSlugs.add(slug);
+      if (personal && "inferred" in personal && personal.inferred) inferredSlugs.add(slug);
       accepted.push({
         action,
         slug,
         scope: scope as MemoryScope,
         type: type as MemoryType,
         description,
-        body,
-        evidence: evidenceFromItem(item),
+        body: personal && "body" in personal ? personal.body : body,
+        evidence: personal && "evidence" in personal ? personal.evidence : evidenceFromItem(item),
       });
       return;
     }
@@ -309,6 +378,7 @@ export function validateSubmittedPlan(
     if (action === "update") {
       const mode = asTrimmedString(item.mode);
       mutatedSlugs.add(slug);
+      if (personal && "inferred" in personal && personal.inferred) inferredSlugs.add(slug);
       accepted.push({
         action,
         slug,
@@ -317,9 +387,9 @@ export function validateSubmittedPlan(
           ? (asTrimmedString(item.type) as MemoryType)
           : undefined,
         description: asTrimmedString(item.description),
-        body: asTrimmedString(item.body),
+        body: personal && "body" in personal ? personal.body : asTrimmedString(item.body),
         mode: (mode === "replace" ? "replace" : "merge") as MemoryUpdateMode,
-        evidence: evidenceFromItem(item),
+        evidence: personal && "evidence" in personal ? personal.evidence : evidenceFromItem(item),
       });
       return;
     }

@@ -24,6 +24,12 @@ pub fn init<R: Runtime, C: serde::de::DeserializeOwned>(
 pub struct MobileAssistant<R: Runtime>(PhantomData<fn() -> R>);
 
 impl<R: Runtime> MobileAssistant<R> {
+    pub fn discover_workstations(&self) -> crate::Result<crate::NearbyWorkstations> {
+        Err(Error::Unavailable("Nearby discovery uses the native desktop service".into()))
+    }
+    pub fn list_home_inventory(&self, _request: crate::HomeInventoryRequest) -> Result<crate::HomeInventoryResult> {
+        Err(Error::Unavailable("HomeKit inventory requires the authorized initiating iOS device".into()))
+    }
     pub fn bluetooth_gatt(&self, _request: crate::BluetoothGattRequest) -> Result<crate::BluetoothGattResult> {
         Err(Error::Unavailable("native Bluetooth GATT requires Android or iOS".into()))
     }
@@ -112,6 +118,14 @@ impl<R: Runtime> MobileAssistant<R> {
         _request: CalendarRangeRequest,
     ) -> Result<Vec<MobileCalendarEvent>> {
         Err(Error::Unavailable("calendar access is only available on mobile".into()))
+    }
+
+    pub fn list_contacts(&self, _request: crate::ContactListRequest) -> Result<crate::ContactListResult> {
+        Err(Error::Unavailable("Device contact access is only available on mobile".into()))
+    }
+
+    pub fn list_calendars(&self, _request: crate::CalendarListRequest) -> Result<crate::CalendarListResult> {
+        Err(Error::Unavailable("Device calendar discovery is only available on mobile".into()))
     }
 
     pub fn list_reminders(

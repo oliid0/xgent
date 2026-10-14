@@ -1,6 +1,102 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+/// Unauthenticated service advertisements, never task/credential authority.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct NearbyWorkstation {
+    pub host_id:String,
+    pub platform:String,
+    pub urls:Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct NearbyWorkstations {pub services:Vec<NearbyWorkstation>}
+
+/// Internal platform change metadata; never a sample value or read grant.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HealthChangeEvent {
+    pub id: String,
+    pub metric: String,
+    pub occurred_at_ms: i64,
+}
+
+/// Actual original-device HomeKit power notification; no write authority.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct HomeChangeEvent {
+    pub id:String,
+    pub home_id:String,
+    pub accessory_id:String,
+    pub service_id:String,
+    pub characteristic_id:String,
+    #[serde(default)] pub home_name_preview:String,
+    #[serde(default)] pub accessory_name_preview:String,
+    #[serde(default)] pub service_name_preview:String,
+    pub power:bool,
+    pub occurred_at_ms:i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct HomeEventConfiguration { pub host_id:String,pub homes:Vec<String>,pub authorize:bool }
+
+#[derive(Debug,Clone,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct HomeEventSource {pub id:String,pub name:String}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HealthEventConfiguration {
+    pub metrics: Vec<String>,
+    pub authorize: bool,
+    /// Read-only native policy/rule source for an Activity-independent worker.
+    #[cfg(target_os = "android")]
+    pub policy_database: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HealthEventAcknowledgement {
+    pub ids: Vec<String>,
+}
+
+/// Internal service payload: content is fixed by the platform, never model text.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ResultNotificationRequest {
+    pub entry_id: String,
+}
+
+/// Native startup only; scoped updates never include full peer credentials.
+#[cfg(any(target_os = "android",target_os = "ios"))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ResultDeliveryConfiguration {
+    pub database_path: String,
+    pub host_id: String,
+    #[serde(default)]
+    pub target_json: String,
+}
+
+/// Private native event service setup; no token/model/shell or event injection.
+#[derive(Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct EventDeliveryConfiguration {
+    pub database_path:String,
+    pub host_id:String,
+    pub enabled:bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ResultNotificationReceipt {
+    Accepted,
+    Blocked,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum MobileAssistantBackend {
@@ -44,6 +140,91 @@ pub struct VoiceInputResult {
 }
 
 pub type MobilePermissionStates = BTreeMap<String, String>;
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HomeInventoryRequest {
+    pub limit: u16,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum HomeInventoryKind { Home, Room, Accessory, Scene }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HomeInventoryRecord {
+    pub kind: HomeInventoryKind,
+    pub id: String,
+    pub home_id: String,
+    pub name: String,
+    pub room_id: Option<String>,
+    pub reachable: Option<bool>,
+    #[serde(default)]
+    pub power_controls: Vec<HomePowerControl>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HomePowerControl {
+    pub id: String,
+    pub service_id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HomePowerRequest {
+    pub home_id: String,
+    pub accessory_id: String,
+    pub service_id: String,
+    pub characteristic_id: String,
+    pub power: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HomePowerDestination {
+    pub id: String,
+    pub source_id: String,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HomeInventoryResult {
+    pub source: String,
+    pub observed_at_ms: i64,
+    pub records: Vec<HomeInventoryRecord>,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContactListRequest {
+    #[serde(default)]
+    pub query: String,
+    pub limit: u16,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MobileContact {
+    pub id: String,
+    pub name: String,
+    pub phones: Vec<String>,
+    pub emails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContactListResult {
+    pub contacts: Vec<MobileContact>,
+    pub truncated: bool,
+    pub access_limited: bool,
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -176,6 +357,42 @@ pub struct CalendarRangeRequest {
     pub end_ms: i64,
     #[serde(default = "default_result_limit")]
     pub limit: u16,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar_ids: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CalendarKind { Event, Reminder }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CalendarListRequest {
+    pub kind: CalendarKind,
+    #[serde(default = "default_true")]
+    pub writable_only: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar_ids: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MobileCalendar {
+    pub id: String,
+    pub title: String,
+    pub source: String,
+    #[serde(default)]
+    pub source_id: String,
+    pub is_default: bool,
+    #[serde(default = "default_true")]
+    pub writable: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalendarListResult {
+    pub calendars: Vec<MobileCalendar>,
+    pub truncated: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -189,6 +406,10 @@ pub struct MobileCalendarEvent {
     pub location: Option<String>,
     pub notes: Option<String>,
     pub calendar: Option<String>,
+    #[serde(default)]
+    pub calendar_id: String,
+    #[serde(default)]
+    pub source_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -198,6 +419,8 @@ pub struct ReminderListRequest {
     pub incomplete_only: bool,
     #[serde(default = "default_result_limit")]
     pub limit: u16,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -209,6 +432,10 @@ pub struct MobileReminder {
     pub completed: bool,
     pub notes: Option<String>,
     pub list: Option<String>,
+    #[serde(default)]
+    pub calendar_id: String,
+    #[serde(default)]
+    pub source_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -221,6 +448,10 @@ pub struct CreateCalendarEventRequest {
     pub all_day: bool,
     pub location: Option<String>,
     pub notes: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_source_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -229,7 +460,17 @@ pub struct CreateReminderRequest {
     pub title: String,
     pub due_ms: Option<i64>,
     pub notes: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recurrence: Option<ReminderRecurrence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_source_id: Option<String>,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReminderRecurrence { Daily, Weekly }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]

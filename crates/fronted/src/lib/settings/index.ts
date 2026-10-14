@@ -22,6 +22,10 @@ import {
 import { getAvailableThinkingLevelsForModel } from "../providers/runtime/modelFactory";
 import { createUuid } from "../shared/id";
 import { mergeAlwaysEnabledSkillNames } from "../skills/builtin";
+import {
+  normalizeSchedulingBudget,
+  type SchedulingBudgetConfig,
+} from "../subagents/schedulingBudget";
 import { normalizeFontFamily } from "../system/fontFamily";
 import { SYSTEM_TOOL_OPTIONS, type SystemToolId } from "../tools/systemToolOptions";
 import { type AppearanceSettings, normalizeAppearance } from "./appearance";
@@ -196,6 +200,8 @@ export type SystemProxyConfig = {
 };
 
 export type SystemSettings = {
+  subagentTemplates?: SubagentTemplateConfig[];
+  schedulingBudget?: SchedulingBudgetConfig;
   executionMode: ExecutionMode;
   commandSafetyMode: CommandSafetyMode;
   workdir: string;
@@ -273,6 +279,9 @@ export type ModelLimitsSource = "catalog" | "provider" | "fallback" | "user";
 
 export type ProviderModelConfig = {
   id: string;
+  /** User-declared chat-agent strengths; no model-name capability inference. */
+  delegationSkills?: string[];
+  delegationMaxConcurrency?: number;
   /** Optional vendor metadata returned by OpenAI-compatible /models endpoints. */
   ownedBy?: string;
   contextWindow: number;
@@ -293,6 +302,7 @@ export type ChatRuntimeControls = {
   reasoning: ReasoningLevel;
   reasoningByProvider: Partial<Record<ChatRuntimeReasoningProviderKey, ReasoningLevel>>;
   planModeEnabled: boolean;
+  intelligentSchedulingEnabled: boolean;
 };
 
 export type ChatRuntimeReasoningProviderKey =
@@ -310,6 +320,43 @@ export type AgentPromptTemplate = {
   prompt: string;
   enabled: boolean;
 };
+
+export type SubagentTemplateConfig = AgentPromptTemplate & {
+  modelValue?: string;
+  requiredSkills?: string[];
+};
+
+export function normalizeSubagentTemplateConfigs(input: unknown): SubagentTemplateConfig[] {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  return input
+    .filter((entry) => entry && typeof entry === "object")
+    .map((entry) => {
+      const base = normalizeAgentPromptTemplate(entry);
+      const value = typeof entry.modelValue === "string" ? entry.modelValue.trim() : "";
+      const requiredSkills = Array.isArray(entry.requiredSkills)
+        ? [
+            ...new Set<string>(
+              entry.requiredSkills.filter(
+                (skill: unknown): skill is string =>
+                  typeof skill === "string" && /^[a-z][a-z0-9_-]{0,47}$/.test(skill),
+              ),
+            ),
+          ].slice(0, 16)
+        : [];
+      return {
+        ...base,
+        enabled: base.enabled && !!base.prompt,
+        modelValue: value || undefined,
+        requiredSkills: requiredSkills.length ? requiredSkills : undefined,
+      };
+    })
+    .filter((entry) => {
+      if (seen.has(entry.id)) return false;
+      seen.add(entry.id);
+      return true;
+    });
+}
 
 export type SshAuthType = "password" | "privateKey" | "keyboardInteractive";
 export type SshProxyType = "socks5" | "http";
@@ -586,6 +633,7 @@ export const DEFAULT_CHAT_RUNTIME_CONTROLS: ChatRuntimeControls = {
   thinkingEnabled: true,
   nativeWebSearchEnabled: true,
   planModeEnabled: false,
+  intelligentSchedulingEnabled: false,
   reasoning: "high",
   reasoningByProvider: {
     claude_code: "high",
@@ -1271,6 +1319,7 @@ export function normalizeChatRuntimeControls(input: unknown): ChatRuntimeControl
     // this flag globally, which made unrelated conversations inherit it and
     // exposed AskUserQuestion in ordinary tasks. Always migrate it off.
     planModeEnabled: false,
+    intelligentSchedulingEnabled: obj.intelligentSchedulingEnabled === true,
     reasoning,
     reasoningByProvider: normalizeChatRuntimeReasoningByProvider(
       obj.reasoningByProvider,
@@ -1652,6 +1701,22 @@ export function normalizeProviderModelConfig(
     ...(cost !== undefined ? { cost } : {}),
     ...(promptCacheHintMode ? { promptCacheHintMode } : {}),
     ...(inputModalities ? { inputModalities } : {}),
+    ...(Array.isArray(obj.delegationSkills)
+      ? {
+          delegationSkills: [
+            ...new Set(
+              obj.delegationSkills.filter(
+                (value): value is string =>
+                  typeof value === "string" && /^[a-z][a-z0-9_-]{0,47}$/.test(value),
+              ),
+            ),
+          ].slice(0, 16),
+        }
+      : {}),
+    ...(typeof obj.delegationMaxConcurrency === "number" &&
+    Number.isInteger(obj.delegationMaxConcurrency)
+      ? { delegationMaxConcurrency: Math.min(8, Math.max(1, obj.delegationMaxConcurrency)) }
+      : {}),
   };
 }
 
@@ -2052,6 +2117,8 @@ export function normalizeSystemProxyConfig(input: unknown): SystemProxyConfig {
 export function normalizeSystemSettings(input: unknown): SystemSettings {
   const obj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   return {
+    subagentTemplates: normalizeSubagentTemplateConfigs(obj.subagentTemplates),
+    schedulingBudget: normalizeSchedulingBudget(obj.schedulingBudget),
     executionMode: normalizeExecutionMode(obj.executionMode),
     commandSafetyMode:
       obj.commandSafetyMode === "ask" ||
@@ -2726,6 +2793,8 @@ export function getDefaultSettings(): AppSettings {
   const customProviders = getBuiltinCustomProviders();
   return {
     system: {
+      subagentTemplates: [],
+      schedulingBudget: normalizeSchedulingBudget(undefined),
       executionMode: "tools",
       commandSafetyMode: "auto",
       workdir: "",

@@ -54,6 +54,7 @@ function createRegistryHarness() {
       },
       "@tauri-apps/api/core": {
         async invoke(command, args) {
+          if (command === "worker_peer_resolve_request") return null;
           if (command === "mcp_list_tools") {
             listedServerIds.push((args.servers ?? []).map((server) => server.id));
             listedServerCommands.push((args.servers ?? []).map((server) => server.command));
@@ -101,7 +102,7 @@ function createRegistryHarness() {
   return { loader, runnerCalls, listedServerIds, listedServerCommands };
 }
 
-async function buildRegistry(harness, { withSubagentRuntime, storeIpc, computerUseDriverId } = {}) {
+async function buildRegistry(harness, { withSubagentRuntime, storeIpc, computerUseDriverId, persistBatchReceipts = false, params = {} } = {}) {
   const { loader } = harness;
   const { buildBuiltinToolRegistry } = loader.loadModule("src/lib/tools/builtinRegistry.ts");
   const { createFileToolState } = loader.loadModule("src/lib/tools/fileToolState.ts");
@@ -114,6 +115,7 @@ async function buildRegistry(harness, { withSubagentRuntime, storeIpc, computerU
     runtimeScope: "chat",
     selectedSystemToolIds: [],
     getMcpSettings: () => mcpSettingsHolder.value,
+    ...params,
   };
   if (!withSubagentRuntime) {
     return { registry: await buildBuiltinToolRegistry(baseParams), mcpSettingsHolder };
@@ -129,6 +131,7 @@ async function buildRegistry(harness, { withSubagentRuntime, storeIpc, computerU
   const registry = await buildBuiltinToolRegistry({
     ...baseParams,
     subagentRuntime: {
+      persistBatchReceipts,
       providerId: "codex",
       model: "gpt-5",
       runtime: { baseUrl: "https://api.example.test/v1", apiKey: "test-key" },
@@ -157,6 +160,49 @@ test("registry without a subagent runtime exposes neither Agent nor SendMessage"
   // Sanity: the base surface is otherwise intact.
   assert.ok(names.includes("Read"));
   assert.ok(names.includes("mcp_docs_search"));
+});
+
+test("accepted background workers can discover and delegate to peers without exposing chat-only agents", async () => {
+  const { registry } = await buildRegistry(createRegistryHarness(), { params: { runtimeScope: "cron_auto_prompt", backgroundTaskDelegation: true } });
+  assert.equal(registry.hasTool("BackgroundTask"), true); assert.equal(registry.hasTool("WorkerDevices"), true);
+  assert.equal(registry.hasTool("Agent"), false); assert.equal(registry.hasTool("AskUserQuestion"), false);
+});
+
+test("ordinary cron does not gain peer delegation without an accepted background task", async () => {
+  const { registry } = await buildRegistry(createRegistryHarness(), { params: { runtimeScope: "cron_auto_prompt" } });
+  assert.equal(registry.hasTool("BackgroundTask"), false); assert.equal(registry.hasTool("WorkerDevices"), false);
+});
+
+test("registry passes persisted lineage to background tools rather than allowing a fresh local root", async () => {
+  const { registry } = await buildRegistry(createRegistryHarness(), { params: {
+    runtimeScope: "cron_auto_prompt", backgroundTaskDelegation: true,
+    backgroundTaskContext: { rootRequestId: "root", requestId: "parent", hostIds: ["this-host"] },
+    backgroundTaskLease: { attempt: 1, generation: 1, token: "11111111-1111-4111-8111-111111111111" },
+  } });
+  const result = await registry.executeToolCall({ id: "child", name: "BackgroundTask", arguments: { action: "submit", peer_id: "this-host" } });
+  assert.equal(result.isError, true);
+  assert.match(result.details.result.error, /cycle/);
+});
+
+test("unpaired native mobile chat offers real peer discovery rather than requiring a global desktop selection", async () => {
+  const { registry } = await buildRegistry(createRegistryHarness(), { params: { nativeMobileRuntime: true, runtimePlatform: "android", skillsEnabled: false } });
+  assert.equal(registry.hasTool("WorkerDevices"), true); assert.equal(registry.hasTool("BackgroundTask"), true);
+});
+
+test("registry namespaces background request IDs by checkpoint or accepted execution context", async () => {
+  const requestIds = [];
+  for (const params of [
+    { checkpoint: { conversationId: "one", turnId: "one" } },
+    { checkpoint: { conversationId: "one", turnId: "two" } },
+    { runtimeScope: "cron_auto_prompt", backgroundTaskDelegation: true, backgroundRequestScope: "execution-one" },
+    { runtimeScope: "cron_auto_prompt", backgroundTaskDelegation: true, backgroundRequestScope: "execution-two" },
+  ]) {
+    const { registry } = await buildRegistry(createRegistryHarness(), { params });
+    const result = await registry.executeToolCall({ id: "same-content-call", name: "BackgroundTask", arguments: { action: "submit" } });
+    assert.equal(result.isError, true); // No provider: test does not submit work.
+    requestIds.push(result.details.result.requestId);
+  }
+  assert.equal(new Set(requestIds).size, 4);
 });
 
 test("selected external computer use exposes its actual tools without competing native CUA", async () => {
@@ -314,4 +360,28 @@ test("read-only children inherit MCP business tools but no write, shell, or mana
   assert.ok(!names.includes("McpManager"));
   // Parent memory is read-write, so readonly children do not receive it.
   assert.ok(!names.includes("MemoryManager"));
+});
+
+test("host binding checks guard actual readonly and worktree delegate tool executors", async () => {
+  for (const mode of ["readonly", "worktree"]) {
+    const harness = createRegistryHarness(); let checks = 0;
+    const { registry } = await buildRegistry(harness, { withSubagentRuntime: true, params: {
+      beforeSubagentToolCall: async () => { checks++; throw new Error("accepted delegate account changed"); },
+    } });
+    await registry.executeToolCall(createAgentToolCall({ agents: [{ id: "guarded", prompt: "Inspect", mode }] }));
+    assert.equal(harness.runnerCalls.length, 1);
+    await assert.rejects(harness.runnerCalls[0].executeToolCall({ id: "guarded-call", name: "mcp_docs_search", arguments: {} }), /accepted delegate account changed/);
+    assert.equal(checks, 1);
+  }
+});
+
+test("actual built-in registry exposes read-only recovery of an opted-in completed Agent batch", async () => {
+  const harness = createRegistryHarness();
+  const { registry } = await buildRegistry(harness, { withSubagentRuntime: true, persistBatchReceipts: true });
+  const call = createAgentToolCall({ agents: [{ id: "recoverable", prompt: "Inspect actual docs" }] });
+  const result = await registry.executeToolCall(call);
+  assert.equal(result.isError, false);
+  assert.deepEqual(JSON.parse(JSON.stringify(await registry.recoverToolCall(call))), JSON.parse(JSON.stringify(result)));
+  assert.equal(harness.runnerCalls.length, 1);
+  assert.equal(await registry.recoverToolCall({ ...call, name: "mcp_docs_search" }), null);
 });

@@ -29,6 +29,7 @@ function harness() {
     workdir: "/sandbox/workspace", providerId: "codex", runtimePlatform: "ios",
     nativeMobileRuntime: true, fileState: createFileToolState(), skillsEnabled: true,
     runtimeScope: "chat", selectedSystemToolIds: [],
+    checkpoint: { conversationId: "mobile-chat", turnId: "mobile-turn" },
     getMcpSettings: () => ({ selected: ["remote"], servers: [{ id: "remote", enabled: true, transport: "http", url: "https://mcp.example.test" }] }),
     ...overrides,
   });
@@ -46,7 +47,7 @@ test("Android Shell paths reach native file tools and preview in the owning work
   const originalWindow = globalThis.window;
   const originalEvent = globalThis.CustomEvent;
   const events = [];
-  globalThis.window = { dispatchEvent: (event) => events.push(event) };
+  globalThis.window = { dispatchEvent: (event) => { events.push(event); event.detail.accept(); } };
   globalThis.CustomEvent ??= class { constructor(type, init) { this.type = type; this.detail = init.detail; } };
   try {
     const preview = await registry.executeToolCall({ id: "guest-preview", name: "PreviewFile", arguments: { path: "/workspace/notes.txt" } });

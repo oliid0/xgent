@@ -10,6 +10,41 @@ import UIKit
 import AppKit
 #endif
 
+struct XgentGeneratedArtifactRow: View {
+    let node: XgentNode
+    let document: XgentDocument
+    @ObservedObject var model: XgentPresentationModel
+    let palette: XgentPalette
+
+    var body: some View {
+        Button { model.send(node, in: document) } label: {
+            HStack(spacing: 12) {
+                Image(systemName: node.icon ?? "doc")
+                    .font(.system(size: 26)).frame(width: 28).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(node.label ?? "").font(.body.weight(.semibold))
+                        .lineLimit(2).truncationMode(.middle)
+                    if let text = node.text, !text.isEmpty {
+                        Text(text).font(.caption).foregroundStyle(Color(xgentHex: palette.secondaryText))
+                            .lineLimit(2)
+                    }
+                }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                if model.isBusy(node, in: document) { ProgressView().controlSize(.small) }
+                else { Image(systemName: "arrow.down").accessibilityHidden(true) }
+            }
+            .padding(16)
+            .background(Color(xgentHex: palette.card), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(xgentHex: palette.border), lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .disabled(node.disabled == true || model.isBusy(node, in: document))
+        .accessibilityIdentifier(node.id)
+        .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
+        .accessibilityHint(node.accessibilityHint ?? "")
+    }
+}
+
 private struct XgentAVPreview: View {
     let data: Data
     let mimeType: String
@@ -487,7 +522,9 @@ extension XgentNodeView {
     var nativeTreeRow: some View {
         Button { model.send(node, in: document) } label: {
             HStack(spacing: 9) {
-                Image(systemName: node.icon ?? "doc").frame(width: 22)
+                Image(systemName: node.icon ?? "doc")
+                    .foregroundStyle(node.variant == "workspace-file-row" && (node.icon ?? "").hasPrefix("folder") ? Color(xgentHex: palette.accent) : Color.primary)
+                    .frame(width: 22)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(node.label ?? "").lineLimit(1).truncationMode(.middle)
                     if let text = node.text, !text.isEmpty {
@@ -528,12 +565,14 @@ extension XgentNodeView {
                 if let icon = node.icon { Image(systemName: icon).frame(width: 24) }
                 VStack(alignment: .leading, spacing: 4) {
                     Text(node.label ?? "")
+                        .lineLimit(node.variant == "background-child" ? 2 : nil)
                     if let text = node.text, !text.isEmpty {
                         Text(text).font(.subheadline).foregroundStyle(.secondary)
                     }
                 }
                 Spacer(minLength: 8)
-                if node.selected == true { Image(systemName: "checkmark").foregroundStyle(.tint) }
+                if node.variant == "background-child" && node.selected == true { Image(systemName: "chevron.down").font(.caption).foregroundStyle(.tertiary) }
+                else if node.selected == true { Image(systemName: "checkmark").foregroundStyle(.tint) }
                 else { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary) }
             }.frame(minHeight: 44).contentShape(Rectangle())
         }.buttonStyle(.plain)
@@ -735,4 +774,55 @@ struct XgentRootLayout: View {
         }
     }
     #endif
+}
+
+
+/// A file action and its menu are separate controls, including on touch devices.
+struct XgentWorkspaceFileRow: View {
+    let node: XgentNode
+    let document: XgentDocument
+    @ObservedObject var model: XgentPresentationModel
+    @Environment(\.xgentPresentationTheme) private var theme
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button { model.send(node, in: document) } label: {
+                HStack(spacing: 12) {
+                    if let icon = node.icon {
+                        Image(systemName: icon).font(.system(size: 28))
+                            .foregroundStyle(icon.hasPrefix("folder") ? Color(xgentHex: theme.palette(for: scheme).accent) : Color.secondary)
+                            .frame(width: 36).accessibilityHidden(true)
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(node.label ?? "").lineLimit(1).truncationMode(.middle)
+                        if let text = node.text, !text.isEmpty {
+                            Text(text).font(.subheadline).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if node.icon?.hasPrefix("folder") == true {
+                        Image(systemName: node.value?.boolean == true ? "chevron.down" : "chevron.right")
+                            .foregroundStyle(.secondary).accessibilityHidden(true)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(node.disabled == true || model.isBusy(node, in: document))
+            .accessibilityIdentifier(node.id)
+            .accessibilityLabel(node.accessibilityLabel ?? node.label ?? "")
+            .accessibilityHint(node.accessibilityHint ?? "")
+            ForEach(node.children ?? []) { item in
+                XgentNativeMenu(node: item, document: document, model: model)
+            }
+        }
+        .modifier(XgentControlTypography(node: node))
+        .opacity(node.secondary == true ? 0.6 : 1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(node.selected == true ? Color(xgentHex: theme.palette(for: scheme).muted) : .clear)
+        .accessibilityElement(children: .contain)
+    }
 }

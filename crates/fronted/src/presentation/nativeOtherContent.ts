@@ -205,15 +205,7 @@ export function createNativeOtherContentStore() {
               variant: "other-settings-area",
               label: options.labels[entry.area].title,
               spacing: 12,
-              children: [
-                {
-                  id: `other:${entry.area}:description`,
-                  kind: "Text" as const,
-                  text: options.labels[entry.area].description,
-                  secondary: true,
-                },
-                ...nodesFor(entry, false),
-              ],
+              children: [...nodesFor(entry, false)],
             })),
           ],
         },

@@ -128,6 +128,8 @@ import {
   type ModelEditDraft,
   mergeModelEdit,
   parseCostRate,
+  parseDelegationConcurrency,
+  parseDelegationSkills,
   parsePositiveInteger,
 } from "./providerModelSettings";
 import { providerRuntimeActions, runtimeModelOptions } from "./providerRuntimeSettings";
@@ -144,6 +146,7 @@ import { RetryErrorSection } from "./RetryErrorSection";
 import { SecretTextInput } from "./SecretTextInput";
 import { SettingsDetailHeader } from "./SettingsDetailHeader";
 import { SettingsModalShell } from "./SettingsModalShell";
+import { SubagentTeamSettings } from "./SubagentTeamSettings";
 import { ConfirmDeletePopover } from "./shared";
 import type { SettingsSectionProps } from "./types";
 
@@ -2453,6 +2456,51 @@ function ProviderEditor({ providerType, initialData, onSave, onClose }: ModalPro
                   </AstryxStack>
                 </AstryxGrid>
 
+                <Input
+                  size={isCompact ? "lg" : "md"}
+                  width="100%"
+                  label={t("settings.modelDelegationSkills")}
+                  htmlName="delegationSkills"
+                  description={t("settings.modelDelegationSkillsHint")}
+                  value={editingModel.delegationSkills}
+                  status={
+                    parseDelegationSkills(editingModel.delegationSkills) === null
+                      ? { type: "error" }
+                      : undefined
+                  }
+                  aria-invalid={
+                    parseDelegationSkills(editingModel.delegationSkills) === null ? true : undefined
+                  }
+                  onChange={(value) =>
+                    updatePresentedModel((previous) =>
+                      previous ? { ...previous, delegationSkills: value } : previous,
+                    )
+                  }
+                />
+                <Input
+                  size={isCompact ? "lg" : "md"}
+                  width="100%"
+                  label={t("settings.modelDelegationConcurrency")}
+                  htmlName="delegationMaxConcurrency"
+                  description={t("settings.modelDelegationConcurrencyHint")}
+                  {...({ inputMode: "numeric" } as const)}
+                  value={editingModel.delegationMaxConcurrency}
+                  status={
+                    parseDelegationConcurrency(editingModel.delegationMaxConcurrency) === null
+                      ? { type: "error" }
+                      : undefined
+                  }
+                  aria-invalid={
+                    parseDelegationConcurrency(editingModel.delegationMaxConcurrency) === null
+                      ? true
+                      : undefined
+                  }
+                  onChange={(value) =>
+                    updatePresentedModel((previous) =>
+                      previous ? { ...previous, delegationMaxConcurrency: value } : previous,
+                    )
+                  }
+                />
                 <Text type="body" weight="medium" wordBreak="break-word">
                   {t("settings.modelCost")}
                 </Text>
@@ -3819,6 +3867,7 @@ export function ProvidersSection(
                 thirdPartyImportEnabled={thirdPartyImportEnabled}
                 usage={usage}
               />
+              <SubagentTeamSettings settings={settings} setSettings={setSettings} />
             </VStack>
           </StackItem>
         </VStack>

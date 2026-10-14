@@ -102,7 +102,10 @@ function normalizeProxyServerInfo(info: ProxyServerInfo): ProxyServerInfo {
   };
 }
 
-async function getProxyServerInfo(): Promise<ProxyServerInfo> {
+async function getProxyServerInfo(capturedInvoke?: typeof invoke): Promise<ProxyServerInfo> {
+  if (capturedInvoke) {
+    return capturedInvoke<ProxyServerInfo>("proxy_get_server_info").then(normalizeProxyServerInfo);
+  }
   if (!proxyServerInfoPromise) {
     proxyServerInfoPromise = invoke<ProxyServerInfo>("proxy_get_server_info")
       .then(normalizeProxyServerInfo)
@@ -240,9 +243,10 @@ export async function prepareProxyRequest(
     oauthAccountId?: string;
     providerConfigId?: string;
     isFullUrl?: boolean;
+    invoke?: typeof invoke;
   },
 ): Promise<PreparedProxyRequest> {
-  const proxyServerInfo = await getProxyServerInfo();
+  const proxyServerInfo = await getProxyServerInfo(options?.invoke);
   const { baseUrl, upstreamOrigin, upstreamUrl } = buildProxyBaseUrl(
     providerId,
     upstreamBaseUrl,

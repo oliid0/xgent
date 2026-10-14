@@ -18,6 +18,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppConversationSurface, AppStartupSurface } from "./components/AppStartupSurface";
 import { useConfirmDialog } from "./components/astryx/useConfirmDialog";
+import { BackgroundInboxReceiver } from "./components/cron/BackgroundInboxReceiver";
 import { CronPromptRunner } from "./components/cron/CronPromptRunner";
 import { useNativeInputContextMenu } from "./components/input-context-menu/NativeInputContextMenu";
 import { MemoryOrganizerHost } from "./components/memory/useMemoryOrganizer";
@@ -29,6 +30,7 @@ import {
 } from "./i18n";
 import { useAppUpdateController } from "./lib/appUpdates";
 import { initAutomation } from "./lib/automation";
+import { useForegroundAttention } from "./lib/automation/foregroundAttention";
 import { installMobileBackNavigation } from "./lib/mobileBackNavigation";
 import { mobileExecutionStatus } from "./lib/mobileExecution";
 import {
@@ -71,7 +73,6 @@ import type { SectionId, SettingsOpenOptions } from "./pages/settings/types";
 import { NativeNotificationViewport } from "./presentation/NativeNotificationViewport";
 import { NativeSettingsPage } from "./presentation/NativeSettingsPage";
 import { isApplePresentationRuntime } from "./runtime/applePresentation";
-import { startLocalAccessHostBridge } from "./runtime/localAccessHostBridge";
 import { createAppearanceTheme } from "./theme/appearanceTheme";
 
 const MOBILE_SETTINGS_DELAY_NOTICE = "Native settings are taking longer than expected to load";
@@ -164,14 +165,6 @@ export default function App() {
     if (!nativeMobile) return;
     return startMobileStartupPolling(setMobileStartup);
   }, [nativeMobile]);
-
-  useEffect(() => {
-    if (browserRuntime || !platformResolved || nativeMobile) return;
-    const unlistenPromise = startLocalAccessHostBridge();
-    return () => {
-      void unlistenPromise.then((unlisten) => unlisten());
-    };
-  }, [browserRuntime, nativeMobile, platformResolved]);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SectionId>("system");
@@ -284,19 +277,24 @@ export default function App() {
     };
     const probe = async () => {
       try {
+        const peerId = await invoke<string>("worker_peer_resolve_endpoint", { base_url: baseUrl });
+        if (cancelled) return;
         const [snapshot, remoteHomeDir, remotePlatformResponse] = await Promise.all([
           invoke<{ defaultWorkdir?: unknown }>("lan_pc_invoke", {
             base_url: baseUrl,
+            peer_id: peerId,
             command: "settings_load_all",
             args: {},
           }),
           invoke<string>("lan_pc_invoke", {
             base_url: baseUrl,
+            peer_id: peerId,
             command: "system_home_dir",
             args: {},
           }),
           invoke<{ platform?: unknown }>("lan_pc_invoke", {
             base_url: baseUrl,
+            peer_id: peerId,
             command: "app_runtime_platform",
             args: {},
           }),
@@ -318,6 +316,7 @@ export default function App() {
         configureLanPcCommandHost({
           enabled: true,
           baseUrl,
+          peerId,
           localWorkdir: settings.system.workdir,
           remoteWorkdir,
           remoteHomeDir: remoteHomeDir.trim(),
@@ -593,6 +592,8 @@ export default function App() {
   );
 
   const runningConversationCountRef = useRef(0);
+  const [deferBackgroundNotices, setDeferBackgroundNotices] = useState(false);
+  useForegroundAttention(deferBackgroundNotices);
   const handleRunningConversationCountChange = useCallback((count: number) => {
     runningConversationCountRef.current = count;
   }, []);
@@ -687,6 +688,7 @@ export default function App() {
                 {appContentReady ? (
                   <>
                     <NativeNotificationViewport settings={settings} nativeMobile={nativeMobile} />
+                    <BackgroundInboxReceiver deferNotices={deferBackgroundNotices} />
                     {settingsHydratedRef.current ? <CronPromptRunner settings={settings} /> : null}
                     {settingsHydratedRef.current ? (
                       <MemoryOrganizerHost settings={settings} setSettings={setSettings} />
@@ -710,6 +712,7 @@ export default function App() {
                           lanPcCommandHostReady={lanPcCommandHostReady}
                           nativeMobile={nativeMobile}
                           onRunningConversationCountChange={handleRunningConversationCountChange}
+                          onNotificationDeferralChange={setDeferBackgroundNotices}
                         />
                       </AppConversationSurface>
                     </AppErrorBoundary>

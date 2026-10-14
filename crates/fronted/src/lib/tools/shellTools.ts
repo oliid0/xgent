@@ -1,5 +1,5 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import { invoke } from "@xgent/runtime";
+import { invoke as invokeRuntime } from "@xgent/runtime";
 import { type TProperties, Type } from "typebox";
 import { executionActivityStore, recordShellActivity } from "../chat/executionActivityStore";
 import {
@@ -19,12 +19,14 @@ import {
 } from "./bashTimeoutPolicy";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
 import {
-  invokeWithAbort,
-  requestRuntimeCancel,
+  type InvokeWithAbortOptions,
+  invokeWithAbort as invokeDefaultWithAbort,
+  requestRuntimeCancel as requestDefaultRuntimeCancel,
   throwIfToolInvocationAborted,
 } from "./invokeWithAbort";
 import { formatResolvedTarget, type ResolvedPath, ToolPathResolver } from "./pathUtils";
 import { assertSkillPathAllowedByPolicy, type SkillAccessPolicy } from "./skillAccessPolicy";
+import type { ToolCommandPort } from "./toolCommandPort";
 
 type ShellRunResponse = {
   exit_code: number;
@@ -310,7 +312,7 @@ function normalizeCursor(value: unknown) {
   return Math.max(0, Math.floor(value));
 }
 
-function requestShellSessionStop(sessionId: string, cursor?: number) {
+function requestShellSessionStopUsing(sessionId: string, cursor?: number, invoke = invokeRuntime) {
   const normalizedSessionId = sessionId.trim();
   if (!normalizedSessionId) return;
   void (async () => {
@@ -513,6 +515,7 @@ export type ShellSandboxSettings = {
 };
 
 export function createShellTools(params: {
+  commandPort?: ToolCommandPort;
   conversationId?: string;
   workdir: string;
   shellWorkspaceRoot?: string;
@@ -527,6 +530,16 @@ export function createShellTools(params: {
 
   sandbox?: ShellSandboxSettings;
 }): BuiltinToolBundle {
+  const invoke = params.commandPort?.invoke ?? invokeRuntime;
+  const invokeWithAbort = <T>(
+    command: string,
+    args: Record<string, unknown> | undefined,
+    signal?: AbortSignal,
+    options: InvokeWithAbortOptions<T> = {},
+  ) => invokeDefaultWithAbort<T>(command, args, signal, { ...options, invoke });
+  const requestRuntimeCancel = (runId: string) => requestDefaultRuntimeCancel(runId, invoke);
+  const requestShellSessionStop = (sessionId: string, cursor?: number) =>
+    requestShellSessionStopUsing(sessionId, cursor, invoke);
   const timeoutPolicy = resolveBashTimeoutPolicy(params.providerId);
   const runtimePlatform =
     normalizeRuntimePlatform(params.runtimePlatform) ?? inferRuntimePlatform();
@@ -582,7 +595,7 @@ export function createShellTools(params: {
   const pathResolver = new ToolPathResolver({
     workdir,
     shellWorkspaceRoot: params.shellWorkspaceRoot,
-    resolveHomeDir: params.resolveHomeDir,
+    resolveHomeDir: params.resolveHomeDir ?? params.commandPort?.homeDir,
     skillsRootEnabled: allowSkillsRoot,
     skillsRootDir: cachedSkillsRootDir,
     skillAccessPolicy,

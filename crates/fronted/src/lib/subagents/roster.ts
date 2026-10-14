@@ -37,7 +37,9 @@ export function createSubagentIdentity(params: {
     agentId: params.spec.id,
     name,
     role,
-    identityPrompt: params.spec.identity?.trim() ?? "",
+    identityPrompt: params.template?.persistInstructions
+      ? [params.template.prompt.trim(), params.spec.identity?.trim()].filter(Boolean).join("\n\n")
+      : (params.spec.identity?.trim() ?? ""),
     templateId: params.template?.id ?? params.spec.templateId,
     lastMode: params.spec.mode,
     createdToolCallId: params.toolCallId,
@@ -59,6 +61,13 @@ export function buildRosterEntries(
       role: identity.role,
       lastMode: identity.lastMode,
       lastStatus: latestRun?.status,
+      ...(latestRun?.providerConfigId
+        ? {
+            providerConfigId: latestRun.providerConfigId,
+            model: latestRun.model,
+            runId: latestRun.id,
+          }
+        : {}),
       lastSummary: latestRun?.summary ? truncateText(latestRun.summary, 500) : undefined,
     });
   }
@@ -70,6 +79,8 @@ export function buildTemplateEntries(templates: SubagentTemplate[]): SubagentTem
     id: template.id,
     name: template.name,
     description: template.description || undefined,
+    ...(template.modelValue ? { modelValue: template.modelValue } : {}),
+    ...(template.requiredSkills?.length ? { requiredSkills: template.requiredSkills } : {}),
   }));
 }
 
@@ -95,7 +106,7 @@ export function formatTemplates(entries: SubagentTemplateEntry[]) {
     .slice(0, MAX_LISTED_AGENTS)
     .map((entry) => {
       const description = entry.description ? ` - ${entry.description}` : "";
-      return `${entry.id} (${entry.name})${description}`;
+      return `${entry.id} (${entry.name})${description}${entry.modelValue ? ` default_model=${entry.modelValue}` : ""}${entry.requiredSkills?.length ? ` required_skills=${entry.requiredSkills.join(",")}` : ""}`;
     })
     .join("\n");
 }

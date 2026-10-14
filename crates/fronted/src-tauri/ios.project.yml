@@ -75,6 +75,8 @@ targets:
       path: {{app.name}}_iOS/{{app.name}}_iOS.entitlements
       properties:
         com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.background-delivery: true
+        com.apple.developer.homekit: true
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full

@@ -470,13 +470,17 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
     return siblings.includes(path) ? siblings : [path];
   };
   const openFile = (path: string) => props.onOpenFile?.(path, siblingImages(path));
-  const startAction = (action: Exclude<PendingAction, null>) => {
+  const startAction = (
+    action: Exclude<PendingAction, null>,
+    targetPath = selectedPath,
+    targetKind = selectedNode?.kind,
+  ) => {
     if (!projectReady || busyAction || !isActive()) return;
-    if (action === "rename" && !selectedPath) return;
+    if (action === "rename" && !targetPath) return;
     setPendingAction(action);
-    setPendingTargetPath(selectedPath);
-    setPendingDirectory(selectedNode?.kind === "dir" ? selectedPath : dirname(selectedPath));
-    setDraftName(action === "rename" ? basename(selectedPath) : "");
+    setPendingTargetPath(targetPath);
+    setPendingDirectory(targetKind === "dir" ? targetPath : dirname(targetPath));
+    setDraftName(action === "rename" ? basename(targetPath) : "");
     setDeleteTarget(null);
     setActionError(null);
   };
@@ -617,9 +621,17 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
     id: `file-row:${node.path || "root"}`,
     kind: "TreeRow",
     label: node.name,
-    text: node.path || undefined,
+    variant: "workspace-file-row",
+    text:
+      node.kind === "dir"
+        ? t("workspaceSftp.entry.folder")
+        : node.name.includes(".")
+          ? node.name.slice(node.name.lastIndexOf(".") + 1).toUpperCase()
+          : t("workspaceSftp.entry.file"),
+    accessibilityHint: node.path || undefined,
     icon: node.kind === "file" ? "doc" : expandedSet.has(node.path) ? "folder.fill" : "folder",
     selected: node.path === selectedPath,
+    value: node.kind === "dir" ? expandedSet.has(node.path) : null,
     secondary: node.hidden,
     padding: 4,
     indent: depth * 14,
@@ -632,6 +644,60 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
       },
       (value) => value === null,
     ),
+    children: node.path
+      ? [
+          {
+            id: `file-menu:${node.path}`,
+            kind: "Menu",
+            label: `${t("sidebar.mobile.more")} · ${node.name}`,
+            icon: "ellipsis",
+            variant: "compact",
+            children: [
+              ...(node.kind === "file"
+                ? [
+                    button(
+                      `file-open:${node.path}`,
+                      t("projectTools.fileTree.openFile"),
+                      "doc.text.magnifyingglass",
+                      () => openFile(node.path),
+                      Boolean(props.onOpenFile),
+                    ),
+                  ]
+                : []),
+              button(
+                `file-new-file:${node.path}`,
+                t("projectTools.fileTree.newFile"),
+                "doc.badge.plus",
+                () => startAction("file", node.path, node.kind),
+                projectReady && !busyAction,
+              ),
+              button(
+                `file-new-folder:${node.path}`,
+                t("projectTools.fileTree.newFolder"),
+                "folder.badge.plus",
+                () => startAction("folder", node.path, node.kind),
+                projectReady && !busyAction,
+              ),
+              button(
+                `file-rename:${node.path}`,
+                t("projectTools.fileTree.rename"),
+                "pencil",
+                () => startAction("rename", node.path, node.kind),
+                projectReady && !busyAction,
+              ),
+              { id: `file-menu-divider:${node.path}`, kind: "Divider" },
+              button(
+                `file-delete:${node.path}`,
+                t("projectTools.fileTree.delete"),
+                "trash",
+                () => setDeleteTarget(node.path),
+                projectReady && !busyAction,
+                true,
+              ),
+            ],
+          },
+        ]
+      : undefined,
   });
   const treeRows: PresentationNode[] = [];
   const visited = new Set<string>();
@@ -966,7 +1032,6 @@ function NativeMobileFilesPanel(props: NativeMobileFilesPanelProps) {
                   kind: "EmptyState" as const,
                   icon: "folder",
                   label: t("projectTools.newFileTree"),
-                  text: t("projectTools.fileTreeDescription"),
                 },
               ]),
         ...(search.truncated && query.trim()

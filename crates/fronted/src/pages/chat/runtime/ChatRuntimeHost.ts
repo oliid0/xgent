@@ -1,3 +1,5 @@
+import { getLanPcCommandHostConfig } from "@xgent/runtime";
+import { runDurableChatTurn } from "../../../lib/automation/backgroundChatIntake";
 import {
   type RunAgentConversationTurnParams,
   runAgentConversationTurn,
@@ -25,7 +27,21 @@ export function createChatRuntimeHost(): ChatRuntimeHost {
   return {
     async runTurn(turn) {
       if (turn.mode === "agent") {
-        await runAgentConversationTurn(turn.params);
+        // Capture before history persistence and model assessment can yield.
+        const params: RunAgentConversationTurnParams = {
+          ...turn.params,
+          commandHostSnapshot: {
+            ...(turn.params.commandHostSnapshot ?? getLanPcCommandHostConfig()),
+          },
+        };
+        let foregroundParams = params;
+        if (
+          await runDurableChatTurn(params, (prepared) => {
+            foregroundParams = prepared;
+          })
+        )
+          return;
+        await runAgentConversationTurn(foregroundParams);
         return;
       }
       await runTextConversationTurn(turn.params);

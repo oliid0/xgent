@@ -25,6 +25,7 @@ import {
 } from "../lib/chat/layoutPreferences";
 import { normalizeLogicalLineEndings } from "../lib/chat/messages/composerText";
 import { createFileMentionReference } from "../lib/chat/messages/mentionReferences";
+import type { PreviewedFile } from "../lib/chat/messages/previewedFiles";
 import { safeStringify, summarizeToolCall } from "../lib/chat/messages/uiMessages";
 import type { PendingUploadedFile } from "../lib/chat/messages/uploadedFiles";
 import { normalizeConversationTitle } from "../lib/chat/page/chatPageHelpers";
@@ -180,8 +181,10 @@ export type NativeChatPageProps = NativeWorkspaceActionsProps & {
   onOpenBrowserSettings: () => void;
   onOpenGitReview: () => void;
   onOpenBackgroundTasks: () => void;
+  onOpenGoals?: () => void;
   onOpenFiles: () => void;
   onOpenWorkspaceFile: (path: string) => void;
+  onOpenPreviewedFile?: (file: PreviewedFile) => void;
   onChangeMode: (mode: "text" | "tools") => void;
   onCommandSafetyModeChange: (mode: CommandSafetyMode) => void;
   onLoadEarlierHistory: () => Promise<unknown> | void;
@@ -479,6 +482,7 @@ export function NativeChatPage(props: NativeChatPageProps) {
       action,
       props.onOpenWorkspaceFile,
       questions.nodes,
+      props.onOpenPreviewedFile,
     ),
     handlers,
     syntaxPalette,
@@ -1797,6 +1801,17 @@ export function NativeChatPage(props: NativeChatPageProps) {
           }
         : undefined,
       tools: [
+        ...(!compact
+          ? [
+              {
+                id: "sidebar-soul-goals",
+                label: t("goals.title"),
+                icon: "checkmark.circle",
+                run: () => props.onOpenGoals?.(),
+                enabled: !!props.onOpenGoals,
+              },
+            ]
+          : []),
         {
           id: "sidebar-soul-terminal",
           label: t("sidebar.terminal"),
@@ -2044,6 +2059,14 @@ export function NativeChatPage(props: NativeChatPageProps) {
                                 props.onOpenBackgroundTasks();
                               }),
                               icon: "clock",
+                            },
+                            {
+                              ...sidebarButton("goals", t("goals.title"), () => {
+                                finishSidebarAction();
+                                props.onOpenGoals?.();
+                              }),
+                              icon: "checkmark.circle",
+                              disabled: !props.onOpenGoals,
                             },
                             {
                               ...sidebarButton("remote", t("sidebar.mobile.remote"), () => {

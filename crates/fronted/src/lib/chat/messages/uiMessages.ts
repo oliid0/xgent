@@ -24,6 +24,7 @@ import { isProviderNativeWebSearchToolName } from "../../providers/nativeWebSear
 import { isSubagentCardToolCall } from "../../subagents/card";
 import { GLOBAL_BASH_MAX_TIMEOUT_MS, MIN_BASH_TIMEOUT_MS } from "../../tools/bashTimeoutPolicy";
 import { readMessageContextUsage } from "../compaction/contextUsageMetadata";
+import { type BackgroundChatArtifact, readBackgroundChatArtifacts } from "./backgroundArtifacts";
 import { fileToolFieldChars, LIVE_TOOL_PREVIEW_META_KEY } from "./toolPreview";
 import { getUserMessageDisplayText } from "./uploadedFiles";
 
@@ -55,6 +56,7 @@ export type UiRoundContentBlock =
     };
 
 export type UiRound = {
+  backgroundArtifacts?: BackgroundChatArtifact[];
   round: number;
   // Stable render key. History-built rounds use `r<n>`; merge paths re-stamp
   // the `r<n>` pattern when round numbers shift so keys stay collision-free.
@@ -1166,7 +1168,9 @@ export function buildUiMessages(messages: Message[], indexOffset = 0): UiMessage
 
         if (!hasContent) continue;
 
+        const backgroundArtifacts = readBackgroundChatArtifacts(assistant);
         rounds.push({
+          ...(backgroundArtifacts.length ? { backgroundArtifacts } : {}),
           round: roundNum,
           key: `r${roundNum}`,
           blocks,

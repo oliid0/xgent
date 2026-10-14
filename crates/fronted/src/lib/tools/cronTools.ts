@@ -4,13 +4,16 @@ import {
   applyCronOps,
   type CronRunRecord,
   type CronTask,
+  createAutomationStore,
   getAutomationState,
   initAutomation,
   listCronRuns,
   refreshAutomationSnapshot,
 } from "@/lib/automation/index";
 import { createUuid } from "@/lib/shared/id";
+import { createAutomationBackend } from "../automation/backend";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
+import type { ToolCommandPort } from "./toolCommandPort";
 
 type SelectedModelInput = {
   customProviderId: string;
@@ -304,7 +307,21 @@ async function executeAction(
   args: Record<string, unknown>,
   currentChatModel?: SelectedModelInput,
   runtimeWorkdir?: string,
+  automation = {
+    initAutomation,
+    applyCronOps,
+    listCronRuns,
+    refreshAutomationSnapshot,
+    getAutomationState,
+  },
 ): Promise<string> {
+  const {
+    initAutomation,
+    applyCronOps,
+    listCronRuns,
+    refreshAutomationSnapshot,
+    getAutomationState,
+  } = automation;
   const action = parseAction(args.action);
   await initAutomation();
 
@@ -369,9 +386,13 @@ async function executeAction(
 }
 
 export function createCronTools(params: {
+  commandPort?: ToolCommandPort;
   currentChatModel?: SelectedModelInput;
   workdir?: string;
 }): BuiltinToolBundle {
+  const automation = params.commandPort
+    ? createAutomationStore(createAutomationBackend(params.commandPort), false)
+    : { initAutomation, applyCronOps, listCronRuns, refreshAutomationSnapshot, getAutomationState };
   const toolCronTaskManager: Tool = {
     name: "CronTaskManager",
     description:
@@ -414,6 +435,7 @@ export function createCronTools(params: {
         (toolCall.arguments ?? {}) as Record<string, unknown>,
         params.currentChatModel,
         params.workdir,
+        automation,
       );
       return {
         role: "toolResult",

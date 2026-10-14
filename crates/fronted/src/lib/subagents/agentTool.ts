@@ -1,6 +1,6 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
-
+import { toModelValue } from "../providers/runtime/modelValue";
 import type { RuntimePlatform } from "../runtimePlatform";
 import type { ProviderId } from "../settings";
 import {
@@ -19,6 +19,11 @@ import {
   toolErrorResult,
 } from "./errors";
 import { type SubagentWorktreeIpc, tauriSubagentWorktreeIpc } from "./ipc/worktree";
+import {
+  type readPersistentModelWorkload,
+  type SubagentModelCandidate,
+  subagentModelPool,
+} from "./modelRouting";
 import { selectReadOnlyTools } from "./policy";
 import type { SubagentBatchDetails, SubagentReportDetails } from "./protocol";
 import {
@@ -62,6 +67,19 @@ const AGENT_PARAMETERS = Type.Object(
             description:
               "Task for this run. For an existing id this is normally the only field needed besides id.",
           }),
+          model: Type.Optional(
+            Type.String({
+              description:
+                "Exact configured provider::model from AgentRoster. Omit to retain an existing agent's binding or the parent model; required_skills without model selects an idle eligible candidate.",
+            }),
+          ),
+          required_skills: Type.Optional(
+            Type.Array(Type.String(), {
+              maxItems: 16,
+              description:
+                "Required user-declared chat-agent skill tags from AgentRoster. Every tag must match; image/video generation needs a separate real media tool.",
+            }),
+          ),
           name: Type.Optional(
             Type.String({ description: "Display name. Only valid when the id is first created." }),
           ),
@@ -182,9 +200,12 @@ async function resolveOutputPaths(params: {
  * the parent conversation id); the scheduler is the turn's single scheduler.
  */
 export type SubagentRuntimeConfig = {
+  readPersistentModels?: () => ReturnType<typeof readPersistentModelWorkload>;
+  persistBatchReceipts?: boolean;
   providerId: ProviderId;
   model: string;
   runtime: SubagentProviderRuntime;
+  models?: SubagentModelCandidate[];
   sessionId?: string;
   templates: SubagentTemplate[];
   store: SubagentConversationStore;
@@ -192,9 +213,12 @@ export type SubagentRuntimeConfig = {
 };
 
 export function createSubagentTools(params: {
+  readPersistentModels?: () => ReturnType<typeof readPersistentModelWorkload>;
+  persistBatchReceipts?: boolean;
   providerId: ProviderId;
   model: string;
   runtime: SubagentProviderRuntime;
+  models?: SubagentModelCandidate[];
   runtimePlatform?: RuntimePlatform;
   workdir: string;
   resolveHomeDir?: () => Promise<string>;
@@ -211,11 +235,13 @@ export function createSubagentTools(params: {
 }): BuiltinToolBundle {
   const store = params.store;
   const templates = params.templates;
+  const models = params.models ?? [];
   const messageBusEnabled = Boolean(store.conversationId);
   const worktreeIpc = params.worktreeIpc ?? tauriSubagentWorktreeIpc;
   const readonlyTools = selectReadOnlyTools({
     tools: params.baseTools,
     metadataByName: params.metadataByName,
+    strictReadOnly: params.forceReadonly,
   });
   const enqueueWorktreeApply = createSequentialQueue();
   const agentRunQueues = new Map<string, ReturnType<typeof createSequentialQueue>>();
@@ -247,6 +273,7 @@ export function createSubagentTools(params: {
       "Subagents communicate through SendMessage (to=parent is parent-private; to=* is a shared broadcast); do not use workspace files as a message channel.",
       "Include the new user request and any parent-conversation context each subagent needs in that agent's prompt. The parent conversation is not copied automatically.",
       "Invalid calls start no agents and return a structured error listing the roster and enabled templates — fix every issue and retry with one corrected call.",
+      "Call AgentRoster to inspect current configured provider/model bindings, declared strengths, local occupancy, observed HTTP cooldowns and actual run status. Configured does not prove the upstream is reachable or has remaining quota. A cooling_down model waits until cooldown.retryAt for new work; required_skills without a model can select another eligible idle binding. Select the exact provider::model, never a bare model name. Media generation must use an available media connector/tool, not this chat executor. Never resend failed work on another model before reconciling its external effects.",
       "Existing agents that may be resumed by id:",
       formatRoster(rosterEntries),
       "Enabled AGENTS templates (reference by template=<id>):",
@@ -306,6 +333,58 @@ export function createSubagentTools(params: {
       return rejectBatch(pathIssues);
     }
 
+    const candidatesByAgent = new Map<string, SubagentModelCandidate[]>();
+    const modelIssues: SubagentIssue[] = [];
+    for (const resolved of agents) {
+      const previous = store.getLatestRun(resolved.spec.id);
+      const requested = resolved.spec.modelValue;
+      const skills = resolved.spec.requiredSkills ?? [];
+      if (skills.some((skill) => ["image_generation", "video_generation"].includes(skill))) {
+        modelIssues.push(
+          issue(
+            "invalid_arguments",
+            "Image/video generation requires an actual media tool/connector, not a chat-agent model binding.",
+            resolved.spec.id,
+          ),
+        );
+        continue;
+      }
+      const retainedValue = previous?.providerConfigId
+        ? toModelValue(previous.providerConfigId, previous.model)
+        : undefined;
+      if (retainedValue && requested && requested !== retainedValue && resolved.spec.resume) {
+        modelIssues.push(
+          issue(
+            "invalid_arguments",
+            "Resuming an agent requires its original provider/model. Use resume=false for an explicit fresh context.",
+            resolved.spec.id,
+          ),
+        );
+        continue;
+      }
+      const selectedValue = requested ?? (resolved.spec.resume ? retainedValue : undefined);
+      const parentValue = toModelValue(params.runtime.providerConfigId, params.model);
+      const inheritParent = !selectedValue && !skills.length;
+      if (inheritParent && !models.some((candidate) => candidate.value === parentValue)) continue;
+      const eligible = subagentModelPool.eligible(
+        models,
+        selectedValue ?? (inheritParent ? parentValue : undefined),
+        skills,
+      );
+      if (!eligible.length) {
+        modelIssues.push(
+          issue(
+            "invalid_arguments",
+            "No active configured provider/model satisfies the exact binding and all required_skills. Inspect AgentRoster; no delegate was started.",
+            resolved.spec.id,
+          ),
+        );
+      } else {
+        candidatesByAgent.set(resolved.spec.id, eligible);
+      }
+    }
+    if (modelIssues.length) return rejectBatch(modelIssues);
+
     const concurrency = parsed.batch.concurrency;
     const scheduler = context?.subagentScheduler ?? params.scheduler;
     const startedAt = Date.now();
@@ -323,6 +402,9 @@ export function createSubagentTools(params: {
       worktree: worktreeIpc,
       createChildToolRegistry: params.createSubagentToolRegistry,
       readonlyTools,
+      readonlyToolsAreStrict: readonlyTools.every(
+        (tool) => params.metadataByName.get(tool.name)?.isReadOnly === true,
+      ),
       readonlyExecuteToolCall: params.executeToolCall,
       withMessageTools: messageBusEnabled
         ? (agent, tools, execute) => {
@@ -386,19 +468,42 @@ export function createSubagentTools(params: {
 
         try {
           const report = await enqueueAgentRun(resolved.spec.id, () =>
-            scheduler.runSubagent(
-              () =>
-                executeSubagentRun(env, {
-                  spec: resolved.spec,
-                  existingIdentity: resolved.existingIdentity,
-                  template: resolved.template,
-                  parentToolCallId: toolCall.id,
-                  index,
-                  total: agents.length,
-                  signal,
-                }),
-              signal,
-            ),
+            scheduler.runSubagent(() => {
+              const run = (
+                binding: Pick<SubagentModelCandidate, "providerId" | "model" | "runtime">,
+              ) => {
+                const latest = store.getLatestRun(resolved.spec.id);
+                if (
+                  resolved.spec.resume &&
+                  latest?.providerConfigId &&
+                  (latest.providerConfigId !== binding.runtime.providerConfigId ||
+                    latest.model !== binding.model)
+                ) {
+                  throw new Error(
+                    "Agent binding changed while queued; resume requires the original provider/model.",
+                  );
+                }
+                const inheritsParent =
+                  !resolved.spec.modelValue &&
+                  !resolved.spec.requiredSkills?.length &&
+                  binding.runtime.providerConfigId === env.runtime.providerConfigId &&
+                  binding.model === env.model;
+                return executeSubagentRun(
+                  { ...env, ...binding, runtime: inheritsParent ? env.runtime : binding.runtime },
+                  {
+                    spec: resolved.spec,
+                    existingIdentity: resolved.existingIdentity,
+                    template: resolved.template,
+                    parentToolCallId: toolCall.id,
+                    index,
+                    total: agents.length,
+                    signal,
+                  },
+                );
+              };
+              const candidates = candidatesByAgent.get(resolved.spec.id);
+              return candidates ? subagentModelPool.run(candidates, run, signal) : run(env);
+            }, signal),
           );
           return finish(report);
         } catch (error) {
@@ -441,7 +546,7 @@ export function createSubagentTools(params: {
       agents: reports,
     };
 
-    return {
+    const result: ToolResultMessage = {
       role: "toolResult",
       toolCallId: toolCall.id,
       toolName: toolCall.name,
@@ -450,13 +555,76 @@ export function createSubagentTools(params: {
       isError: reports.some((report) => report.status !== "completed"),
       timestamp: Date.now(),
     };
+    if (params.persistBatchReceipts) await store.saveBatchReceipt(toolCall, result);
+    return result;
   }
 
   return {
     groupId: "subagent",
-    tools: [toolAgent],
-    executeToolCall: executeAgentToolCall,
+    recoverToolCall: params.persistBatchReceipts
+      ? (call) => store.recoverBatchReceipt(call)
+      : undefined,
+    tools: [
+      toolAgent,
+      {
+        name: "AgentRoster",
+        description:
+          "Inspect actual subordinate identities/run status and configured chat models with declared skills, local active-run counts and observed HTTP cooldowns. For an accepted native background parent, persistentExecution separately reports that original host's observed pending/running/waiting queues per exact binding, or unavailable observation. Queue load is not private Agent occupancy or upstream quota. Cooldown includes only status/time, never response headers or credentials. Configured does not prove reachable upstream or remaining quota. Does not start work.",
+        parameters: Type.Object({}, { additionalProperties: false }),
+      },
+    ],
+    executeToolCall: async (call, signal, context) => {
+      if (call.name !== "AgentRoster") return executeAgentToolCall(call, signal, context);
+      if (signal?.aborted) return toolErrorResult(call, "Cancelled");
+      try {
+        await store.ready();
+        let persistentExecution:
+          | ({ status: "observed" } & Awaited<ReturnType<typeof readPersistentModelWorkload>>)
+          | { status: "unavailable" }
+          | undefined;
+        if (params.readPersistentModels) {
+          try {
+            persistentExecution = { status: "observed", ...(await params.readPersistentModels()) };
+          } catch {
+            persistentExecution = { status: "unavailable" };
+          }
+        }
+        if (signal?.aborted) return toolErrorResult(call, "Cancelled");
+        const snapshot = {
+          ...(persistentExecution ? { persistentExecution } : {}),
+          models: subagentModelPool.snapshot(models),
+          agents: buildRosterEntries(store.listIdentities(), store.latestRunsByAgent()),
+          templates: buildTemplateEntries(templates),
+          ...(params.scheduler.executionBudget
+            ? { executionBudget: params.scheduler.executionBudget.snapshot() }
+            : {}),
+        };
+        return {
+          role: "toolResult",
+          toolCallId: call.id,
+          toolName: call.name,
+          content: [{ type: "text", text: JSON.stringify(snapshot) }],
+          details: snapshot,
+          isError: false,
+          timestamp: Date.now(),
+        };
+      } catch (error) {
+        return toolErrorResult(
+          call,
+          normalizeErrorMessage(error, "Agent roster could not be loaded."),
+        );
+      }
+    },
     metadataByName: createBuiltinMetadataMap([
+      [
+        "AgentRoster",
+        {
+          groupId: "subagent",
+          kind: "subagent_roster",
+          isReadOnly: true,
+          displayCategory: "system",
+        },
+      ],
       [
         AGENT_TOOL_NAME,
         {

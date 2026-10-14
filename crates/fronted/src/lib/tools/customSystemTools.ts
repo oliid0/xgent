@@ -1,9 +1,10 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import { invoke } from "@xgent/runtime";
+import { invoke as invokeRuntime } from "@xgent/runtime";
 import { Type } from "typebox";
 
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
 import type { SystemToolRuntimeScope } from "./systemToolOptions";
+import type { ToolCommandPort } from "./toolCommandPort";
 
 type SystemHttpGetResponse = {
   url: string;
@@ -21,7 +22,11 @@ type SystemToolDefinition = {
   parameters: Tool["parameters"];
   isReadOnly: boolean;
   runtimeScopes: readonly SystemToolRuntimeScope[];
-  execute: (toolCall: ToolCall, signal?: AbortSignal) => Promise<ToolResultMessage>;
+  execute: (
+    toolCall: ToolCall,
+    signal?: AbortSignal,
+    commandPort?: ToolCommandPort,
+  ) => Promise<ToolResultMessage>;
 };
 
 function asErrorMessage(err: unknown) {
@@ -31,7 +36,9 @@ function asErrorMessage(err: unknown) {
 async function executeHttpGetTest(
   toolCall: ToolCall,
   _signal?: AbortSignal,
+  commandPort?: ToolCommandPort,
 ): Promise<ToolResultMessage> {
+  const invoke = commandPort?.invoke ?? invokeRuntime;
   const now = Date.now();
 
   try {
@@ -101,6 +108,7 @@ function supportsRuntimeScope(
 }
 
 export function createCustomSystemTools(params: {
+  commandPort?: ToolCommandPort;
   selectedToolIds: readonly string[];
   runtimeScope: SystemToolRuntimeScope;
   currentChatModel?: {
@@ -142,7 +150,7 @@ export function createCustomSystemTools(params: {
 
     const toolDefinition = activeDefinitionByName.get(toolCall.name);
     if (toolDefinition) {
-      return toolDefinition.execute(toolCall, signal);
+      return toolDefinition.execute(toolCall, signal, params.commandPort);
     }
 
     return {

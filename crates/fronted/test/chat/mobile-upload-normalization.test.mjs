@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { File } from "node:buffer";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
@@ -7,12 +8,13 @@ const normalized = { fileName: "photo.jpg", mimeType: "image/jpeg", contentBase6
 const photo = (name = "photo.heic", type = "image/heic") => new File(["selected bytes"], name, { type });
 
 function harness(options = {}) {
-  const calls = [], notices = [], errors = [], invalidations = [];
+  const calls = [], notices = [], errors = [], invalidations = [], disk = new Map();
   let focused = 0;
   const frame = { state: [], effects: [], cursor: 0 };
   const same = (a, b) => a?.length === b?.length && a.every((item, index) => Object.is(item, b[index]));
   const loader = createTsModuleLoader({ mocks: {
-    "@xgent/runtime": { isTauriRuntime: () => options.native !== false },
+    "@xgent/runtime": { isTauriRuntime: () => options.native !== false,
+      getLanPcCommandHostConfig: () => options.host ?? { enabled: false } },
     react: {
       useState(initial) {
         const index = frame.cursor++;
@@ -44,8 +46,16 @@ function harness(options = {}) {
         if (command.endsWith("|prepare_image_attachment")) return options.prepare ? options.prepare(args.request) : normalized;
         if (command === "system_import_uploaded_readable_files") {
           if (options.import) return options.import(args);
-          return { files: args.files.map((file, index) => ({ fileName: file.fileName, kind: "image", sizeBytes: 5,
-            relativePath: `uploads/${index}/${file.fileName}`, absolutePath: `${args.workdir}/uploads/${index}/${file.fileName}` })), skipped: [] };
+          return { files: args.files.map((file, index) => {
+            const bytes = Buffer.from(file.contentBase64, "base64"), absolutePath = `${args.workdir}/uploads/${index}/${file.fileName}`;
+            disk.set(absolutePath, bytes);
+            return { fileName: file.fileName, kind: "image", sizeBytes: bytes.length,
+              relativePath: `uploads/${index}/${file.fileName}`, absolutePath };
+          }), skipped: [] };
+        }
+        if (command === "fs_snapshot_binary") {
+          assert.ok(disk.has(args.path)); const bytes = disk.get(args.path);
+          return { bytes: bytes.length, contentBase64: bytes.toString("base64"), contentHash: createHash("sha256").update(bytes).digest("hex") };
         }
         throw new Error(`Unexpected command ${command}`);
       },
@@ -131,8 +141,9 @@ test("the upload hook merges normalized files and skip reasons, and releases bus
   const state = h.render();
   assert.equal(state.isUploadingFiles, false);
   assert.equal(state.pendingUploadedFiles[0].fileName, "photo.jpg");
-  assert.deepEqual(h.calls.at(-1).args.files, [normalized]);
-  assert.equal(h.calls.at(-1).args.workdir, "/a");
+  const imported = h.calls.find(call => call.command === "system_import_uploaded_readable_files");
+  assert.deepEqual(imported.args.files, [normalized]);
+  assert.equal(imported.args.workdir, "/a");
   assert.match(h.notices.at(-1)[1], /bad.heic: Decoder failed/);
   assert.equal(h.focused, 1);
   assert.equal(h.invalidations.length, 1);
@@ -158,6 +169,18 @@ test("a workspace change during decoding does not attach stale paths to the new 
   assert.equal(h.render().pendingUploadedFiles.length, 0);
   assert.match(h.notices.at(-1)[1], /上传目标已失效/);
   assert.equal(h.focused, 0);
+});
+
+test("a selected peer change during decoding invalidates the target captured before preparation", async () => {
+  const wait = Promise.withResolvers();
+  const h = harness({ host: { enabled: true, baseUrl: "http://old-pc:28367", localWorkdir: "/phone", remoteWorkdir: "/pc" }, prepare: () => wait.promise });
+  const pending = h.render().importReadableFiles([photo()]); await new Promise(setImmediate);
+  h.options.host = { ...h.options.host, baseUrl: "http://new-pc:28367" };
+  wait.resolve(normalized); await pending;
+  assert.equal(h.calls.some(call => call.command === "system_import_uploaded_readable_files"), false);
+  assert.equal(h.render().pendingUploadedFiles.length, 0);
+  assert.match(h.notices.at(-1)[1], /上传目标已失效/);
+  assert.equal(h.render().isUploadingFiles, false);
 });
 
 function pickerDocument(t, onOpen) {
@@ -319,7 +342,7 @@ test("native decoding respects the remaining file slots and the upload single-fl
   await h.render().importReadableFiles([photo("duplicate.heic")]);
   assert.equal(h.calls.length, 1);
   wait.resolve(normalized); await pending;
-  assert.equal(h.calls.at(-1).args.maxFiles, 1);
+  assert.equal(h.calls.find(call => call.command === "system_import_uploaded_readable_files").args.maxFiles, 1);
   assert.equal(h.render().pendingUploadedFiles.length, 9);
   assert.equal(h.render().isUploadingFiles, false);
   assert.ok(h.notices.some(([, message]) => message.includes("1 个额外文件")));

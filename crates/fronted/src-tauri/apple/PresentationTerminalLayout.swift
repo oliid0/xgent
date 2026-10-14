@@ -81,6 +81,14 @@ private struct XgentCommandTerminalLayout: View {
 
     private let endID = "command-terminal-end"
 
+    private var actions: [XgentNode] {
+        (input.children ?? []).filter { ["run", "cancel", "clear"].contains($0.id) }
+    }
+
+    private var fields: [XgentNode] {
+        (input.children ?? []).filter { !["run", "cancel", "clear"].contains($0.id) }
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -108,14 +116,30 @@ private struct XgentCommandTerminalLayout: View {
                 if followsOutput { proxy.scrollTo(endID, anchor: .bottom) }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                ScrollView {
-                    nodes([input]).padding(12)
+                VStack(spacing: 0) {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: CGFloat(input.spacing ?? 8)) {
+                            nodes(fields)
+                        }
+                        .padding(12)
                         .submitLabel(.send)
                         .onSubmit {
-                            let targetID = input.children?.contains(where: { $0.id == "live-input" }) == true
+                            let targetID = fields.contains(where: { $0.id == "live-input" })
                                 ? "send-input" : "run"
                             if let action = document.node(id: targetID) { model.send(action, in: document) }
                         }
+                    }
+                    // Stopping a waiting command must not require scrolling its stdin form.
+                    HStack(spacing: 8) {
+                        ForEach(actions) { action in
+                            XgentActionButton(node: action, document: document, model: model)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(1)
                 }
                 .frame(maxHeight: 220)
                 .background { XgentThemeBackground() }

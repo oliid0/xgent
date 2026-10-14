@@ -1773,14 +1773,14 @@ pub async fn system_clipboard_write_text(app: tauri::AppHandle, text: String) ->
 
 #[tauri::command(rename_all = "snake_case")]
 #[cfg(desktop)]
-pub fn system_begin_power_activity(
+pub async fn system_begin_power_activity(
     activity_id: String,
     reason: String,
     ttl_ms: Option<u64>,
     power_activity: tauri::State<'_, Arc<PowerActivityManager>>,
 ) -> Result<(), String> {
-    power_activity.begin(activity_id, reason, ttl_ms);
-    Ok(())
+    let power=Arc::clone(power_activity.inner());
+    tauri::async_runtime::spawn_blocking(move||power.begin(activity_id,reason,ttl_ms)).await.map_err(|error|error.to_string())?
 }
 
 #[tauri::command(rename_all = "snake_case")]

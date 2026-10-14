@@ -160,12 +160,12 @@ struct XgentDesktopSettingsLayout: View {
                     .frame(maxWidth: 640, alignment: .leading)
                     .frame(maxWidth: .infinity, alignment: .top)
                 }
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if let footer = providerEditorFooter {
-                        XgentProviderEditorFooter(node: footer, document: document, model: model)
-                            .frame(maxWidth: 640)
-                            .frame(maxWidth: .infinity)
-                    }
+                if let footer = providerEditorFooter {
+                    XgentProviderEditorFooter(node: footer, document: document, model: model)
+                        .frame(maxWidth: 640)
+                        .frame(maxWidth: .infinity)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .layoutPriority(1)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

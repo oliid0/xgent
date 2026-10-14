@@ -1,10 +1,14 @@
-import type { Tool } from "@earendil-works/pi-ai";
-
+import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import {
   type ConversationViewState,
   normalizeConversationState,
   type StoredContextSegment,
 } from "../chat/conversation/conversationState";
+import {
+  persistSubagentBatchReceipt,
+  recoverSubagentBatchReceipt,
+  verifyReadOnlySubagentBatchReceipt,
+} from "./batchReceipt";
 import {
   type SubagentMessageAppendInput,
   type SubagentPruneResult,
@@ -42,6 +46,8 @@ export type SubagentPersistRunInput = {
   mode: SubagentMode;
   status: SubagentRunStatus;
   providerId: string;
+  providerConfigId?: string;
+  readOnlyTools?: boolean;
   model: string;
   sessionId?: string;
   workdir?: string;
@@ -77,6 +83,9 @@ export type SubagentConversationStore = {
   knownAgentIds: () => string[];
   latestRunsByAgent: () => Map<string, SubagentRunSummary>;
   getLatestRun: (agentId: string) => SubagentRunSummary | undefined;
+  saveBatchReceipt: (call: ToolCall, receipt: ToolResultMessage) => Promise<void>;
+  recoverBatchReceipt: (call: ToolCall) => Promise<ToolResultMessage | null>;
+  verifyReadOnlyBatchReceipt: (call: ToolCall, receipt: ToolResultMessage) => Promise<boolean>;
   upsertIdentity: (identity: SubagentIdentity) => Promise<SubagentIdentity>;
   saveRunState: (input: SubagentPersistRunInput) => Promise<void>;
   loadRunState: (input: {
@@ -222,6 +231,11 @@ export function createSubagentConversationStore(params: {
     knownAgentIds: () => [...identities.keys()],
     latestRunsByAgent: () => new Map(latestRuns),
     getLatestRun: (agentId) => latestRuns.get(agentId.trim()),
+    saveBatchReceipt: (call, receipt) =>
+      persistSubagentBatchReceipt(ipc, conversationId, call, receipt),
+    recoverBatchReceipt: (call) => recoverSubagentBatchReceipt(ipc, conversationId, call),
+    verifyReadOnlyBatchReceipt: (call, receipt) =>
+      verifyReadOnlySubagentBatchReceipt(ipc, conversationId, call, receipt),
 
     async upsertIdentity(identity) {
       const stored = await ipc.upsertIdentity({
@@ -250,6 +264,8 @@ export function createSubagentConversationStore(params: {
         mode: input.mode,
         status: input.status,
         providerId: input.providerId,
+        providerConfigId: input.providerConfigId,
+        readOnlyTools: input.readOnlyTools,
         model: input.model,
         sessionId: input.sessionId,
         workdir: input.workdir,

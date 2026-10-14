@@ -124,6 +124,33 @@ pub(crate) async fn list_reminders<R: Runtime>(
 }
 
 #[command]
+pub(crate) async fn list_contacts<R: Runtime>(
+    app: AppHandle<R>, request: crate::ContactListRequest,
+) -> Result<crate::ContactListResult> {
+    if request.query.len() > 1024 || request.limit == 0 || request.limit > 200 {
+        return Err(crate::Error::Unavailable("Contact query exceeds 1024 bytes or limit is outside 1–200".into()));
+    }
+    on_worker(move || app.mobile_assistant().list_contacts(request)).await
+}
+
+#[command]
+pub(crate) async fn list_home_inventory<R: Runtime>(
+    app: AppHandle<R>, request: crate::HomeInventoryRequest,
+) -> Result<crate::HomeInventoryResult> {
+    if request.limit == 0 || request.limit > 200 || request.home_id.as_ref().is_some_and(|id| id.len() != 36) {
+        return Err(crate::Error::Unavailable("Home inventory requires limit 1–200 and an optional HomeKit UUID".into()));
+    }
+    on_worker(move || app.mobile_assistant().list_home_inventory(request)).await
+}
+
+#[command]
+pub(crate) async fn list_calendars<R: Runtime>(
+    app: AppHandle<R>, request: crate::CalendarListRequest,
+) -> Result<crate::CalendarListResult> {
+    on_worker(move || app.mobile_assistant().list_calendars(request)).await
+}
+
+#[command]
 pub(crate) async fn create_calendar_event<R: Runtime>(
     app: AppHandle<R>,
     request: CreateCalendarEventRequest,
@@ -136,6 +163,9 @@ pub(crate) async fn create_reminder<R: Runtime>(
     app: AppHandle<R>,
     request: CreateReminderRequest,
 ) -> Result<MobileActionResult> {
+    if request.recurrence.is_some() && request.due_ms.is_none() {
+        return Err(crate::Error::Unavailable("Recurring reminders require their first due time".into()));
+    }
     on_worker(move || app.mobile_assistant().create_reminder(request)).await
 }
 

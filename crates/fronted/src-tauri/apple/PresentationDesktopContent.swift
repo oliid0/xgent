@@ -87,6 +87,18 @@ extension XgentNodeView {
                 XgentCronDetailValue(node: node)
             } else if node.variant == "cron-run-row" {
                 XgentCronRunRow(node: node, document: document, model: model)
+            } else if node.variant == "cron-run-list" {
+                XgentCronRunList(node: node, document: document, model: model)
+            } else if node.variant == "connector-data-list" {
+                XgentConnectorDataList(node: node, document: document, model: model)
+            } else if node.variant == "connector-data-row" {
+                XgentConnectorDataRow(node: node, document: document, model: model)
+            } else if node.variant == "goal-row" {
+                XgentGoalRow(node: node, document: document, model: model)
+            } else if node.variant == "goal-activity" {
+                XgentGoalActivityRow(node: node, document: document, model: model)
+            } else if node.variant == "goal-association" {
+                XgentGoalAssociationRow(node: node, document: document, model: model)
             } else if node.variant == "backup-connection-fields" {
                 XgentBackupConnectionFields(node: node, document: document, model: model)
             } else if node.variant == "backup-transfer-actions" {
@@ -133,6 +145,15 @@ extension XgentNodeView {
         case .card:
             XgentDesktopSettingsCard(node: node, document: document, model: model)
         case .settingsGroup:
+            if node.variant == "goal-section" {
+                XgentGoalSection(node: node, document: document, model: model)
+            } else if node.id == "connector-catalog" {
+                XgentConnectorCatalog(node: node, document: document, model: model)
+            } else if node.variant == "task-review" {
+                XgentTaskReviewGroup(node: node, document: document, model: model)
+            } else if node.variant == "cron-detail-section" {
+                XgentCronDetailSection(node: node, document: document, model: model)
+            } else {
             #if os(macOS)
             if node.id == "computer-use-permissions" {
                 XgentComputerUsePermissionsCard(node: node, document: document, model: model)
@@ -140,6 +161,7 @@ extension XgentNodeView {
             #else
             XgentDesktopSettingsCard(node: node, document: document, model: model)
             #endif
+            }
         case .section:
             VStack(alignment: .leading, spacing: CGFloat(presentationTheme.spacing.md)) {
                 if let label = node.label, !label.isEmpty {
@@ -156,7 +178,9 @@ extension XgentNodeView {
         case .heading:
             nativeHeading
         case .button:
-            if node.variant == "workspace-source-action" {
+            if node.variant == "generated-file" {
+                XgentGeneratedArtifactRow(node: node, document: document, model: model, palette: palette)
+            } else if node.variant == "workspace-source-action" {
                 XgentWorkspaceSourceAction(node: node, document: document, model: model)
             } else if node.variant == "workspace-editor-bulk-action" {
                 XgentWorkspaceBulkAction(node: node, document: document, model: model)
@@ -196,7 +220,8 @@ extension XgentNodeView {
         case .colorInput:
             nativeColorInput.modifier(XgentControlTypography(node: node))
         case .toggle:
-            XgentSwitch(node: node, document: document, model: model)
+            if node.variant == "goal-step" { XgentGoalCheck(node: node, document: document, model: model) }
+            else { XgentSwitch(node: node, document: document, model: model) }
         case .selector:
             if node.variant == "provider-vendor-tabs" || node.variant == "provider-editor-tabs" {
                 XgentProviderCategoryTabs(node: node, document: document, model: model)
@@ -244,9 +269,13 @@ extension XgentNodeView {
         case .providerList:
             XgentProviderListView(node: node, document: document, model: model)
         case .treeRow:
-            nativeTreeRow
+            if node.variant == "workspace-file-row" {
+                XgentWorkspaceFileRow(node: node, document: document, model: model)
+            } else { nativeTreeRow }
         case .navigationRow:
-            if node.variant == "memory-entry" {
+            if node.variant == "goal-artifact" || node.variant == "goal-artifacts-nav" {
+                XgentGoalFileRow(node: node, document: document, model: model)
+            } else if node.variant == "memory-entry" {
                 XgentMemoryEntry(node: node, document: document, model: model)
             } else if node.variant == "sidebar-conversation-row" || node.variant == "sidebar-workspace-row" {
                 XgentSidebarConversationRow(node: node, document: document, model: model)

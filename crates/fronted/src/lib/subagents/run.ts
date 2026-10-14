@@ -9,6 +9,7 @@ import {
 } from "../chat/conversation/conversationState";
 import { createTurnCancellationFromSignal } from "../chat/conversation/turnCancellation";
 import { runAssistantWithTools } from "../chat/runner/agentRunner";
+import { completeAssistantMessage } from "../providers/runtime/textOnlyRuntime";
 import type { ProviderRuntimeConfig } from "../providers/runtime/types";
 import type { RuntimePlatform } from "../runtimePlatform";
 import type { ProviderId } from "../settings";
@@ -63,6 +64,7 @@ export type SubagentRunEnvironment = {
   worktree: SubagentWorktreeIpc;
   createChildToolRegistry?: (workdir: string) => Promise<SubagentToolRegistry>;
   readonlyTools: Tool[];
+  readonlyToolsAreStrict?: boolean;
   readonlyExecuteToolCall: ChildToolExecutor;
   withMessageTools?: (
     agent: { id: string; name: string; runId: string },
@@ -173,6 +175,7 @@ export async function executeSubagentRun(
   let candidateArtifacts: string[] | undefined;
   let changedPaths: string[] | undefined;
   let childWorkdir = env.workdir;
+  let readOnlyTools: boolean | undefined;
 
   const persistenceWarnings: string[] = [];
   const trackedPersists: Promise<void>[] = [];
@@ -198,6 +201,8 @@ export async function executeSubagentRun(
       mode: spec.mode,
       status,
       providerId: env.providerId,
+      providerConfigId: env.runtime.providerConfigId,
+      readOnlyTools,
       model: env.model,
       sessionId: subagentSessionId,
       workdir: childWorkdir,
@@ -247,7 +252,11 @@ export async function executeSubagentRun(
     role: identity.role,
     prompt: spec.prompt,
     templateId: spec.templateId,
+    providerConfigId: env.runtime.providerConfigId,
+    providerId: env.providerId,
+    model: env.model,
     mode: spec.mode,
+    readOnlyTools,
     applyPolicy: spec.mode === "worktree" ? spec.applyPolicy : undefined,
     allowedOutputPaths: spec.allowedOutputPaths.length > 0 ? spec.allowedOutputPaths : undefined,
     status,
@@ -455,6 +464,7 @@ export async function executeSubagentRun(
       childTools = env.readonlyTools;
       childExecute = env.readonlyExecuteToolCall;
     }
+    readOnlyTools = spec.mode === "readonly" && env.readonlyToolsAreStrict === true;
     if (env.withMessageTools) {
       const attached = env.withMessageTools(
         { id: spec.id, name: identity.name, runId },
@@ -489,6 +499,13 @@ export async function executeSubagentRun(
         providerId: env.providerId,
         model: env.model,
         runtime: env.runtime,
+        complete: env.scheduler.executionBudget
+          ? (params) =>
+              completeAssistantMessage({
+                ...params,
+                beforeModelRequest: () => env.scheduler.executionBudget!.consume("modelRequests"),
+              })
+          : undefined,
         cancellation: compactionCancellation,
         sinks: {
           applyState: (state) => {

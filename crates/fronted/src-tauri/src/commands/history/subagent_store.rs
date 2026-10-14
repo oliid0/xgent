@@ -48,6 +48,8 @@ pub struct SubagentIdentityRecord {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubagentRunRecord {
+    pub batch_receipt_json: Option<String>,
+    pub read_only_tools: Option<bool>,
     pub id: String,
     pub parent_conversation_id: String,
     pub parent_tool_call_id: String,
@@ -58,6 +60,7 @@ pub struct SubagentRunRecord {
     pub mode: String,
     pub status: String,
     pub provider_id: String,
+    pub provider_config_id: Option<String>,
     pub model: String,
     pub session_id: Option<String>,
     pub workdir: Option<String>,
@@ -154,6 +157,10 @@ pub struct SubagentIdentityListInput {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubagentRunSaveHeader {
+    #[serde(default)]
+    pub batch_receipt_json: Option<String>,
+    #[serde(default)]
+    pub read_only_tools: Option<bool>,
     pub id: String,
     pub parent_conversation_id: String,
     pub parent_tool_call_id: String,
@@ -164,6 +171,7 @@ pub struct SubagentRunSaveHeader {
     pub mode: String,
     pub status: String,
     pub provider_id: String,
+    pub provider_config_id: Option<String>,
     pub model: String,
     pub session_id: Option<String>,
     pub workdir: Option<String>,
@@ -204,6 +212,7 @@ pub struct SubagentRunSaveInput {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubagentRunListInput {
+    pub parent_tool_call_id: Option<String>,
     pub parent_conversation_id: String,
     pub limit: Option<i64>,
 }
@@ -322,6 +331,8 @@ fn row_to_identity(row: &rusqlite::Row<'_>) -> rusqlite::Result<SubagentIdentity
 
 fn row_to_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<SubagentRunRecord> {
     Ok(SubagentRunRecord {
+        batch_receipt_json: row.get("batch_receipt_json")?,
+        read_only_tools: row.get("read_only_tools")?,
         id: row.get("id")?,
         parent_conversation_id: row.get("parent_conversation_id")?,
         parent_tool_call_id: row.get("parent_tool_call_id")?,
@@ -332,6 +343,7 @@ fn row_to_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<SubagentRunRecord> {
         mode: row.get("mode")?,
         status: row.get("status")?,
         provider_id: row.get("provider_id")?,
+        provider_config_id: row.get("provider_config_id")?,
         model: row.get("model")?,
         session_id: row.get("session_id")?,
         workdir: row.get("workdir")?,
@@ -385,6 +397,8 @@ fn row_to_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<SubagentMessageRe
 }
 
 const RUN_HEADER_COLUMNS: &str = "
+    batch_receipt_json,
+    read_only_tools,
     id,
     parent_conversation_id,
     parent_tool_call_id,
@@ -395,6 +409,7 @@ const RUN_HEADER_COLUMNS: &str = "
     mode,
     status,
     provider_id,
+    provider_config_id,
     model,
     session_id,
     workdir,
@@ -540,6 +555,14 @@ pub(crate) fn list_subagent_identities_sync(
 
 fn validate_run_save_input(input: &SubagentRunSaveInput) -> Result<(), String> {
     let run = &input.run;
+    if let Some(receipt) = &run.batch_receipt_json {
+        if !["completed", "failed", "cancelled"].contains(&run.status.as_str()) || receipt.len() > 1024 * 1024 || serde_json::from_str::<serde_json::Value>(receipt).is_err() {
+            return Err("Batch receipt requires a terminal run and valid JSON of at most 1 MiB".into());
+        }
+    }
+    if run.read_only_tools == Some(true) && run.mode != "readonly" {
+        return Err("Only a readonly run can attest a strictly read-only tool set".into());
+    }
     require_non_empty(&run.id, "run id")?;
     require_non_empty(&run.parent_conversation_id, "parentConversationId")?;
     require_non_empty(&run.parent_tool_call_id, "parentToolCallId")?;
@@ -632,8 +655,11 @@ fn upsert_run_header(
             error,
             started_at,
             ended_at,
-            updated_at
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)
+            updated_at,
+            provider_config_id,
+            batch_receipt_json,
+            read_only_tools
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30)
         ON CONFLICT(id) DO UPDATE SET
             parent_conversation_id = excluded.parent_conversation_id,
             parent_tool_call_id = excluded.parent_tool_call_id,
@@ -644,6 +670,10 @@ fn upsert_run_header(
             mode = excluded.mode,
             status = excluded.status,
             provider_id = excluded.provider_id,
+            provider_config_id = excluded.provider_config_id,
+            batch_receipt_json = COALESCE(subagentRun.batch_receipt_json, excluded.batch_receipt_json),
+            read_only_tools = CASE WHEN subagentRun.read_only_tools = 0 OR excluded.read_only_tools = 0 THEN 0
+                ELSE COALESCE(subagentRun.read_only_tools, excluded.read_only_tools) END,
             model = excluded.model,
             session_id = excluded.session_id,
             workdir = excluded.workdir,
@@ -690,6 +720,9 @@ fn upsert_run_header(
             run.started_at,
             run.ended_at,
             updated_at,
+            trimmed_opt(run.provider_config_id.as_ref()),
+            run.batch_receipt_json.as_deref(),
+            run.read_only_tools,
         ],
     )
     .map_err(|e| format!("failed to upsert subagent run header: {e}"))?;
@@ -780,13 +813,13 @@ pub(crate) fn list_subagent_runs_sync(
     let mut stmt = conn
         .prepare(&format!(
             "SELECT {RUN_HEADER_COLUMNS} FROM subagentRun
-             WHERE parent_conversation_id = ?1
+             WHERE parent_conversation_id = ?1 AND (?3 IS NULL OR parent_tool_call_id = ?3)
              ORDER BY updated_at DESC
              LIMIT ?2"
         ))
         .map_err(|e| format!("failed to prepare subagent run list query: {e}"))?;
     let rows = stmt
-        .query_map(params![parent.as_str(), limit], row_to_run)
+        .query_map(params![parent.as_str(), limit, trimmed_opt(input.parent_tool_call_id.as_ref())], row_to_run)
         .map_err(|e| format!("failed to query subagent runs: {e}"))?;
     let mut runs = Vec::new();
     for row in rows {
@@ -1528,6 +1561,9 @@ mod tests {
             mode: "readonly".to_string(),
             status: "running".to_string(),
             provider_id: "codex".to_string(),
+            provider_config_id: None,
+            batch_receipt_json: None,
+            read_only_tools: None,
             model: "gpt-5".to_string(),
             session_id: Some("session-1".to_string()),
             workdir: Some("/tmp/work".to_string()),
@@ -1953,6 +1989,7 @@ mod tests {
         let listed = list_subagent_runs_sync(
             &conn,
             &SubagentRunListInput {
+                parent_tool_call_id: None,
                 parent_conversation_id: "conv-1".to_string(),
                 limit: None,
             },
@@ -1966,6 +2003,7 @@ mod tests {
         let limited = list_subagent_runs_sync(
             &conn,
             &SubagentRunListInput {
+                parent_tool_call_id: None,
                 parent_conversation_id: "conv-1".to_string(),
                 limit: Some(2),
             },

@@ -3,6 +3,7 @@
 // one forced SubmitMemoryPlan tool call. No fenced-block output, no sentinel
 // status strings — status text is rendered by the caller through i18n.
 
+import { PERSONAL_PATTERN_MIN_DATES } from "../config";
 import type { MemoryConfidence, MemoryReviewerMode } from "../schema";
 import { DEFAULT_MEMORY_REVIEWER_MODE, EXTRACTION_PLAN_ACTIONS } from "../schema";
 import {
@@ -194,6 +195,9 @@ export function buildExtractionInstructionPrompt(params: {
     "Step 3 — plan with evidence:",
     MEMORY_WRITE_EVIDENCE_POLICY,
     MEMORY_CONFIDENCE_RUBRIC,
+    '- For user/feedback memories, evidence_basis="explicit" needs an exact source_quote from the host <user-observations> window. Assistant suggestions, summaries and tool text are not user statements.',
+    '- When recent activity suggests a useful personal pattern but this window has insufficient corroboration, use MemoryManager(action="search", include_history=true) with distinctive related terms. The host may append bounded original historical user observations with IDs and actual timestamps to the search receipt; only those host-read observations can corroborate a pattern, never FTS snippets, summaries or updatedAt fallbacks. Missing/changed/deleted originals are excluded before submission. Do not search unrelated topics or infer permissions from history.',
+    `- A personal routine inferred from observations must use evidence_basis="inferred", low confidence and observations with host IDs/exact quotes from at least ${PERSONAL_PATTERN_MIN_DATES} distinct local dates where inferenceEligible=true. Dates are actual report dates, not activity dates; repeated reports alone never prove a routine. Describe it as a candidate, never as a confirmed preference or universal routine. The host verifies quotes/dates and retains provenance; you cannot create observations or dates. Strict mode does not permit inferred patterns. Do not accept a newly inferred pattern in this plan, schedule actions from it, or treat it as permission. With insufficient evidence, retain meaningful dated activity in the daily journal and skip the pattern.`,
     `- ${MEMORY_CONFIDENCE_CONTRACT_LINE}`,
     '- Updating confidence does NOT automatically mark an unreviewed memory as reviewed. Emit a separate action="accept" item only when the current user confirms, corrects-then-confirms, restates, or clearly relies on that memory.',
     "",

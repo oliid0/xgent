@@ -1,8 +1,14 @@
-import { invoke, isTauriRuntime } from "@xgent/runtime";
+import { isTauriRuntime } from "@xgent/runtime";
 import { type MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
 
 import type { MentionComposerHandle } from "../../../components/chat/MentionComposer";
 import type { NotifyItem } from "../../../components/chat/NotifyToast";
+import {
+  type AttachmentImportTarget,
+  captureAttachmentImportTarget,
+  importAttachments,
+  isAttachmentImportTargetCurrent,
+} from "../../../lib/chat/messages/attachmentImport";
 import {
   mergePendingUploadedFiles,
   type PendingUploadedFile,
@@ -20,6 +26,7 @@ type UploadTarget = {
   targetWorkdir: string;
   remainingFileSlots: number;
   contextRevision: number;
+  attachmentTarget: AttachmentImportTarget;
 };
 
 type UsePendingUploadsParams = {
@@ -160,7 +167,11 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
 
   const isUploadTargetCurrent = useCallback((target: UploadTarget) => {
     const current = uploadContextsRef.current.get(target.targetConversationId);
-    return current?.workdir === target.targetWorkdir && current.revision === target.contextRevision;
+    return (
+      current?.workdir === target.targetWorkdir &&
+      current.revision === target.contextRevision &&
+      isAttachmentImportTargetCurrent(target.attachmentTarget)
+    );
   }, []);
 
   const captureUploadTarget = useCallback((): UploadTarget | null => {
@@ -177,11 +188,19 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
       return null;
     }
 
+    let attachmentTarget: AttachmentImportTarget;
+    try {
+      attachmentTarget = captureAttachmentImportTarget(workdir);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+      return null;
+    }
     return {
       targetConversationId,
       targetWorkdir: workdir,
       remainingFileSlots,
       contextRevision: uploadContextsRef.current.get(targetConversationId)?.revision ?? 0,
+      attachmentTarget,
     };
   }, [
     addNotify,
@@ -272,6 +291,10 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
         const result = await task.importer(uploadTarget);
         appendImportedFiles(uploadTarget, result, task.emptySelectionMessage);
       } catch (error) {
+        if (!isUploadTargetCurrent(uploadTarget)) {
+          addNotify("warning", "上传目标已失效，已忽略本次导入的文件");
+          return;
+        }
         const message = error instanceof Error ? error.message : String(error);
         if (currentConversationIdRef.current.trim() === uploadTarget.targetConversationId) {
           setErrorMessage(message || task.errorFallback);
@@ -288,6 +311,7 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
       appendImportedFiles,
       captureUploadTarget,
       currentConversationIdRef,
+      isUploadTargetCurrent,
       setErrorMessage,
       workdir,
     ],
@@ -299,15 +323,19 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
       await runUploadTask({
         emptySelectionMessage: "拖入文件均不受当前 Read 支持",
         errorFallback: "导入文件失败",
-        importer: ({ targetWorkdir, remainingFileSlots }) =>
-          invoke<SystemPickReadableFilesResponse>("system_import_readable_file_paths", {
-            workdir: targetWorkdir,
-            paths,
-            maxFiles: remainingFileSlots,
-          }),
+        importer: (target) =>
+          importAttachments(
+            target.attachmentTarget,
+            "system_import_readable_file_paths",
+            {
+              paths,
+              maxFiles: target.remainingFileSlots,
+            },
+            () => isUploadTargetCurrent(target),
+          ),
       });
     },
-    [runUploadTask],
+    [isUploadTargetCurrent, runUploadTask],
   );
 
   const importFilesForTarget = useCallback(
@@ -317,7 +345,7 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
         addNotify("warning", "上传目标已失效，已忽略本次导入的文件");
         return { files: [], skipped: [] };
       }
-      const { targetWorkdir, remainingFileSlots } = target;
+      const { remainingFileSlots } = target;
       const importBatch = files.slice(0, remainingFileSlots);
       const ignoredForLimit = files.length - importBatch.length;
       if (ignoredForLimit > 0) {
@@ -332,9 +360,11 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
         addNotify("warning", "上传目标已失效，已忽略本次导入的文件");
         return { files: [], skipped: [] };
       }
-      const result = await invoke<SystemPickReadableFilesResponse>(
+      const result = await importAttachments(
+        target.attachmentTarget,
         "system_import_uploaded_readable_files",
-        { workdir: targetWorkdir, files: prepared.files, maxFiles: remainingFileSlots },
+        { files: prepared.files, maxFiles: remainingFileSlots },
+        () => isUploadTargetCurrent(target),
       );
       return { ...result, skipped: [...prepared.skipped, ...result.skipped] };
     },
@@ -373,13 +403,17 @@ export function usePendingUploads(params: UsePendingUploadsParams) {
     await runUploadTask({
       emptySelectionMessage: "所选文件均不受当前 Read 支持",
       errorFallback: "导入文件失败",
-      importer: ({ targetWorkdir, remainingFileSlots }) =>
-        invoke<SystemPickReadableFilesResponse>("system_pick_readable_files", {
-          workdir: targetWorkdir,
-          maxFiles: remainingFileSlots,
-        }),
+      importer: (target) =>
+        importAttachments(
+          target.attachmentTarget,
+          "system_pick_readable_files",
+          {
+            maxFiles: target.remainingFileSlots,
+          },
+          () => isUploadTargetCurrent(target),
+        ),
     });
-  }, [pickReadableFilesFromWebView, nativeMobileRuntime, runUploadTask]);
+  }, [pickReadableFilesFromWebView, nativeMobileRuntime, isUploadTargetCurrent, runUploadTask]);
 
   const pickReadablePhotos = useCallback(async () => {
     await pickReadableFilesFromWebView({ accept: "image/*", multiple: true });

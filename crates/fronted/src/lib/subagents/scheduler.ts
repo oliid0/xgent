@@ -1,3 +1,8 @@
+import {
+  ExecutionBudget,
+  type ExecutionBudgetLimits,
+  type ExecutionBudgetPort,
+} from "./executionBudget";
 import { AGENT_TOOL_NAME } from "./types";
 
 export const DEFAULT_SUBAGENT_MAX_PARALLEL_RUNS = 8;
@@ -5,6 +10,8 @@ export const DEFAULT_AGENT_TOOL_MAX_PARALLEL_CALLS = DEFAULT_SUBAGENT_MAX_PARALL
 export const DEFAULT_BASH_MAX_PARALLEL_EXECUTIONS = 4;
 
 export type SubagentSchedulerLimits = {
+  executionBudget?: ExecutionBudgetLimits;
+  executionBudgetPort?: ExecutionBudgetPort;
   maxParallelSubagents?: number;
   maxParallelAgentToolCalls?: number;
   maxParallelBash?: number;
@@ -91,6 +98,7 @@ class Semaphore {
 }
 
 export class SubagentScheduler {
+  readonly executionBudget?: ExecutionBudgetPort;
   readonly maxParallelSubagents: number;
   readonly maxParallelAgentToolCalls: number;
   readonly maxParallelBash: number;
@@ -99,6 +107,9 @@ export class SubagentScheduler {
   private readonly bashExecutions: Semaphore;
 
   constructor(limits: SubagentSchedulerLimits = {}) {
+    this.executionBudget =
+      limits.executionBudgetPort ??
+      (limits.executionBudget ? new ExecutionBudget(limits.executionBudget) : undefined);
     this.maxParallelSubagents = normalizeLimit(
       limits.maxParallelSubagents,
       DEFAULT_SUBAGENT_MAX_PARALLEL_RUNS,

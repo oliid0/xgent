@@ -242,6 +242,39 @@ test("Astryx model edits keep newly discovered limits unless that individual lim
   }
 });
 
+test("Astryx capability/concurrency edits reach the real provider save even before repaint", () => {
+  const initial = { id: "delegate-model", contextWindow: 32000, maxOutputToken: 8000, delegationSkills: ["general"] };
+  const f = fixture({ models: [initial], activeModels: [initial.id] });
+  try {
+    f.node("settings.modelSettings").props.onClick(); f.render();
+    f.change("settings.modelDelegationSkills", "Coding, research coding");
+    f.change("settings.modelDelegationConcurrency", "3");
+    f.modelAction("settings.save"); f.save();
+    assert.equal(f.saved.length, 1);
+    assert.deepEqual(f.saved[0].models[0].delegationSkills, ["coding", "research"]);
+    assert.equal(f.saved[0].models[0].delegationMaxConcurrency, 3);
+    assert.equal(f.saved[0].models[0].contextWindow, initial.contextWindow);
+  } finally { f.close(); }
+});
+
+test("Astryx rejects an invalid concurrency draft and remains usable after correction", () => {
+  const initial = { id: "delegate-model", contextWindow: 32000, maxOutputToken: 8000 };
+  const f = fixture({ models: [initial], activeModels: [initial.id] });
+  try {
+    f.node("settings.modelSettings").props.onClick(); f.render();
+    f.change("settings.modelDelegationConcurrency", "2.5");
+    f.modelAction("settings.save"); f.save();
+    assert.equal(f.saved.length, 0);
+    f.render(); assert.ok(f.modelDialog());
+    f.change("settings.modelDelegationConcurrency", "1");
+    f.change("settings.modelDelegationSkills", "documents");
+    f.modelAction("settings.save"); f.save();
+    assert.equal(f.saved.length, 1);
+    assert.deepEqual(f.saved[0].models[0].delegationSkills, ["documents"]);
+    assert.equal(f.saved[0].models[0].delegationMaxConcurrency, 1);
+  } finally { f.close(); }
+});
+
 test("accepted provider credentials retire an older model reply before the next render", async t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const f = fixture();

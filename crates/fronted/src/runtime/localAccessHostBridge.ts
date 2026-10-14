@@ -1,4 +1,4 @@
-import { invoke, listen } from "./index";
+import { captureLanPcCommandRouter } from "./lanPcCommandHost";
 
 type LocalAccessRpcRequest = {
   requestId: string;
@@ -25,9 +25,32 @@ function errorMessage(cause: unknown) {
  * reach this native host bridge.
  */
 export async function startLocalAccessHostBridge() {
+  // This device already admitted the request. Its UI's selected peer must
+  // never forward it again or move its subscription to a different device.
+  const { createTauriRuntime } = await import("./tauri");
+  const { invoke, listen } = createTauriRuntime(
+    captureLanPcCommandRouter({ enabled: false, baseUrl: "" }),
+  );
   const subscriptions = new Map<string, () => void>();
   const subscriptionVersions = new Map<string, number>();
+  const rootListeners: Array<() => void> = [];
   let stopped = false;
+
+  function stop() {
+    if (stopped) return;
+    stopped = true;
+    for (const unlisten of rootListeners.splice(0).reverse()) unlisten();
+    for (const unlisten of subscriptions.values()) unlisten();
+    subscriptions.clear();
+    subscriptionVersions.clear();
+  }
+
+  function registrationFailed(error: unknown): never {
+    // Retrying registration must not leave a first RPC listener executing the
+    // same admitted write twice. Also invalidate subscriptions still resolving.
+    stop();
+    throw error;
+  }
 
   function invalidateSubscription(subscriptionId: string) {
     const nextVersion = (subscriptionVersions.get(subscriptionId) ?? 0) + 1;
@@ -38,6 +61,7 @@ export async function startLocalAccessHostBridge() {
   }
 
   const stopRpc = await listen<LocalAccessRpcRequest>("local-access:rpc-request", (event) => {
+    if (stopped) return;
     const request = event.payload;
     void invoke<unknown>(request.command, request.args)
       .then((result) =>
@@ -56,11 +80,13 @@ export async function startLocalAccessHostBridge() {
           error: errorMessage(cause),
         }),
       );
-  });
+  }).catch(registrationFailed);
+  rootListeners.push(stopRpc);
 
   const stopSubscribe = await listen<LocalAccessEventSubscription>(
     "local-access:event-subscribe",
     (event) => {
+      if (stopped) return;
       const subscription = event.payload;
       const version = invalidateSubscription(subscription.subscriptionId);
       void listen<unknown>(subscription.event, (forwarded) => {
@@ -82,22 +108,17 @@ export async function startLocalAccessHostBridge() {
           }
         });
     },
-  );
+  ).catch(registrationFailed);
+  rootListeners.push(stopSubscribe);
 
   const stopUnsubscribe = await listen<LocalAccessEventUnsubscribe>(
     "local-access:event-unsubscribe",
     (event) => {
+      if (stopped) return;
       invalidateSubscription(event.payload.subscriptionId);
     },
-  );
+  ).catch(registrationFailed);
+  rootListeners.push(stopUnsubscribe);
 
-  return () => {
-    stopped = true;
-    stopRpc();
-    stopSubscribe();
-    stopUnsubscribe();
-    for (const unlisten of subscriptions.values()) unlisten();
-    subscriptions.clear();
-    subscriptionVersions.clear();
-  };
+  return stop;
 }

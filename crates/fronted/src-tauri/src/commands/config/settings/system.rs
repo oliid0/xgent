@@ -522,6 +522,42 @@ fn normalize_command_safety_mode_value(raw: Option<&Value>) -> Value {
 }
 
 
+/// Read through the automation writer transaction: policy changes and effect
+/// claims serialize in the SAME config.sqlite, rather than a WebView snapshot.
+pub(crate) fn mobile_task_action_requires_approval(conn: &Connection, kind: &str) -> Result<bool, String> {
+    mobile_task_connector_requires_approval(conn, kind, "MobilePersonalActions", true)
+}
+
+pub(crate) fn mobile_task_read_requires_approval(conn: &Connection, kind: &str) -> Result<bool, String> {
+    let action_kind = match kind { "event" => "calendar_event", "reminder" => "reminder", "health" => "health_event", "home"=>"home_power", _ => return Err("Unsupported task read capability".into()) };
+    mobile_task_connector_requires_approval(conn, action_kind, "MobilePersonalData", false)
+}
+
+fn mobile_task_connector_requires_approval(conn: &Connection, kind: &str, tool: &str, write: bool) -> Result<bool, String> {
+    let personal = match kind { "calendar_event" => "personal:calendar", "reminder" => "personal:reminders", "health_event" => "personal:health", "home_power" => "personal:home", _ => return Err("Unsupported task connector policy".into()) };
+    let system = load_system(conn)?.unwrap_or_else(||json!({}));
+    let mode = match system.get(SYSTEM_EXECUTION_MODE_KEY) {
+        None | Some(Value::Null) => "tools",
+        Some(Value::String(mode)) => mode.trim(),
+        _ => return Err("Invalid native execution mode; no device effect allowed".into()),
+    };
+    if !matches!(mode,"tools" | "agent-dev") { return Err("Agent execution is disabled on the original phone".into()); }
+    let policies = match system.get(SYSTEM_TOOL_POLICIES_KEY) {
+        None | Some(Value::Null) => None,
+        Some(Value::Object(policies)) => Some(policies),
+        _ => return Err("Invalid native tool policies; no device effect allowed".into()),
+    };
+    let broad = policies.and_then(|policies|policies.get(tool).or_else(||policies.get("group:system"))).and_then(Value::as_str).unwrap_or("allow");
+    let scoped = policies.and_then(|policies|policies.get(personal)).and_then(Value::as_str).unwrap_or("ask");
+    // Invalid configured values do not become broad default permission.
+    for key in [tool,"group:system",personal] {
+        if policies.and_then(|policies|policies.get(key)).is_some_and(|value|!matches!(value.as_str(),Some("allow" | "ask" | "deny"))) { return Err("Invalid native connector policy; no device effect allowed".into()); }
+    }
+    if broad == "deny" || scoped == "deny" { return Err("The user disabled this connector; prior task approval cannot override denial".into()); }
+    let safety = normalize_command_safety_mode_value(system.get(SYSTEM_COMMAND_SAFETY_MODE_KEY));
+    Ok(broad == "ask" || scoped == "ask" || (write && safety == "ask"))
+}
+
 pub(crate) fn load_runtime_command_safety_mode() -> Result<String, String> {
     let conn = open_db()?;
     let system = load_system(&conn)?;
@@ -560,6 +596,7 @@ fn save_system_with_default_workdir(
         Value::Object(system) => system,
         _ => unreachable!(),
     };
+    parse_scheduling_budget(system.get(SYSTEM_SCHEDULING_BUDGET_KEY))?;
     let updated_at = now_ms();
     let tx = conn
         .transaction()
@@ -569,6 +606,8 @@ fn save_system_with_default_workdir(
 
     for key in [
         SYSTEM_EXECUTION_MODE_KEY,
+        SYSTEM_SUBAGENT_TEMPLATES_KEY,
+        SYSTEM_SCHEDULING_BUDGET_KEY,
         SYSTEM_WORKDIR_KEY,
         SYSTEM_SELECTED_TOOLS_KEY,
         SYSTEM_TOOL_POLICIES_KEY,
@@ -600,6 +639,24 @@ fn save_system_with_default_workdir(
     #[cfg(desktop)]
     crate::services::webdav_auto_sync::mark_dirty();
     Ok(())
+}
+
+pub(crate) fn background_scheduling_budget(conn:&Connection) -> Result<(u64,u64,u64),String> {
+    let exists:bool=conn.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='system_settings')",[],|row|row.get(0)).map_err(|e|e.to_string())?;
+    if !exists {return Ok((128,256,0));}
+    let system=load_system(conn)?.unwrap_or_else(||json!({}));
+    parse_scheduling_budget(system.get(SYSTEM_SCHEDULING_BUDGET_KEY))
+}
+
+fn parse_scheduling_budget(value:Option<&Value>) -> Result<(u64,u64,u64),String> {
+    let Some(value)=value.filter(|value|!value.is_null()) else {return Ok((128,256,0));};
+    let object=value.as_object().ok_or("Invalid configured scheduling budget")?;
+    if object.len()!=3 || object.keys().any(|key|!["maxModelRequests","maxToolCalls","lifetimeMinutes"].contains(&key.as_str())) {return Err("Invalid configured scheduling budget fields".into());}
+    let requests=value["maxModelRequests"].as_u64().ok_or("Invalid model request budget")?;
+    let tools=value["maxToolCalls"].as_u64().ok_or("Invalid tool call budget")?;
+    let minutes=value["lifetimeMinutes"].as_u64().ok_or("Invalid lifetime budget")?;
+    if !(1..=128).contains(&requests) || !(1..=256).contains(&tools) || minutes>43200 {return Err("Configured scheduling budget exceeds supported limits".into());}
+    Ok((requests,tools,minutes))
 }
 
 fn refresh_system_proxy_state(conn: &Connection) -> Result<(), String> {

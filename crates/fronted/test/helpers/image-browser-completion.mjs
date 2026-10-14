@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -159,5 +159,11 @@ export async function imageBrowserCompletion(browser, fileURL, directory, option
     // An exited Windows launcher can leave inherited stderr open in a
     // browser helper. The fixture is complete; release the owned pipe too.
     child.stderr?.destroy();
+    // Windows browser helpers can release their profile after the launcher
+    // exits. Retire only this fixture's verified child directory, with bounded
+    // filesystem retries, before its caller removes the surrounding fixture.
+    const fixtureRoot = path.resolve(directory), ownedProfile = path.resolve(profile);
+    if (path.relative(fixtureRoot, ownedProfile) !== "image-profile") throw new Error("Browser profile escaped its fixture");
+    await rm(ownedProfile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 }

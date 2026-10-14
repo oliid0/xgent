@@ -693,6 +693,12 @@ fn apply_cors_headers(headers: &mut HeaderMap, request_headers: &HeaderMap) {
         HeaderName::from_static("access-control-allow-headers"),
         build_allow_headers_value(request_headers),
     );
+    // WebViews must be able to read upstream retry delays across the local
+    // proxy origin. Do not expose arbitrary upstream headers or credentials.
+    headers.insert(
+        HeaderName::from_static("access-control-expose-headers"),
+        HeaderValue::from_static("retry-after, retry-after-ms"),
+    );
     headers.insert(
         HeaderName::from_static("vary"),
         HeaderValue::from_static(VARY_VALUE),

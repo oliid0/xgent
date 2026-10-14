@@ -271,7 +271,7 @@ jobs:
             sample "$app_pid" 5 -file "$RUNNER_TEMP/xgent-macos-process-sample.log" || true
             screencapture -x "$RUNNER_TEMP/xgent-macos-runner-screen.png" || true
           fi
-          if [ -d "$RUNNER_TEMP/xgent-macos-interactions.xcresult" ]; then
+          if [ -f "$RUNNER_TEMP/xgent-macos-interactions.xcresult/Info.plist" ]; then
             xcrun xcresulttool export attachments --path "$RUNNER_TEMP/xgent-macos-interactions.xcresult" \
               --output-path "$RUNNER_TEMP/xgent-macos-interactions"
           fi
@@ -1234,7 +1234,7 @@ jobs:
         shell: bash
         run: |
           for result in xgent-ios-interactions xgent-ios-settings-dark-large; do
-            if [ -d "$RUNNER_TEMP/$result.xcresult" ]; then
+            if [ -f "$RUNNER_TEMP/$result.xcresult/Info.plist" ]; then
               xcrun xcresulttool export attachments --path "$RUNNER_TEMP/$result.xcresult" \
                 --output-path "$RUNNER_TEMP/$result"
             fi

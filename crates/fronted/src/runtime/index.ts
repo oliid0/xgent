@@ -34,6 +34,24 @@ export async function invoke<T>(command: string, args?: RuntimeInvokeArgs): Prom
   return (await loadRuntime()).invoke<T>(command, args);
 }
 
+/** Invoke the current installation, independently of the selected execution PC. */
+export async function invokeNative<T>(command: string, args?: RuntimeInvokeArgs): Promise<T> {
+  if (!isTauriRuntime()) throw new Error("Device-owned commands require the native app");
+  return (await import("./tauri")).invokeNative<T>(command, args);
+}
+
+export async function listenNative<T>(
+  event: string,
+  handler: (event: RuntimeEvent<T>) => void,
+): Promise<RuntimeUnlisten> {
+  if (!isTauriRuntime()) throw new Error("Device-owned events require the native app");
+  return (await import("./tauri")).listenNative<T>(event, handler);
+}
+
+export async function getNativeWindowLabel(): Promise<string | null> {
+  return isTauriRuntime() ? (await import("./tauri")).getNativeWindowLabel() : null;
+}
+
 export async function listen<T>(
   event: string,
   handler: (event: RuntimeEvent<T>) => void,

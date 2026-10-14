@@ -310,12 +310,14 @@ struct XgentSegmentedControl: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            XgentFieldLabel(node: node)
+            if !(node.variant == "connector-tabs" || node.variant == "cron-view-tabs") { XgentFieldLabel(node: node) }
             if dynamicTypeSize.isAccessibilitySize {
                 XgentSelector(node: node, document: document, model: model, showsLabel: false)
             } else {
                 ViewThatFits(in: .horizontal) {
-                    picker.pickerStyle(.segmented).fixedSize(horizontal: true, vertical: false)
+                    picker.pickerStyle(.segmented)
+                        .fixedSize(horizontal: !(node.variant == "connector-tabs" || node.variant == "cron-view-tabs"), vertical: false)
+                        .frame(maxWidth: (node.variant == "connector-tabs" || node.variant == "cron-view-tabs") ? .infinity : nil)
                     XgentSelector(node: node, document: document, model: model, showsLabel: false)
                 }
                 .modifier(XgentControlTypography(node: node))

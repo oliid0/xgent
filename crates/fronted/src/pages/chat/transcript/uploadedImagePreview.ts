@@ -1,5 +1,6 @@
 import { invoke } from "@xgent/runtime";
 import { useEffect, useState } from "react";
+import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
 
 type UploadedImagePreviewResponse = {
   mimeType: string;
@@ -14,14 +15,23 @@ function getUploadedImagePreviewCacheKey(workspaceRoot: string, absolutePath: st
   return `${workspaceRoot}\n${absolutePath}`;
 }
 
+export function getUploadedImagePreviewSource(
+  workspaceRoot: string | undefined,
+  file: Pick<PendingUploadedFile, "absolutePath" | "localSource">,
+) {
+  if (file.localSource === null) return null;
+  const root = (file.localSource?.workdir ?? workspaceRoot)?.trim();
+  const absolutePath = (file.localSource?.path ?? file.absolutePath)?.trim();
+  return root && absolutePath ? { workspaceRoot: root, absolutePath } : null;
+}
+
 export function invalidateUploadedImagePreviewCache(
   workspaceRoot: string,
-  file: { absolutePath?: string },
+  file: Pick<PendingUploadedFile, "absolutePath" | "localSource">,
 ) {
-  const absolutePath = file.absolutePath?.trim();
-  const root = workspaceRoot.trim();
-  if (!root || !absolutePath) return;
-  const cacheKey = getUploadedImagePreviewCacheKey(root, absolutePath);
+  const source = getUploadedImagePreviewSource(workspaceRoot, file);
+  if (!source) return;
+  const cacheKey = getUploadedImagePreviewCacheKey(source.workspaceRoot, source.absolutePath);
   uploadedImagePreviewCache.delete(cacheKey);
   uploadedImagePreviewRequests.delete(cacheKey);
 }

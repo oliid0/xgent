@@ -22,8 +22,12 @@ let package = Package(
             name: "tauri-plugin-mobile-assistant",
             dependencies: [
                 .byName(name: "Tauri"),
+                .byName(name: "XgentResultReceiverBridge"),
             ],
-            path: "Sources"
+            path: "Sources",
+            linkerSettings: [.linkedFramework("HomeKit"), .linkedFramework("BackgroundTasks"),
+                             .linkedFramework("Security"), .linkedFramework("CryptoKit")]
         ),
+        .target(name: "XgentResultReceiverBridge", path: "Bridge", publicHeadersPath: "include"),
     ]
 )

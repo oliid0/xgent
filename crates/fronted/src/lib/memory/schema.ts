@@ -92,6 +92,8 @@ export type ExtractionPlanItem = {
   mode?: string;
   confidence?: string;
   source_quote?: string;
+  evidence_basis?: string;
+  observations?: Array<{ id?: string; quote?: string }>;
   reasoning?: string;
   aliases?: string[];
   supersedes?: string;
@@ -129,6 +131,8 @@ export const PLAN_ITEM_REJECTION_CODES = [
   "already-written-this-turn",
   "empty-daily-body",
   "body-too-large",
+  "invalid-personal-evidence",
+  "inferred-awaiting-confirmation",
 ] as const;
 export type PlanItemRejectionCode = (typeof PLAN_ITEM_REJECTION_CODES)[number];
 

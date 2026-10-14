@@ -47,11 +47,13 @@ import org.json.JSONArray
 private const val ALIAS_MICROPHONE = "microphone"
 private const val ALIAS_CAMERA = "camera"
 private const val ALIAS_CALENDAR = "calendar"
+private const val ALIAS_CONTACTS = "contacts"
 private const val ALIAS_LOCATION = "location"
 private const val ALIAS_PHOTOS = "photos"
 private const val ALIAS_PHOTOS_LEGACY = "photosLegacy"
 private const val ALIAS_PHOTOS_SELECTED = "photosSelected"
 private const val ALIAS_HEALTH = "health"
+private const val ALIAS_NOTIFICATIONS = "notifications"
 private const val ALIAS_BLUETOOTH = "bluetooth"
 private const val HEALTH_PROVIDER_PACKAGE = "com.google.android.apps.healthdata"
 
@@ -82,6 +84,7 @@ class CalendarRangeArgs {
     var startMs: Long = 0
     var endMs: Long = 0
     var limit: Int = 50
+    var calendarIds: List<String>? = null
 }
 
 @InvokeArg
@@ -94,6 +97,7 @@ class HealthStepsArgs {
 class ReminderListArgs {
     var incompleteOnly: Boolean = true
     var limit: Int = 50
+    var calendarIds: List<String>? = null
 }
 
 @InvokeArg
@@ -104,6 +108,8 @@ class CreateCalendarEventArgs {
     var allDay: Boolean = false
     var location: String? = null
     var notes: String? = null
+    var calendarId: String? = null
+    var expectedSourceId: String? = null
 }
 
 @InvokeArg
@@ -111,6 +117,9 @@ class CreateReminderArgs {
     lateinit var title: String
     var dueMs: Long? = null
     var notes: String? = null
+    var recurrence: String? = null
+    var calendarId: String? = null
+    var expectedSourceId: String? = null
 }
 
 @InvokeArg
@@ -123,6 +132,7 @@ class ComposeMessageArgs {
 
 @TauriPlugin(
     permissions = [
+        Permission(strings = [Manifest.permission.POST_NOTIFICATIONS], alias = ALIAS_NOTIFICATIONS),
         Permission(strings = [Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT], alias = ALIAS_BLUETOOTH),
         Permission(strings = [Manifest.permission.RECORD_AUDIO], alias = ALIAS_MICROPHONE),
         Permission(strings = [Manifest.permission.CAMERA], alias = ALIAS_CAMERA),
@@ -141,11 +151,102 @@ class ComposeMessageArgs {
             alias = ALIAS_LOCATION,
         ),
         Permission(strings = [Manifest.permission.READ_MEDIA_IMAGES], alias = ALIAS_PHOTOS),
+        Permission(strings = [Manifest.permission.READ_CONTACTS], alias = ALIAS_CONTACTS),
         Permission(strings = [Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED], alias = ALIAS_PHOTOS_SELECTED),
         Permission(strings = [Manifest.permission.READ_EXTERNAL_STORAGE], alias = ALIAS_PHOTOS_LEGACY),
     ],
 )
 class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
+    @Command
+    fun configureResultDelivery(invoke: Invoke) {
+        val args = parseArgs(invoke, ResultDeliveryConfigurationArgs::class.java) ?: return
+        Thread {
+            runCatching { ResultDelivery.configure(activity.applicationContext, args); true }
+                .onSuccess(invoke::resolveObject)
+                .onFailure { invoke.reject("Unable to configure retained result delivery: ${it.message}") }
+        }.start()
+    }
+    @Command
+    fun discoverWorkstations(invoke: Invoke) {
+        WorkstationDiscovery.discover(activity.applicationContext, invoke)
+    }
+
+    // Internal native setup only; absent from the public Rust command list.
+    @Command
+    fun configureEventDelivery(invoke: Invoke) {
+        val args = parseArgs(invoke, EventDeliveryConfigurationArgs::class.java) ?: return
+        Thread {
+            runCatching { EventDelivery.configure(activity.applicationContext, args); true }
+                .onSuccess(invoke::resolveObject).onFailure { invoke.reject("Native event delivery setup remains available for retry") }
+        }.start()
+    }
+    // Internal Rust service calls only; no public JS command/permission entry.
+    @Command
+    fun availableHealthEventMetrics(invoke: Invoke) {
+        Thread {
+            runCatching { HealthEventCollector.availableMetrics(activity.applicationContext) }
+                .onSuccess(invoke::resolveObject).onFailure { invoke.reject(it.message) }
+        }.start()
+    }
+
+    @Command
+    fun configureHealthEvents(invoke: Invoke) {
+        val args = parseArgs(invoke, HealthEventConfigurationArgs::class.java) ?: return
+        Thread {
+            runCatching {
+                if (args.metrics.isNotEmpty()) {
+                    val requested = HealthEventCollector.requiredPermissions(args.metrics)
+                    check(args.metrics.all { it in HealthEventCollector.availableMetrics(activity.applicationContext) }) { "Background health reads are unavailable" }
+                    val granted = runBlocking { HealthConnectClient.getOrCreate(activity).permissionController.getGrantedPermissions() }
+                    if (!granted.containsAll(requested)) {
+                        check(args.authorize) { "Background health permission was not granted" }
+                        mainHandler.post {
+                            runCatching {
+                                val contract = PermissionController.createRequestPermissionResultContract(HEALTH_PROVIDER_PACKAGE)
+                                startActivityForResult(invoke, contract.createIntent(activity, requested - granted), "onHealthEventPermissionResult")
+                            }.onFailure { invoke.reject("Unable to request background health access: ${it.message}") }
+                        }
+                        return@runCatching null
+                    }
+                }
+                runBlocking { HealthEventCollector.configure(activity.applicationContext, args) }
+            }.onSuccess { metrics -> if (metrics != null) invoke.resolveObject(metrics) }
+                .onFailure { invoke.reject("Unable to configure health events: ${it.message}") }
+        }.start()
+    }
+
+    @ActivityCallback
+    private fun onHealthEventPermissionResult(invoke: Invoke, result: ActivityResult) {
+        val args = parseArgs(invoke, HealthEventConfigurationArgs::class.java) ?: return
+        Thread {
+            // Query the actual permission controller again. A sheet result is
+            // not a receipt for permissions that were never granted.
+            runCatching { runBlocking { HealthEventCollector.configure(activity.applicationContext, args) } }
+                .onSuccess(invoke::resolveObject).onFailure { invoke.reject("Background health access was not configured: ${it.message}") }
+        }.start()
+    }
+
+    @Command
+    fun pendingHealthEvents(invoke: Invoke) {
+        Thread {
+            runCatching { runBlocking { HealthEventCollector.pending(activity.applicationContext) } }
+                .onSuccess(invoke::resolveObject).onFailure { invoke.reject(it.message) }
+        }.start()
+    }
+
+    @Command
+    fun acknowledgeHealthEvents(invoke: Invoke) {
+        val args = parseArgs(invoke, HealthEventAcknowledgementArgs::class.java) ?: return
+        Thread {
+            runCatching { runBlocking { HealthEventCollector.acknowledge(activity.applicationContext, args.ids) } }
+                .onSuccess { invoke.resolve() }.onFailure { invoke.reject(it.message) }
+        }.start()
+    }
+
+    private val calendarWrites = CalendarWrites(activity)
+    private val contacts = ContactsAccess(activity)
+    @Command
+    fun listContacts(invoke: Invoke) { contacts.list(invoke) }
     private val photos = PhotoLibrary(activity)
     @Command
     fun listPhotos(invoke: Invoke) { photos.list(invoke) }
@@ -198,7 +299,24 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
             requestHealthPermissions(invoke)
             return
         }
+        if (request.permissions?.contains(ALIAS_NOTIFICATIONS) == true &&
+            (Build.VERSION.SDK_INT < 33 || getPermissionState(ALIAS_NOTIFICATIONS) == PermissionState.GRANTED)) {
+            checkPermissions(invoke)
+            return
+        }
         super.requestPermissions(invoke)
+    }
+
+    @Command
+    fun postResultNotification(invoke: Invoke) {
+        runCatching { ResultNotifications.post(activity, invoke, getPermissionState(ALIAS_NOTIFICATIONS)) }
+            .onFailure { invoke.reject("Invalid result notification: ${it.message}") }
+    }
+
+    @Command
+    fun removeResultNotification(invoke: Invoke) {
+        runCatching { ResultNotifications.remove(activity, invoke) }
+            .onFailure { invoke.reject("Unable to withdraw result notification: ${it.message}") }
     }
 
     @Command
@@ -290,9 +408,11 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
                     "permissionAliases",
                     JSObject().apply {
                         put("microphone", ALIAS_MICROPHONE)
+                        put("notifications", ALIAS_NOTIFICATIONS)
                         put("bluetooth", if (Build.VERSION.SDK_INT >= 31) ALIAS_BLUETOOTH else ALIAS_LOCATION)
                         put("camera", ALIAS_CAMERA)
                         put("calendar", ALIAS_CALENDAR)
+                        put("contacts", ALIAS_CONTACTS)
                         put("reminders", ALIAS_CALENDAR)
                         put("photos", photoAlias)
                         put("location", ALIAS_LOCATION)
@@ -536,6 +656,11 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
         }.start()
     }
 
+    @Command
+    fun listHomeInventory(invoke: Invoke) {
+        invoke.reject("HomeKit inventory requires the authorized initiating iOS device; Android has no HomeKit adapter")
+    }
+
     @ActivityCallback
     private fun onHealthMetricPermissionResult(invoke: Invoke, result: ActivityResult) {
         val args = parseArgs(invoke, HealthMetricArgs::class.java) ?: return
@@ -563,6 +688,21 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @Command
+    fun checkHealthMetricPermission(invoke: Invoke) {
+        val args = parseArgs(invoke, HealthMetricArgs::class.java) ?: return
+        if (healthSdkStatus() != HealthConnectClient.SDK_AVAILABLE) {
+            invoke.reject(healthStatusDetail()); return
+        }
+        Thread {
+            runCatching {
+                val permission = healthMetricPermission(args.metric)
+                val granted = runBlocking { HealthConnectClient.getOrCreate(activity).permissionController.getGrantedPermissions() }
+                JSObject().apply { put("health", if (permission in granted) "granted" else "denied") }
+            }.onSuccess(invoke::resolve).onFailure { invoke.reject("Unable to check health permission: ${it.message}") }
+        }.start()
+    }
+
+    @Command
     fun listCalendarEvents(invoke: Invoke) {
         val args = parseArgs(invoke, CalendarRangeArgs::class.java) ?: return
         if (!calendarPermissionGranted(invoke)) return
@@ -572,7 +712,7 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
         }
         Thread {
             runCatching {
-                queryCalendarInstances(args.startMs, args.endMs, args.limit, remindersOnly = false)
+                queryCalendarInstances(args.startMs, args.endMs, args.limit, remindersOnly = false, calendarIds = args.calendarIds)
             }.onSuccess(invoke::resolveObject).onFailure { error ->
                 invoke.reject("Unable to read calendar events: ${error.message}")
             }
@@ -591,6 +731,7 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
                     now + REMINDER_LOOKAHEAD_MS,
                     args.limit,
                     remindersOnly = true,
+                    calendarIds = args.calendarIds,
                 )
             }.onSuccess(invoke::resolveObject).onFailure { error ->
                 invoke.reject("Unable to read Android calendar reminders: ${error.message}")
@@ -601,49 +742,22 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
     @Command
     fun createCalendarEvent(invoke: Invoke) {
         val args = parseArgs(invoke, CreateCalendarEventArgs::class.java) ?: return
-        val title = args.title.trim()
-        if (title.isEmpty() || args.endMs <= args.startMs) {
-            invoke.reject("A title and an end after the start are required")
-            return
-        }
-        val intent = Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).apply {
-            putExtra(CalendarContract.Events.TITLE, title)
-            putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, args.startMs)
-            putExtra(CalendarContract.EXTRA_EVENT_END_TIME, args.endMs)
-            putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, args.allDay)
-            args.location?.trim()?.takeIf(String::isNotEmpty)?.let {
-                putExtra(CalendarContract.Events.EVENT_LOCATION, it)
-            }
-            args.notes?.trim()?.takeIf(String::isNotEmpty)?.let {
-                putExtra(CalendarContract.Events.DESCRIPTION, it)
-            }
-        }
-        presentIntent(invoke, intent, "Calendar draft opened; the user must review and save it")
+        calendarWrites.save(invoke, args.title, args.startMs, args.endMs, args.allDay,
+            args.notes, args.location, null, args.calendarId, args.expectedSourceId, false)
     }
+
+    @Command
+    fun listCalendars(invoke: Invoke) { calendarWrites.list(invoke) }
 
     @Command
     fun createReminder(invoke: Invoke) {
         val args = parseArgs(invoke, CreateReminderArgs::class.java) ?: return
-        val title = args.title.trim()
-        if (title.isEmpty()) {
-            invoke.reject("A reminder title is required")
-            return
+        val due = args.dueMs
+        if (due == null || due > Long.MAX_VALUE - DEFAULT_REMINDER_DURATION_MS) {
+            invoke.reject("Android reminders require their first due date/time"); return
         }
-        val due = args.dueMs ?: (System.currentTimeMillis() + DEFAULT_REMINDER_DELAY_MS)
-        val intent = Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).apply {
-            putExtra(CalendarContract.Events.TITLE, title)
-            putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, due)
-            putExtra(CalendarContract.EXTRA_EVENT_END_TIME, due + DEFAULT_REMINDER_DURATION_MS)
-            putExtra(CalendarContract.Events.HAS_ALARM, 1)
-            args.notes?.trim()?.takeIf(String::isNotEmpty)?.let {
-                putExtra(CalendarContract.Events.DESCRIPTION, it)
-            }
-        }
-        presentIntent(
-            invoke,
-            intent,
-            "Android calendar reminder draft opened; the user must choose an alert and save it",
-        )
+        calendarWrites.save(invoke, args.title, due, due + DEFAULT_REMINDER_DURATION_MS, false,
+            args.notes, null, args.recurrence, args.calendarId, args.expectedSourceId, true)
     }
 
     @Command
@@ -726,6 +840,7 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
     private fun permissionPayload(healthGranted: Boolean? = null): JSObject {
         val payload = JSObject()
         getPermissionStates().forEach { (alias, state) -> payload.put(alias, state.toString()) }
+        payload.put(ALIAS_NOTIFICATIONS, ResultNotifications.permissionState(activity, getPermissionState(ALIAS_NOTIFICATIONS)))
         if (photos.hasAccess()) {
             payload.put(ALIAS_PHOTOS, PermissionState.GRANTED.toString())
             payload.put(ALIAS_PHOTOS_SELECTED, PermissionState.GRANTED.toString())
@@ -764,6 +879,7 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
         endMs: Long,
         requestedLimit: Int,
         remindersOnly: Boolean,
+        calendarIds: List<String>? = null,
     ): JSONArray {
         val uriBuilder = CalendarContract.Instances.CONTENT_URI.buildUpon()
         ContentUris.appendId(uriBuilder, startMs)
@@ -778,22 +894,35 @@ class MobileAssistantPlugin(private val activity: Activity) : Plugin(activity) {
             CalendarContract.Instances.DESCRIPTION,
             CalendarContract.Instances.CALENDAR_DISPLAY_NAME,
             CalendarContract.Instances.HAS_ALARM,
+            CalendarContract.Instances.CALENDAR_ID,
         )
-        val selection = if (remindersOnly) "${CalendarContract.Instances.HAS_ALARM}=1" else null
+        val sources = calendarWrites.readSourceIds(calendarIds)
+        if (calendarIds != null) {
+            check(calendarIds.isNotEmpty() && calendarIds.size <= 16 && calendarIds.distinct().size == calendarIds.size &&
+                calendarIds.all { sources.containsKey(it) }) { "The selected task calendar scope is empty, invalid or unavailable" }
+        }
+        val clauses = mutableListOf<String>()
+        if (remindersOnly) clauses.add("${CalendarContract.Instances.HAS_ALARM}=1")
+        if (calendarIds != null) clauses.add("${CalendarContract.Instances.CALENDAR_ID} IN (${calendarIds.joinToString(",") { "?" }})")
+        val selection = clauses.takeIf { it.isNotEmpty() }?.joinToString(" AND ")
         val result = JSONArray()
-        activity.contentResolver.query(
+        val records = activity.contentResolver.query(
             uriBuilder.build(),
             projection,
             selection,
-            null,
+            calendarIds?.toTypedArray(),
             "${CalendarContract.Instances.BEGIN} ASC",
-        )?.use { cursor ->
+        ) ?: error("Calendar provider did not return event records")
+        records.use { cursor ->
             val limit = requestedLimit.coerceIn(1, 200)
             while (cursor.moveToNext() && result.length() < limit) {
                 val payload = JSObject()
                 val eventId = cursor.getString(0).orEmpty()
                 val title = cursor.getString(1)?.takeIf(String::isNotBlank) ?: "Untitled event"
                 val begin = cursor.getLong(2)
+                val calendarId = cursor.getString(9).orEmpty()
+                payload.put("calendarId", calendarId)
+                payload.put("sourceId", sources[calendarId] ?: "")
                 if (remindersOnly) {
                     payload.put("id", eventId)
                     payload.put("title", title)

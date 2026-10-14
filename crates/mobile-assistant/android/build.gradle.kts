@@ -25,6 +25,9 @@ android {
 dependencies {
     implementation(project(":tauri-android"))
     implementation("androidx.health.connect:connect-client:1.1.0")
+    // 2.9.1 keeps the existing Kotlin 1.9 toolchain; the native collector also
+    // runs when no Tauri Activity/WebView is alive.
+    implementation("androidx.work:work-runtime:2.9.1")
     // 1.8.1 is published against Kotlin 1.9.21, matching Tauri's Kotlin 1.9
     // compiler. Coroutines 1.10.x publishes Kotlin 2.1 metadata and cannot be
     // consumed by this Android host without upgrading the whole toolchain.

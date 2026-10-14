@@ -9,13 +9,13 @@ const httpHook = () => ({ id: "hook-one", name: "通知", description: "事件�
   enabled: false, type: "http", requests: [{ id: "request-one", method: "POST", url: "https://example.test/hook",
     headers: { Authorization: "Bearer stored" }, body: { message: "hello" } }] });
 
-function harness(kind, initialData, save = async () => undefined, validate = async () => undefined) {
+function harness(kind, initialData, save = async () => undefined, validate = async () => undefined, translate = key => key) {
   const hooks = createReactHookHarness();
   const types = createTsModuleLoader().loadModule("src/lib/automation/types.ts");
   const saves = []; let closed = 0; let surface; let requestId = 0;
   const loader = createTsModuleLoader({ mocks: {
     react: hooks.react,
-    "../../i18n": { useLocale: () => ({ t: key => key }) },
+    "../../i18n": { useLocale: () => ({ t: translate }) },
     "../../lib/automation": { ...types, validateCronExpression: validate },
     "../lib/automation": types,
     "../../presentation/NativeSurface": { NativeSurface: "NativeSurface" },
@@ -45,6 +45,17 @@ function harness(kind, initialData, save = async () => undefined, validate = asy
     nodes: () => flatten(surface.props.document.nodes), closed: () => closed, props,
     unmount: () => { hooks.unmount(); registry.remove("automation"); } };
 }
+
+test("native cron editors use real translations for each task type and retain editable controls", () => {
+  const {translations}=createTsModuleLoader().loadModule("src/i18n/config.ts");
+  for(const locale of ["zh-CN","en-US"])for(const type of ["bash","http","prompt"]){
+    const h=harness("CronTaskModal",{id:"task",name:"Task",type,description:"Actual note",cron:"0 * * * *",enabled:true,script:"echo ok",prompt:"Review documents",workdir:"/project"},undefined,undefined,key=>{assert.ok(key in translations[locale],"Missing translation "+key);return translations[locale][key];});
+    assert.equal(h.node("description").label,translations[locale]["settings.cronTaskDesc"]);
+    assert.equal(h.node("workdir-hint"),undefined);
+    assert.equal(h.node("cron").value,"0 * * * *");
+    h.unmount();
+  }
+});
 
 test("native hook HTTP rows preserve stored values, validate edits and match body support of the shared editor", async () => {
   let fail = true;

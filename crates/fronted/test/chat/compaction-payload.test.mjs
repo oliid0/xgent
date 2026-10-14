@@ -8,7 +8,6 @@ const payloadModule = loader.loadModule("src/lib/chat/compaction/payload.ts");
 const {
   buildCompactionPayload,
   serializeMessageForCompaction,
-  shrinkCompactionPayload,
   fitCompactionPayloadToBudget,
   estimateCompactionPayloadTokens,
   trimText,
@@ -107,8 +106,7 @@ test("serializeMessageForCompaction captures each role's essentials", () => {
   const bigToolResult = serializeMessageForCompaction(toolResult("x".repeat(40_000)), 1);
   assert.equal(bigToolResult.role, "toolResult");
   assert.equal(bigToolResult.toolName, "Read");
-  assert.ok(bigToolResult.content.includes("... [truncated] ..."));
-  assert.ok(bigToolResult.content.length < 40_000);
+  assert.equal(bigToolResult.content, "x".repeat(40_000));
 
   const serializedUser = serializeMessageForCompaction(user("question"), 2);
   assert.deepEqual(serializedUser, {
@@ -204,38 +202,7 @@ test("buildCompactionPayload removes synthetic subagent card calls and paired re
   assert.equal(JSON.stringify(payload).includes("synthetic card result"), false);
 });
 
-test("shrink keeps head+tail and records the omitted count; summary-backed payloads drop the head", () => {
-  const messages = Array.from({ length: 20 }, (_, i) =>
-    serializeMessageForCompaction(user(`msg-${i}`, i), i),
-  );
-  const base = {
-    compaction_reason: { trigger: "t", context_tokens: 1, threshold: 1 },
-    system_prompt: "p",
-    previous_summary: null,
-    active_segment_messages: messages,
-  };
-
-  const shrunk = shrinkCompactionPayload(base);
-  assert.equal(shrunk.active_segment_messages.length, 12);
-  assert.equal(shrunk.compaction_reason.omitted_message_count, 8);
-  assert.equal(shrunk.compaction_reason.reduced_input, true);
-  assert.equal(shrunk.active_segment_messages[0].content, "msg-0");
-  assert.equal(shrunk.active_segment_messages.at(-1).content, "msg-19");
-
-  const withSummary = shrinkCompactionPayload({
-    ...base,
-    previous_summary: { id: "s", content: "sum", summaryMeta: {} },
-  });
-  assert.equal(withSummary.active_segment_messages.length, 10);
-  assert.equal(withSummary.active_segment_messages[0].content, "msg-10");
-
-  assert.equal(
-    shrinkCompactionPayload({ ...base, active_segment_messages: messages.slice(0, 6) }),
-    null,
-  );
-});
-
-test("fitCompactionPayloadToBudget converges under the model budget", () => {
+test("fitCompactionPayloadToBudget schedules chunks without trimming the history or envelope", () => {
   const messages = Array.from({ length: 40 }, (_, i) =>
     serializeMessageForCompaction(toolResult("y".repeat(6000), i), i),
   );
@@ -253,10 +220,12 @@ test("fitCompactionPayloadToBudget converges under the model budget", () => {
     modelConfig: { contextWindow: 10_000, maxOutputToken: 2_000 },
   });
 
-  assert.equal(fitted.compaction_reason.reduced_input, true);
+  assert.equal(fitted.compaction_reason.reduced_input, undefined);
   assert.equal(fitted.compaction_reason.payload_budget_tokens, 6_750);
-  assert.ok(estimateCompactionPayloadTokens(fitted) < estimateCompactionPayloadTokens(payload));
-  assert.ok(fitted.active_segment_messages.length < messages.length);
+  assert.equal(fitted.active_segment_messages, messages);
+  assert.equal(fitted.previous_summary, payload.previous_summary);
+  assert.equal(fitted.system_prompt, payload.system_prompt);
+  assert.equal(fitted.next_user_message, payload.next_user_message);
 
   const tiny = {
     ...payload,

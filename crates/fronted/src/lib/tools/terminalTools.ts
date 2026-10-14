@@ -1,7 +1,8 @@
 import type { ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import { invoke } from "@xgent/runtime";
+import { invoke as invokeRuntime } from "@xgent/runtime";
 import { Type } from "typebox";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
+import type { ToolCommandPort } from "./toolCommandPort";
 
 type TerminalReadTailResponse = {
   sessions: Array<{
@@ -59,7 +60,11 @@ function formatTerminalReadResult(result: TerminalReadTailResponse) {
   return `${header}\n\n${result.output || "(empty output)"}`;
 }
 
-export function createTerminalTools(params: { workdir: string }): BuiltinToolBundle {
+export function createTerminalTools(params: {
+  workdir: string;
+  commandPort?: ToolCommandPort;
+}): BuiltinToolBundle {
+  const invoke = params.commandPort?.invoke ?? invokeRuntime;
   const projectPathKey = params.workdir.trim();
   const tools = [
     {

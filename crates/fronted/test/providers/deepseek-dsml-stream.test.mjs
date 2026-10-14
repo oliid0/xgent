@@ -1047,6 +1047,7 @@ test("streamAssistantMessage normalizes recovered DeepSeek DSML tool calls from 
 });
 
 test("completeAssistantMessage normalizes recovered DeepSeek DSML tool calls from history", async () => {
+  let admissions = 0;
   const missingSearch = createToolCall("dsml-tool-call-complete-search", "builtin_web_search", {
     additionalContext: "DeepSeek complete missing result",
   });
@@ -1080,6 +1081,7 @@ test("completeAssistantMessage normalizes recovered DeepSeek DSML tool calls fro
   const providers = localLoader.loadModule("src/lib/providers/llm.ts");
 
   await providers.completeAssistantMessage({
+    beforeModelRequest: async () => { admissions++; },
     providerId: "claude_code",
     model: "deepseek-chat",
     runtime: {
@@ -1097,6 +1099,7 @@ test("completeAssistantMessage normalizes recovered DeepSeek DSML tool calls fro
   });
 
   assert.equal(capturedContexts.length, 1);
+  assert.equal(admissions, 1);
   const messages = capturedContexts[0].messages;
   const assistantIndex = messages.findIndex((message) => message === incompleteAssistant);
   assert.equal(assistantIndex, 1);

@@ -51,8 +51,8 @@ function utf8Bytes(text: string): Uint8Array {
 }
 
 /** Synchronous SHA-256 used by the desktop trajectory database protocol. */
-export function sha256Hex(text: string): string {
-  const source = utf8Bytes(text);
+export function sha256Hex(text: string | Uint8Array): string {
+  const source = typeof text === "string" ? utf8Bytes(text) : text;
   const paddedLength = Math.ceil((source.length + 9) / 64) * 64;
   const padded = new Uint8Array(paddedLength);
   padded.set(source);

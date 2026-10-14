@@ -5,11 +5,11 @@ import type {
   ToolCall,
   ToolResultMessage,
 } from "@earendil-works/pi-ai";
-import { invoke } from "@xgent/runtime";
-
+import { invoke as invokeRuntime } from "@xgent/runtime";
 import type { McpServerConfig } from "../settings";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
 import { createToolRunId, invokeWithAbort, waitForAbortablePromise } from "./invokeWithAbort";
+import type { ToolCommandPort } from "./toolCommandPort";
 import { normalizeToolParametersSchema } from "./toolSchema";
 
 type McpToolInfo = {
@@ -87,6 +87,7 @@ function buildSafeToolName(serverId: string, toolName: string) {
 }
 
 export async function createMcpTools(params: {
+  commandPort?: ToolCommandPort;
   servers: McpServerConfig[];
   onLoadError?: (message: string) => void;
   loadFailureMode?: "continue" | "throw";
@@ -96,6 +97,7 @@ export async function createMcpTools(params: {
     toolNameMap: Map<string, { serverId: string; toolName: string; serverLabel: string }>;
   }>
 > {
+  const invoke = params.commandPort?.invoke ?? invokeRuntime;
   const servers = params.servers ?? [];
   const enabledServers = servers.filter((s) => s.enabled);
 
@@ -199,8 +201,27 @@ export async function createMcpTools(params: {
     ]
   > = [];
 
-  for (const info of toolInfos ?? []) {
-    const safeName = buildSafeToolName(info.serverId, info.name);
+  const catalog = (toolInfos ?? []).map((info) => ({
+    info,
+    safeName: buildSafeToolName(info.serverId, info.name),
+  }));
+  const seenNames = new Set<string>();
+  const ambiguousNames = new Set<string>();
+  for (const { safeName } of catalog) {
+    if (seenNames.has(safeName)) ambiguousNames.add(safeName);
+    seenNames.add(safeName);
+  }
+  if (ambiguousNames.size) {
+    const message = `Ambiguous MCP tool names were disabled: ${[...ambiguousNames].join(", ")}. Rename the server ids or upstream tools and refresh the tool list.`;
+    if (params.loadFailureMode === "throw") throw new Error(message);
+    params.onLoadError?.(message);
+    console.warn(message);
+  }
+
+  for (const { info, safeName } of catalog) {
+    // Sanitization and the server/tool separator can collapse different routes.
+    // Omit every colliding entry before creating tools, policies or dispatch maps.
+    if (ambiguousNames.has(safeName)) continue;
     const descriptionPrefix = info.serverLabel ? `[MCP:${info.serverLabel}] ` : "[MCP] ";
     tools.push({
       name: safeName,
@@ -281,6 +302,7 @@ export async function createMcpTools(params: {
             },
             signal,
             {
+              invoke,
               onAbort: () => {
                 void invoke("mcp_cancel_tool", { run_id: runId } as any).catch(() => undefined);
               },

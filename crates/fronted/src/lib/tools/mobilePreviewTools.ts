@@ -3,10 +3,14 @@ import { Type } from "typebox";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
 import { invokeFs } from "./fsBackend";
 import { ToolPathResolver } from "./pathUtils";
+import { bindPreviewExecution, type PreviewExecution } from "./previewExecution";
+import type { ToolCommandPort } from "./toolCommandPort";
+import { readWorkspaceFileSource } from "./workspaceFileSource";
 
 export const MOBILE_PREVIEW_REQUEST_EVENT = "xgent:mobile-preview-request";
 
-export type MobilePreviewRequest = {
+export type MobilePreviewRequest = PreviewExecution & {
+  ownerId: string;
   workdir: string;
   projectPathKey: string;
   path: string;
@@ -47,10 +51,14 @@ function toolResult(
   };
 }
 
-export function subscribeMobilePreviewRequests(listener: (request: MobilePreviewRequest) => void) {
+type PreviewEventDetail = MobilePreviewRequest & { accept: () => void };
+
+export function subscribeMobilePreviewRequests(
+  listener: (request: MobilePreviewRequest) => boolean,
+) {
   const handleEvent = (event: Event) => {
-    const detail = (event as CustomEvent<MobilePreviewRequest>).detail;
-    if (detail?.workdir && detail.path) listener(detail);
+    const detail = (event as CustomEvent<PreviewEventDetail>).detail;
+    if (detail?.workdir && detail.path && detail.ownerId && listener(detail)) detail.accept();
   };
   window.addEventListener(MOBILE_PREVIEW_REQUEST_EVENT, handleEvent);
   return () => window.removeEventListener(MOBILE_PREVIEW_REQUEST_EVENT, handleEvent);
@@ -60,13 +68,22 @@ export function createMobilePreviewTools(params: {
   workdir: string;
   shellWorkspaceRoot?: string;
   projectPathKey?: string;
+  conversationId?: string;
+  commandPort?: ToolCommandPort;
 }): BuiltinToolBundle {
-  const pathResolver = new ToolPathResolver(params);
+  const execution = bindPreviewExecution({ commandPort: params.commandPort });
+  const pathResolver = new ToolPathResolver({
+    ...params,
+    resolveHomeDir: params.commandPort?.homeDir,
+  });
   async function executeToolCall(toolCall: ToolCall, signal?: AbortSignal) {
     if (toolCall.name !== "PreviewFile") {
       return toolResult(toolCall, `Unknown tool: ${toolCall.name}`, {}, true);
     }
     if (signal?.aborted) return toolResult(toolCall, "Preview cancelled.", {}, true);
+    if (!params.conversationId) {
+      return toolResult(toolCall, "PreviewFile requires an owning conversation.", {}, true);
+    }
 
     const args = (toolCall.arguments ?? {}) as Record<string, unknown>;
     const path = typeof args.path === "string" ? args.path.trim() : "";
@@ -83,10 +100,11 @@ export function createMobilePreviewTools(params: {
       if (resolved.scope !== "workspace") {
         throw new Error("PreviewFile requires a file in the current workspace.");
       }
-      const status = await invokeFs<PathStatusResponse>("fs_path_status", {
-        workdir: params.workdir,
-        path: resolved.relativePath ?? ".",
-      });
+      const status = await invokeFs<PathStatusResponse>(
+        "fs_path_status",
+        { workdir: params.workdir, path: resolved.relativePath ?? "." },
+        execution.commandPort?.invoke,
+      );
       if (!status.exists) {
         return toolResult(toolCall, `PreviewFile could not find ${path}.`, { path }, true);
       }
@@ -100,16 +118,52 @@ export function createMobilePreviewTools(params: {
       }
       if (signal?.aborted) return toolResult(toolCall, "Preview cancelled.", {}, true);
 
-      const request: MobilePreviewRequest = {
+      // Older/custom transports can still show a live preview, but cannot
+      // manufacture durable source authority from a path or the UI selection.
+      const fileSource = readWorkspaceFileSource(
+        await execution.commandPort?.resolveFileSource?.(params.workdir).catch(() => null),
+      );
+      if (signal?.aborted) return toolResult(toolCall, "Preview cancelled.", {}, true);
+      const request: MobilePreviewRequest = bindPreviewExecution({
+        ...execution,
+        commandPort:
+          fileSource && execution.commandPort
+            ? { ...execution.commandPort, fileSource }
+            : execution.commandPort,
+        fileSource,
+        ownerId: params.conversationId,
         workdir: params.workdir,
         projectPathKey: params.projectPathKey?.trim() || params.workdir,
         path: status.path || path,
-      };
-      window.dispatchEvent(new CustomEvent(MOBILE_PREVIEW_REQUEST_EVENT, { detail: request }));
-      return toolResult(toolCall, `Opened ${request.path} in Xgent's mobile preview.`, {
-        kind: "mobile_file_preview",
-        ...request,
       });
+      let accepted = false;
+      const detail: PreviewEventDetail = {
+        ...request,
+        accept: () => {
+          accepted = true;
+        },
+      };
+      window.dispatchEvent(new CustomEvent(MOBILE_PREVIEW_REQUEST_EVENT, { detail }));
+      if (!accepted) {
+        return toolResult(
+          toolCall,
+          "Preview was not accepted by the active conversation. The file remains available in its workspace.",
+          { path: request.path },
+          true,
+        );
+      }
+      return toolResult(
+        toolCall,
+        `Submitted ${request.path} to Xgent's mobile preview. The viewer reports loading errors.`,
+        {
+          kind: "mobile_file_preview",
+          ownerId: request.ownerId,
+          workdir: request.workdir,
+          projectPathKey: request.projectPathKey,
+          path: request.path,
+          fileSource,
+        },
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return toolResult(toolCall, `PreviewFile failed: ${message}`, { path }, true);

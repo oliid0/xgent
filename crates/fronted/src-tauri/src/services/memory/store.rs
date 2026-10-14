@@ -1,4 +1,18 @@
 impl MemoryStore {
+    /// Existing private store only: no directory/database creation, migration,
+    /// reconciliation, quarantine or profile writes from an OS callback.
+    pub(crate) fn open_existing_readonly_at(storage:&Path)->Result<Self,String>{
+        let storage=fs::canonicalize(storage).map_err(|e|e.to_string())?;
+        let root=fs::canonicalize(storage.join(MEMORY_ROOT_DIR)).map_err(|e|e.to_string())?;
+        let db_path=fs::canonicalize(root.join(DB_FILENAME)).map_err(|e|e.to_string())?;
+        if !root.starts_with(&storage) || !db_path.starts_with(&root) || !root.is_dir() || !db_path.is_file() {
+            return Err("Original private memory store unavailable".into());
+        }
+        let conn=Connection::open_with_flags(&db_path,rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|e|e.to_string())?;
+        conn.busy_timeout(Duration::from_millis(100)).map_err(|e|e.to_string())?;
+        Ok(Self {root,db_path,conn:Mutex::new(conn),mutation_lock:Mutex::new(())})
+    }
+
     pub fn open() -> Result<Self, String> {
         let root = memory_root_dir()?;
         ensure_root_dirs(&root)?;

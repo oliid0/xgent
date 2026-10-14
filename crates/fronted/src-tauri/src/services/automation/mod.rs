@@ -1,4 +1,5 @@
 pub mod db;
+pub(crate) mod origin_memory;
 pub mod scheduler;
 pub mod store;
 pub mod types;

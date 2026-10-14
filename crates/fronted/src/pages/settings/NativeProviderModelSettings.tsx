@@ -151,6 +151,37 @@ export function NativeProviderModelSettings(
                 : "decimal-input",
           },
         ]),
+        c.input(
+          `${prefix}:delegationSkills`,
+          t("settings.modelDelegationSkills"),
+          draft.delegationSkills,
+          (value) => patch("delegationSkills", value),
+          false,
+          !deleting,
+        ),
+        {
+          id: `${prefix}:delegation-skills-hint`,
+          kind: "Text",
+          secondary: true,
+          text: t("settings.modelDelegationSkillsHint"),
+        },
+        {
+          ...c.input(
+            `${prefix}:delegationMaxConcurrency`,
+            t("settings.modelDelegationConcurrency"),
+            draft.delegationMaxConcurrency,
+            (value) => patch("delegationMaxConcurrency", value),
+            false,
+            !deleting,
+          ),
+          variant: "integer-input",
+        },
+        {
+          id: `${prefix}:delegation-concurrency-hint`,
+          kind: "Text",
+          secondary: true,
+          text: t("settings.modelDelegationConcurrencyHint"),
+        },
         {
           id: `${prefix}:cost-hint`,
           kind: "Text",

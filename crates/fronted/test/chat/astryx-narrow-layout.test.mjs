@@ -58,6 +58,10 @@ const mocks = {
   "../../components/astryx/ConfirmActionPopover": {},
 };
 const loader = createTsModuleLoader({ mocks });
+const { IntelligentSchedulingControl } = createTsModuleLoader({ mocks: {
+  ...vendor, react: React, "react/jsx-runtime": jsx,
+  "../../../i18n": { useLocale }, "../../../components/icons": icons,
+} }).loadModule("src/pages/chat/components/IntelligentSchedulingControl.tsx");
 const { xgentCompactTheme } = loader.loadModule("src/theme/xgentTheme.ts");
 const { Theme, generateThemeCSS } = vendor["@astryxdesign/core/theme"];
 const { ChatSidebarSurface, ProjectRow, HistoryRow } = loader.loadModule("src/components/chat/ChatHistorySidebar.tsx");
@@ -216,6 +220,14 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
   }
   for (const locale of ["en-US", "zh-CN"]) for (const width of [240, 320, 390, 768]) for (const scale of [1, 1.5]) {
     const t = key => translations[locale][key] ?? key;
+    for (const state of ["off", "on", "text"]) {
+      sections.push(React.createElement(Locale.Provider, { value: locale }, React.createElement("section", {
+        className: "fixture-intelligent-scheduling",
+        style: { width, padding: 12, "--text-label-size": `${17 * scale}px`, "--text-supporting-size": `${17 / 1.18 * scale}px` },
+        "data-width": width, "data-scale": scale, "data-locale": locale, "data-state": state,
+      }, React.createElement(IntelligentSchedulingControl, { controls: { intelligentSchedulingEnabled: state === "on" },
+        disabled: false, agentMode: state !== "text", onChange: noop }))));
+    }
     for (const providerType of ["claude_code", "codex"]) for (const panel of ["general", "model", "request", "usage"]) {
       sections.push(React.createElement(Locale.Provider, { value: locale }, React.createElement("section", {
         className: "fixture-provider-editor settings-page settings-page-compact",
@@ -264,7 +276,7 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       }, React.createElement("div", { "data-settings-section": "access" }, React.createElement(CompactAccessSettingsForm, {
         access: { ...settings.access, webUiEnabled: true, cloudExecutionEnabled: true, githubOwner: "A multilingual account name 用户名", githubRepository: "A task repository with a long name 任务仓库", lanControlUrl: "http://192.168.1.2:28367/", preferLanPcExecution: true },
         nativeMobile: mobile, browser: false,
-        localStatus: { enabled: true, running: true, bindAddress: "0.0.0.0", port: 28367, urls: ["http://192.168.1.2:28367/"], pairingCode: "123456", pairedDevices: 1, devices: [{ deviceId: "phone", label: "An already paired device with a very long multilingual name 用户设备", lastSeenAt: Date.UTC(2026, 9, 5, 16) }] },
+        localStatus: { enabled: true, running: true, bindAddress: "0.0.0.0", port: 28367, urls: ["http://192.168.1.2:28367/"], pairingCode: "123456", pairedDevices: 1, devices: [{ deviceId: "phone", label: "An already paired device with a very long multilingual name 用户设备", lastSeenAt: Date.UTC(2026, 9, 5, 16) }], tailscale: { state: "running", addresses: ["100.70.1.2", "fd7a:115c:a1e0:ab12:1234:5678:9abc:def0"], observedAt: Date.UTC(2026, 9, 9, 23, 59) } },
         vaultStatus: { githubTokenConfigured: true, githubUsername: "A multilingual account name 用户名" }, lanPcStatus: { paired: true, baseUrl: "http://192.168.1.2:28367/" },
         lanPairingCode: "123456", lanDeviceName: "A multilingual phone name 用户设备", githubToken: "", busyAction: "", endpoint: "http://192.168.1.2:28367/", localStatusLabel: t("settings.accessRunning"), localStatusPhase: "running",
         actionError: "Could not connect to https://example.com/" + "long-diagnostic-path/".repeat(8),
@@ -409,13 +421,21 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
         const dialogPanel = dialog.querySelector('.settings-provider-model-dialog-body');
         const dialogFooter = dialog.querySelector('.settings-provider-model-dialog-footer');
         const dialogBounds = dialog.getBoundingClientRect();
+        for (const name of ['delegationSkills', 'delegationMaxConcurrency']) {
+          const input = dialogPanel.querySelector('input[name="' + name + '"]');
+          if (!input || input.disabled) failures.push({width:section.dataset.width,locale:section.dataset.locale,missingDelegationInput:name});
+          else {
+            const box = input.getBoundingClientRect();
+            if (box.left < dialogBounds.left - 1 || box.right > dialogBounds.right + 1) failures.push({width:section.dataset.width,locale:section.dataset.locale,delegationInputOverflow:name});
+          }
+        }
         const dialogTitle = dialog.querySelector('.astryx-dialog-header-title-block h2');
         if (!dialogTitle || dialogTitle.getBoundingClientRect().height > parseFloat(getComputedStyle(dialogTitle).lineHeight) * 2 + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,overgrownModelTitle:true});
         for (const button of dialogFooter.querySelectorAll('button')) {
           const rect = button.getBoundingClientRect();
           if (rect.top < dialogPanel.getBoundingClientRect().bottom - 1 || rect.bottom > dialogBounds.bottom + 1) failures.push({width:section.dataset.width,scale:section.dataset.scale,coveredModelAction:button.textContent});
         }
-        const limits = dialogPanel.querySelectorAll('input[inputmode="numeric"]');
+        const limits = dialogPanel.querySelectorAll('input[inputmode="numeric"]:not([name="delegationMaxConcurrency"])');
         const costs = dialogPanel.querySelectorAll('input[inputmode="decimal"]');
         if (limits.length !== 2 || costs.length !== 4) failures.push({width:section.dataset.width,missingModelParameters:{limits:limits.length,costs:costs.length}});
         dialogPanel.scrollTop = dialogPanel.scrollHeight;
@@ -507,7 +527,9 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       const status = [...section.querySelectorAll('.settings-status-label')];
       if (status.length !== 2) failures.push({width:section.dataset.width,missingAccessStatus:status.length});
       const groups = section.querySelectorAll('.settings-row-group').length;
-      if (groups !== (section.dataset.mobile === 'true' ? 3 : 5)) failures.push({width:section.dataset.width,missingAccessGroups:groups});
+      const expectedGroups = section.classList.contains('fixture-access-controller') ? 5 : section.dataset.mobile === 'true' ? 4 : 6;
+      if (groups !== expectedGroups) failures.push({width:section.dataset.width,missingAccessGroups:groups});
+      if (section.dataset.mobile !== 'true' && !section.textContent.includes('Tailscale')) failures.push({width:section.dataset.width,missingTailscaleStatus:true});
       if (section.dataset.mobile === 'true') {
         const code = section.querySelector('input[autocomplete="one-time-code"]');
         if (!code || code.inputMode !== 'numeric' || code.maxLength !== 6) failures.push({width:section.dataset.width,missingPairingInputHints:true});
@@ -677,7 +699,17 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
       const grid = section.querySelector('.workspace-file-tree-actions');
       evidence.push({locale:section.dataset.locale,width:section.dataset.width,scale:section.dataset.scale,columns:getComputedStyle(grid).gridTemplateColumns.split(' ').length,titleHeight:title.getBoundingClientRect().height,statuses:[...section.querySelectorAll('.settings-navigation-status')].map(element=>element.textContent)});
     }
-    document.getElementById('result').textContent = JSON.stringify({failures,evidence,detailEvidence,backupEvidence,permissionsEvidence,memoryEvidence,nativeTimeEvidence,accessEvidence,providerEvidence,viewport:{width:document.documentElement.clientWidth,narrow:matchMedia('(max-width:600px)').matches,touch:matchMedia('(pointer:coarse)').matches}});
+    const schedulingEvidence = [];
+    for (const section of document.querySelectorAll('.fixture-intelligent-scheduling')) {
+      const bounds=section.getBoundingClientRect(), input=section.querySelector('input');
+      if (!input || input.checked !== (section.dataset.state === 'on') || (input.getAttribute('aria-disabled') === 'true') !== (section.dataset.state === 'text')) failures.push({schedulingState:section.dataset.state,locale:section.dataset.locale,width:section.dataset.width});
+      for (const element of section.querySelectorAll('input, label, .astryx-text')) {
+        const box=element.getBoundingClientRect();
+        if (box.width <= 0 || box.left < bounds.left - 1 || box.right > bounds.right + 1) failures.push({schedulingOverflow:element.className,locale:section.dataset.locale,width:section.dataset.width});
+      }
+      schedulingEvidence.push({locale:section.dataset.locale,width:Number(section.dataset.width),scale:Number(section.dataset.scale),state:section.dataset.state});
+    }
+    document.getElementById('result').textContent = JSON.stringify({failures,evidence,detailEvidence,backupEvidence,permissionsEvidence,memoryEvidence,nativeTimeEvidence,accessEvidence,providerEvidence,schedulingEvidence,viewport:{width:document.documentElement.clientWidth,narrow:matchMedia('(max-width:600px)').matches,touch:matchMedia('(pointer:coarse)').matches}});
   }); });</script>`;
   const temporaryRoot = path.resolve(tmpdir());
   const directory = await mkdtemp(path.join(temporaryRoot, "xgent-astryx-layout-test-"));
@@ -691,6 +723,8 @@ test("actual Astryx rows keep long titles, settings labels and file actions with
     }
     const screenshotKind = process.env.XGENT_LAYOUT_SCREENSHOT ?? (process.env.XGENT_LAYOUT_DETAIL ? "detail" : "layout");
     const screenshotSelectors = { providerEditor: '.fixture-provider-editor[data-locale="en-US"][data-width="320"][data-scale="1"][data-panel="general"]', providerRequest: '.fixture-provider-editor[data-locale="en-US"][data-width="320"][data-scale="1"][data-panel="request"]', providerUsage: '.fixture-provider-editor[data-locale="en-US"][data-width="320"][data-scale="1"][data-panel="usage"]', layout: '.fixture-settings-index[data-locale="en-US"]', detail: '.fixture-system-details[data-locale="en-US"][data-width="320"][data-scale="1"]', backup: '.fixture-backup-details[data-locale="en-US"][data-width="320"][data-scale="1"]', permissions: '.fixture-permissions-details[data-locale="en-US"][data-width="320"][data-scale="1"] .astryx-section', memory: '.fixture-memory-details[data-locale="en-US"][data-width="320"][data-scale="1"]', access: '.fixture-access-details[data-mobile="true"][data-locale="en-US"][data-width="320"][data-scale="1"]', providers: '.fixture-provider-controller[data-locale="en-US"][data-width="320"][data-scale="1"]' };
+    screenshotSelectors.providerModel = '.fixture-provider-editor[data-locale="en-US"][data-width="320"][data-scale="1"][data-panel="model"]';
+    screenshotSelectors.scheduling = '.fixture-intelligent-scheduling[data-locale="zh-CN"][data-width="320"][data-scale="1"][data-state="off"]';
     assert.ok(screenshotSelectors[screenshotKind], "Use a known source-component screenshot target");
     const viewportResults = [];
     for (const width of [240, 320, 390, 768]) {

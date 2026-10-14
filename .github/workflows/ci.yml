@@ -372,11 +372,11 @@ jobs:
           find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 \
             \( -iname '*xctest*' -o -iname '*XgentNativeTestHost*' \) \
             -exec cp {} "$RUNNER_TEMP/native-crashes/" \; || true
-          if [ -d "$RUNNER_TEMP/native-macos.xcresult" ]; then
+          if [ -f "$RUNNER_TEMP/native-macos.xcresult/Info.plist" ]; then
             xcrun xcresulttool export attachments --path "$RUNNER_TEMP/native-macos.xcresult" \
               --output-path "$RUNNER_TEMP/native-desktop-screenshots"
           fi
-          if [ -d "$RUNNER_TEMP/native-ios.xcresult" ]; then
+          if [ -f "$RUNNER_TEMP/native-ios.xcresult/Info.plist" ]; then
             xcrun xcresulttool export attachments --path "$RUNNER_TEMP/native-ios.xcresult" \
               --output-path "$RUNNER_TEMP/native-screenshots"
           fi

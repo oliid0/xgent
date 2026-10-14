@@ -1,7 +1,13 @@
 import type { ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
 import { homeDir } from "@xgent/runtime";
+import type {
+  BackgroundExecutionLease,
+  BackgroundSourceContext,
+  BackgroundTaskContext,
+} from "../automation/types";
 import { activityObservation, executionActivityStore } from "../chat/executionActivityStore";
 import { isMobileShellAvailable } from "../mobileExecution";
+import type { OfficeImageSnapshot } from "../office/createOfficeDocument";
 import type { RuntimePlatform } from "../runtimePlatform";
 import {
   type AccessSettings,
@@ -19,6 +25,8 @@ import {
 } from "../subagents";
 import type { AdditionalProjectRoot } from "./additionalProjectRoots";
 import { createAskUserQuestionTools } from "./askUserQuestionTools";
+import { createBackgroundInboxTools } from "./backgroundInboxTools";
+import { createBackgroundTaskTools } from "./backgroundTaskTools";
 import { createBrowserUseTools } from "./browserUseTools";
 import type {
   BuiltinToolBundle,
@@ -31,6 +39,8 @@ import { createCuaTools } from "./cuaTools";
 import { createCustomSystemTools } from "./customSystemTools";
 import { createFileToolState, type FileToolState } from "./fileToolState";
 import { createFsTools } from "./fsTools";
+import { createGoalTools } from "./goalTools";
+import { createImageGenerationTools, type ImageGenerationContext } from "./imageGenerationTools";
 import { createMcpManagerTools } from "./mcpManagerTools";
 import { createMcpTools } from "./mcpTools";
 import { createMemoryTools } from "./memoryTools";
@@ -47,7 +57,9 @@ import type { SystemToolId, SystemToolRuntimeScope } from "./systemToolOptions";
 import { createTaskTools, type TaskStateStore } from "./taskTools";
 import { createTerminalTools } from "./terminalTools";
 import { createTodoTools, type TodoToolState } from "./todoTools";
+import type { ToolCommandPort } from "./toolCommandPort";
 import { createToolSearchTools, shouldDeferMcpTools } from "./toolSearchTools";
+import { createVideoGenerationTools, type VideoGenerationContext } from "./videoGenerationTools";
 
 export type BuiltinToolRegistry = {
   tools: BuiltinToolBundle["tools"];
@@ -59,6 +71,7 @@ export type BuiltinToolRegistry = {
   metadataByName: Map<string, BuiltinToolMetadata>;
   hasTool: (toolName: string) => boolean;
   mcpToolDeferralActive?: boolean;
+  recoverToolCall?: (call: ToolCall) => Promise<ToolResultMessage | null>;
 };
 
 const UNTRUSTED_TOOL_GROUPS: ReadonlySet<BuiltinToolBundle["groupId"]> = new Set(["mcp"]);
@@ -67,6 +80,7 @@ function createBuiltinToolRegistry(bundles: BuiltinToolBundle[]): BuiltinToolReg
   const tools: BuiltinToolBundle["tools"] = [];
   const metadataByName = new Map<string, BuiltinToolMetadata>();
   const executorsByName = new Map<string, BuiltinToolBundle["executeToolCall"]>();
+  const recoverersByName = new Map<string, NonNullable<BuiltinToolBundle["recoverToolCall"]>>();
   const groupIdByToolName = new Map<string, BuiltinToolBundle["groupId"]>();
   const canonicalToolNameByLookupKey = new Map<string, string | null>();
 
@@ -107,6 +121,7 @@ function createBuiltinToolRegistry(bundles: BuiltinToolBundle[]): BuiltinToolReg
       }
       tools.push(tool);
       executorsByName.set(tool.name, bundle.executeToolCall);
+      if (bundle.recoverToolCall) recoverersByName.set(tool.name, bundle.recoverToolCall);
       groupIdByToolName.set(tool.name, bundle.groupId);
       registerCanonicalToolName(tool.name);
       const metadata = bundle.metadataByName.get(tool.name);
@@ -119,6 +134,7 @@ function createBuiltinToolRegistry(bundles: BuiltinToolBundle[]): BuiltinToolReg
   return {
     tools,
     metadataByName,
+    recoverToolCall: async (call) => recoverersByName.get(call.name)?.(call) ?? null,
     hasTool: (toolName) => resolveToolName(toolName) !== null,
     async executeToolCall(toolCall, signal, context) {
       const resolvedToolName = resolveToolName(toolCall.name);
@@ -153,6 +169,13 @@ function createBuiltinToolRegistry(bundles: BuiltinToolBundle[]): BuiltinToolReg
 }
 
 type BuildBuiltinBaseToolRegistryParams = {
+  commandPort?: ToolCommandPort;
+  imageGeneration?: ImageGenerationContext;
+  videoGeneration?: VideoGenerationContext;
+  readOfficeArtifactImage?: (
+    artifactId: string,
+    signal?: AbortSignal,
+  ) => Promise<OfficeImageSnapshot>;
   workdir: string;
   additionalRoots?: readonly AdditionalProjectRoot[];
   providerId: ProviderId;
@@ -160,6 +183,14 @@ type BuildBuiltinBaseToolRegistryParams = {
   nativeMobileRuntime?: boolean;
   personalAssistantAccess?: Parameters<typeof createMobilePersonalAssistantTools>[0];
   lanPcCommandHostReady?: boolean;
+  backgroundTaskDelegation?: boolean;
+  backgroundRequestScope?: string;
+  getBackgroundSourceContext?: () => BackgroundSourceContext | undefined;
+  backgroundTaskContext?: BackgroundTaskContext;
+  backgroundTaskLease?: BackgroundExecutionLease;
+  backgroundSchedulingEnabled?: boolean;
+  getBackgroundExecutionDeadline?: () => number | undefined;
+  startBackgroundCloudTask?: (callId: string) => Promise<ToolResultMessage>;
   fileState: FileToolState;
   sandbox?: ShellSandboxSettings;
   checkpoint?: { conversationId: string; turnId: string };
@@ -192,9 +223,9 @@ type BuildBuiltinBaseToolRegistryParams = {
   onSshSessionsChanged?: (change: SshManagerSessionChange) => void | Promise<void>;
 };
 
-const resolveHomeDir = () => homeDir();
-
 async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryParams) {
+  const commandPort = params.commandPort;
+  const resolveHomeDir = commandPort ? () => commandPort.homeDir() : () => homeDir();
   const runtimeToolHost = resolveRuntimeToolHost(
     params.nativeMobileRuntime === true,
     params.lanPcCommandHostReady === true,
@@ -206,7 +237,10 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       ? "/workspace"
       : undefined;
   const baseBundles: BuiltinToolBundle[] = [
+    createGoalTools({ commandPort: params.commandPort }),
     createFsTools({
+      commandPort: params.commandPort,
+      readOfficeArtifactImage: params.readOfficeArtifactImage,
       workdir: params.workdir,
       shellWorkspaceRoot,
       additionalRoots: params.additionalRoots,
@@ -220,6 +254,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
     ...(shellAvailable
       ? [
           createShellTools({
+            commandPort: params.commandPort,
             conversationId: params.checkpoint?.conversationId,
             workdir: params.workdir,
             shellWorkspaceRoot,
@@ -248,14 +283,35 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
     ...(capabilities.cron
       ? [
           createCronTools({
+            commandPort: params.commandPort,
             currentChatModel: params.currentChatModel,
             workdir: params.workdir,
+          }),
+        ]
+      : []),
+    ...(params.runtimeScope === "chat" || params.backgroundTaskDelegation === true
+      ? [
+          createBackgroundTaskTools({
+            workdir: params.workdir,
+            currentChatModel: params.currentChatModel,
+            requirePeer: runtimeToolHost === "native-mobile",
+            backgroundContext: params.backgroundTaskContext,
+            backgroundLease: params.backgroundTaskLease,
+            schedulingEnabled: params.backgroundSchedulingEnabled,
+            getExecutionDeadline: params.getBackgroundExecutionDeadline,
+            getSourceContext: params.getBackgroundSourceContext,
+            requestScope:
+              params.backgroundRequestScope ??
+              (params.checkpoint
+                ? JSON.stringify([params.checkpoint.conversationId, params.checkpoint.turnId])
+                : undefined),
           }),
         ]
       : []),
     ...(capabilities.mcp
       ? [
           createMcpManagerTools({
+            commandPort: params.commandPort,
             workdir: params.workdir,
             getMcpSettings: params.getMcpSettings,
             applyMcpOps: params.applyMcpOps,
@@ -269,6 +325,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
     ...(capabilities.customSystemTools
       ? [
           createCustomSystemTools({
+            commandPort: params.commandPort,
             selectedToolIds: params.selectedSystemToolIds,
             runtimeScope: params.runtimeScope,
             currentChatModel: params.currentChatModel,
@@ -284,6 +341,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       ? [
           createMobilePersonalAssistantTools({
             ...params.personalAssistantAccess,
+            commandPort: params.commandPort,
             workdir: params.workdir,
           }),
         ]
@@ -294,6 +352,8 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
             workdir: params.workdir,
             shellWorkspaceRoot,
             projectPathKey: params.projectPathKey,
+            commandPort: params.commandPort,
+            conversationId: params.checkpoint?.conversationId,
           }),
         ]
       : []),
@@ -307,11 +367,18 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
       },
     }),
     ...(params.cloudExecution?.cloudExecutionEnabled
-      ? [createCloudTaskTools(params.cloudExecution, params.workdir)]
+      ? [
+          createCloudTaskTools(
+            params.cloudExecution,
+            params.workdir,
+            params.startBackgroundCloudTask,
+          ),
+        ]
       : []),
     ...(capabilities.ssh
       ? [
           createSSHManagerTools({
+            commandPort: params.commandPort,
             enabled:
               params.runtimeScope === "chat" &&
               params.sshManagerRemoteAllowed !== false &&
@@ -330,11 +397,20 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
     ...(capabilities.terminal && params.runtimeScope === "chat"
       ? [
           createTerminalTools({
+            commandPort: params.commandPort,
             workdir: params.workdir,
           }),
         ]
       : []),
   ];
+  if (params.imageGeneration && commandPort) {
+    const images = createImageGenerationTools(params.imageGeneration, commandPort, params.workdir);
+    if (images) baseBundles.push(images);
+  }
+  if (params.videoGeneration && commandPort) {
+    const videos = createVideoGenerationTools(params.videoGeneration, commandPort);
+    if (videos) baseBundles.push(videos);
+  }
 
   const mcpSettings = params.getMcpSettings();
   const selectedDriverId = mcpSettings.computerUseDriverId;
@@ -355,6 +431,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
     .map((server) => server.id);
   if (enabledServers.length > 0) {
     mcpBundle = await createMcpTools({
+      commandPort: params.commandPort,
       servers: enabledServers,
       onLoadError: params.onMcpLoadError,
       loadFailureMode: params.mcpLoadFailureMode,
@@ -404,6 +481,7 @@ async function buildBaseBuiltinToolBundles(params: BuildBuiltinBaseToolRegistryP
 export async function buildBuiltinToolRegistry(
   params: BuildBuiltinBaseToolRegistryParams & {
     subagentRuntime?: SubagentRuntimeConfig;
+    beforeSubagentToolCall?: () => Promise<void>;
     todoState?: TodoToolState;
     taskStateStore?: TaskStateStore;
     askUserQuestionConversationId?: string;
@@ -411,12 +489,18 @@ export async function buildBuiltinToolRegistry(
     toolSearch?: { conversationId: string };
   },
 ) {
+  const commandPort = params.commandPort;
+  const resolveHomeDir = commandPort ? () => commandPort.homeDir() : () => homeDir();
   const runtimeToolHost = resolveRuntimeToolHost(
     params.nativeMobileRuntime === true,
     params.lanPcCommandHostReady === true,
   );
   const capabilities = resolveRuntimeToolCapabilities(runtimeToolHost);
-  const baseBundles = await buildBaseBuiltinToolBundles(params);
+  const baseBundles = await buildBaseBuiltinToolBundles({
+    ...params,
+    getBackgroundExecutionDeadline: () =>
+      params.subagentRuntime?.scheduler.executionBudget?.snapshot().deadlineAt,
+  });
   const mcpBusinessBundle = baseBundles.find((bundle) =>
     bundle.tools.some((tool) => bundle.metadataByName.get(tool.name)?.kind === "mcp"),
   );
@@ -457,6 +541,7 @@ export async function buildBuiltinToolRegistry(
         ]
       : [];
   const chatBundles = [
+    ...(params.runtimeScope === "chat" ? [createBackgroundInboxTools()] : []),
     ...todoBundles,
     ...taskBundles,
     ...askUserQuestionBundles,
@@ -502,9 +587,12 @@ export async function buildBuiltinToolRegistry(
       ...parentBundles,
       ...chatBundles,
       createSubagentTools({
+        persistBatchReceipts: subagentRuntime.persistBatchReceipts,
         providerId: subagentRuntime.providerId,
         model: subagentRuntime.model,
         runtime: subagentRuntime.runtime,
+        models: subagentRuntime.models,
+        readPersistentModels: subagentRuntime.readPersistentModels,
         runtimePlatform: params.runtimePlatform,
         workdir: params.workdir,
         resolveHomeDir,
@@ -514,10 +602,13 @@ export async function buildBuiltinToolRegistry(
         scheduler: subagentRuntime.scheduler,
         forceReadonly: planModeActive,
         baseTools: baseRegistry.tools,
-        executeToolCall: baseRegistry.executeToolCall,
+        executeToolCall: async (...args) => {
+          await params.beforeSubagentToolCall?.();
+          return baseRegistry.executeToolCall(...args);
+        },
         metadataByName: baseRegistry.metadataByName,
-        createSubagentToolRegistry: async (workdir) =>
-          createBuiltinToolRegistry(
+        createSubagentToolRegistry: async (workdir) => {
+          const registry = createBuiltinToolRegistry(
             await buildBaseBuiltinToolBundles({
               ...params,
               workdir,
@@ -529,7 +620,15 @@ export async function buildBuiltinToolRegistry(
               mcpLoadFailureMode: "continue",
               memoryToolMode: "ro",
             }),
-          ),
+          );
+          return {
+            ...registry,
+            executeToolCall: async (...args) => {
+              await params.beforeSubagentToolCall?.();
+              return registry.executeToolCall(...args);
+            },
+          };
+        },
       }),
     ]),
   );

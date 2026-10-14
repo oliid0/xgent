@@ -7,6 +7,9 @@ export function nativeCronTaskDetails(
   t: (key: string) => string,
 ): PresentationNode[] {
   const c = presentationControls();
+  const reasoning = task.reasoning || "medium";
+  const reasoningKey = `settings.reasoning.${reasoning}`;
+  const reasoningLabel = t(reasoningKey);
   const value = (id: string, label: string, text: string): PresentationNode => ({
     id: `cron-detail:${id}`,
     kind: "VStack",
@@ -15,15 +18,17 @@ export function nativeCronTaskDetails(
     text,
   });
   const basic: PresentationNode[] = [
+    ...(task.description ? [value("description", "settings.cronTaskDesc", task.description)] : []),
     value(
-      "description",
-      "settings.cronDescription",
-      task.description || t("settings.cronViewNoDesc"),
-    ),
-    value(
-      "status",
-      "settings.cronViewStatus",
-      t(task.enabled ? "settings.cronViewStatusEnabled" : "settings.cronViewStatusDisabled"),
+      "type",
+      "settings.cronViewType",
+      t(
+        task.type === "bash"
+          ? "settings.cronTypeBash"
+          : task.type === "http"
+            ? "settings.cronTypeHttp"
+            : "settings.cronTypePrompt",
+      ),
     ),
     value("schedule", "settings.cronViewSchedule", task.cron),
     value(
@@ -38,7 +43,7 @@ export function nativeCronTaskDetails(
       "settings.cronTimeoutSeconds",
       String(task.timeoutSeconds ?? DEFAULT_CRON_TIMEOUT_SECONDS),
     ),
-    ...(task.workdir ? [value("workdir", "settings.cronWorkdir", task.workdir)] : []),
+    ...(task.workdir ? [value("workdir", "settings.cronWorkdirLabel", task.workdir)] : []),
     ...(task.lastError
       ? [
           {
@@ -58,22 +63,25 @@ export function nativeCronTaskDetails(
             id: "cron-detail:script",
             kind: "CodeBlock",
             language: "bash",
-            label: t("settings.cronCommand"),
+            label: t("settings.cronCommandList"),
             text: task.script || t("settings.cronViewNoConfig"),
           },
         ]
       : task.type === "prompt"
         ? [
             ...(task.selectedModel
-              ? [
-                  value("model", "settings.cronPromptModelLabel", task.selectedModel.model),
-                  value("provider", "settings.providerName", task.selectedModel.customProviderId),
-                ]
+              ? [value("model", "settings.cronPromptModelLabel", task.selectedModel.model)]
               : []),
-            value("reasoning", "settings.reasoning", task.reasoning || "medium"),
+            value(
+              "reasoning",
+              "settings.reasoning",
+              reasoningLabel === reasoningKey ? reasoning : reasoningLabel,
+            ),
             {
               id: "cron-detail:prompt",
-              kind: "Text",
+              kind: "CodeBlock",
+              label: t("settings.cronPromptLabel"),
+              language: "text",
               text: task.prompt || t("settings.cronViewNoConfig"),
             },
           ]
@@ -110,20 +118,10 @@ export function nativeCronTaskDetails(
             ),
           );
   return [
-    c.group("cron-detail:metadata", t("settings.cronViewType"), [
-      {
-        id: "cron-detail:type",
-        kind: "Badge",
-        label: t(
-          task.type === "bash"
-            ? "settings.cronTypeBash"
-            : task.type === "http"
-              ? "settings.cronTypeHttp"
-              : "settings.cronTypePrompt",
-        ),
-      },
-      ...basic,
-    ]),
-    c.group("cron-detail:configuration", t("settings.cronViewConfig"), config),
+    { ...c.group("cron-detail:metadata", "", basic), variant: "cron-detail-section" },
+    {
+      ...c.group("cron-detail:configuration", t("settings.cronViewConfig"), config),
+      variant: "cron-detail-section",
+    },
   ];
 }

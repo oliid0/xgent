@@ -124,3 +124,86 @@ test("openai-completions: 带工具请求 any 映射为 required", async () => {
   );
   assert.equal(options.toolChoice, "required");
 });
+
+test("supported HTTP adapters retain the caller's actual fetch boundary", async () => {
+  for (const api of ["openai-completions", "openai-responses", "anthropic-messages"]) {
+    const captured = [];
+    const loader = createTsModuleLoader({ mocks: {
+      [`@earendil-works/pi-ai/api/${api}`]: { stream(_model, _context, options) {
+        captured.push(options); return createSourceStream();
+      } },
+    } });
+    const { streamSimpleByApi } = loader.loadModule("src/lib/providers/runtime/streamByApi.ts");
+    const fetch = async () => new Response("provider");
+    await streamSimpleByApi({ ...createOpenAICompletionsModel(), api }, { messages: [] }, {
+      apiKey: "key", fetch, streamRetry: { disabled: true },
+    }).result();
+    assert.equal(captured.length, 1, api);
+    assert.equal(captured[0].fetch, fetch, api);
+  }
+});
+
+test("every supported provider refuses the initial model request before its SDK starts when shared budget is exhausted", async () => {
+  for (const api of ["openai-completions", "openai-responses", "anthropic-messages", "google-generative-ai", "deepseek-responses"]) {
+    let starts = 0;
+    const loader = createTsModuleLoader({ mocks: {
+      [`@earendil-works/pi-ai/api/${api}`]: { stream() { starts++; return createSourceStream(); } },
+    } });
+    const { streamSimpleByApi } = loader.loadModule("src/lib/providers/runtime/streamByApi.ts");
+    const result = await streamSimpleByApi({ ...createOpenAICompletionsModel(), api }, { messages: [] }, {
+      apiKey: "key", beforeModelRequest() { throw new Error("Shared execution budget exhausted"); },
+    }).result();
+    assert.equal(result.stopReason, "error", api);
+    assert.match(result.errorMessage, /Shared execution budget exhausted/, api);
+    assert.equal(starts, 0, api);
+  }
+});
+
+test("outer stream retry spends the shared admission budget and reports exhaustion rather than replaying the previous 429", async () => {
+  let starts = 0;
+  const loader = createTsModuleLoader({ mocks: {
+    "@earendil-works/pi-ai/api/openai-completions": { stream() {
+      starts++;
+      const source = createSourceStream();
+      return {
+        async *[Symbol.asyncIterator]() {
+          const assistant = await source.result();
+          yield { type: "error", reason: "error", error: { ...assistant, content: [], stopReason: "error", errorMessage: "429 too many requests" } };
+        },
+      };
+    } },
+  } });
+  const { ExecutionBudget } = loader.loadModule("src/lib/subagents/executionBudget.ts");
+  const { streamSimpleByApi } = loader.loadModule("src/lib/providers/runtime/streamByApi.ts");
+  const budget = new ExecutionBudget({ maxModelRequests: 1, maxToolCalls: 4 });
+  const result = await streamSimpleByApi(createOpenAICompletionsModel(), { messages: [] }, {
+    apiKey: "key", beforeModelRequest: () => budget.consume("modelRequests"),
+  }).result();
+  assert.equal(starts, 1);
+  assert.equal(result.stopReason, "error");
+  assert.match(result.errorMessage, /Shared execution budget exhausted/);
+  assert.equal(budget.snapshot().modelRequests.used, 1);
+});
+
+test("async durable admission resolves before every SDK starts, preserves stream events and honors cancellation", async () => {
+  for (const mode of ["accept", "refuse", "cancel"]) {
+    let starts = 0, release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const controller = new AbortController();
+    const loader = createTsModuleLoader({ mocks: {
+      "@earendil-works/pi-ai/api/openai-completions": { stream() { starts++; return createSourceStream(); } },
+    } });
+    const { streamSimpleByApi } = loader.loadModule("src/lib/providers/runtime/streamByApi.ts");
+    const stream = streamSimpleByApi(createOpenAICompletionsModel(), { messages: [] }, {
+      apiKey: "key", signal: controller.signal, streamRetry: { disabled: true },
+      beforeModelRequest: async () => { await gate; if (mode === "refuse") throw new Error("durable budget refused"); },
+    });
+    await Promise.resolve(); assert.equal(starts, 0);
+    if (mode === "cancel") controller.abort();
+    release();
+    const events = []; for await (const event of stream) events.push(event.type);
+    const result = await stream.result();
+    if (mode === "accept") { assert.equal(starts, 1); assert.deepEqual(events, ["start", "done"]); assert.equal(result.stopReason, "stop"); }
+    else { assert.equal(starts, 0); assert.equal(result.stopReason, "error"); assert.deepEqual(events, ["error"]); }
+  }
+});

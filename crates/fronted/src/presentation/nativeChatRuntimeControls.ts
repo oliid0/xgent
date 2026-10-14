@@ -21,6 +21,26 @@ export function createNativeChatRuntimeControls(
   const nodes: PresentationNode[] = [
     {
       ...c.toggle(
+        "runtime-intelligent-scheduling",
+        t("chat.runtime.intelligentScheduling"),
+        props.controls.intelligentSchedulingEnabled === true,
+        (intelligentSchedulingEnabled) => props.onChange({ intelligentSchedulingEnabled }),
+        !props.disabled && props.agentMode,
+      ),
+      icon: "sparkles",
+    },
+    {
+      id: "runtime-intelligent-scheduling-hint",
+      kind: "Text",
+      variant: "secondary",
+      label: t(
+        props.agentMode
+          ? "chat.runtime.intelligentSchedulingHint"
+          : "chat.runtime.intelligentSchedulingAgentOnly",
+      ),
+    },
+    {
+      ...c.toggle(
         "runtime-plan",
         t(props.controls.planModeEnabled ? "chat.planMode.on" : "chat.planMode.off"),
         props.controls.planModeEnabled,

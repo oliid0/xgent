@@ -351,6 +351,18 @@ struct XgentIOSNode: View {
                 XgentCronDetailValue(node: node)
             } else if node.variant == "cron-run-row" {
                 XgentCronRunRow(node: node, document: document, model: model)
+            } else if node.variant == "cron-run-list" {
+                XgentCronRunList(node: node, document: document, model: model)
+            } else if node.variant == "connector-data-list" {
+                XgentConnectorDataList(node: node, document: document, model: model)
+            } else if node.variant == "connector-data-row" {
+                XgentConnectorDataRow(node: node, document: document, model: model)
+            } else if node.variant == "goal-row" {
+                XgentGoalRow(node: node, document: document, model: model)
+            } else if node.variant == "goal-activity" {
+                XgentGoalActivityRow(node: node, document: document, model: model)
+            } else if node.variant == "goal-association" {
+                XgentGoalAssociationRow(node: node, document: document, model: model)
             } else if node.variant == "backup-connection-fields" {
                 XgentBackupConnectionFields(node: node, document: document, model: model)
             } else if node.variant == "backup-transfer-actions" {
@@ -409,7 +421,9 @@ struct XgentIOSNode: View {
             .foregroundStyle(Color(xgentHex: palette.text))
             .accessibilityAddTraits(.isHeader)
         case .button:
-            if node.variant == "workspace-source-action" {
+            if node.variant == "generated-file" {
+                XgentGeneratedArtifactRow(node: node, document: document, model: model, palette: palette)
+            } else if node.variant == "workspace-source-action" {
                 XgentWorkspaceSourceAction(node: node, document: document, model: model)
             } else if node.variant == "workspace-editor-bulk-action" {
                 XgentWorkspaceBulkAction(node: node, document: document, model: model)
@@ -429,7 +443,8 @@ struct XgentIOSNode: View {
         case .textArea:
             textArea
         case .toggle:
-            XgentSwitch(node: node, document: document, model: model)
+            if node.variant == "goal-step" { XgentGoalCheck(node: node, document: document, model: model) }
+            else { XgentSwitch(node: node, document: document, model: model) }
         case .selector:
             if node.variant == "provider-vendor-tabs" || node.variant == "provider-editor-tabs" {
                 XgentProviderCategoryTabs(node: node, document: document, model: model)
@@ -496,7 +511,11 @@ struct XgentIOSNode: View {
         case .providerList:
             XgentProviderListView(node: node, document: document, model: model)
         case .treeRow, .navigationRow:
-            if node.variant == "memory-entry" {
+            if node.variant == "goal-artifact" || node.variant == "goal-artifacts-nav" {
+                XgentGoalFileRow(node: node, document: document, model: model)
+            } else if node.variant == "workspace-file-row" {
+                XgentWorkspaceFileRow(node: node, document: document, model: model)
+            } else if node.variant == "memory-entry" {
                 XgentMemoryEntry(node: node, document: document, model: model)
             } else if node.variant == "sidebar-conversation-row" || node.variant == "sidebar-workspace-row" {
                 XgentSidebarConversationRow(node: node, document: document, model: model)
@@ -504,7 +523,15 @@ struct XgentIOSNode: View {
                 XgentSettingsNavigationRow(node: node, document: document, model: model)
             } else { navigationRow }
         case .settingsGroup:
-            settingsGroup
+            if node.variant == "goal-section" {
+                XgentGoalSection(node: node, document: document, model: model)
+            } else if node.id == "connector-catalog" {
+                XgentConnectorCatalog(node: node, document: document, model: model)
+            } else if node.variant == "task-review" {
+                XgentTaskReviewGroup(node: node, document: document, model: model)
+            } else if node.variant == "cron-detail-section" {
+                XgentCronDetailSection(node: node, document: document, model: model)
+            } else { settingsGroup }
         case .settingsLayout:
             VStack(alignment: .leading, spacing: CGFloat(theme.spacing.lg)) { children }
         case .iconButton:
@@ -729,19 +756,26 @@ struct XgentIOSNode: View {
         Button { model.send(node, in: document) } label: {
             HStack(spacing: 12) {
                 if let icon = node.icon {
-                    Image(systemName: icon).font(.system(size: 19)).frame(width: 24)
+                    Image(systemName: icon)
+                        .font(.system(size: node.variant == "workspace-file-row" ? 28 : 19))
+                        .foregroundStyle(node.variant == "workspace-file-row" && icon.hasPrefix("folder") ? Color(xgentHex: palette.accent) : Color(xgentHex: palette.text))
+                        .frame(width: node.variant == "workspace-file-row" ? 36 : 24)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(node.label ?? "").foregroundStyle(Color(xgentHex: palette.text))
+                        .lineLimit(node.variant == "background-child" ? 2 : (node.variant == "workspace-file-row" ? 1 : nil))
+                        .truncationMode(.middle)
                         .fixedSize(horizontal: false, vertical: true)
                     if let text = node.text, !text.isEmpty {
                         Text(text).font(.subheadline).foregroundStyle(Color(xgentHex: palette.secondaryText))
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                            .lineLimit(node.variant == "background-child" || dynamicTypeSize.isAccessibilitySize ? nil : 2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 8)
-                if node.selected == true && node.variant == "sidebar-conversation" {
+                if node.variant == "background-child" && node.selected == true {
+                    Image(systemName: "chevron.down").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                } else if node.selected == true && node.variant == "sidebar-conversation" {
                     Circle().fill(Color(xgentHex: palette.accent)).frame(width: 8, height: 8)
                         .accessibilityHidden(true)
                 } else if node.selected == true {

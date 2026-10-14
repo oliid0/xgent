@@ -1,8 +1,4 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-import { AppErrorBoundary } from "./components/AppErrorBoundary";
-import { LocalAccessPairingGate } from "./components/local-access/LocalAccessPairingGate";
+import { getNativeWindowLabel } from "./runtime";
 import "./index.css";
 import "katex/dist/katex.min.css";
 import "streamdown/styles.css";
@@ -15,12 +11,15 @@ if (import.meta.env.DEV) {
   });
 }
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <AppErrorBoundary>
-      <LocalAccessPairingGate>
-        <App />
-      </LocalAccessPairingGate>
-    </AppErrorBoundary>
-  </React.StrictMode>,
-);
+async function startApplication() {
+  if ((await getNativeWindowLabel()) === "agent-worker") {
+    const { startAgentWorker } = await import("./runtime/agentWorker");
+    const stop = startAgentWorker();
+    window.addEventListener("pagehide", stop, { once: true });
+  } else {
+    const { mountApp } = await import("./runtime/mountApp");
+    mountApp();
+  }
+}
+
+void startApplication().catch(console.error);

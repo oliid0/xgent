@@ -1,15 +1,20 @@
 import { DropdownMenu, type DropdownMenuOption } from "@astryxdesign/core/DropdownMenu";
 import { useLocale } from "../../i18n";
+import type { PreviewCommandPort } from "../../lib/tools/previewExecution";
 import { useWorkspaceFileApplications } from "./useWorkspaceFileApplications";
 
 export function OpenWithMenu({
   workdir,
   path,
+  commandPort,
+  enabled = true,
   onError,
   onPreview,
 }: {
   workdir: string;
   path: string;
+  commandPort?: PreviewCommandPort;
+  enabled?: boolean;
   onError: (message: string) => void;
   onPreview?: () => void;
 }) {
@@ -21,7 +26,7 @@ export function OpenWithMenu({
     load,
     open,
     isCurrent,
-  } = useWorkspaceFileApplications({ workdir, path, onError });
+  } = useWorkspaceFileApplications({ workdir, path, commandPort, enabled, onError });
   const items: DropdownMenuOption[] = [
     ...(onPreview
       ? [
@@ -56,7 +61,7 @@ export function OpenWithMenu({
         label: t("workspaceFiles.openWith"),
         variant: "ghost",
         size: "sm",
-        isDisabled: busy,
+        isDisabled: busy || !enabled,
         isLoading: busy,
       }}
       items={items}

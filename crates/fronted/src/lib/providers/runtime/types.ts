@@ -47,6 +47,8 @@ export type ToolChoice =
     };
 
 export type StreamOptionsEx = Omit<SimpleStreamOptions, "toolChoice"> & {
+  /** Admission hook for each actual stream attempt, including outer retries. */
+  beforeModelRequest?: () => void | Promise<void>;
   /** Custom fetch boundary used by native adapters for response capture. */
   fetch?: typeof globalThis.fetch;
   /** Provider-specific sampling fields preserved by the payload pipeline. */

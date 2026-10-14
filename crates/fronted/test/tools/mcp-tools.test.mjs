@@ -22,6 +22,45 @@ function createServer(id) {
   };
 }
 
+for (const [label, first, second] of [
+  ["server sanitization", ["pc.one", "write"], ["pc_one", "write"]],
+  ["tool sanitization", ["pc", "read.file"], ["pc", "read_file"]],
+  ["server/tool boundary", ["pc_one", "write"], ["pc", "one_write"]],
+  ["duplicate discovery", ["pc", "write"], ["pc", "write"]],
+]) {
+  test(`ambiguous MCP ${label} cannot overwrite a route; independent tools remain usable`, async () => {
+    const warnings = [], calls = [];
+    const infos = [first, second, ["docs", "search"]].map(([serverId, name]) => ({
+      serverId, name, serverLabel: serverId, description: name,
+      inputSchema: { type: "object" },
+    }));
+    const loader = createTsModuleLoader({ mocks: {
+      "@tauri-apps/api/core": { async invoke(command, args) {
+        if (command === "mcp_list_tools") return infos;
+        assert.equal(command, "mcp_call_tool");
+        calls.push(args);
+        return { content: [{ type: "text", text: "actual docs result" }], isError: false, details: {} };
+      } },
+    } });
+    const { createMcpTools } = loader.loadModule("src/lib/tools/mcpTools.ts");
+    const servers = [...new Set(infos.map(info => info.serverId))].map(createServer);
+    const bundle = await createMcpTools({ servers, onLoadError: message => warnings.push(message) });
+    assert.deepEqual(bundle.tools.map(tool => tool.name), ["mcp_docs_search"]);
+    assert.deepEqual([...bundle.toolNameMap.keys()], ["mcp_docs_search"]);
+    assert.deepEqual([...bundle.metadataByName.keys()], ["mcp_docs_search"]);
+    assert.match(warnings[0], /ambiguous/i);
+    const disabled = await bundle.executeToolCall(createToolCall("disabled", `mcp_${first[0].replace(/\./g, "_")}_${first[1].replace(/\./g, "_")}`));
+    assert.equal(disabled.isError, true);
+    assert.equal(calls.length, 0);
+    const valid = await bundle.executeToolCall(createToolCall("valid", "mcp_docs_search", { q: "runner" }));
+    assert.equal(valid.isError, false);
+    assert.equal(calls[0].server_id, "docs");
+    assert.equal(calls[0].tool_name, "search");
+    assert.deepEqual(calls[0].arguments, { q: "runner" });
+    await assert.rejects(createMcpTools({ servers, loadFailureMode: "throw" }), /ambiguous/i);
+  });
+}
+
 test("chat keeps working MCP servers when another enabled server is incomplete", async () => {
   const warnings = [];
   const listed = [];

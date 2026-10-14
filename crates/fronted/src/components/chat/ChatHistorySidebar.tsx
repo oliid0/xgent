@@ -166,6 +166,7 @@ type ChatHistorySidebarProps = {
   workspaceToolsAvailable?: boolean;
   fileTreeAvailable?: boolean;
   onOpenWorkspaceTool?: (target: WorkspaceToolTarget, shell?: string) => void;
+  onOpenGoals?: () => void;
 };
 
 export function ChatSidebarSurface(props: {
@@ -1241,6 +1242,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
     workspaceToolsAvailable = false,
     fileTreeAvailable = workspaceToolsAvailable,
     onOpenWorkspaceTool,
+    onOpenGoals,
   } = props;
   const { t } = useLocale();
   const soul = useSoul();
@@ -2074,6 +2076,13 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                       size="sm"
                     />
                     <SideNavItem
+                      label={t("goals.title")}
+                      icon={Check}
+                      isDisabled={!onOpenGoals}
+                      onClick={onOpenGoals}
+                      size="sm"
+                    />
+                    <SideNavItem
                       label={t("sidebar.mobile.remote")}
                       icon={Key}
                       isDisabled={!workspaceToolsAvailable || !onOpenWorkspaceTool}
@@ -2723,6 +2732,7 @@ export const ChatHistorySidebar = memo(function ChatHistorySidebar(props: ChatHi
                   workspaceToolsAvailable={workspaceToolsAvailable && !!onOpenWorkspaceTool}
                   onSelect={(target, shell) => onOpenWorkspaceTool?.(target, shell)}
                   onOpenSettings={onOpenSettings}
+                  onOpenGoals={onOpenGoals}
                   onCreateSoul={onCreateSoul}
                   trajectoryAvailable={trajectoryAvailable}
                 />

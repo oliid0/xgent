@@ -21,7 +21,7 @@ import {
   supportsDirectUploadedImageCopy,
   supportsSystemImageOpen,
 } from "../../../lib/system/imagePreview";
-import { useUploadedImagePreview } from "./uploadedImagePreview";
+import { getUploadedImagePreviewSource, useUploadedImagePreview } from "./uploadedImagePreview";
 
 function UserImageAttachment(props: {
   file: PendingUploadedFile;
@@ -33,17 +33,14 @@ function UserImageAttachment(props: {
 }) {
   const { file, workspaceRoot, compact, onRemove, previewLabel, closePreviewLabel } = props;
   const [previewOpen, setPreviewOpen] = useState(false);
-  const shouldLoad = Boolean(file.absolutePath?.trim());
-  const { imageSrc, isLoading } = useUploadedImagePreview(
-    shouldLoad ? file.absolutePath : undefined,
-    workspaceRoot,
-  );
+  const previewSource = getUploadedImagePreviewSource(workspaceRoot, file);
+  const previewPath = previewSource?.absolutePath;
+  const previewRoot = previewSource?.workspaceRoot;
+  const { imageSrc, isLoading } = useUploadedImagePreview(previewPath, previewRoot);
   const previewSlides = useMemo<ImagePreviewSlide[]>(() => {
     if (!imageSrc) return [];
     const nativeRequest =
-      workspaceRoot?.trim() && file.absolutePath?.trim()
-        ? { workdir: workspaceRoot, absolutePath: file.absolutePath }
-        : null;
+      previewRoot && previewPath ? { workdir: previewRoot, absolutePath: previewPath } : null;
     return [
       {
         src: imageSrc,
@@ -64,7 +61,7 @@ function UserImageAttachment(props: {
             : undefined,
       },
     ];
-  }, [file.absolutePath, file.fileName, imageSrc, workspaceRoot]);
+  }, [previewPath, previewRoot, file.fileName, imageSrc]);
   const thumbnailWidth = compact ? "min(10rem, 32vw)" : "min(16rem, 70vw)";
 
   return (

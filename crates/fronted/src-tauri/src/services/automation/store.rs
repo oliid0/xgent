@@ -1,3 +1,76 @@
+mod background;
+mod children;
+mod model_children;
+mod child_recovery;
+mod child_resumes;
+pub use child_resumes::BackgroundChildResumeProbe;
+mod artifacts;
+mod artifact_parts;
+pub(crate) use artifact_parts::{ArtifactReader, MAX_STREAM_ARTIFACT_BYTES, ARTIFACT_CHUNK_BYTES};
+mod child_artifacts;
+mod large_child_artifacts;
+mod videos;
+pub(crate) use videos::{VideoInput, video_account};
+pub(crate) use child_artifacts::ChildArtifactImport;
+mod completion;
+mod journal;
+mod inputs;
+mod compaction;
+mod lease;
+mod budget;
+mod budget_settlements;
+pub use budget::{BackgroundBudgetKind, BackgroundBudgetSnapshot, BackgroundBudgetAdmission};
+mod resume;
+mod outcomes;
+mod waiting;
+mod task_joins;
+mod cloud_waiting;
+mod cloud_artifacts;
+mod cloud_launch;
+mod cloud_recovery;
+mod cloud_cancellation;
+mod worker_instance;
+mod power_activity;
+pub(crate) use worker_instance::WORKER_SUPERSEDED;
+mod inbox;
+mod chat_context;
+mod inbox_notifications;
+mod result_delivery;
+pub(crate) use result_delivery::{ResultDeliveryEndpoint, ResultDeliveryTarget};
+pub(crate) use result_delivery::{result_read_proof, result_reply_proof, verify_result_reply_proof};
+mod proactive;
+mod proactive_remote;
+mod event_origin_memory;
+mod foreground_attention;
+pub use foreground_attention::ForegroundAttentionInput;
+mod event_sender;
+mod health_events;
+mod home_events;
+mod event_health_reads;
+pub(crate) use event_health_reads::EventHealthReadResult;
+pub use proactive::{ProactiveApplyInput, ProactiveSnapshot};
+pub(crate) use proactive::ProactiveRemoteExecution;
+mod goals;
+mod goal_launch;
+mod goal_progress;
+mod goal_prompt;
+mod goal_event_context;
+pub use goal_prompt::GoalPromptContext;
+pub use goal_launch::{GoalLaunchInput, GoalLaunchReceipt};
+pub use goals::{GoalApplyInput, GoalSnapshot, GoalActivityCursor, GoalActivityPage, GoalArtifactsPage};
+mod result_continuation;
+mod submission;
+mod source_context;
+mod mobile_connector_writes;
+mod device_channel;
+mod device_planning;
+mod device_observations;
+mod device_actions;
+mod device_review;
+mod device_grants;
+mod device_reads;
+pub(crate) use device_actions::device_action_id;
+
 use std::sync::{Mutex, Weak};
 
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
@@ -73,6 +146,12 @@ impl AutomationStore {
     pub fn open() -> Result<Self, String> {
         let conn = db::open_automation_connection()?;
         db::initialize(&conn)?;
+        // The mobile OS owns a single app process. Its old native callbacks
+        // cannot still complete after that process has restarted.
+        #[cfg(mobile)]
+        Self::recover_mobile_connector_writes_on_startup(&conn)?;
+        #[cfg(mobile)]
+        Self::recover_mobile_branch_planning_on_startup(&conn)?;
         Ok(Self {
             conn: Mutex::new(conn),
             notifier: Mutex::new(None),
@@ -83,10 +162,12 @@ impl AutomationStore {
     pub fn open_in_memory() -> Result<Self, String> {
         let conn = Connection::open_in_memory().map_err(|e| e.to_string())?;
         db::initialize(&conn)?;
-        Ok(Self {
+        let store = Self {
             conn: Mutex::new(conn),
             notifier: Mutex::new(None),
-        })
+        };
+        store.bind_worker_identity(&Uuid::new_v4().to_string())?;
+        Ok(store)
     }
 
     /// Test-only: read a run's lease deadline column (not exposed via any
@@ -359,94 +440,41 @@ impl AutomationStore {
         workdir: &str,
         counted: bool,
     ) -> Result<PromptQueueOutcome, String> {
-        let prompt = task
-            .prompt
-            .as_deref()
-            .unwrap_or_default()
-            .trim()
-            .to_string();
-        if prompt.is_empty() {
-            return Err("Auto Prompt task has no prompt content.".to_string());
-        }
-        let selected_model = task.selected_model.as_ref().ok_or_else(|| {
-            "Auto Prompt task is missing the selected model configuration.".to_string()
-        })?;
-        let provider_id = selected_model.custom_provider_id.trim().to_string();
-        let model = selected_model.model.trim().to_string();
-        if provider_id.is_empty() || model.is_empty() {
-            return Err(
-                "Auto Prompt task has an invalid selected model configuration.".to_string(),
-            );
-        }
-
-        let request = {
+        let queued = {
             let mut conn = self.lock_conn()?;
-            let tx = conn
-                .transaction_with_behavior(TransactionBehavior::Immediate)
+            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(|e| format!("开启 prompt 排队事务失败：{e}"))?;
-
-            let active: Option<String> = tx
-                .query_row(
-                    "SELECT execution_id FROM automation_cron_runs
-                     WHERE task_id = ?1 AND state IN ('pending', 'leased') LIMIT 1",
-                    params![task.id],
-                    |row| row.get(0),
-                )
-                .optional()
-                .map_err(|e| format!("检查 prompt 活动运行失败：{e}"))?;
-            if active.is_some() {
-                return Ok(PromptQueueOutcome::SkippedActiveRun);
-            }
-
-            let started_at = db::now_ms();
-            let request = PromptRunRequest {
-                execution_id: Uuid::new_v4().to_string(),
-                task_id: task.id.clone(),
-                task_name: task.name.clone(),
-                prompt,
-                provider_id,
-                model,
-                started_at,
-                // Fixed claim window while pending; re-stamped from the
-                // timeout snapshot when a runner claims the row.
-                lease_expires_at: started_at + PROMPT_PENDING_CLAIM_WINDOW_MS,
-                timeout_seconds: task.timeout_seconds.max(1),
-                counted,
-                workdir: workdir.to_string(),
-                reasoning: task.reasoning.clone().unwrap_or_default(),
-            };
-            let request_json = serde_json::to_string(&request)
-                .map_err(|e| format!("序列化 prompt run 请求失败：{e}"))?;
-            tx.execute(
-                "INSERT INTO automation_cron_runs
-                    (execution_id, task_id, state, success, started_at, duration_ms,
-                     output, lease_expires_at, request_json)
-                 VALUES (?1, ?2, 'pending', 0, ?3, 0, '', ?4, ?5)",
-                params![
-                    request.execution_id,
-                    request.task_id,
-                    request.started_at,
-                    request.lease_expires_at,
-                    request_json,
-                ],
-            )
-            .map_err(|e| format!("写入 prompt run 失败：{e}"))?;
-            tx.commit()
-                .map_err(|e| format!("提交 prompt 排队事务失败：{e}"))?;
-            request
+            let queued = queue_prompt_in_transaction(&tx, task, workdir, counted)?;
+            tx.commit().map_err(|e| format!("提交 prompt 排队事务失败：{e}"))?;
+            queued
         };
-
-        let _ = request;
-        self.with_notifier(|notifier| notifier.prompt_pending());
-        Ok(PromptQueueOutcome::Queued)
+        if queued.is_some() {
+            self.with_notifier(|notifier| notifier.prompt_pending());
+            Ok(PromptQueueOutcome::Queued)
+        } else {
+            Ok(PromptQueueOutcome::SkippedActiveRun)
+        }
     }
 
-    /// Atomically claim all pending prompt runs (pending -> leased). Overdue
+    /// Atomically claim a bounded batch of pending prompt runs (pending -> leased). Overdue
     /// runs are expired in the same pass instead of being handed out. The
     /// execution lease starts here: each claimed row is re-stamped to
     /// `now + timeout_seconds` (column and request_json together), so queue
     /// latency never counts against the task's execution budget.
     pub fn claim_prompt_runs(&self) -> Result<Vec<PromptRunRequest>, String> {
+        self.claim_prompt_runs_with_limit(2)
+    }
+
+    pub fn claim_prompt_runs_with_limit(&self, limit: usize) -> Result<Vec<PromptRunRequest>, String> {
+        self.claim_prompt_runs_on_worker(limit, None)
+    }
+
+    pub(crate) fn claim_prompt_runs_for_worker(&self, limit: usize, instance: &str) -> Result<Vec<PromptRunRequest>, String> {
+        self.claim_prompt_runs_on_worker(limit, Some(instance))
+    }
+
+    fn claim_prompt_runs_on_worker(&self, limit: usize, instance: Option<&str>) -> Result<Vec<PromptRunRequest>, String> {
+        let limit = limit.clamp(1, 2) as i64;
         self.sweep_expired_prompt_runs()?;
 
         let claims = {
@@ -454,17 +482,20 @@ impl AutomationStore {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(|e| format!("开启 prompt claim 事务失败：{e}"))?;
+            if let Some(instance) = instance { Self::require_worker_instance(&tx, instance)?; }
+            Self::reconcile_proactive_pending(&tx)?;
             let mut claims = Vec::new();
             {
                 let mut stmt = tx
                     .prepare(
                         "SELECT request_json FROM automation_cron_runs
                          WHERE state = 'pending' AND request_json IS NOT NULL
-                         ORDER BY started_at ASC, execution_id ASC",
+                         AND NOT EXISTS (SELECT 1 FROM automation_prompt_completion_outbox o WHERE o.execution_id = automation_cron_runs.execution_id)
+                         ORDER BY started_at ASC, execution_id ASC LIMIT ?1",
                     )
                     .map_err(|e| format!("准备读取 pending prompt runs 失败：{e}"))?;
                 let rows = stmt
-                    .query_map([], |row| row.get::<_, String>(0))
+                    .query_map(params![limit], |row| row.get::<_, String>(0))
                     .map_err(|e| format!("读取 pending prompt runs 失败：{e}"))?;
                 for row in rows {
                     let raw = row.map_err(|e| format!("读取 pending prompt run 行失败：{e}"))?;
@@ -476,6 +507,8 @@ impl AutomationStore {
             }
             let now = db::now_ms();
             for request in &mut claims {
+                Self::refresh_goal_prompt_context(&tx,request)?;
+                request.lease = Self::claim_background_lease(&tx, &request.execution_id)?;
                 request.lease_expires_at =
                     now + (request.timeout_seconds.max(1) as i64).saturating_mul(1_000);
                 let request_json = serde_json::to_string(request)
@@ -500,18 +533,28 @@ impl AutomationStore {
     /// claiming webview unmounted before executing). Re-stamps a fresh claim
     /// window on the column; the stale lease inside request_json is harmless
     /// because a claim always re-stamps before handing the row out.
-    pub fn release_prompt_run(&self, execution_id: &str) -> Result<(), String> {
+    pub fn release_prompt_run(&self, execution_id: &str, lease: Option<&BackgroundExecutionLease>) -> Result<(), String> {
+        let execution_id = execution_id.trim();
         let released = {
-            let conn = self.lock_conn()?;
-            conn.execute(
+            let mut conn = self.lock_conn()?;
+            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|e| e.to_string())?;
+            if Self::is_background_execution(&tx, execution_id)? {
+                Self::require_background_fence(&tx, execution_id, lease)?;
+            }
+            let changed = tx.execute(
                 "UPDATE automation_cron_runs SET state = 'pending', lease_expires_at = ?2
-                 WHERE execution_id = ?1 AND state = 'leased'",
+                 WHERE execution_id = ?1 AND state = 'leased'
+                 AND NOT EXISTS (SELECT 1 FROM automation_background_checkpoints c WHERE c.execution_id = automation_cron_runs.execution_id)
+                 AND NOT EXISTS (SELECT 1 FROM automation_background_operations o WHERE o.execution_id = automation_cron_runs.execution_id)
+                 AND NOT EXISTS (SELECT 1 FROM automation_prompt_completion_outbox o WHERE o.execution_id = automation_cron_runs.execution_id)",
                 params![
                     execution_id.trim(),
                     db::now_ms() + PROMPT_PENDING_CLAIM_WINDOW_MS
                 ],
             )
-            .map_err(|e| format!("释放 prompt run 失败：{e}"))?
+            .map_err(|e| format!("释放 prompt run 失败：{e}"))?;
+            tx.commit().map_err(|e| e.to_string())?;
+            changed
         };
         if released > 0 {
             self.with_notifier(|notifier| notifier.prompt_pending());
@@ -523,6 +566,14 @@ impl AutomationStore {
         &self,
         input: CompletePromptRunInput,
     ) -> Result<PromptCompletionResponse, String> {
+        self.sweep_expired_prompt_runs()?;
+        let Some(input) = self.stage_prompt_completion(input)? else {
+            return Ok(PromptCompletionResponse { status: PromptCompletionStatus::AlreadyFinished });
+        };
+        self.finalize_prompt_completion(input)
+    }
+
+    fn finalize_prompt_completion(&self, input: CompletePromptRunInput) -> Result<PromptCompletionResponse, String> {
         let execution_id = input.execution_id.trim().to_string();
         if execution_id.is_empty() {
             return Err("executionId cannot be empty.".to_string());
@@ -545,17 +596,31 @@ impl AutomationStore {
                 .map_err(|e| format!("读取 prompt run 失败：{e}"))?;
 
             let Some((task_id, state, started_at, request_json)) = row else {
+                tx.execute("DELETE FROM automation_prompt_completion_outbox WHERE execution_id = ?1", params![execution_id]).map_err(|e| e.to_string())?;
+                tx.commit().map_err(|e| e.to_string())?;
                 return Ok(PromptCompletionResponse {
                     status: PromptCompletionStatus::AlreadyFinished,
                 });
             };
             if state != "pending" && state != "leased" {
+                tx.execute("DELETE FROM automation_prompt_completion_outbox WHERE execution_id = ?1", params![execution_id]).map_err(|e| e.to_string())?;
+                tx.commit().map_err(|e| e.to_string())?;
                 return Ok(PromptCompletionResponse {
                     status: PromptCompletionStatus::AlreadyFinished,
                 });
             }
 
             let now = db::now_ms();
+            if Self::is_background_execution(&tx, &execution_id)? {
+                let staged: Option<String> = tx.query_row("SELECT input_json FROM automation_prompt_completion_outbox WHERE execution_id = ?1",
+                    params![execution_id], |row| row.get(0)).optional().map_err(|e| e.to_string())?;
+                if staged.as_deref() != Some(serde_json::to_string(&input).map_err(|e| e.to_string())?.as_str()) {
+                    return Err("Background conclusion must match its durable completion outbox".to_string());
+                }
+                let fenced: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM automation_background_leases WHERE execution_id = ?1)",
+                    params![execution_id], |row| row.get(0)).map_err(|e| e.to_string())?;
+                if fenced { Self::require_background_fence(&tx, &execution_id, input.lease.as_ref())?; }
+            }
             let output = if input.output.trim().is_empty() {
                 if input.success {
                     "Auto Prompt run produced an empty final conclusion.".to_string()
@@ -573,7 +638,7 @@ impl AutomationStore {
 
             tx.execute(
                 "UPDATE automation_cron_runs
-                 SET state = 'done', success = ?2, finished_at = ?3, duration_ms = ?4,
+                 SET state = 'done', success = ?2, finished_at = ?3, duration_ms = duration_ms + ?4,
                      output = ?5, lease_expires_at = NULL, request_json = NULL
                  WHERE execution_id = ?1",
                 params![
@@ -592,6 +657,7 @@ impl AutomationStore {
                 CronMutationEffect::None
             };
             db::prune_runs(&tx, &task_id)?;
+            tx.execute("DELETE FROM automation_prompt_completion_outbox WHERE execution_id = ?1", params![execution_id]).map_err(|e| e.to_string())?;
             let snapshot = match effect {
                 CronMutationEffect::Changed => {
                     db::bump_revision(&tx, db::CRON_REVISION_KEY)?;
@@ -617,28 +683,35 @@ impl AutomationStore {
     /// execution aborts. Pending rows expired here never started executing
     /// (no runner claimed them), so they get a distinct message.
     pub fn sweep_expired_prompt_runs(&self) -> Result<Vec<PromptExpiredEvent>, String> {
+        // An expired writer is not evidence that its reserved remote job never
+        // started. Retain that original task for GET-only reconciliation first.
+        self.park_expired_cloud_launches()?;
+        self.park_expired_child_submissions()?;
         let mut events = self.expire_prompt_runs_where(
-            "state = 'pending' AND lease_expires_at IS NOT NULL AND lease_expires_at < ?1",
+            "state = 'pending' AND lease_expires_at IS NOT NULL AND lease_expires_at < ?1 AND NOT EXISTS (SELECT 1 FROM automation_background_tasks b WHERE b.execution_id = automation_cron_runs.execution_id) AND NOT EXISTS (SELECT 1 FROM automation_prompt_completion_outbox o WHERE o.execution_id = automation_cron_runs.execution_id)",
             params![db::now_ms()],
             "Auto Prompt run expired before any runner claimed it.",
         )?;
         events.extend(self.expire_prompt_runs_where(
-            "state = 'leased' AND lease_expires_at IS NOT NULL AND lease_expires_at < ?1",
+            "state = 'leased' AND lease_expires_at IS NOT NULL AND lease_expires_at < ?1 AND NOT EXISTS (SELECT 1 FROM automation_prompt_completion_outbox o WHERE o.execution_id = automation_cron_runs.execution_id)",
             params![db::now_ms()],
             "Auto Prompt run timed out before the front-end completed it.",
         )?);
         Ok(events)
     }
 
-    /// Startup recovery: any queued/leased run from a previous process is
-    /// dead — record it as expired instead of silently dropping it.
+    /// Resume bounded background attempts with known effects. Other interrupted
+    /// executions expire and retain their evidence for explicit reconciliation.
     pub fn recover_interrupted_prompt_runs(&self) -> Result<usize, String> {
+        self.flush_prompt_completion_outbox()?;
+        let parked = self.park_interrupted_cloud_launches()? + self.park_interrupted_child_submissions()?;
+        let resumed = self.requeue_recoverable_background_runs()?;
         let expired = self.expire_prompt_runs_where(
-            "state IN ('pending', 'leased')",
+            "state = 'leased' OR (state = 'pending' AND NOT EXISTS (SELECT 1 FROM automation_background_tasks b WHERE b.execution_id = automation_cron_runs.execution_id))",
             params![],
-            "Auto Prompt run was interrupted by an app restart.",
+            "Prompt execution was interrupted by an app restart. External actions may have occurred; inspect their receipts before retrying.",
         )?;
-        Ok(expired.len())
+        Ok(parked + resumed + expired.len())
     }
 
     fn expire_prompt_runs_where(
@@ -646,6 +719,16 @@ impl AutomationStore {
         predicate: &str,
         predicate_params: &[&dyn rusqlite::ToSql],
         message: &str,
+    ) -> Result<Vec<PromptExpiredEvent>, String> {
+        self.expire_prompt_runs_where_with_cloud_cancel(predicate, predicate_params, message, false)
+    }
+
+    fn expire_prompt_runs_where_with_cloud_cancel(
+        &self,
+        predicate: &str,
+        predicate_params: &[&dyn rusqlite::ToSql],
+        message: &str,
+        cancel_cloud: bool,
     ) -> Result<Vec<PromptExpiredEvent>, String> {
         let (events, cron_snapshot) = {
             let mut conn = self.lock_conn()?;
@@ -683,6 +766,12 @@ impl AutomationStore {
             let mut changed = false;
             let mut events = Vec::with_capacity(rows.len());
             for (execution_id, task_id, started_at, request_json) in rows {
+                // Local revocation and durable remote intent are one commit.
+                // Ordinary expiry/restart does not invent user cancellation.
+                if cancel_cloud {
+                    Self::enqueue_background_cloud_cancellations(&tx, &execution_id, now)?;
+                    Self::enqueue_background_child_cancellations(&tx, &execution_id, now)?;
+                }
                 tx.execute(
                     "UPDATE automation_cron_runs
                      SET state = 'expired', success = 0, finished_at = ?2, duration_ms = ?3,
@@ -1035,4 +1124,84 @@ fn read_system_workdir(conn: &Connection) -> Result<String, String> {
         Ok(Value::Null) | Err(_) => Ok(String::new()),
         Ok(_) => Ok(String::new()),
     }
+}
+
+/// Shared queue insertion: caller owns the transaction and post-commit notification.
+fn queue_prompt_in_transaction(
+    tx: &rusqlite::Transaction<'_>,
+    task: &CronTask,
+    workdir: &str,
+    counted: bool,
+) -> Result<Option<String>, String> {
+    let prompt = task
+        .prompt
+        .as_deref()
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    if prompt.is_empty() {
+        return Err("Auto Prompt task has no prompt content.".to_string());
+    }
+    let selected_model = task.selected_model.as_ref().ok_or_else(|| {
+        "Auto Prompt task is missing the selected model configuration.".to_string()
+    })?;
+    let provider_id = selected_model.custom_provider_id.trim().to_string();
+    let model = selected_model.model.trim().to_string();
+    if provider_id.is_empty() || model.is_empty() {
+        return Err(
+            "Auto Prompt task has an invalid selected model configuration.".to_string(),
+        );
+    }
+
+    let active: Option<String> = tx
+        .query_row(
+            "SELECT execution_id FROM automation_cron_runs
+             WHERE task_id = ?1 AND state IN ('pending', 'leased') LIMIT 1",
+            params![task.id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| format!("检查 prompt 活动运行失败：{e}"))?;
+    if active.is_some() {
+        return Ok(None);
+    }
+
+    let started_at = db::now_ms();
+    let mut request = PromptRunRequest {
+        lease: None,
+        execution_id: Uuid::new_v4().to_string(),
+        task_id: task.id.clone(),
+        task_name: task.name.clone(),
+        prompt,
+        provider_id,
+        model,
+        started_at,
+        // Fixed claim window while pending; re-stamped from the
+        // timeout snapshot when a runner claims the row.
+        lease_expires_at: started_at + PROMPT_PENDING_CLAIM_WINDOW_MS,
+        timeout_seconds: task.timeout_seconds.max(1),
+        counted,
+        workdir: workdir.to_string(),
+        reasoning: task.reasoning.clone().unwrap_or_default(),
+        background_context: None,
+        goal_context: None,
+    };
+    AutomationStore::capture_goal_prompt_context(tx,task,&mut request)?;
+    let request_json = serde_json::to_string(&request)
+        .map_err(|e| format!("序列化 prompt run 请求失败：{e}"))?;
+    tx.execute(
+        "INSERT INTO automation_cron_runs
+            (execution_id, task_id, state, success, started_at, duration_ms,
+             output, lease_expires_at, request_json)
+         VALUES (?1, ?2, 'pending', 0, ?3, 0, '', ?4, ?5)",
+        params![
+            request.execution_id,
+            request.task_id,
+            request.started_at,
+            request.lease_expires_at,
+            request_json,
+        ],
+    )
+    .map_err(|e| format!("写入 prompt run 失败：{e}"))?;
+    Ok(Some(request.execution_id))
 }

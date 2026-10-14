@@ -1,7 +1,6 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import { invoke } from "@xgent/runtime";
+import { invoke as invokeRuntime } from "@xgent/runtime";
 import { Type } from "typebox";
-
 import {
   type McpServerConfig,
   type McpSettings,
@@ -17,6 +16,7 @@ import {
 import { ToolPathResolver } from "./pathUtils";
 import type { ShellSandboxSettings } from "./shellTools";
 import type { SystemToolRuntimeScope } from "./systemToolOptions";
+import type { ToolCommandPort } from "./toolCommandPort";
 
 type McpManagerAction =
   | "list"
@@ -462,7 +462,7 @@ function summarizeTool(tool: McpDiagnosticToolInfo, includeSchema: boolean): Mcp
   };
 }
 
-async function stopRuntime(serverId: string, warnings: string[]) {
+async function stopRuntimeUsing(serverId: string, warnings: string[], invoke = invokeRuntime) {
   try {
     const stopped = await invoke<McpStopServerResponse>("mcp_stop_server", {
       server_id: serverId,
@@ -474,15 +474,16 @@ async function stopRuntime(serverId: string, warnings: string[]) {
   }
 }
 
-async function runtimeStatus(serverId: string) {
+async function runtimeStatusUsing(serverId: string, invoke = invokeRuntime) {
   return invoke<McpRuntimeStatus>("mcp_runtime_status", { server_id: serverId });
 }
 
-async function runtimeTest(
+async function runtimeTestUsing(
   server: McpServerConfig,
   includeSchema: boolean,
   restart: boolean,
   persist: boolean,
+  invoke = invokeRuntime,
 ) {
   return invoke<McpRuntimeTestResponse>(restart ? "mcp_restart_server" : "mcp_test_server", {
     server,
@@ -637,6 +638,7 @@ function detailsForResult(result: McpManagerExecutionResult): McpManagerResultDe
 }
 
 export function createMcpManagerTools(params: {
+  commandPort?: ToolCommandPort;
   workdir: string;
   /** Live read of the authoritative MCP settings; must never be a snapshot. */
   getMcpSettings: () => McpSettings;
@@ -649,9 +651,28 @@ export function createMcpManagerTools(params: {
   /** Native mobile currently supports network MCP transports, not local stdio children. */
   localStdioSupported?: boolean;
 }): BuiltinToolBundle {
+  for (const server of params.getMcpSettings().servers) {
+    params.commandPort?.registerMcpServerRoute?.(server);
+  }
+  const invoke = <T>(command: string, args?: Record<string, unknown>) => {
+    const server =
+      typeof args?.server_id === "string"
+        ? params.getMcpSettings().servers.find((server) => server.id === args.server_id)
+        : undefined;
+    if (server) params.commandPort?.registerMcpServerRoute?.(server);
+    return (params.commandPort?.invoke ?? invokeRuntime)<T>(command, args);
+  };
+  const stopRuntime = (id: string, warnings: string[]) => stopRuntimeUsing(id, warnings, invoke);
+  const runtimeStatus = (id: string) => runtimeStatusUsing(id, invoke);
+  const runtimeTest = (
+    server: McpServerConfig,
+    schema: boolean,
+    restart: boolean,
+    persist: boolean,
+  ) => runtimeTestUsing(server, schema, restart, persist, invoke);
   const pathResolver = new ToolPathResolver({
     workdir: params.workdir,
-    resolveHomeDir: params.resolveHomeDir,
+    resolveHomeDir: params.resolveHomeDir ?? params.commandPort?.homeDir,
   });
 
   async function resolveMcpCwd(cwd: string | undefined, label: string) {

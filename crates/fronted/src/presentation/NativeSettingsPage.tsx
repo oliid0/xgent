@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
 import { SUPPORTED_LOCALES, useLocale } from "../i18n";
 import {
+  connectorObservationTime,
+  mobileContactRows,
+  mobileScheduleRows,
+} from "../lib/connectors/connectorDataView";
+import { mobileConnectorCatalog } from "../lib/connectors/mobileConnectorCatalog";
+import { mobileHomeRows } from "../lib/connectors/mobileHomeView";
+import { useMobileContacts } from "../lib/connectors/useMobileContacts";
+import { useMobileHome } from "../lib/connectors/useMobileHome";
+import { useMobileSchedule } from "../lib/connectors/useMobileSchedule";
+import {
   checkMobileAssistantPermissions,
   type MobileAssistantStatus,
   type MobilePermissionStates,
@@ -60,6 +70,9 @@ import { SoulSection } from "../pages/settings/SoulSection";
 import { SshSettingsSection } from "../pages/settings/SshSettingsSection";
 import type { SectionId, SettingsPageProps } from "../pages/settings/types";
 import { useCodexOAuthAccounts } from "../pages/settings/useCodexOAuthAccounts";
+import { useSchedulingBudgetEditor } from "../pages/settings/useSchedulingBudgetEditor";
+import { useSubagentTeamEditor } from "../pages/settings/useSubagentTeamEditor";
+import { connectorDataNodes } from "./connectorDataNodes";
 import { presentationControls } from "./controls";
 import { NativeOtherSettings } from "./NativeOtherSettings";
 import {
@@ -81,6 +94,8 @@ import { setNativeSettingsChrome } from "./nativeSettingsChrome";
 import { withNativeSettingsIcons } from "./nativeSettingsIcons";
 import { createNativePresentationTheme } from "./nativeTheme";
 import { createNativeToolPermissions } from "./nativeToolPermissions";
+import { schedulingBudgetNodes } from "./schedulingBudgetNodes";
+import { subagentTeamNodes } from "./subagentTeamNodes";
 import type { PresentationNode } from "./types";
 
 function formatByteCount(value?: number | null) {
@@ -104,7 +119,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
     return () => removeNativeSurfaceSession(sessionSurface, console.error);
   }, [sessionSurface]);
   const { settings, setSettings, nativeMobile = false } = props;
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const initialPage =
     props.initialSection === "mcp" || props.initialSection === "skills"
       ? nativeMobile
@@ -139,6 +154,17 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   const [failure, setFailure] = useState<unknown>(null);
   const [status, setStatus] = useState<MobileAssistantStatus>();
   const [permissions, setPermissions] = useState<MobilePermissionStates>({});
+  const [connectorTab, setConnectorTab] = useState("available");
+  const [connectorQuery, setConnectorQuery] = useState("");
+  const [openConnector, setOpenConnector] = useState<string | null>(null);
+  const contacts = useMobileContacts(page === "mobileAssistant" && nativeMobile);
+  const home = useMobileHome(
+    page === "mobileAssistant" &&
+      nativeMobile &&
+      status?.homeAvailable === true &&
+      status.backend === "ios-native",
+  );
+  const schedule = useMobileSchedule(page === "mobileAssistant" && nativeMobile);
   const [shell, setShell] = useState<MobileExecutionStatus>();
   const [shellFilesOpen, setShellFilesOpen] = useState(false);
   const [shellToolchains, setShellToolchains] = useState<string[]>([]);
@@ -204,6 +230,8 @@ export function NativeSettingsPage(props: SettingsPageProps) {
   }, [props.initialSection, nativeMobile]);
   const providerEditor = useNativeProviderEditor(props, providerId, page === "providers", t);
   const provider = providerEditor.provider;
+  const subagentTeam = useSubagentTeamEditor(props, page === "providers" && !provider);
+  const schedulingBudget = useSchedulingBudgetEditor(props, page === "providers" && !provider);
   const providerTitle = provider
     ? t(providerEditor.isNew ? "settings.addProvider" : "settings.editProvider")
     : undefined;
@@ -236,7 +264,19 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           provider.authMode ?? "api-key",
           providerEditor.revision,
         ])
-      : undefined,
+      : page === "mobileAssistant"
+        ? JSON.stringify([
+            "mobile-assistant",
+            contacts.query,
+            schedule.kind,
+            schedule.calendarId,
+            schedule.title,
+            schedule.day,
+            schedule.time,
+            schedule.duration,
+            schedule.recurrence,
+          ])
+        : undefined,
   );
   const oauth = useCodexOAuthAccounts(
     {
@@ -1108,6 +1148,12 @@ export function NativeSettingsPage(props: SettingsPageProps) {
           if (id) setProviderId(id);
         }),
       );
+      const teamControls = subagentTeamNodes(subagentTeam, t);
+      nodes.push(...teamControls.nodes);
+      for (const [id, handler] of teamControls.handlers) c.handlers.set(id, handler);
+      const budgetControls = schedulingBudgetNodes(schedulingBudget, t);
+      nodes.push(...budgetControls.nodes);
+      for (const [id, handler] of budgetControls.handlers) c.handlers.set(id, handler);
     } else {
       nodes.push({
         id: "provider-editor-navigation",
@@ -1385,6 +1431,431 @@ export function NativeSettingsPage(props: SettingsPageProps) {
       for (const [id, handler] of deleteControls.handlers) c.handlers.set(id, handler);
     }
   } else if (page === "mobileAssistant") {
+    if (status?.permissionAliases.calendar && status.permissionAliases.reminders) {
+      const idle = !schedule.busy && !busy;
+      nodes.push(
+        c.group("schedule-form", t("settings.connectors.schedule"), [
+          c.select(
+            "schedule-kind",
+            t("settings.connectors.scheduleKind"),
+            schedule.kind,
+            ["event", "reminder"].map((value) => ({
+              value,
+              label: t(`settings.mobileAssistant.${value === "event" ? "calendar" : "reminders"}`),
+            })),
+            (value) => schedule.setKind(value as "event" | "reminder"),
+            idle,
+          ),
+          c.action(
+            "schedule-load",
+            t("settings.connectors.loadSchedule"),
+            () => schedule.load(),
+            idle,
+          ),
+          ...(schedule.calendars
+            ? [
+                ...(schedule.calendars.truncated
+                  ? [
+                      {
+                        id: "schedule-partial",
+                        kind: "Text" as const,
+                        text: t("settings.connectors.partialCalendars"),
+                      },
+                    ]
+                  : []),
+                ...(schedule.calendars.calendars.length
+                  ? [
+                      c.select(
+                        "schedule-destination",
+                        t("settings.connectors.destination"),
+                        schedule.calendarId,
+                        [
+                          { value: "", label: t("settings.connectors.chooseDestination") },
+                          ...schedule.calendars.calendars.map((calendar) => ({
+                            value: calendar.id,
+                            label: [
+                              calendar.title.trim() || t("settings.connectors.unnamedList"),
+                              calendar.source,
+                            ]
+                              .filter(Boolean)
+                              .join(" · "),
+                          })),
+                        ],
+                        schedule.setCalendarId,
+                        idle,
+                      ),
+                      c.input(
+                        "schedule-title",
+                        t("settings.connectors.recordTitle"),
+                        schedule.title,
+                        schedule.setTitle,
+                        false,
+                        idle,
+                      ),
+                      c.input(
+                        "schedule-day",
+                        t("settings.connectors.recordDay"),
+                        schedule.day,
+                        schedule.setDay,
+                        false,
+                        idle,
+                      ),
+                      c.input(
+                        "schedule-time",
+                        t("settings.connectors.recordTime"),
+                        schedule.time,
+                        schedule.setTime,
+                        false,
+                        idle,
+                      ),
+                      schedule.kind === "reminder"
+                        ? c.select(
+                            "schedule-recurrence",
+                            t("settings.connectors.recurrence"),
+                            schedule.recurrence,
+                            ["none", "daily", "weekly"].map((value) => ({
+                              value,
+                              label: t(`settings.connectors.repeat.${value}`),
+                            })),
+                            (value) => schedule.setRecurrence(value as "none" | "daily" | "weekly"),
+                            idle,
+                          )
+                        : c.select(
+                            "schedule-duration",
+                            t("settings.connectors.duration"),
+                            String(schedule.duration),
+                            [15, 30, 60, 90, 120].map((n) => ({
+                              value: String(n),
+                              label: String(n),
+                            })),
+                            (value) => schedule.setDuration(Number(value)),
+                            idle,
+                          ),
+                      c.action(
+                        "schedule-save",
+                        t("settings.connectors.saveSchedule"),
+                        () => schedule.save(),
+                        idle && schedule.canSave,
+                      ),
+                    ]
+                  : [
+                      {
+                        id: "schedule-no-calendars",
+                        kind: "Text" as const,
+                        text: t("settings.connectors.noCalendars"),
+                      },
+                    ]),
+              ]
+            : []),
+          ...(schedule.error
+            ? [{ id: "schedule-error", kind: "Text" as const, text: schedule.error }]
+            : []),
+          ...(schedule.receipt
+            ? [
+                {
+                  id: "schedule-saved",
+                  kind: "Text" as const,
+                  text: t("settings.connectors.savedSchedule"),
+                },
+              ]
+            : []),
+          ...(schedule.records
+            ? [
+                {
+                  id: "schedule-record-scope",
+                  kind: "Text" as const,
+                  text: t("settings.connectors.scheduleRecords"),
+                },
+                ...(schedule.records.length
+                  ? [
+                      connectorDataNodes(
+                        "schedule-record",
+                        mobileScheduleRows(schedule.records, schedule.kind, t, locale),
+                      ),
+                    ]
+                  : []),
+                ...(schedule.records.length
+                  ? []
+                  : [
+                      {
+                        id: "schedule-no-records",
+                        kind: "Text" as const,
+                        text: t("settings.connectors.noScheduleRecords"),
+                      },
+                    ]),
+              ]
+            : []),
+        ]),
+      );
+    }
+    if (status?.homeAvailable && status.backend === "ios-native")
+      nodes.push(
+        c.group("home-inventory", t("settings.mobileAssistant.home"), [
+          c.action(
+            "home-read",
+            t("settings.connectors.readHome"),
+            () => home.refresh(),
+            !home.busy && !busy,
+          ),
+          ...(home.busy
+            ? [
+                {
+                  id: "home-loading",
+                  kind: "Progress" as const,
+                  label: t("settings.connectors.readHome"),
+                },
+              ]
+            : []),
+          ...(home.error
+            ? [
+                {
+                  id: "home-error",
+                  kind: "Banner" as const,
+                  status: "error" as const,
+                  label: home.error,
+                },
+              ]
+            : []),
+          ...(home.data
+            ? [
+                {
+                  id: "home-observed",
+                  kind: "Text" as const,
+                  text: `${t("settings.connectors.homeObserved")} · ${connectorObservationTime(home.data.observedAtMs, locale)}`,
+                  wrap: true,
+                },
+                ...(home.data.truncated
+                  ? [
+                      {
+                        id: "home-truncated",
+                        kind: "Text" as const,
+                        text: t("settings.connectors.homeTruncated"),
+                        wrap: true,
+                      },
+                    ]
+                  : []),
+                ...(home.data.records.length
+                  ? [
+                      connectorDataNodes(
+                        "home-record",
+                        mobileHomeRows(home.data, t, {
+                          busy: busy || home.busy,
+                          setPower: home.setPower,
+                        }),
+                        c.action,
+                      ),
+                    ]
+                  : []),
+                ...(home.data.records.length
+                  ? []
+                  : [
+                      {
+                        id: "home-empty",
+                        kind: "Text" as const,
+                        text: t("settings.connectors.noHome"),
+                        wrap: true,
+                      },
+                    ]),
+              ]
+            : !home.busy && !home.error
+              ? [
+                  {
+                    id: "home-not-read",
+                    kind: "Text" as const,
+                    text: t("settings.connectors.homeNotRead"),
+                    wrap: true,
+                  },
+                ]
+              : []),
+        ]),
+      );
+    if (status?.permissionAliases.contacts)
+      nodes.push(
+        c.group("contact-search-group", t("settings.connectors.searchContacts"), [
+          c.input(
+            "contact-query",
+            t("settings.connectors.contactQuery"),
+            contacts.query,
+            contacts.setQuery,
+            false,
+            !contacts.busy,
+          ),
+          c.action(
+            "contact-search",
+            t("settings.connectors.search"),
+            () => contacts.search(),
+            !contacts.busy && !busy,
+          ),
+          ...(contacts.error
+            ? [
+                {
+                  id: "contact-error",
+                  kind: "Banner" as const,
+                  status: "error" as const,
+                  label: contacts.error,
+                },
+              ]
+            : []),
+          ...(contacts.data
+            ? [
+                {
+                  id: "contact-results",
+                  kind: "Text" as const,
+                  text: t(
+                    contacts.data.accessLimited || contacts.data.truncated
+                      ? "settings.connectors.partialContacts"
+                      : "settings.connectors.contactResults",
+                  ),
+                },
+                ...(contacts.data.contacts.length
+                  ? [connectorDataNodes("contact", mobileContactRows(contacts.data, t))]
+                  : []),
+                ...(contacts.data.contacts.length
+                  ? []
+                  : [
+                      {
+                        id: "contact-empty",
+                        kind: "Text" as const,
+                        text: t("settings.connectors.noContacts"),
+                      },
+                    ]),
+              ]
+            : []),
+        ]),
+      );
+    const visibleConnectors = mobileConnectorCatalog(
+      status,
+      permissions,
+      settings.system.toolPolicies,
+    ).filter(
+      (connector) =>
+        (connectorTab === "connected") === (connector.permissionState === "granted") &&
+        t(`settings.mobileAssistant.${connector.id}`)
+          .toLocaleLowerCase()
+          .includes(connectorQuery.trim().toLocaleLowerCase()),
+    );
+    nodes.push(
+      c.group("connector-catalog", t("settings.connectors.title"), [
+        {
+          ...c.input(
+            "connector-search",
+            t("settings.connectors.searchConnectors"),
+            connectorQuery,
+            setConnectorQuery,
+          ),
+          children: [
+            {
+              ...c.action(
+                "connector-search-clear",
+                t("chat.history.searchClear"),
+                () => setConnectorQuery(""),
+                connectorQuery.length > 0,
+              ),
+              kind: "IconButton",
+              icon: "xmark.circle.fill",
+            },
+          ],
+        },
+        {
+          ...c.select(
+            "connector-tab",
+            t("settings.connectors.title"),
+            connectorTab,
+            [
+              { value: "available", label: t("settings.connectors.availableTab") },
+              { value: "connected", label: t("settings.connectors.connectedTab") },
+            ],
+            setConnectorTab,
+          ),
+          kind: "SegmentedControl",
+          variant: "connector-tabs",
+        },
+        ...visibleConnectors.flatMap((connector): PresentationNode[] => [
+          {
+            ...(connector.canRequest
+              ? c.action(
+                  `connector:${connector.id}`,
+                  t(`settings.mobileAssistant.${connector.id}`),
+                  () =>
+                    work(async () => {
+                      if (!status) return;
+                      if (
+                        connector.permissionState === "denied" ||
+                        connector.permissionState === "requested"
+                      ) {
+                        await openMobileSystemSettings();
+                        return;
+                      }
+                      const next = await requestMobileAssistantPermission(
+                        status.permissionAliases[connector.permission] ?? connector.permission,
+                      );
+                      setPermissions(normalizeMobileAssistantPermissions(status, next));
+                    }),
+                  !busy && !home.busy,
+                )
+              : connector.permissionState === "granted"
+                ? c.action(
+                    `connector:${connector.id}`,
+                    t(`settings.mobileAssistant.${connector.id}`),
+                    () => setOpenConnector(openConnector === connector.id ? null : connector.id),
+                  )
+                : { id: `connector:${connector.id}` }),
+            kind: "NavigationRow",
+            variant:
+              connector.permissionState === "granted"
+                ? "device-connector-connected"
+                : "device-connector",
+            label: t(`settings.mobileAssistant.${connector.id}`),
+            value:
+              connector.permissionState === "granted"
+                ? undefined
+                : t(
+                    connector.canRequest
+                      ? "settings.connectors.connect"
+                      : `settings.connectors.${connector.state}`,
+                  ),
+            icon:
+              connector.id === "calendar"
+                ? "calendar"
+                : connector.id === "reminders"
+                  ? "checklist"
+                  : connector.id === "contacts"
+                    ? "person.crop.circle"
+                    : connector.id === "health"
+                      ? "heart.fill"
+                      : "house.fill",
+          },
+          ...(connector.permissionState === "granted" && openConnector === connector.id
+            ? [
+                c.select(
+                  `connector:${connector.id}:policy`,
+                  t("settings.mobileAssistant.agentAccess"),
+                  personalPolicy(connector.permission, settings.system.toolPolicies),
+                  ["allow", "ask", "deny"].map((value) => ({
+                    value,
+                    label: t(`settings.toolPolicy.${value}`),
+                  })),
+                  (value) =>
+                    setSettings((previous) =>
+                      updateSystem(previous, {
+                        toolPolicies: {
+                          ...previous.system.toolPolicies,
+                          [personalPolicyKey(connector.permission)]: value as
+                            | "allow"
+                            | "ask"
+                            | "deny",
+                        },
+                      }),
+                    ),
+                ),
+              ]
+            : []),
+        ]),
+        ...(!visibleConnectors.length
+          ? [{ id: "connector-empty", kind: "Text" as const, text: t("settings.connectors.empty") }]
+          : []),
+      ]),
+    );
     nodes.push(
       c.action(
         "refresh-permissions",
@@ -1419,7 +1890,7 @@ export function NativeSettingsPage(props: SettingsPageProps) {
             `settings.mobileAssistant.${state === "granted" ? "granted" : state === "requested" ? "requested" : state === "denied" ? "denied" : "notRequested"}`,
           ),
         ),
-        disabled: busy || state === "granted",
+        disabled: busy || home.busy || state === "granted",
       };
     });
     if (status?.network) {

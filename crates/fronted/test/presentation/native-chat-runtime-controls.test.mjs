@@ -54,3 +54,17 @@ test("input lock and unsupported reasoning stay enforced at the action boundary"
   assert.equal((await unsupported.dispatch("runtime-reasoning", "high")).ok, false);
   assert.deepEqual(locked.patches.concat(unsupported.patches), []);
 });
+
+test("intelligent scheduling is off by default and native + menu dispatches real opt-in patches with locks enforced", async () => {
+  const h = harness();
+  assert.equal(h.nodes.find(node => node.id === "runtime-intelligent-scheduling").value, false);
+  assert.equal((await h.dispatch("runtime-intelligent-scheduling", true)).ok, true);
+  assert.equal((await h.dispatch("runtime-intelligent-scheduling", false)).ok, true);
+  assert.deepEqual(h.patches, [{ intelligentSchedulingEnabled: true }, { intelligentSchedulingEnabled: false }]);
+  assert.equal((await h.dispatch("runtime-intelligent-scheduling", "true")).ok, false);
+  for (const overrides of [{ disabled: true }, { agentMode: false }]) {
+    const locked = harness(overrides);
+    assert.equal((await locked.dispatch("runtime-intelligent-scheduling", true)).ok, false);
+    assert.deepEqual(locked.patches, []);
+  }
+});

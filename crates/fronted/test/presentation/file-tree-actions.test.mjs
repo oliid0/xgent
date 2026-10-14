@@ -27,9 +27,9 @@ function harness(t, options = {}) {
     "../../../i18n": { useLocale: () => ({ t: key => key }) },
     "../../../lib/chat/workspacePathDrag": { finishWorkspacePathDrag() {}, writeWorkspacePathDragPayload: () => true },
     "../../chat/fileTypeIcons": { getFileTypeIcon: () => "FileIcon" },
-    "../../icons": Object.fromEntries(["Check", "FolderOpen", "RefreshCw", "Trash2", "X"].map(name => [name, name])),
+    "../../icons": Object.fromEntries(["Check", "FileText", "Folder", "FolderOpen", "RefreshCw", "Trash2", "X"].map(name => [name, name])),
     "../WorkspaceToolsContext": { useWorkspaceToolsContext: () => context },
-    "./ContextMenu": { FileTreeContextMenu: "ContextMenu" },
+    "./ContextMenu": { FileTreeContextMenu: "ContextMenu", FileTreeRowMenu: "FileTreeRowMenu" },
     "../../presentation/NativeSurface": {},
     "../../runtime/applePresentation": { isApplePresentationRuntime: () => false },
     "./useFileTreeData": { useFileTreeData: ({ cwd }) => {

@@ -1,16 +1,18 @@
 import type { Tool, ToolCall, ToolResultMessage } from "@earendil-works/pi-ai";
-import { invoke } from "@xgent/runtime";
+import { invoke as invokeRuntime } from "@xgent/runtime";
 import { Type } from "typebox";
 
 import type { SshHostConfig } from "../settings";
 import { type BuiltinToolBundle, createBuiltinMetadataMap } from "./builtinTypes";
 import {
   createToolRunId,
-  invokeWithAbort,
-  requestRuntimeCancel,
+  type InvokeWithAbortOptions,
+  invokeWithAbort as invokeDefaultWithAbort,
+  requestRuntimeCancel as requestDefaultRuntimeCancel,
   throwIfToolInvocationAborted,
 } from "./invokeWithAbort";
 import { ToolPathResolver } from "./pathUtils";
+import type { ToolCommandPort } from "./toolCommandPort";
 
 type SSHManagerAction =
   | "list_hosts"
@@ -394,11 +396,16 @@ function errorResult(
   };
 }
 
-async function listProjectSessions(projectPathKey: string, signal?: AbortSignal) {
-  const response = await invokeWithAbort<RawTerminalListResponse>(
+async function listProjectSessionsUsing(
+  projectPathKey: string,
+  signal?: AbortSignal,
+  invoke = invokeRuntime,
+) {
+  const response = await invokeDefaultWithAbort<RawTerminalListResponse>(
     "terminal_list",
     { project_path_key: projectPathKey },
     signal,
+    { invoke },
   );
   return (response.sessions ?? [])
     .map(normalizeSession)
@@ -412,16 +419,17 @@ function createAllowedHostMap(hosts: SshHostConfig[], associatedHostIds: readonl
   );
 }
 
-async function validateSession(params: {
+async function validateSessionUsing(params: {
   sessionId: string;
   projectPathKey: string;
   allowedHostIds: Set<string>;
   needsSftp?: boolean;
   signal?: AbortSignal;
+  invoke?: ToolCommandPort["invoke"];
 }) {
-  const session = (await listProjectSessions(params.projectPathKey, params.signal)).find(
-    (candidate) => candidate.session_id === params.sessionId,
-  );
+  const session = (
+    await listProjectSessionsUsing(params.projectPathKey, params.signal, params.invoke)
+  ).find((candidate) => candidate.session_id === params.sessionId);
   if (!session) {
     throw new Error("SSH session not found in the current project.");
   }
@@ -458,7 +466,7 @@ function findReusableSession(params: {
     })[0];
 }
 
-async function createSession(params: {
+async function createSessionUsing(params: {
   host: SshHostConfig;
   workdir: string;
   projectPathKey: string;
@@ -467,8 +475,9 @@ async function createSession(params: {
   rows?: number;
   sftpEnabled?: boolean;
   signal?: AbortSignal;
+  invoke?: ToolCommandPort["invoke"];
 }) {
-  const response = await invokeWithAbort<RawTerminalSnapshotResponse>(
+  const response = await invokeDefaultWithAbort<RawTerminalSnapshotResponse>(
     "terminal_create_ssh",
     {
       cwd: params.workdir,
@@ -480,6 +489,7 @@ async function createSession(params: {
       sftp_enabled: params.sftpEnabled ?? true,
     },
     params.signal,
+    { invoke: params.invoke },
   );
   if (response.sshPrompt || response.ssh_prompt) {
     throw new Error(promptErrorMessage());
@@ -494,7 +504,7 @@ async function createSession(params: {
   return session;
 }
 
-async function resolveSession(params: {
+async function resolveSessionUsing(params: {
   args: Record<string, unknown>;
   workdir: string;
   projectPathKey: string;
@@ -503,6 +513,7 @@ async function resolveSession(params: {
   needsSftp?: boolean;
   onNewConnectionStarted?: () => void | Promise<void>;
   signal?: AbortSignal;
+  invoke?: ToolCommandPort["invoke"];
 }): Promise<ResolvedSshSession> {
   const sessionId = normalizeOptionalString(params.args.session_id);
   const strategy = normalizeSessionStrategy(params.args.session_strategy);
@@ -510,12 +521,13 @@ async function resolveSession(params: {
     if (strategy === "new") {
       throw new Error("SSHManager.session_strategy=new cannot be combined with session_id.");
     }
-    const session = await validateSession({
+    const session = await validateSessionUsing({
       sessionId,
       projectPathKey: params.projectPathKey,
       allowedHostIds: params.allowedHostIds,
       needsSftp: params.needsSftp === true,
       signal: params.signal,
+      invoke: params.invoke,
     });
     return { session, reused: true, created: false, strategy: "session_id" };
   }
@@ -526,7 +538,7 @@ async function resolveSession(params: {
   }
   if (strategy !== "new") {
     const reusable = findReusableSession({
-      sessions: await listProjectSessions(params.projectPathKey, params.signal),
+      sessions: await listProjectSessionsUsing(params.projectPathKey, params.signal, params.invoke),
       hostId,
       needsSftp: params.needsSftp === true,
     });
@@ -545,7 +557,7 @@ async function resolveSession(params: {
   }
   await params.onNewConnectionStarted?.();
   throwIfToolInvocationAborted(params.signal);
-  const session = await createSession({
+  const session = await createSessionUsing({
     host,
     workdir: params.workdir,
     projectPathKey: params.projectPathKey,
@@ -554,6 +566,7 @@ async function resolveSession(params: {
       `SSHManager: ${host.name || host.host || host.id}`,
     sftpEnabled: true,
     signal: params.signal,
+    invoke: params.invoke,
   });
   return { session, reused: false, created: true, strategy };
 }
@@ -561,6 +574,7 @@ async function resolveSession(params: {
 async function executeSSHManager(
   toolCall: ToolCall,
   params: {
+    commandPort?: ToolCommandPort;
     workdir: string;
     projectPathKey: string;
     hosts: SshHostConfig[];
@@ -571,6 +585,22 @@ async function executeSSHManager(
   },
   signal?: AbortSignal,
 ): Promise<ToolResultMessage> {
+  const invoke = params.commandPort?.invoke ?? invokeRuntime;
+  const invokeWithAbort = <T>(
+    command: string,
+    args: Record<string, unknown> | undefined,
+    signal?: AbortSignal,
+    options: InvokeWithAbortOptions<T> = {},
+  ) => invokeDefaultWithAbort<T>(command, args, signal, { ...options, invoke });
+  const requestRuntimeCancel = (runId: string) => requestDefaultRuntimeCancel(runId, invoke);
+  const listProjectSessions = (project: string, signal?: AbortSignal) =>
+    listProjectSessionsUsing(project, signal, invoke);
+  const validateSession = (input: Parameters<typeof validateSessionUsing>[0]) =>
+    validateSessionUsing({ ...input, invoke });
+  const createSession = (input: Parameters<typeof createSessionUsing>[0]) =>
+    createSessionUsing({ ...input, invoke });
+  const resolveSession = (input: Parameters<typeof resolveSessionUsing>[0]) =>
+    resolveSessionUsing({ ...input, invoke });
   const args = asArgs(toolCall.arguments);
   const invokeTool = <T = unknown>(command: string, input: Record<string, unknown>) =>
     invokeWithAbort<T>(command, input, signal);
@@ -1118,6 +1148,7 @@ async function executeSSHManager(
 }
 
 export function createSSHManagerTools(params: {
+  commandPort?: ToolCommandPort;
   enabled: boolean;
   runtimeScope: "chat" | "cron_auto_prompt";
   workdir: string;
@@ -1133,7 +1164,7 @@ export function createSSHManagerTools(params: {
   const associatedHostIds = params.associatedHostIds ?? [];
   const pathResolver = new ToolPathResolver({
     workdir: params.workdir,
-    resolveHomeDir: params.resolveHomeDir,
+    resolveHomeDir: params.resolveHomeDir ?? params.commandPort?.homeDir,
   });
   const tools =
     params.enabled &&
@@ -1158,6 +1189,7 @@ export function createSSHManagerTools(params: {
       executeSSHManager(
         toolCall,
         {
+          commandPort: params.commandPort,
           workdir: params.workdir,
           projectPathKey,
           hosts,

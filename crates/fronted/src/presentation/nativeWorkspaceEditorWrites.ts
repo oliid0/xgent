@@ -1,4 +1,4 @@
-import { invokeFs } from "../lib/tools/fsBackend";
+import { invokePreviewFs, type PreviewExecution } from "../lib/tools/previewExecution";
 
 export type NativeEditorDraft = {
   content: string | null;
@@ -9,7 +9,7 @@ export type NativeEditorDraft = {
 export type NativeEditorSource = NativeEditorDraft & {
   mode: "editor" | "preview";
   path: string;
-  request: { workdir: string };
+  request: PreviewExecution & { workdir: string };
   sizeBytes: number;
   totalLines?: number;
 };
@@ -50,12 +50,12 @@ export async function saveNativeWorkspaceEditorSource<
   cache.writeFailures?.delete(key);
   cache.publish?.();
   try {
-    const response = await invokeFs<{
+    const response = await invokePreviewFs<{
       mtimeMs: number;
       contentHash: string;
       bytesWritten: number;
       totalLines: number;
-    }>("fs_write_text", {
+    }>(snapshot.request, "fs_write_text", {
       workdir: snapshot.request.workdir,
       path: snapshot.path,
       content: snapshot.content,

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { createReactHookHarness } from "../helpers/react-hook-harness.mjs";
 import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
@@ -27,8 +28,9 @@ async function harness(format = "text") {
     "../../lib/system/clipboardText": { writeClipboardText: async value => {
       calls.push(["clipboard", { value }]); return options.copy ? options.copy(value) : true;
     } },
-    "../../lib/tools/fsBackend": { invokeFs: async (command, args) => {
+    [fileURLToPath(new URL("../../src/lib/tools/fsBackend.ts", import.meta.url))]: { invokeFs: async (command, args, invoker) => {
       calls.push([command, args]);
+      if (options.owned && invoker) return invoker(command, args);
       if (command.startsWith("fs_read")) return options.read ? options.read(args) : disk.get(args.path);
       return options.write ? options.write(args) : writeSource(args);
     } },
@@ -63,6 +65,50 @@ async function harness(format = "text") {
   return { props, calls, options, disk, render, controls, flush, find, waitFor, writeSource, previewDrafts, previewPendingWrites, previewDraftKey,
     unmount() { hooks.unmount(); if (previous === undefined) delete globalThis.window; else globalThis.window = previous; } };
 }
+
+test("shared preview same-path ports isolate drafts and concurrent writes", async () => {
+  const h = await harness(), calls = [], wait = Promise.withResolvers();
+  const port = id => ({ async invoke(command, args) {
+    calls.push([id, command, args]);
+    if (command.startsWith("fs_read")) return { ...h.disk.get("a.md"), content: `${id} original` };
+    if (id === "a") await wait.promise;
+    return { contentHash: `${id}:written`, mtimeMs: 11, bytesWritten: Buffer.byteLength(args.content) };
+  } });
+  const a = port("a"), b = port("b");
+  const open = async (commandPort, id) => {
+    h.props.openRequest = { ...h.props.openRequest, id, commandPort };
+    h.render(); await h.waitFor(() => !!h.controls().tabs);
+    h.controls().tabs.props.onChange("source"); h.render();
+  };
+  try {
+    h.options.owned = true;
+    await open(a, 2);
+    h.controls().text.props.onChange("A draft"); h.controls().save.props.onClick();
+    await open(b, 2);
+    assert.equal(h.controls().text.props.value, "b original");
+    h.controls().text.props.onChange("B draft"); h.controls().save.props.onClick();
+    await h.flush();
+    assert.deepEqual(calls.filter(([, command]) => command.startsWith("fs_write")).map(([id, , args]) => [id, args.content]),
+      [["a", "A draft"], ["b", "B draft"]]);
+    wait.resolve(); await h.waitFor(() => !h.previewPendingWrites.size);
+    assert.equal(h.controls().text.props.value, "B draft");
+  } finally { wait.resolve(); h.unmount(); }
+});
+
+test("shared preview close discards late read bytes before creating a blob URL", async () => {
+  const h = await harness(), wait = Promise.withResolvers();
+  const original = URL.createObjectURL;
+  let created = 0;
+  try {
+    URL.createObjectURL = (...args) => { created++; return original(...args); };
+    h.options.owned = true;
+    h.props.openRequest = { ...h.props.openRequest, id: 2, commandPort: { invoke: () => wait.promise } };
+    h.render(); await h.flush();
+    h.props.isOpen = false; h.render();
+    wait.resolve(h.disk.get("a.md")); await h.flush();
+    assert.equal(created, 0);
+  } finally { URL.createObjectURL = original; wait.resolve(h.disk.get("a.md")); h.unmount(); }
+});
 
 test("shared text and DOCX source save immediate input once and retain the source tab", async () => {
   for (const format of ["text", "docx"]) {

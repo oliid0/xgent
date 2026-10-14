@@ -1,26 +1,38 @@
 import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Section } from "@astryxdesign/core/Section";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
-import { useMemo } from "react";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Fragment, useMemo, useState } from "react";
 import {
   Activity,
+  Calendar,
   Camera,
   Check,
-  Clock3,
+  ChevronRight,
   Cloud,
+  ContactRound,
+  Heart,
+  House,
   ImageIcon,
+  ListChecks,
   Mic,
   RefreshCw,
   Shield,
   WifiOff,
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
+import { mobileContactRows } from "../../lib/connectors/connectorDataView";
+import { mobileConnectorCatalog } from "../../lib/connectors/mobileConnectorCatalog";
+import { useMobileContacts } from "../../lib/connectors/useMobileContacts";
+import { useMobileHome } from "../../lib/connectors/useMobileHome";
 import type { MobileAssistantPermission, MobilePermissionStates } from "../../lib/mobileAssistant";
 import { type ToolPolicy, updateSystem } from "../../lib/settings";
 import {
@@ -28,6 +40,9 @@ import {
   personalPolicy,
   personalPolicyKey,
 } from "../../lib/tools/mobileAssistantPolicy";
+import { ConnectorDataList } from "./ConnectorDataList";
+import { MobileHomeSection } from "./MobileHomeSection";
+import { MobileScheduleSection } from "./MobileScheduleSection";
 import type { SettingsSectionProps } from "./types";
 import { useMobileAssistantAccess } from "./useMobileAssistantAccess";
 
@@ -39,6 +54,24 @@ type PermissionDescriptor = {
 };
 
 const PERMISSIONS: PermissionDescriptor[] = [
+  {
+    id: "home",
+    labelKey: "settings.mobileAssistant.home",
+    descriptionKey: "settings.mobileAssistant.homeDescription",
+    icon: Shield,
+  },
+  {
+    id: "notifications",
+    labelKey: "settings.mobileAssistant.notifications",
+    descriptionKey: "settings.mobileAssistant.notificationsDescription",
+    icon: Shield,
+  },
+  {
+    id: "contacts",
+    labelKey: "settings.mobileAssistant.contacts",
+    descriptionKey: "settings.mobileAssistant.contactsDescription",
+    icon: Shield,
+  },
   {
     id: "bluetooth",
     labelKey: "settings.mobileAssistant.bluetooth",
@@ -61,7 +94,7 @@ const PERMISSIONS: PermissionDescriptor[] = [
     id: "calendar",
     labelKey: "settings.mobileAssistant.calendar",
     descriptionKey: "settings.mobileAssistant.calendarDescription",
-    icon: Clock3,
+    icon: Calendar,
   },
   {
     id: "reminders",
@@ -118,8 +151,24 @@ function PermissionStateBadge({
 
 export function MobileAssistantSection({ settings, setSettings }: SettingsSectionProps) {
   const { t } = useLocale();
+  const [connectorTab, setConnectorTab] = useState("available");
+  const [connectorQuery, setConnectorQuery] = useState("");
+  const [openConnector, setOpenConnector] = useState<string | null>(null);
+  const contacts = useMobileContacts(true);
   const { status, permissions, busy, error, refresh, request } = useMobileAssistantAccess(
     t("settings.mobileAssistant.unavailable"),
+  );
+  const home = useMobileHome(status?.homeAvailable === true && status.backend === "ios-native");
+  const connectors = mobileConnectorCatalog(
+    status,
+    permissions,
+    settings.system.toolPolicies,
+  ).filter(
+    (connector) =>
+      (connectorTab === "connected") === (connector.permissionState === "granted") &&
+      t(`settings.mobileAssistant.${connector.id}`)
+        .toLocaleLowerCase()
+        .includes(connectorQuery.trim().toLocaleLowerCase()),
   );
 
   const permissionRows = useMemo(
@@ -129,13 +178,162 @@ export function MobileAssistantSection({ settings, setSettings }: SettingsSectio
   );
 
   return (
-    <VStack gap={5}>
+    <VStack gap={5} className="autonomy-settings">
+      {status?.homeAvailable && status.backend === "ios-native" ? (
+        <MobileHomeSection home={home} disabled={busy !== ""} />
+      ) : null}
+      {status?.permissionAliases.calendar && status.permissionAliases.reminders ? (
+        <MobileScheduleSection disabled={busy !== ""} />
+      ) : null}
+      {status?.permissionAliases.contacts ? (
+        <Section padding={4} width="100%">
+          <VStack gap={3}>
+            <Heading level={3}>{t("settings.connectors.searchContacts")}</Heading>
+            <TextInput
+              label={t("settings.connectors.contactQuery")}
+              size="lg"
+              value={contacts.query}
+              onChange={contacts.setQuery}
+              isDisabled={contacts.busy}
+              width="100%"
+            />
+            <Button
+              label={t("settings.connectors.search")}
+              onClick={() => void contacts.search()}
+              isLoading={contacts.busy}
+              isDisabled={contacts.busy || busy !== ""}
+              size="lg"
+            />
+            {contacts.error ? (
+              <Banner status="error" title={contacts.error} collapsible={false} />
+            ) : null}
+            {contacts.data ? (
+              <>
+                <Text type="supporting" color="secondary">
+                  {t(
+                    contacts.data.accessLimited || contacts.data.truncated
+                      ? "settings.connectors.partialContacts"
+                      : "settings.connectors.contactResults",
+                  )}
+                </Text>
+                {contacts.data.contacts.length ? (
+                  <ConnectorDataList rows={mobileContactRows(contacts.data, t)} />
+                ) : (
+                  <Text>{t("settings.connectors.noContacts")}</Text>
+                )}
+              </>
+            ) : null}
+          </VStack>
+        </Section>
+      ) : null}
+      <Section padding={0} width="100%" className="connector-catalog">
+        <VStack gap={2} padding={4}>
+          <Heading level={3}>{t("settings.connectors.title")}</Heading>
+          <TextInput
+            label={t("settings.connectors.searchConnectors")}
+            isLabelHidden
+            placeholder={t("settings.connectors.searchConnectors")}
+            startIcon="search"
+            value={connectorQuery}
+            onChange={setConnectorQuery}
+            hasClear
+            width="100%"
+            size="lg"
+          />
+          <SegmentedControl
+            label={t("settings.connectors.title")}
+            value={connectorTab}
+            onChange={setConnectorTab}
+            layout="fill"
+            size="lg"
+          >
+            <SegmentedControlItem value="available" label={t("settings.connectors.availableTab")} />
+            <SegmentedControlItem value="connected" label={t("settings.connectors.connectedTab")} />
+          </SegmentedControl>
+        </VStack>
+        <List density="balanced" hasDividers>
+          {connectors.map((connector) => (
+            <Fragment key={connector.id}>
+              <ListItem
+                label={t(`settings.mobileAssistant.${connector.id}`)}
+                startContent={
+                  <span className={`connector-icon connector-icon-${connector.id}`}>
+                    {connector.id === "home" ? (
+                      <House />
+                    ) : connector.id === "health" ? (
+                      <Heart />
+                    ) : connector.id === "calendar" ? (
+                      <Calendar />
+                    ) : connector.id === "reminders" ? (
+                      <ListChecks />
+                    ) : (
+                      <ContactRound />
+                    )}
+                  </span>
+                }
+                endContent={
+                  connector.canRequest ? (
+                    <Button
+                      className="connector-connect"
+                      label={t("settings.connectors.connect")}
+                      variant="ghost"
+                      size="lg"
+                      isDisabled={busy !== "" || home.busy}
+                      isLoading={busy === connector.permission}
+                      onClick={() => void request(connector.permission)}
+                    />
+                  ) : connector.permissionState === "granted" ? (
+                    <ChevronRight />
+                  ) : (
+                    <Text type="supporting" color="secondary" wordBreak="break-word">
+                      {t(`settings.connectors.${connector.state}`)}
+                    </Text>
+                  )
+                }
+                onClick={
+                  connector.permissionState === "granted"
+                    ? () => setOpenConnector(openConnector === connector.id ? null : connector.id)
+                    : undefined
+                }
+              />
+              {connector.permissionState === "granted" && openConnector === connector.id ? (
+                <ListItem
+                  label={t("settings.mobileAssistant.agentAccess")}
+                  endContent={
+                    <Selector
+                      label={t(`settings.mobileAssistant.${connector.id}`)}
+                      isLabelHidden
+                      value={personalPolicy(connector.permission, settings.system.toolPolicies)}
+                      options={["allow", "ask", "deny"].map((value) => ({
+                        value,
+                        label: t(`settings.toolPolicy.${value}`),
+                      }))}
+                      onChange={(value) =>
+                        setSettings((previous) =>
+                          updateSystem(previous, {
+                            toolPolicies: {
+                              ...previous.system.toolPolicies,
+                              [personalPolicyKey(connector.permission)]: value as ToolPolicy,
+                            },
+                          }),
+                        )
+                      }
+                    />
+                  }
+                />
+              ) : null}
+            </Fragment>
+          ))}
+        </List>
+        {!connectors.length ? (
+          <Text type="supporting" color="secondary" className="connector-empty">
+            {t("settings.connectors.empty")}
+          </Text>
+        ) : null}
+      </Section>
       <Section padding={4} width="100%">
         <VStack gap={3}>
           <Heading level={3}>{t("settings.mobileAssistant.agentAccess")}</Heading>
-          <Text type="supporting" color="secondary">
-            {t("settings.mobileAssistant.agentAccessDescription")}
-          </Text>
           {PERSONAL_CAPABILITIES.filter(
             (capability) =>
               capability === "clipboard" || status?.permissionAliases[capability] !== undefined,
@@ -169,9 +367,6 @@ export function MobileAssistantSection({ settings, setSettings }: SettingsSectio
           <StackItem size="fill">
             <VStack gap={1}>
               <Heading level={3}>{t("settings.mobileAssistant.permissions")}</Heading>
-              <Text type="supporting" color="secondary">
-                {t("settings.mobileAssistant.permissionsDescription")}
-              </Text>
             </VStack>
           </StackItem>
           <IconButton
@@ -193,7 +388,13 @@ export function MobileAssistantSection({ settings, setSettings }: SettingsSectio
               <ListItem
                 key={permission.id}
                 label={t(permission.labelKey)}
-                description={t(permission.descriptionKey)}
+                description={
+                  permission.id === "notifications" ? (
+                    <Text type="supporting" color="secondary" wordBreak="break-word">
+                      {t(permission.descriptionKey)}
+                    </Text>
+                  ) : undefined
+                }
                 startContent={
                   busy === permission.id ? (
                     <Spinner aria-label={t(permission.labelKey)} size="sm" />
@@ -202,7 +403,7 @@ export function MobileAssistantSection({ settings, setSettings }: SettingsSectio
                   )
                 }
                 endContent={<PermissionStateBadge state={state} />}
-                isDisabled={busy !== "" || state === "granted"}
+                isDisabled={busy !== "" || home.busy || state === "granted"}
                 onClick={() => void request(permission.id)}
               />
             );
@@ -243,7 +444,6 @@ export function MobileAssistantSection({ settings, setSettings }: SettingsSectio
               <ListItem
                 key={service.id}
                 label={service.title}
-                description={service.detail}
                 startContent={<Icon />}
                 endContent={
                   <HStack gap={2} vAlign="center">
@@ -270,11 +470,6 @@ export function MobileAssistantSection({ settings, setSettings }: SettingsSectio
         </List>
       </Section>
 
-      {status?.detail ? (
-        <Text type="supporting" color="secondary">
-          {status.detail}
-        </Text>
-      ) : null}
       {error ? <Banner status="error" title={error} collapsible={false} /> : null}
     </VStack>
   );

@@ -326,7 +326,7 @@ export function CronTaskModal({
     const nodes: PresentationNode[] = [
       c.group("basic", t("settings.cronStepBasic"), [
         c.input("name", t("settings.cronTaskName"), name, setName),
-        c.input("description", t("settings.cronDescription"), description, setDescription),
+        c.input("description", t("settings.cronTaskDesc"), description, setDescription),
         c.input("cron", t("settings.cronExpression"), cron, setCron),
         {
           ...c.optionalNumber(
@@ -371,7 +371,7 @@ export function CronTaskModal({
       ...(type === "bash"
         ? [
             {
-              ...c.input("script", t("settings.cronCommand"), scriptText, setScriptText),
+              ...c.input("script", t("settings.cronCommandList"), scriptText, setScriptText),
               kind: "TextArea" as const,
               language: "bash",
               minHeight: 200,
@@ -381,7 +381,7 @@ export function CronTaskModal({
       ...(type === "prompt"
         ? [
             {
-              ...c.input("prompt", t("settings.cronPrompt"), prompt, setPrompt),
+              ...c.input("prompt", t("settings.cronPromptLabel"), prompt, setPrompt),
               kind: "TextArea" as const,
             },
             c.select(
@@ -407,7 +407,7 @@ export function CronTaskModal({
         ? [
             c.select(
               "workdir-mode",
-              t("settings.cronWorkdir"),
+              t("settings.cronWorkdirLabel"),
               customWorkdir ? CUSTOM_WORKDIR_VALUE : workdir || FOLLOW_ACTIVE_WORKSPACE_VALUE,
               [
                 {
@@ -432,7 +432,7 @@ export function CronTaskModal({
               ? [
                   c.input(
                     "workdir",
-                    t("settings.cronWorkdir"),
+                    t("settings.cronWorkdirLabel"),
                     workdir,
                     setWorkdir,
                     false,
@@ -440,12 +440,6 @@ export function CronTaskModal({
                   ),
                 ]
               : []),
-            {
-              id: "workdir-hint",
-              kind: "Text" as const,
-              text: t("settings.cronWorkdirHint"),
-              secondary: true,
-            },
             ...(onPickWorkdir
               ? [
                   c.action("pick-workdir", t("chat.mobileWorkspace.chooseFolder"), async () => {
@@ -515,7 +509,6 @@ export function CronTaskModal({
         header={
           <SettingsDetailHeader
             title={modalTitle}
-            subtitle={t("settings.cronExpressionHint")}
             startContent={
               <IconButton
                 label={t("settings.cancel")}
@@ -627,19 +620,16 @@ export function CronTaskModal({
                     <RadioListItem
                       value="bash"
                       label={t("settings.cronTypeBash")}
-                      description={t("settings.cronTypeBashHint")}
                       startContent={<Terminal aria-hidden="true" />}
                     />
                     <RadioListItem
                       value="http"
                       label={t("settings.cronTypeHttp")}
-                      description={t("settings.cronTypeHttpHint")}
                       startContent={<Globe aria-hidden="true" />}
                     />
                     <RadioListItem
                       value="prompt"
                       label={t("settings.cronTypePrompt")}
-                      description={t("settings.cronTypePromptHint")}
                       startContent={<MessageSquare aria-hidden="true" />}
                     />
                   </RadioList>
@@ -753,18 +743,17 @@ export function CronTaskModal({
                             />
                           ) : null}
                         </HStack>
-                      ) : (
+                      ) : workdir ? (
                         <Text type="supporting" color="secondary">
-                          {workdir || t("settings.cronWorkdirHint")}
+                          {workdir}
                         </Text>
-                      )}
+                      ) : null}
                     </FormLayout>
                   ) : null}
 
                   {type === "bash" ? (
                     <TextArea
                       label={t("settings.cronCommandList")}
-                      description={t("settings.cronCommandHint")}
                       value={scriptText}
                       rows={9}
                       isRequired

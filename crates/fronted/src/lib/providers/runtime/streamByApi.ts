@@ -1,4 +1,10 @@
-import type { Api, Context, Model } from "@earendil-works/pi-ai";
+import {
+  type Api,
+  type AssistantMessage,
+  type Context,
+  createAssistantMessageEventStream,
+  type Model,
+} from "@earendil-works/pi-ai";
 import { stream as streamAnthropic } from "@earendil-works/pi-ai/api/anthropic-messages";
 import {
   type GoogleOptions,
@@ -33,6 +39,60 @@ import {
 import { omitToolResultImagesForTextOnlyModel } from "./toolResultImageFallback";
 import type { StreamOptionsEx, ToolChoice } from "./types";
 
+function admittedModelRequest(
+  options: StreamOptionsEx,
+  model: Model<Api>,
+  start: () => ReturnType<typeof streamOpenAIResponses>,
+): ReturnType<typeof streamOpenAIResponses> {
+  const failure = (error: unknown, stream = createAssistantMessageEventStream()) => {
+    // Return a terminal stream even on a retry attempt; the retry wrapper
+    // must retain the actual admission failure rather than the prior 429.
+    const message: AssistantMessage = {
+      role: "assistant",
+      content: [],
+      api: model.api,
+      provider: model.provider,
+      model: model.id,
+      timestamp: Date.now(),
+      stopReason: "error",
+      errorMessage: error instanceof Error ? error.message : String(error),
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+    };
+    stream.push({ type: "error", reason: "error", error: message });
+    stream.end(message);
+    return stream;
+  };
+  try {
+    const admission = options.beforeModelRequest?.();
+    if (admission) {
+      const stream = createAssistantMessageEventStream();
+      void (async () => {
+        try {
+          await admission;
+          options.signal?.throwIfAborted();
+          const source = start();
+          for await (const event of source) stream.push(event);
+          stream.end(await source.result());
+        } catch (error) {
+          failure(error, stream);
+        }
+      })();
+      return stream;
+    }
+    options.signal?.throwIfAborted();
+    return start();
+  } catch (error) {
+    return failure(error);
+  }
+}
+
 function mapToolChoiceToOpenAI(
   toolChoice: ToolChoice | undefined,
 ): OpenAICompletionsOptions["toolChoice"] | undefined {
@@ -63,6 +123,7 @@ function buildOpenAIBaseOptions(model: Model<Api>, options: StreamOptionsEx) {
     maxTokens: resolveMaxTokens(options.maxTokens, model.maxTokens),
     signal: options.signal,
     apiKey: options.apiKey,
+    fetch: options.fetch,
     cacheRetention: options.cacheRetention,
     sessionId: options.sessionId,
     headers: options.headers,
@@ -100,30 +161,32 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
           ? "auto"
           : requestedToolChoice;
       return withStreamRetry(
-        () => {
-          const source = streamAnthropic(model as Model<"anthropic-messages">, anthropicContext, {
-            temperature: effectiveOptions.temperature,
-            maxTokens: anthropicThinking.maxTokens,
-            signal: effectiveOptions.signal,
-            apiKey: effectiveOptions.apiKey,
-            cacheRetention: effectiveOptions.cacheRetention,
-            sessionId: effectiveOptions.sessionId,
-            headers: effectiveOptions.headers,
-            onPayload: effectiveOptions.onPayload,
-            onResponse: effectiveOptions.onResponse,
-            maxRetryDelayMs: effectiveOptions.maxRetryDelayMs,
-            metadata: effectiveOptions.metadata,
-            thinkingEnabled: anthropicThinking.thinkingEnabled,
-            ...(anthropicThinking.effort ? { effort: anthropicThinking.effort } : {}),
-            ...(anthropicThinking.thinkingBudgetTokens !== undefined
-              ? { thinkingBudgetTokens: anthropicThinking.thinkingBudgetTokens }
-              : {}),
-            toolChoice: anthropicToolChoice,
-          });
-          return effectiveOptions.deepSeekDsmlToolCallRepair
-            ? wrapDeepSeekDsmlToolCallStream(source)
-            : source;
-        },
+        () =>
+          admittedModelRequest(effectiveOptions, model, () => {
+            const source = streamAnthropic(model as Model<"anthropic-messages">, anthropicContext, {
+              temperature: effectiveOptions.temperature,
+              maxTokens: anthropicThinking.maxTokens,
+              signal: effectiveOptions.signal,
+              apiKey: effectiveOptions.apiKey,
+              fetch: effectiveOptions.fetch,
+              cacheRetention: effectiveOptions.cacheRetention,
+              sessionId: effectiveOptions.sessionId,
+              headers: effectiveOptions.headers,
+              onPayload: effectiveOptions.onPayload,
+              onResponse: effectiveOptions.onResponse,
+              maxRetryDelayMs: effectiveOptions.maxRetryDelayMs,
+              metadata: effectiveOptions.metadata,
+              thinkingEnabled: anthropicThinking.thinkingEnabled,
+              ...(anthropicThinking.effort ? { effort: anthropicThinking.effort } : {}),
+              ...(anthropicThinking.thinkingBudgetTokens !== undefined
+                ? { thinkingBudgetTokens: anthropicThinking.thinkingBudgetTokens }
+                : {}),
+              toolChoice: anthropicToolChoice,
+            });
+            return effectiveOptions.deepSeekDsmlToolCallRepair
+              ? wrapDeepSeekDsmlToolCallStream(source)
+              : source;
+          }),
         { signal: effectiveOptions.signal, ...effectiveOptions.streamRetry },
       );
     }
@@ -143,27 +206,30 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
           : undefined,
       };
       return withStreamRetry(
-        () => {
-          const source = streamOpenAICompletions(
-            model as Model<"openai-completions">,
-            requestContext,
-            openAIOptions,
-          );
-          const compatible = effectiveOptions.recoverMissingFinishReason
-            ? recoverOpenAICompletionsMissingFinishReason(source)
-            : source;
-          return rejectEmptyOpenAICompletionsResponse(compatible);
-        },
+        () =>
+          admittedModelRequest(effectiveOptions, model, () => {
+            const source = streamOpenAICompletions(
+              model as Model<"openai-completions">,
+              requestContext,
+              openAIOptions,
+            );
+            const compatible = effectiveOptions.recoverMissingFinishReason
+              ? recoverOpenAICompletionsMissingFinishReason(source)
+              : source;
+            return rejectEmptyOpenAICompletionsResponse(compatible);
+          }),
         { signal: effectiveOptions.signal, ...effectiveOptions.streamRetry },
       );
     }
     case DEEPSEEK_RESPONSES_API:
       return withStreamRetry(
         () =>
-          streamDeepSeekResponses(
-            model,
-            omitToolResultImagesForTextOnlyModel(context, model),
-            options,
+          admittedModelRequest(options, model, () =>
+            streamDeepSeekResponses(
+              model,
+              omitToolResultImagesForTextOnlyModel(context, model),
+              options,
+            ),
           ),
         { signal: options.signal, ...options.streamRetry },
       );
@@ -175,7 +241,13 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
       };
       return withStreamRetry(
         () =>
-          streamOpenAIResponses(model as Model<"openai-responses">, requestContext, openAIOptions),
+          admittedModelRequest(options, model, () =>
+            streamOpenAIResponses(
+              model as Model<"openai-responses">,
+              requestContext,
+              openAIOptions,
+            ),
+          ),
         {
           signal: options.signal,
           ...options.streamRetry,
@@ -198,7 +270,10 @@ export function streamSimpleByApi(model: Model<Api>, context: Context, options: 
         toolChoice: mapToolChoiceToGoogle(options.toolChoice) ?? "none",
       };
       return withStreamRetry(
-        () => streamGoogle(model as Model<"google-generative-ai">, requestContext, googleOptions),
+        () =>
+          admittedModelRequest(options, model, () =>
+            streamGoogle(model as Model<"google-generative-ai">, requestContext, googleOptions),
+          ),
         {
           signal: options.signal,
           ...options.streamRetry,

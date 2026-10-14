@@ -6,6 +6,7 @@ import { createTsModuleLoader } from "../helpers/load-ts-module.mjs";
 
 const parentId = "call-parent|fc_parent";
 const cardId = `${parentId}:agent:1`;
+let lastRunnerScheduler;
 
 const parentToolCall = {
   type: "toolCall",
@@ -86,6 +87,7 @@ const loader = createTsModuleLoader({
       // (1-based rounds, results paired by toolCallId) is pinned against the
       // real runner in agent-runner.test.mjs.
       async runAssistantWithTools(params) {
+        lastRunnerScheduler = params.subagentScheduler;
         params.onTurnStart?.(1);
         params.onToolCall?.(parentToolCall, 1);
         params.onToolCall?.(cardToolCall, 1);
@@ -166,7 +168,9 @@ function createHookLifecycle() {
   };
 }
 
-test("agent turn preserves suppressed parent Agent trace for cancellation persistence", async () => {
+for (const [schedulingEnabled,schedulingBudget] of [[false,undefined],[true,undefined],[false,{maxModelRequests:3,maxToolCalls:5,lifetimeMinutes:30}],[true,{maxModelRequests:3,maxToolCalls:5,lifetimeMinutes:30}]]) {
+test(`agent turn preserves suppressed parent Agent trace and optional shared budget (scheduling=${schedulingEnabled}, custom=${!!schedulingBudget})`, async () => {
+  const startedAt=Date.now();
   let liveRounds = [];
   const progressUpdates = [];
   let committed = false;
@@ -176,6 +180,8 @@ test("agent turn preserves suppressed parent Agent trace for cancellation persis
   });
 
   await runAgentConversationTurn({
+    intelligentSchedulingEnabled: schedulingEnabled,
+    schedulingBudget,
     providerId: "codex",
     model: "gpt-5",
     runtime: {},
@@ -217,6 +223,7 @@ test("agent turn preserves suppressed parent Agent trace for cancellation persis
       },
     },
     cancellation: {
+      userStop: new AbortController(),
       deriveScope() {
         return { controller: new AbortController(), release: noOp };
       },
@@ -240,6 +247,14 @@ test("agent turn preserves suppressed parent Agent trace for cancellation persis
   });
 
   assert.equal(committed, true);
+  assert.equal(Boolean(lastRunnerScheduler.executionBudget), schedulingEnabled);
+  if (schedulingEnabled) {
+    assert.equal(lastRunnerScheduler.executionBudget.snapshot().modelRequests.limit, schedulingBudget?.maxModelRequests??128);
+    assert.equal(lastRunnerScheduler.executionBudget.snapshot().toolCalls.limit, schedulingBudget?.maxToolCalls??256);
+    const deadlineAt=lastRunnerScheduler.executionBudget.snapshot().deadlineAt;
+    if(schedulingBudget){assert.ok(deadlineAt>=startedAt+30*60_000&&deadlineAt<=Date.now()+30*60_000);}
+    else assert.equal(deadlineAt,undefined);
+  }
   assert.equal(progressUpdates.length, 1);
   assert.equal(progressUpdates[0].completedThroughRound, 1);
   assert.deepEqual(
@@ -259,3 +274,4 @@ test("agent turn preserves suppressed parent Agent trace for cancellation persis
   assert.deepEqual(visibleToolCalls, [cardId]);
   assert.equal(visibleToolCalls.includes(parentId), false);
 });
+}

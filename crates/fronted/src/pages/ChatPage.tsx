@@ -75,6 +75,7 @@ import { WorkspaceSidePanel } from "../components/workspace-tools/WorkspaceSideP
 import { useLocale } from "../i18n";
 import type { AppUpdateController } from "../lib/appUpdates";
 import { getAutomationState, useAutomation } from "../lib/automation";
+import { openBackgroundChatArtifact } from "../lib/automation/backgroundChatArtifactOpen";
 import { createHookRunScope } from "../lib/automation/hookRunner";
 import { browserSessionController } from "../lib/browser/browserSessionController";
 import type { ChatFileLink } from "../lib/chat/chatFileLinks";
@@ -120,6 +121,10 @@ import {
 import { memoryExtraction } from "../lib/chat/memory/extractionController";
 import type { MemoryExtractionStatusKey } from "../lib/chat/memory/extractionEngine";
 import { memoryTurnInjection } from "../lib/chat/memory/injectionController";
+import {
+  captureAttachmentImportTarget,
+  importAttachments,
+} from "../lib/chat/messages/attachmentImport";
 import { type ChangedFileEntry, collectChangedFiles } from "../lib/chat/messages/changedFiles";
 import { normalizeLogicalLineEndings } from "../lib/chat/messages/composerText";
 import {
@@ -129,6 +134,7 @@ import {
   formatFileMentionToken,
   formatMarkdownReferenceDestination,
 } from "../lib/chat/messages/mentionReferences";
+import type { PreviewedFile } from "../lib/chat/messages/previewedFiles";
 import type { ToolTraceItem } from "../lib/chat/messages/uiMessages";
 import {
   createUserMessageWithUploads,
@@ -260,6 +266,7 @@ import {
   isPlanApprovalMessage,
   registerPlanDecisionHandlers,
 } from "../lib/tools/planModeTools";
+import { bindPreviewExecution } from "../lib/tools/previewExecution";
 import type { SkillAccessPolicy } from "../lib/tools/skillAccessPolicy";
 import { disposeTodoToolState } from "../lib/tools/todoTools";
 import {
@@ -270,6 +277,10 @@ import {
   subscribeToolApprovals,
 } from "../lib/tools/toolApproval";
 import { clearMcpToolActivation } from "../lib/tools/toolSearchTools";
+import {
+  readWorkspaceFileSource,
+  restoreWorkspaceFilePort,
+} from "../lib/tools/workspaceFileSource";
 import {
   clearLocalTrajectory,
   invalidateDesktopTrajectory,
@@ -347,6 +358,7 @@ import {
   type ConversationRuntimeSnapshotState,
   conversationRuntimeSnapshotToLiveTranscript,
 } from "./chat/local-access/conversationRuntimeSnapshot";
+import { GoalsPanel } from "./chat/mobile/GoalsPanel";
 import { MobileBackgroundTasksPanel } from "./chat/mobile/MobileBackgroundTasksPanel";
 import { MobileBrowserSettingsPanel } from "./chat/mobile/MobileBrowserSettingsPanel";
 import { MobileFilesPanel } from "./chat/mobile/MobileFilesPanel";
@@ -442,11 +454,13 @@ type ChatPageProps = {
   lanPcCommandHostReady: boolean;
   nativeMobile: boolean;
   onRunningConversationCountChange?: (count: number) => void;
+  onNotificationDeferralChange?: (deferred: boolean) => void;
 };
 
 type MobileWorkspaceDestination =
   | { kind: "activity" }
   | { kind: "background-tasks" }
+  | { kind: "goals" }
   | { kind: "files" }
   | { kind: "git-review" }
   | { kind: "ssh" }
@@ -530,11 +544,6 @@ async function listChatHistoryIdsForProjectPath(projectPath: string) {
   return ids;
 }
 
-type SystemImportPastedTextsResponse = {
-  files: PendingUploadedFile[];
-  skipped: string[];
-};
-
 function buildPastedTextFileName(paste: MentionComposerLargePaste, index: number) {
   const baseName = paste.label
     .trim()
@@ -608,13 +617,16 @@ async function importPastedTextsAsFiles(workdir: string, pastes: MentionComposer
     };
   }
 
-  const response = await invoke<SystemImportPastedTextsResponse>("system_import_pasted_texts", {
-    workdir: normalizedWorkdir,
-    texts: pastes.map((paste, index) => ({
-      fileName: buildPastedTextFileName(paste, index),
-      content: paste.text,
-    })),
-  });
+  const response = await importAttachments(
+    captureAttachmentImportTarget(normalizedWorkdir),
+    "system_import_pasted_texts",
+    {
+      texts: pastes.map((paste, index) => ({
+        fileName: buildPastedTextFileName(paste, index),
+        content: paste.text,
+      })),
+    },
+  );
 
   if (response.files.length !== pastes.length) {
     const skipped = response.skipped.length > 0 ? `\n${response.skipped.join("\n")}` : "";
@@ -742,6 +754,7 @@ export function ChatPage(props: ChatPageProps) {
     lanPcCommandHostReady,
     nativeMobile,
     onRunningConversationCountChange,
+    onNotificationDeferralChange,
   } = props;
   const desktopCommandHostAvailable = desktopBridgeEnabled || lanPcCommandHostReady;
   const effectiveTheme = resolveEffectiveTheme(settings.theme);
@@ -914,6 +927,8 @@ export function ChatPage(props: ChatPageProps) {
   );
   const previousCompactViewportRef = useRef(compactViewport);
   const [activeView, setActiveView] = useState<"chat" | "skills-hub" | "mcp-hub">("chat");
+  const activeViewRef = useRef(activeView);
+  activeViewRef.current = activeView;
   const [nativeSidebarOpenRequestId, setNativeSidebarOpenRequestId] = useState(0);
   const [desktopNavigationTarget, setDesktopNavigationTarget] =
     useState<WorkspaceNavigationTarget>("conversations");
@@ -1776,6 +1791,15 @@ export function ChatPage(props: ChatPageProps) {
   }, [canShowTrajectory, workspaceToolLaunchRequest?.target]);
   useSyncExternalStore(subscribeToolApprovals, getToolApprovalVersion, getToolApprovalVersion);
   const pendingToolApprovals = listPendingToolApprovalsForConversation(currentConversationId);
+  const deferBackgroundNotices =
+    isSending ||
+    runningConversationIds.size > 0 ||
+    pendingToolApprovals.length > 0 ||
+    confirmDialog !== null;
+  useEffect(() => {
+    onNotificationDeferralChange?.(deferBackgroundNotices);
+    return () => onNotificationDeferralChange?.(false);
+  }, [onNotificationDeferralChange, deferBackgroundNotices]);
   const currentConversationPersistedCwd =
     historyItems.find((item) => item.id === currentConversationId)?.cwd?.trim() || "";
   const currentConversationRuntimeWorkdir =
@@ -2023,11 +2047,13 @@ export function ChatPage(props: ChatPageProps) {
       workspaceFilePreviewRequestIdRef.current += 1;
       setWorkspaceFilePreviewMounted(true);
       setWorkspaceFilePreviewOpen(true);
-      setWorkspaceFilePreviewOpenRequest({
-        ownerId: currentConversationIdRef.current,
-        id: workspaceFilePreviewRequestIdRef.current,
-        ...request,
-      });
+      setWorkspaceFilePreviewOpenRequest(
+        bindPreviewExecution({
+          ownerId: currentConversationIdRef.current,
+          id: workspaceFilePreviewRequestIdRef.current,
+          ...request,
+        }),
+      );
     },
     [hideWorkspaceSshTerminalOverlay],
   );
@@ -2052,12 +2078,19 @@ export function ChatPage(props: ChatPageProps) {
   useEffect(() => {
     if (!nativeMobile) return;
     return subscribeMobilePreviewRequests((request) => {
+      if (activeViewRef.current !== "chat" || request.ownerId !== currentConversationIdRef.current)
+        return false;
       openWorkspaceFilePreview({
+        ownerId: request.ownerId,
+        commandPort: request.commandPort,
+        executionKey: request.executionKey,
+        fileSource: request.fileSource,
         projectPathKey:
           request.projectPathKey || workspaceProjectPathKey(request.workdir) || request.workdir,
         workdir: request.workdir,
         path: request.path,
       });
+      return true;
     });
   }, [nativeMobile, openWorkspaceFilePreview]);
   const handleOpenWorkspaceFile = useCallback(
@@ -2107,9 +2140,87 @@ export function ChatPage(props: ChatPageProps) {
       openWorkspaceFilePreview,
     ],
   );
+  const artifactView = useMemo(
+    () => ({
+      main: currentConversationId,
+      side: splitConversationId,
+      workdir: settings.system.workdir,
+    }),
+    [currentConversationId, splitConversationId, settings.system.workdir],
+  );
+  const artifactViewRef = useRef(artifactView);
+  artifactViewRef.current = artifactView;
+  const artifactViewMounted = useRef(false);
+  useEffect(() => {
+    artifactViewMounted.current = true;
+    return () => {
+      artifactViewMounted.current = false;
+    };
+  }, []);
+  const handleOpenPreviewedFile = useCallback(
+    async (file: PreviewedFile, ownerId = currentConversationIdRef.current) => {
+      if (file.backgroundArtifact) {
+        const ref = file.backgroundArtifact;
+        if (ref.conversationId !== ownerId) {
+          setErrorMessage("Artifact does not belong to this conversation");
+          return;
+        }
+        const view = artifactViewRef.current;
+        const isCurrent = () =>
+          artifactViewMounted.current &&
+          artifactViewRef.current === view &&
+          (view.main === ownerId || view.side === ownerId);
+        try {
+          const saved = await openBackgroundChatArtifact(ref, settings.system.workdir, isCurrent);
+          if (!isCurrent()) return;
+          const commandPort = restoreWorkspaceFilePort(saved.fileSource);
+          if (!isWorkspacePreviewPath(saved.path)) {
+            await commandPort.invoke("fs_open_workspace_path", {
+              workdir: saved.fileSource.workdir,
+              path: saved.path,
+              mode: "reveal",
+            });
+          } else
+            openWorkspaceFilePreview({
+              ownerId,
+              workdir: saved.fileSource.workdir,
+              projectPathKey: workspaceProjectPathKey(saved.fileSource.workdir),
+              path: saved.path,
+              fileSource: saved.fileSource,
+              commandPort,
+            });
+        } catch (error) {
+          if (isCurrent()) setErrorMessage(asErrorMessage(error, "Artifact transfer failed"));
+        }
+        return;
+      }
+      const fileSource = readWorkspaceFileSource(file.fileSource);
+      if (!fileSource) {
+        setErrorMessage("这个历史结果缺少可验证的原设备来源，请在原任务设备中确认文件。");
+        return;
+      }
+      openWorkspaceFilePreview({
+        ownerId,
+        workdir: fileSource.workdir,
+        projectPathKey: workspaceProjectPathKey(fileSource.workdir),
+        path: file.path,
+        fileSource,
+        commandPort: restoreWorkspaceFilePort(fileSource),
+      });
+    },
+    [openWorkspaceFilePreview, settings.system.workdir, splitConversationId],
+  );
   const handleOpenMobileChatFileLink = useCallback(
-    (link: ChatFileLink) => handleOpenMobileWorkspaceFile(link.path),
-    [handleOpenMobileWorkspaceFile],
+    (link: ChatFileLink) =>
+      Object.hasOwn(link, "fileSource") || link.backgroundArtifact
+        ? handleOpenPreviewedFile({
+            path: link.path,
+            toolCallId: "",
+            fileSource: link.fileSource ?? null,
+            backgroundArtifact: link.backgroundArtifact,
+          })
+        : handleOpenMobileWorkspaceFile(link.path),
+    [handleOpenMobileWorkspaceFile, handleOpenPreviewedFile],
   );
 
   const latestChangedFiles = useMemo(() => {
@@ -2389,6 +2500,10 @@ export function ChatPage(props: ChatPageProps) {
   );
   const openChatAttachmentPreview = useCallback(
     (request: Omit<WorkspaceFilePreviewOpenRequest, "id">) => {
+      request = bindPreviewExecution({
+        ...request,
+        ownerId: request.ownerId ?? currentConversationId,
+      });
       if (mobileExperience) {
         openWorkspaceFilePreview(request);
         return;
@@ -2397,7 +2512,10 @@ export function ChatPage(props: ChatPageProps) {
       setWorkspaceFilePreviewOpen(false);
       browserSessionController.closePanel();
       const existing = rightFileTabs.find(
-        (file) => file.path === request.path && file.workdir === request.workdir,
+        (file) =>
+          file.path === request.path &&
+          file.workdir === request.workdir &&
+          file.executionKey === request.executionKey,
       );
       const file = existing ?? {
         ...request,
@@ -2414,6 +2532,7 @@ export function ChatPage(props: ChatPageProps) {
   const handleOpenChatFileLink = useChatFileLinkNavigation({
     conversationId: currentConversationId,
     conversationWorkdir: displayedConversationWorkdir,
+    localArtifactWorkdir: settings.system.workdir,
     terminalProjectPathKey,
     notifyError: notifyChatFileLinkError,
     onRevealInFileTree: handleChangedFileReveal,
@@ -4937,6 +5056,27 @@ export function ChatPage(props: ChatPageProps) {
         await chatRuntimeHost.runTurn({
           mode: "agent",
           params: {
+            backgroundIntake: {
+              userMessage: pendingUserMessage,
+              ensureHistoryPersisted: async () => Boolean(await initialPersist),
+              foregroundText: t("backgroundChat.foreground"),
+              assessingText: t("backgroundChat.assessing"),
+              routingText: (reason) => t(`backgroundChat.route.${reason}`),
+              receiptText: (receipt) =>
+                [
+                  t(
+                    receipt.cancelRequested
+                      ? "backgroundInbox.cancelPending"
+                      : receipt.accepted
+                        ? "backgroundChat.accepted"
+                        : "backgroundChat.saved",
+                  ),
+                  `${t("backgroundInbox.executionDevice")}: ${receipt.hostId}`,
+                  `${t("backgroundInbox.request")}: ${receipt.requestId}`,
+                  ...(receipt.routing ? [t(`backgroundChat.route.${receipt.routing.reason}`)] : []),
+                  t("backgroundChat.followup"),
+                ].join("\n\n"),
+            },
             providerId,
             model,
             runtime: providerConfig,
@@ -4967,6 +5107,8 @@ export function ChatPage(props: ChatPageProps) {
               );
             },
             agentTemplates: settings.agents,
+            subagentTemplates: settings.system.subagentTemplates,
+            subagentProviders: settings.customProviders,
             selectedSystemToolIds: effectiveSelectedSystemToolIds,
             cloudExecution: settings.access,
             nativeMobileRuntime: nativeMobile,
@@ -4975,6 +5117,8 @@ export function ChatPage(props: ChatPageProps) {
             getToolPolicies,
             commandSafetyMode: settings.system.commandSafetyMode,
             planModeEnabled: runtimeControls.planModeEnabled,
+            intelligentSchedulingEnabled: runtimeControls.intelligentSchedulingEnabled,
+            schedulingBudget: settings.system.schedulingBudget,
             applyMcpOps: (ops) => {
               const removedIds = ops.filter((op) => op.kind === "remove").map((op) => op.serverId);
               setSettings((prev) =>
@@ -6583,8 +6727,10 @@ export function ChatPage(props: ChatPageProps) {
           onOpenBrowserSettings={() => setMobileWorkspaceDestination({ kind: "browser-settings" })}
           onOpenGitReview={() => setMobileWorkspaceDestination({ kind: "git-review" })}
           onOpenBackgroundTasks={() => setMobileWorkspaceDestination({ kind: "background-tasks" })}
+          onOpenGoals={() => setMobileWorkspaceDestination({ kind: "goals" })}
           onOpenFiles={() => setMobileWorkspaceDestination({ kind: "files" })}
           onOpenWorkspaceFile={handleOpenMobileWorkspaceFile}
+          onOpenPreviewedFile={handleOpenPreviewedFile}
           onLoadEarlierHistory={handleLoadEarlierHistory}
           onDecide={(toolCallId, decision) =>
             answerToolApproval(toolCallId, decision, { conversationId: currentConversationId })
@@ -6750,6 +6896,13 @@ export function ChatPage(props: ChatPageProps) {
           managedProcessesAvailable={!nativeMobile && desktopCommandHostAvailable}
           onClose={() => setMobileWorkspaceDestination(null)}
         />
+        <GoalsPanel
+          open={mobileWorkspaceDestination?.kind === "goals"}
+          mobile={nativeMobile}
+          settings={settings}
+          setSettings={setSettings}
+          onClose={() => setMobileWorkspaceDestination(null)}
+        />
         <MobileBrowserSettingsPanel
           open={mobileWorkspaceDestination?.kind === "browser-settings"}
           settings={settings}
@@ -6775,6 +6928,9 @@ export function ChatPage(props: ChatPageProps) {
             onSend={sendSideConversation}
             onStop={() => requestConversationStop(splitConversationId)}
             onOpenWorkspaceFile={handleOpenSplitWorkspaceFile}
+            onOpenPreviewedFile={(file) =>
+              handleOpenPreviewedFile(file, splitConversationId ?? currentConversationId)
+            }
           />
         ) : null}
         <NativeBrowserPage
@@ -6957,6 +7113,10 @@ export function ChatPage(props: ChatPageProps) {
         onOpenSettings={(section) => {
           if (mobileExperience) setSidebarOpen(false);
           onOpenSettings(section);
+        }}
+        onOpenGoals={() => {
+          setSidebarOpen(false);
+          setMobileWorkspaceDestination({ kind: "goals" });
         }}
         onCreateSoul={() => {
           if (mobileExperience) setSidebarOpen(false);
@@ -7525,6 +7685,9 @@ export function ChatPage(props: ChatPageProps) {
                       key={splitConversationId}
                       settings={settings}
                       onOpenWorkspaceFile={handleOpenSplitWorkspaceFile}
+                      onOpenPreviewedFile={(file) =>
+                        handleOpenPreviewedFile(file, splitConversationId ?? currentConversationId)
+                      }
                       width="100%"
                       conversationId={splitConversationId}
                       record={splitConversationRecord}
@@ -7664,6 +7827,13 @@ export function ChatPage(props: ChatPageProps) {
           onClose={() => setMobileWorkspaceDestination(null)}
         />
       ) : null}
+      <GoalsPanel
+        open={mobileWorkspaceDestination?.kind === "goals"}
+        mobile={mobileExperience}
+        settings={settings}
+        setSettings={setSettings}
+        onClose={() => setMobileWorkspaceDestination(null)}
+      />
       {mobileExperience ? (
         <MobileBrowserSettingsPanel
           open={mobileBrowserSettingsOpen}

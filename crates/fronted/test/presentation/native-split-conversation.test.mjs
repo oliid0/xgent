@@ -58,6 +58,28 @@ function find(nodes, id) {
   for (const node of nodes) { if (node.id === id) return node; const match = find(node.children ?? [], id); if (match) return match; }
 }
 
+test("native side conversation preserves replayed file source instead of using its current workspace", async () => {
+  const fileSource = { version: 1, hostId: "22222222-2222-4222-8222-222222222222", workdir: "/original-project" }, opened = [];
+  const h = harness({ props: { onOpenPreviewedFile: file => opened.push(file),
+    onOpenWorkspaceFile: () => assert.fail("Current workspace used for original-device result"),
+    record: { title: "Results", state: { transcript: { items: [{ kind: "assistant", key: "result", rounds: [{ round: 1, key: "round", blocks: [{ kind: "tool", item: {
+      toolCall: { id: "preview", name: "PreviewFile", arguments: { path: "report.md" } },
+      toolResult: { role: "toolResult", toolName: "PreviewFile", toolCallId: "preview", content: [], details: { kind: "mobile_file_preview", path: "report.md", fileSource }, isError: false, timestamp: 1 },
+    } }] }], timestamp: 1 }] } } },
+  } });
+  try {
+    const node = find(h.render().document.nodes, "result:previewed-file:preview");
+    assert.equal(node.disabled, false); assert.match(node.accessibilityLabel, /original-project/);
+    assert.ok(node.label.includes(fileSource.hostId.slice(0, 8)));
+    await h.action(node.action);
+    assert.deepEqual(opened, [{ path: "report.md", toolCallId: "preview", fileSource }]);
+    h.props.onOpenPreviewedFile = undefined;
+    const disabled = find(h.render().document.nodes, "result:previewed-file:preview");
+    assert.equal(disabled.disabled, true);
+    assert.equal(h.render().handlers.get(disabled.action).enabled, false);
+  } finally { h.unmount(); }
+});
+
 test("native side conversation shares real draft/send/stop/retry/activate and close handlers", async () => {
   const h = harness();
   assert.equal(h.render().document.mode, "panel");

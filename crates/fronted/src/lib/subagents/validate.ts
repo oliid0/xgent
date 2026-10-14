@@ -53,6 +53,8 @@ const KNOWN_AGENT_KEYS = new Set([
   "allowed_output_paths",
   "resume",
   "retain_worktree",
+  "model",
+  "required_skills",
 ]);
 
 const MODES = new Set<SubagentMode>(["readonly", "worktree"]);
@@ -235,6 +237,33 @@ export function parseSubagentBatch(
     const role = optionalString(entry.role);
     const identityText = optionalString(entry.identity);
     const templateRef = optionalString(entry.template);
+    const modelValue = optionalString(entry.model);
+    if (entry.model !== undefined && !modelValue) {
+      issues.push(
+        issue(
+          "invalid_arguments",
+          "model must be a non-empty configured provider::model value.",
+          agentRef,
+        ),
+      );
+    }
+    const requiredSkills = entry.required_skills;
+    if (
+      requiredSkills !== undefined &&
+      (!Array.isArray(requiredSkills) ||
+        requiredSkills.length > 16 ||
+        requiredSkills.some(
+          (skill) => typeof skill !== "string" || !/^[a-z][a-z0-9_-]{0,47}$/.test(skill),
+        ))
+    ) {
+      issues.push(
+        issue(
+          "invalid_arguments",
+          "required_skills must contain at most 16 capability tags from the configured roster.",
+          agentRef,
+        ),
+      );
+    }
 
     let template: SubagentTemplate | undefined;
     if (templateRef) {
@@ -361,6 +390,16 @@ export function parseSubagentBatch(
         allowedOutputPaths,
         resume,
         retainWorktree,
+        modelValue: modelValue ?? (!existingIdentity ? template?.modelValue : undefined),
+        requiredSkills:
+          requiredSkills === undefined && (!template?.requiredSkills?.length || existingIdentity)
+            ? undefined
+            : [
+                ...new Set([
+                  ...(Array.isArray(requiredSkills) ? (requiredSkills as string[]) : []),
+                  ...(!existingIdentity ? (template?.requiredSkills ?? []) : []),
+                ]),
+              ],
       },
       existingIdentity,
       template,

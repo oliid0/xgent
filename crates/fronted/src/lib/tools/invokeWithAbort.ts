@@ -1,9 +1,10 @@
 import { invoke } from "@xgent/runtime";
 import { createUuid } from "../shared/id";
 
-type InvokeWithAbortOptions<T> = {
+export type InvokeWithAbortOptions<T> = {
   onAbort?: () => Promise<void> | void;
   onLateResult?: (result: T) => Promise<void> | void;
+  invoke?: typeof invoke;
 };
 
 export class ToolInvocationCancelledError extends Error {
@@ -32,13 +33,13 @@ function delay(ms: number) {
 }
 
 /** Best-effort bounded cancellation for native runs registered by run_id. */
-export function requestRuntimeCancel(runId: string) {
+export function requestRuntimeCancel(runId: string, invoker = invoke) {
   const normalizedRunId = runId.trim();
   if (!normalizedRunId) return;
   void (async () => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
-        const response = await invoke<{ cancelled: boolean }>("runtime_cancel", {
+        const response = await invoker<{ cancelled: boolean }>("runtime_cancel", {
           run_id: normalizedRunId,
         });
         if (response.cancelled) return;
@@ -88,7 +89,7 @@ export function invokeWithAbort<T>(
   options: InvokeWithAbortOptions<T> = {},
 ): Promise<T> {
   throwIfToolInvocationAborted(signal);
-  const invocation = invoke<T>(command, args);
+  const invocation = (options.invoke ?? invoke)<T>(command, args);
   if (!signal) return invocation;
 
   return new Promise<T>((resolve, reject) => {

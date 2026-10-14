@@ -3,11 +3,12 @@ import type { AssistantMessage, Context } from "@earendil-works/pi-ai";
 import type { StreamDebugLogger } from "../../debug/agentDebug";
 import { assistantMessageToText, completeAssistantMessage } from "../../providers/llm";
 import type { ProviderId } from "../../settings";
+import { COMPACTION_MAX_CHUNKS, takeCompactionChunk } from "./chunks";
 import {
   COMPACTION_PAYLOAD_TOKEN_CAP,
   type CompactionPayload,
   estimateCompactionPayloadTokens,
-  shrinkCompactionPayload,
+  resolveCompactionPayloadBudget,
   stringifyCompactionPayload,
 } from "./payload";
 import { detectCompactionSummaryLanguage } from "./summaryLanguage";
@@ -85,6 +86,7 @@ type SummarizerRequest = {
   debugLogger?: StreamDebugLogger;
   complete: CompleteAssistantFn;
   repair?: { invalidOutput: string; validationError: string };
+  summaryLanguage?: string;
 };
 
 function createZeroUsage() {
@@ -100,7 +102,7 @@ function createZeroUsage() {
 
 async function requestSummary(params: SummarizerRequest): Promise<AssistantMessage> {
   const serializedPayload = stringifyCompactionPayload(params.payload);
-  const summaryLanguage = detectCompactionSummaryLanguage(params.payload);
+  const summaryLanguage = params.summaryLanguage ?? detectCompactionSummaryLanguage(params.payload);
   params.debugLogger?.logResult({
     event: "compaction_payload_prepared",
     payloadChars: serializedPayload.length,
@@ -158,82 +160,124 @@ export async function summarizeConversation(params: {
   complete?: CompleteAssistantFn;
 }): Promise<SummarizeConversationResult> {
   const complete = params.complete ?? completeAssistantMessage;
-  let payload = params.payload;
-  let networkRetryUsed = false;
-  let shrinkRetryUsed = false;
-
-  const tryShrink = () => {
-    if (shrinkRetryUsed) return false;
-    const shrunk = shrinkCompactionPayload(payload);
-    if (!shrunk) return false;
-    shrinkRetryUsed = true;
-    payload = shrunk;
-    params.debugLogger?.logResult({
-      event: "compaction_payload_shrunk",
-      omittedMessageCount: shrunk.compaction_reason.omitted_message_count,
-    });
-    return true;
+  const original = params.payload;
+  if (original.compaction_reason.omitted_message_count)
+    throw new Error("Compaction payload omits history; original history retained");
+  let budget = Math.min(
+    original.compaction_reason.payload_budget_tokens ?? COMPACTION_PAYLOAD_TOKEN_CAP,
+    resolveCompactionPayloadBudget(params.runtime.modelConfig),
+  );
+  let pending = original.active_segment_messages.slice();
+  let previousSummary = original.previous_summary;
+  let overflowRetryUsed = false;
+  const summaryLanguage = detectCompactionSummaryLanguage(original);
+  const totalUsage: SummarizeConversationResult["summarizerUsage"] = {};
+  const addUsage = (assistant: AssistantMessage) => {
+    for (const [key, value] of [
+      ["inputTokens", assistant.usage?.input],
+      ["outputTokens", assistant.usage?.output],
+    ] as const) {
+      if (typeof value === "number" && Number.isFinite(value) && value >= 0)
+        totalUsage[key] = (totalUsage[key] ?? 0) + value;
+    }
   };
 
-  while (true) {
-    let assistant: AssistantMessage;
-    try {
-      assistant = await requestSummary({ ...params, complete, payload });
-    } catch (error) {
-      if (params.signal?.aborted) throw error;
-      if (isOverflowError(error) && tryShrink()) continue;
-      if (!networkRetryUsed && isTransientError(error)) {
-        networkRetryUsed = true;
-        params.debugLogger?.logResult({
-          event: "compaction_request_retry",
-          reason: error instanceof Error ? error.message : String(error),
-        });
-        await sleepWithAbort(getRetryDelayMs(0), params.signal);
-        continue;
-      }
-      throw error;
-    }
-
+  for (let chunkIndex = 0; ; chunkIndex++) {
+    params.signal?.throwIfAborted();
+    if (chunkIndex >= COMPACTION_MAX_CHUNKS)
+      throw new Error("Compaction requires too many summary chunks; original history retained");
+    const { payload, remaining } = takeCompactionChunk(
+      { ...original, previous_summary: previousSummary },
+      pending,
+      budget,
+    );
     const payloadTokens = estimateCompactionPayloadTokens(payload);
-    const finalize = (validated: AssistantMessage): SummarizeConversationResult => {
-      const { summaryText } = validateCompactionSummary(
-        assistantMessageToText(validated),
-        payloadTokens,
-        payload,
-      );
-      return {
-        summaryText,
-        responseId: validated.responseId,
-        timestamp: validated.timestamp ?? Date.now(),
-        summarizerUsage: {
-          inputTokens: validated.usage?.input,
-          outputTokens: validated.usage?.output,
-        },
-        payloadTokens,
-      };
-    };
-
+    let networkRetryUsed = false;
     try {
-      return finalize(assistant);
-    } catch (validationError) {
-      if (params.signal?.aborted) throw validationError;
+      let assistant: AssistantMessage;
+      while (true) {
+        params.signal?.throwIfAborted();
+        try {
+          assistant = await requestSummary({ ...params, complete, payload, summaryLanguage });
+          addUsage(assistant);
+          break;
+        } catch (error) {
+          if (params.signal?.aborted) throw error;
+          if (!networkRetryUsed && isTransientError(error)) {
+            networkRetryUsed = true;
+            params.debugLogger?.logResult({
+              event: "compaction_request_retry",
+              reason: String(error),
+            });
+            await sleepWithAbort(getRetryDelayMs(0), params.signal);
+            continue;
+          }
+          throw error;
+        }
+      }
+      params.signal?.throwIfAborted();
+      let summaryText: string;
       try {
-        const repaired = await requestSummary({
+        summaryText = validateCompactionSummary(
+          assistantMessageToText(assistant),
+          payloadTokens,
+          payload,
+        ).summaryText;
+      } catch (validationError) {
+        assistant = await requestSummary({
           ...params,
           complete,
           payload,
+          summaryLanguage,
           repair: {
             invalidOutput: assistantMessageToText(assistant).trim(),
             validationError:
               validationError instanceof Error ? validationError.message : String(validationError),
           },
         });
-        return finalize(repaired);
-      } catch (repairError) {
-        if (params.signal?.aborted) throw repairError;
-        if (isOverflowError(repairError) && tryShrink()) continue;
-        throw repairError;
+        addUsage(assistant);
+        params.signal?.throwIfAborted();
+        summaryText = validateCompactionSummary(
+          assistantMessageToText(assistant),
+          payloadTokens,
+          payload,
+        ).summaryText;
       }
+      const finalResult: SummarizeConversationResult = {
+        summaryText,
+        responseId: assistant.responseId,
+        timestamp: assistant.timestamp ?? Date.now(),
+        summarizerUsage: totalUsage,
+        payloadTokens: estimateCompactionPayloadTokens(original),
+      };
+      params.debugLogger?.logResult({
+        event: "compaction_chunk_complete",
+        chunkIndex,
+        messageCount: payload.active_segment_messages.length,
+        remainingMessageCount: remaining.length,
+      });
+      if (!remaining.length) return finalResult;
+      previousSummary = {
+        id: `compaction-chunk-${chunkIndex}`,
+        content: summaryText,
+        summaryMeta: original.previous_summary?.summaryMeta ?? null,
+      };
+      pending = remaining;
+    } catch (error) {
+      if (params.signal?.aborted) throw error;
+      if (!overflowRetryUsed && !isNonRetryableError(error) && isOverflowError(error)) {
+        overflowRetryUsed = true;
+        budget = Math.floor(budget / 2);
+        // Retry the same uncommitted range with smaller chunks, never a
+        // head/tail subset. Earlier cumulative summaries remain in memory.
+        params.debugLogger?.logResult({
+          event: "compaction_chunk_budget_reduced",
+          budgetTokens: budget,
+        });
+        chunkIndex--;
+        continue;
+      }
+      throw error;
     }
   }
 }

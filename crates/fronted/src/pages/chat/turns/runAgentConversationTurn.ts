@@ -6,6 +6,12 @@ import type {
   ToolResultMessage,
 } from "@earendil-works/pi-ai";
 import { getLanPcCommandHostConfig } from "@xgent/runtime";
+import {
+  appendBackgroundChatContext,
+  captureBackgroundChatContext,
+} from "../../../lib/automation/backgroundChatContext";
+import type { BackgroundChatIntake } from "../../../lib/automation/backgroundChatIntake";
+import { captureBackgroundSourceContext } from "../../../lib/automation/backgroundSourceContext";
 import { ASK_USER_QUESTION_TOOL_NAME } from "../../../lib/chat/askUserQuestion";
 import type { CompactionController } from "../../../lib/chat/compaction/controller";
 import { estimateTextTokenUnits } from "../../../lib/chat/compaction/tokenLedger";
@@ -75,8 +81,16 @@ import {
   renderMessageBusSnapshot,
   SUBAGENT_PARENT_ID,
   type SubagentConversationStore,
-  type SubagentTemplate,
 } from "../../../lib/subagents";
+import { configuredSubagentTemplates } from "../../../lib/subagents/configuredTemplates";
+import {
+  intelligentSchedulingModels,
+  intelligentSchedulingPrompt,
+} from "../../../lib/subagents/intelligentScheduling";
+import {
+  normalizeSchedulingBudget,
+  schedulingDeadlineSignal,
+} from "../../../lib/subagents/schedulingBudget";
 import type { AdditionalProjectRoot } from "../../../lib/tools/additionalProjectRoots";
 import { buildBuiltinToolRegistry } from "../../../lib/tools/builtinRegistry";
 import type { BuiltinToolExecutionContext } from "../../../lib/tools/builtinTypes";
@@ -96,6 +110,7 @@ import {
   requestToolApproval,
   toolApprovalScope,
 } from "../../../lib/tools/toolApproval";
+import { captureToolCommandPort } from "../../../lib/tools/toolCommandPort";
 import { resolveToolPolicy } from "../../../lib/tools/toolPolicy";
 import {
   buildMcpRequestToolFilter,
@@ -111,6 +126,10 @@ import {
   serializeToolCatalog,
 } from "../../../lib/trajectory/sections";
 import type { TrajectoryUsage } from "../../../lib/trajectory/types";
+import {
+  captureLanPcCommandRouter,
+  type LanPcCommandHostConfig,
+} from "../../../runtime/lanPcCommandHost";
 import {
   appendSystemPrompt,
   buildPartialAssistantMessage,
@@ -221,16 +240,6 @@ function finishAgentPerfSpan(
 }
 
 // Only enabled, non-empty templates are resolvable from Agent calls.
-function enabledSubagentTemplates(agentTemplates: AppSettings["agents"]): SubagentTemplate[] {
-  return (agentTemplates ?? [])
-    .filter((template) => template.enabled && template.prompt.trim())
-    .map((template) => ({
-      id: template.id,
-      name: template.name,
-      description: template.description,
-      prompt: template.prompt,
-    }));
-}
 
 // The parent Agent call is suppressed in favor of the per-agent cards; a
 // rejected batch (error result) stays visible so validation failures are
@@ -270,6 +279,9 @@ function subagentRunIdsFromToolResult(toolResult: unknown): string[] {
 }
 
 export type RunAgentConversationTurnParams = {
+  backgroundIntake?: BackgroundChatIntake;
+  /** Execution selection captured before durable preflight; never a live UI binding. */
+  commandHostSnapshot?: LanPcCommandHostConfig;
   providerId: ProviderId;
   model: string;
   runtime: ProviderRuntimeConfig;
@@ -291,6 +303,8 @@ export type RunAgentConversationTurnParams = {
     baseDirs: string[];
   }) => void | Promise<void>;
   agentTemplates: AppSettings["agents"];
+  subagentTemplates?: AppSettings["system"]["subagentTemplates"];
+  subagentProviders?: AppSettings["customProviders"];
   selectedSystemToolIds: SystemToolId[];
   cloudExecution?: AppSettings["access"];
   nativeMobileRuntime?: boolean;
@@ -299,6 +313,8 @@ export type RunAgentConversationTurnParams = {
   getToolPolicies?: () => AppSettings["system"]["toolPolicies"];
   commandSafetyMode?: AppSettings["system"]["commandSafetyMode"];
   planModeEnabled?: boolean;
+  intelligentSchedulingEnabled?: boolean;
+  schedulingBudget?: AppSettings["system"]["schedulingBudget"];
   applyMcpOps?: (ops: McpSettingsOp[]) => void;
   sshHosts?: SshHostConfig[];
   associatedSshHostIds?: string[];
@@ -368,6 +384,11 @@ export type RunAgentConversationTurnParams = {
 };
 
 export async function runAgentConversationTurn(params: RunAgentConversationTurnParams) {
+  const commandHostSnapshot: LanPcCommandHostConfig = {
+    ...(params.lanPcCommandHostReady === true
+      ? (params.commandHostSnapshot ?? getLanPcCommandHostConfig())
+      : { enabled: false, baseUrl: "" }),
+  };
   const {
     providerId,
     model,
@@ -543,10 +564,16 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
   refreezeTaskListContext();
 
   const planModeSection = planModeEnabled ? buildPlanModeSystemPromptSection() : "";
+  let schedulingSection = "";
+  const backgroundChatContext = await captureBackgroundChatContext(
+    conversationId,
+    cancellation.userStop.signal,
+  );
 
   const planRunPolicy = planModeEnabled ? createPlanModeRunPolicy({ conversationId }) : null;
   const withAgentRuntimeContext = (context: Context): Context => {
-    let systemPrompt = context.systemPrompt;
+    let systemPrompt = appendBackgroundChatContext(context.systemPrompt, backgroundChatContext);
+    if (schedulingSection) systemPrompt = appendSystemPrompt(systemPrompt, schedulingSection);
     if (planModeSection) {
       systemPrompt = appendSystemPrompt(systemPrompt, planModeSection);
     }
@@ -562,6 +589,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
 
     currentTrajectoryRuntimeContext = buildTrajectoryRuntimeContext([
       { source: "plan-mode", text: planModeSection },
+      { source: "intelligent-scheduling", text: schedulingSection },
       { source: "subagent-roster", text: rosterIdentitySection },
       { source: "parent-message-bus", text: parentMessageBusSnapshot },
       { source: "task-list", text: frozenTaskListContext },
@@ -574,18 +602,45 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
       : context;
   };
   const fileState = createFileToolState();
-  const subagentScheduler = createSubagentScheduler();
-  const lanPcCommandHost = getLanPcCommandHostConfig();
+  const schedulingBudget = normalizeSchedulingBudget(params.schedulingBudget);
+  const subagentScheduler = createSubagentScheduler(
+    params.intelligentSchedulingEnabled === true
+      ? {
+          executionBudget: {
+            maxModelRequests: schedulingBudget.maxModelRequests,
+            maxToolCalls: schedulingBudget.maxToolCalls,
+            ...(schedulingBudget.lifetimeMinutes > 0
+              ? { deadlineAt: Date.now() + schedulingBudget.lifetimeMinutes * 60_000 }
+              : {}),
+          },
+        }
+      : undefined,
+  );
+  const lanPcCommandHost = commandHostSnapshot;
+  const commandPort = await captureToolCommandPort(commandHostSnapshot);
   const runtimePlatform =
     lanPcCommandHostReady && lanPcCommandHost.remotePlatform
       ? lanPcCommandHost.remotePlatform
       : await resolveRuntimePlatform();
   const toolWorkdir =
     lanPcCommandHostReady && lanPcCommandHost.remoteWorkdir
-      ? lanPcCommandHost.remoteWorkdir
+      ? String(
+          captureLanPcCommandRouter(commandHostSnapshot).prepareLanPcInvokeArgs({
+            workdir: effectiveWorkdir,
+          }).workdir,
+        )
       : effectiveWorkdir;
   const buildRegistryStartedAt = perfNowMs();
+  const executionTurnId = checkpointTurnId?.trim() || createUuid();
+  const backgroundRequestScope = JSON.stringify([conversationId, executionTurnId]);
+  let backgroundModelContext: Pick<Context, "systemPrompt" | "messages"> | undefined;
   const builtinRegistry = await buildBuiltinToolRegistry({
+    commandPort,
+    backgroundRequestScope,
+    getBackgroundSourceContext: () =>
+      backgroundModelContext
+        ? captureBackgroundSourceContext(backgroundModelContext, backgroundRequestScope)
+        : undefined,
     personalAssistantAccess: {
       getToolPolicies,
       getCommandSafetyMode: () => commandSafetyMode ?? "auto",
@@ -601,7 +656,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     sandbox: resolveShellSandboxSettings(commandSafetyMode),
     checkpoint: {
       conversationId,
-      turnId: checkpointTurnId?.trim() || createUuid(),
+      turnId: executionTurnId,
     },
     taskStateStore,
     // Keep the ordinary Agent tool surface identical to the reference runtime:
@@ -636,8 +691,16 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
           providerId,
           model,
           runtime,
+          models: intelligentSchedulingModels(
+            params.intelligentSchedulingEnabled,
+            params.subagentProviders ?? [],
+          ),
           sessionId,
-          templates: enabledSubagentTemplates(agentTemplates),
+          templates: configuredSubagentTemplates(
+            agentTemplates,
+            params.subagentTemplates,
+            params.intelligentSchedulingEnabled === true,
+          ),
           store: subagentStore,
           scheduler: subagentScheduler,
         }
@@ -657,6 +720,10 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
   });
 
   const preCompactionStartedAt = perfNowMs();
+  schedulingSection = intelligentSchedulingPrompt(
+    params.intelligentSchedulingEnabled,
+    combinedTools.map((tool) => tool.name),
+  );
   await compaction.maybeCompactPreSend({
     budgetContext: withAgentRuntimeContext(
       buildPreparedContext(getNextConversationState(), combinedTools, {
@@ -964,6 +1031,10 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
     pendingAgentContext = null;
 
     const scope = cancellation.deriveScope();
+    const deadlineScope = schedulingDeadlineSignal(
+      scope.controller.signal,
+      subagentScheduler.executionBudget?.snapshot().deadlineAt,
+    );
     compaction.beginRequest(agentContext, getNextConversationState());
 
     try {
@@ -986,6 +1057,10 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
         resolveToolChoice: planRunPolicy ? () => planRunPolicy.resolveToolChoice() : undefined,
         maxRounds: planRunPolicy?.maxRounds(),
         onRequestStart: ({ round, context: requestContext, toolsSuffix }) => {
+          backgroundModelContext = {
+            systemPrompt: requestContext.systemPrompt,
+            messages: requestContext.messages.slice(),
+          };
           const activeSources = new Set(
             currentTrajectoryRuntimeContext.entries.map((entry) => entry.source),
           );
@@ -1317,7 +1392,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
             emittedMessages: [],
           };
         },
-        signal: scope.controller.signal,
+        signal: deadlineScope.signal,
         debugLogger: trajectoryDebugLogger,
       });
       finishAgentPerfSpan(
@@ -1429,6 +1504,7 @@ export async function runAgentConversationTurn(params: RunAgentConversationTurnP
         midStreamProtectionDisabled = true;
       }
     } finally {
+      deadlineScope.dispose();
       scope.release();
     }
   }

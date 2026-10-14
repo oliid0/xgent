@@ -7,6 +7,17 @@ test("native settings mirrors compact navigation and persists shared system, pro
   let discoveryOptions;
   let discoveryError;
   let discoveryPause;
+  const scheduleCalls = [];
+  const homeCalls = [];
+  const permissionCalls = [];
+  const home = { data: null, busy: false, error: "", async refresh() { homeCalls.push("read"); home.data = { source: "homekit", observedAtMs: 1234, truncated: false, records: [] }; } };
+  home.setPower=async request=>homeCalls.push(["power",request]);
+  const schedule = { kind: "event", calendarId: "actual-destination", title: "Meeting", day: "2099-10-09", time: "20:00", duration: 30, recurrence: "none",
+    calendars: { calendars: [{ id: "actual-destination", title: "Work", source: "device-account" }], truncated: false }, records: [], busy: false, error: "", receipt: null, canSave: true };
+  for (const key of ["kind", "calendarId", "title", "day", "time", "duration", "recurrence"])
+    schedule[`set${key[0].toUpperCase()}${key.slice(1)}`] = value => { schedule[key] = value; };
+  schedule.load = async () => { scheduleCalls.push("load"); };
+  schedule.save = async () => { scheduleCalls.push(["save", schedule.title, schedule.calendarId]); };
   const states = [];
   let cursor = 0;
   const locale = {
@@ -17,6 +28,7 @@ test("native settings mirrors compact navigation and persists shared system, pro
     react: {
       useSyncExternalStore(_subscribe, getSnapshot) { return getSnapshot(); },
       useEffect() {},
+      useCallback(callback) { return callback; },
       useRef(current) {
         const index = cursor++;
         return states[index] ??= { current };
@@ -42,6 +54,14 @@ test("native settings mirrors compact navigation and persists shared system, pro
       },
     },
     "../pages/settings/CronSection": { CronSection: "CronSection" },
+    "../lib/connectors/useMobileSchedule": { useMobileSchedule: () => schedule },
+    "../lib/connectors/useMobileHome": { useMobileHome: () => home },
+    "../lib/mobileAssistant": {
+      async mobileAssistantStatus() { return { available: true, backend: "ios-native", homeAvailable: true, permissionAliases: { calendar: "calendar", reminders: "reminders", home: "home" } }; },
+      async checkMobileAssistantPermissions() { return { calendar: "granted", reminders: "granted" }; },
+      async requestMobileAssistantPermission(alias) { permissionCalls.push(alias); return { calendar: "granted", reminders: "granted", [alias]: "granted" }; },
+      normalizeMobileAssistantPermissions: (_status, states) => states,
+    },
     "../pages/settings/SshSettingsSection": { SshSettingsSection: "SshSettingsSection" },
     "../pages/settings/ComputerUseSection": { ComputerUseSection: "ComputerUseSection" },
     "../pages/settings/GlobalShortcutsSection": { GlobalShortcutsSection: "GlobalShortcutsSection" },
@@ -294,10 +314,54 @@ test("native settings mirrors compact navigation and persists shared system, pro
   assert.ok(settings.customProviders.at(-1).activeModels.includes("example-model"));
   await dispatch("back");
   await dispatch("nav:mobileAssistant");
+  await dispatch("refresh-permissions");
+  assert.ok(document.nodes.find(node => node.id === "home-inventory").children.some(node => node.id === "home-not-read"));
+  await dispatch("home-read"); assert.deepEqual(homeCalls, ["read"]);
+  assert.ok(document.nodes.find(node => node.id === "home-inventory").children.some(node => node.id === "home-empty"));
+  home.data.records = [{ kind: "home", id: "actual-home-identity", homeId: "actual-home-identity", name: "My home" }]; render();
+  const observedHome = document.nodes.find(node => node.id === "home-inventory").children.find(node => node.id === "home-record");
+  assert.equal(observedHome.variant, "connector-data-list");
+  assert.equal(observedHome.children[0].label, "My home");
+  assert.equal(observedHome.children[0].text, "settings.connectors.homeKind.home");
+  assert.equal(observedHome.children[0].action, undefined);
+  home.data.records.push({kind:"accessory",id:"accessory-id",homeId:"actual-home-identity",name:"Light",reachable:true,powerControls:[{id:"power-id",serviceId:"service-id",name:"Light"}]});render();
+  await dispatch("home-power:power-id:on");
+  assert.deepEqual(homeCalls.at(-1),["power",{homeId:"actual-home-identity",accessoryId:"accessory-id",serviceId:"service-id",characteristicId:"power-id",power:true}]);
+  home.busy=true;render();assert.equal(rendered.props.handlers.get(actionFor("home-power:power-id:off")).enabled,false);home.busy=false;
+  home.error = "HomeKit access revoked"; home.data = null; render();
+  assert.ok(document.nodes.find(node => node.id === "home-inventory").children.some(node => node.id === "home-error" && node.label === home.error));
+  home.busy = true; render(); assert.equal(rendered.props.handlers.get(actionFor("home-read")).enabled, false);
+  home.busy = false; home.error = ""; render();
+  assert.ok(document.nodes.some(node => node.id === "schedule-form"));
+  await dispatch("schedule-load");
+  schedule.records = [{ id: "actual-observed-event", title: "Meeting", time: null, source: "Work" }]; render();
+  const observedSchedule = document.nodes.find(node => node.id === "schedule-form").children.find(node => node.id === "schedule-record");
+  assert.equal(observedSchedule.variant, "connector-data-list");
+  assert.equal(observedSchedule.children[0].label, "Meeting");
+  assert.equal(observedSchedule.children[0].text, "Work");
+  const retiredScheduleSave = actionFor("schedule-save");
+  await dispatch("schedule-title", "Actual edited meeting");
+  const staleSchedule = await registry.dispatch({ surface: "settings", action: retiredScheduleSave, value: null, requestId: String(++request) });
+  assert.equal(staleSchedule.ok, false, "a queued save from the previous draft cannot save a different record");
+  await dispatch("schedule-save");
+  assert.deepEqual(scheduleCalls, ["load", ["save", "Actual edited meeting", "actual-destination"]]);
   assert.ok(!document.nodes.flatMap((node) => node.children ?? []).some((node) => node.id === "policy:Bash"));
   assert.equal((await dispatch("personal-policy:clipboard", "deny")).ok, true);
   assert.equal(settings.system.toolPolicies["personal:clipboard"], "deny");
   assert.ok(document.nodes.some((node) => node.id === "personal-access"));
+  const connectorNodes = document.nodes.find(node => node.id === "connector-catalog").children;
+  assert.deepEqual(connectorNodes.filter(node => node.id.startsWith("connector:")).map(node => node.id), ["connector:contacts", "connector:health", "connector:home"]);
+  assert.equal(connectorNodes.find(node => node.id === "connector:contacts").action, undefined);
+  assert.equal((await dispatch("connector:home")).ok, true);
+  assert.deepEqual(permissionCalls, ["home"]);
+  await dispatch("connector-tab", "connected");
+  assert.deepEqual(document.nodes.find(node => node.id === "connector-catalog").children.filter(node => node.id.startsWith("connector:")).map(node => node.id), ["connector:calendar", "connector:reminders", "connector:home"]);
+  await dispatch("connector:calendar");
+  await dispatch("connector:calendar:policy", "deny");
+  assert.equal(settings.system.toolPolicies["personal:calendar"], "deny");
+  assert.ok(document.nodes.find(node => node.id === "connector-catalog").children.some(node => node.id === "connector:calendar"));
+  await dispatch("connector-search", "no matching connector");
+  assert.ok(document.nodes.find(node => node.id === "connector-catalog").children.some(node => node.id === "connector-empty"));
   await dispatch("back");
   await dispatch("nav:toolPermissions");
   const allPolicyNodes = nodes => nodes.flatMap(node => [node, ...allPolicyNodes(node.children ?? [])]);
@@ -387,6 +451,7 @@ test("native Shell install reports progress, errors, and live and final package 
     react: {
       useSyncExternalStore(_subscribe, getSnapshot) { return getSnapshot(); },
       useEffect(effect) { effects.push(effect); },
+      useCallback(callback) { return callback; },
       useRef(current) {
         const index = cursor++;
         return states[index] ??= { current };

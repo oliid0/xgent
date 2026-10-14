@@ -1,4 +1,4 @@
-import { invoke } from "@xgent/runtime";
+import { invokeNative as invoke } from "@xgent/runtime";
 
 import { isNativeMobileRuntime } from "../runtimePlatform";
 import { createUuid } from "../shared/id";

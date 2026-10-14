@@ -2,6 +2,10 @@ import type { AssistantMessage, Context } from "@earendil-works/pi-ai";
 import type { HostedSearchBlock } from "@/lib/chat/hostedSearch";
 import { composeTrajectorySystemPrompt, serializeToolCatalog } from "@/lib/trajectory/sections";
 import type { TrajectoryUsage } from "@/lib/trajectory/types";
+import {
+  appendBackgroundChatContext,
+  captureBackgroundChatContext,
+} from "../../../lib/automation/backgroundChatContext";
 import type { CompactionController } from "../../../lib/chat/compaction/controller";
 import { estimateTextTokenUnits } from "../../../lib/chat/compaction/tokenLedger";
 import type { ProviderRuntimeConfig } from "../../../lib/chat/compaction/types";
@@ -324,6 +328,10 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
     trajectory.stepStart(textRound, headerId);
   }
 
+  const backgroundChatContext = await captureBackgroundChatContext(
+    conversationId,
+    cancellation.userStop.signal,
+  );
   await compaction.maybeCompactPreSend({
     budgetContext: buildPreparedContext(getNextConversationState(), undefined, {
       includeUploadedFilesMetadata: true,
@@ -339,6 +347,13 @@ export async function runTextConversationTurn(params: RunTextConversationTurnPar
         includeUploadedFilesMetadata: true,
       });
     pendingTextContext = null;
+    contextWithSkills = {
+      ...contextWithSkills,
+      systemPrompt: appendBackgroundChatContext(
+        contextWithSkills.systemPrompt,
+        backgroundChatContext,
+      ),
+    };
     compaction.beginRequest(contextWithSkills, getNextConversationState());
     hookLifecycle.startTurn(textRound);
     textModeUsesLiveRounds = false;

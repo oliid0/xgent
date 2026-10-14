@@ -38,7 +38,9 @@ pub fn open_automation_connection() -> Result<Connection, String> {
         .map_err(|e| format!("设置 SQLite busy_timeout 失败：{e}"))?;
     conn.pragma_update(None, "journal_mode", "WAL")
         .map_err(|e| format!("启用 SQLite WAL 失败：{e}"))?;
-    conn.pragma_update(None, "synchronous", "NORMAL")
+    // Action intents must be durable before invoking external systems. WAL
+    // NORMAL can lose acknowledged commits on power loss; FULL syncs commits.
+    conn.pragma_update(None, "synchronous", "FULL")
         .map_err(|e| format!("设置 SQLite synchronous 失败：{e}"))?;
     Ok(conn)
 }
@@ -88,6 +90,422 @@ pub fn ensure_schema(conn: &Connection) -> Result<(), String> {
             lease_expires_at INTEGER,
             request_json TEXT
         );
+        CREATE TABLE IF NOT EXISTS automation_background_tasks (
+            request_id TEXT PRIMARY KEY,
+            execution_id TEXT NOT NULL UNIQUE,
+            input_json TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_artifacts (
+            artifact_id TEXT PRIMARY KEY,
+            execution_id TEXT NOT NULL,
+            relative_path TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
+            bytes INTEGER NOT NULL,
+            content BLOB NOT NULL,
+            created_at INTEGER NOT NULL,
+            UNIQUE (execution_id, relative_path, content_hash)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_configuration_bindings (
+            execution_id TEXT PRIMARY KEY,
+            binding TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_plans (
+            execution_id TEXT PRIMARY KEY,
+            plan_json TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_outcomes (
+            execution_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            state TEXT NOT NULL,
+            evidence_json TEXT,
+            reason TEXT,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (execution_id, branch_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_leases (
+            execution_id TEXT PRIMARY KEY,
+            attempt INTEGER NOT NULL,
+            generation INTEGER NOT NULL,
+            token TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_wait_conditions (
+            execution_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            tool_name TEXT,
+            inventory_change INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (execution_id, branch_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_cloud_waits (
+            execution_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            call_id TEXT NOT NULL,
+            PRIMARY KEY (execution_id, branch_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_result_watches (
+            request_id TEXT PRIMARY KEY,
+            source_host_id TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1,
+            retry_at INTEGER NOT NULL DEFAULT 0,
+            probes INTEGER NOT NULL DEFAULT 0,
+            last_digest TEXT,
+            execution_id TEXT,
+            last_revision INTEGER NOT NULL DEFAULT 0,
+            last_state TEXT,
+            last_received_at INTEGER
+        );
+        CREATE INDEX IF NOT EXISTS idx_result_watches_due ON automation_result_watches (active, retry_at);
+        CREATE TABLE IF NOT EXISTS automation_result_inbox (
+            sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+            entry_id TEXT NOT NULL UNIQUE,
+            source_host_id TEXT NOT NULL,
+            request_id TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            received_at INTEGER NOT NULL,
+            read_at INTEGER,
+            UNIQUE (source_host_id, request_id, content_hash)
+        );
+        CREATE TABLE IF NOT EXISTS automation_result_notifications (
+            entry_id TEXT PRIMARY KEY NOT NULL REFERENCES automation_result_inbox(entry_id),
+            accepted_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS automation_result_responses (
+            resume_id TEXT PRIMARY KEY,
+            entry_id TEXT NOT NULL,
+            source_host_id TEXT NOT NULL,
+            request_id TEXT NOT NULL,
+            wait_id TEXT NOT NULL UNIQUE,
+            response TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            retry_at INTEGER NOT NULL DEFAULT 0,
+            probes INTEGER NOT NULL DEFAULT 0,
+            result_json TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_result_response_due
+            ON automation_result_responses (retry_at) WHERE result_json IS NULL;
+        CREATE TABLE IF NOT EXISTS automation_submission_outbox (
+            sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+            request_id TEXT NOT NULL UNIQUE,
+            initiating_host_id TEXT NOT NULL,
+            source_host_id TEXT NOT NULL,
+            input_json TEXT NOT NULL,
+            origin_json TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            retry_at INTEGER NOT NULL DEFAULT 0,
+            probes INTEGER NOT NULL DEFAULT 0,
+            last_error TEXT,
+            result_json TEXT,
+            cancel_requested INTEGER NOT NULL DEFAULT 0,
+            cancel_json TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_submission_due ON automation_submission_outbox (initiating_host_id, retry_at);
+        CREATE TABLE IF NOT EXISTS automation_background_waits (
+            wait_id TEXT PRIMARY KEY,
+            execution_id TEXT NOT NULL,
+            input_json TEXT NOT NULL,
+            automatic_tools_json TEXT NOT NULL,
+            known_tools_json TEXT NOT NULL,
+            retry_on_inventory_change INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            retry_at INTEGER NOT NULL,
+            probes INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_background_waits_execution ON automation_background_waits (execution_id, created_at DESC);
+        CREATE TABLE IF NOT EXISTS automation_background_resumptions (
+            resume_id TEXT PRIMARY KEY,
+            execution_id TEXT NOT NULL,
+            wait_id TEXT NOT NULL UNIQUE,
+            input_json TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_plan_resolutions (
+            execution_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            criteria_json TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (execution_id, branch_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_operation_leases (
+            execution_id TEXT NOT NULL,
+            call_id TEXT NOT NULL,
+            attempt INTEGER NOT NULL,
+            generation INTEGER NOT NULL,
+            token TEXT NOT NULL,
+            PRIMARY KEY (execution_id, call_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_prompt_completion_outbox (
+            execution_id TEXT PRIMARY KEY,
+            input_json TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_checkpoints (
+            execution_id TEXT PRIMARY KEY,
+            revision INTEGER NOT NULL,
+            context_json TEXT NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_operations (
+            sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+            execution_id TEXT NOT NULL,
+            call_id TEXT NOT NULL,
+            tool_name TEXT NOT NULL,
+            arguments_json TEXT NOT NULL,
+            context_revision INTEGER NOT NULL,
+            state TEXT NOT NULL,
+            result_json TEXT,
+            is_error INTEGER NOT NULL DEFAULT 0,
+            started_at INTEGER NOT NULL,
+            finished_at INTEGER,
+            UNIQUE (execution_id, call_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_children (
+            execution_id TEXT NOT NULL,
+            call_id TEXT NOT NULL,
+            child_request_id TEXT NOT NULL UNIQUE,
+            peer_id TEXT NOT NULL,
+            issuer_host_id TEXT NOT NULL,
+            input_json TEXT NOT NULL,
+            issued_at INTEGER NOT NULL,
+            receipt_json TEXT,
+            observed_json TEXT,
+            observed_execution_id TEXT,
+            observed_revision INTEGER NOT NULL DEFAULT 0,
+            observed_state TEXT,
+            observed_success INTEGER NOT NULL DEFAULT 0,
+            terminal_confirmed INTEGER NOT NULL DEFAULT 0,
+            cancel_requested INTEGER NOT NULL DEFAULT 0,
+            cancel_acknowledged INTEGER NOT NULL DEFAULT 0,
+            retry_at INTEGER NOT NULL,
+            probes INTEGER NOT NULL DEFAULT 0,
+            probe_token TEXT,
+            last_error TEXT,
+            PRIMARY KEY (execution_id, call_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_background_children_due ON automation_background_children (retry_at);
+        CREATE TABLE IF NOT EXISTS automation_background_task_joins (
+            execution_id TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('child','cloud','video')),
+            call_id TEXT NOT NULL,
+            wait_id TEXT NOT NULL,
+            retry_at INTEGER NOT NULL DEFAULT 0,
+            wake_consumed INTEGER NOT NULL DEFAULT 0 CHECK (wake_consumed IN (0,1)),
+            PRIMARY KEY (execution_id, kind, call_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_background_task_joins_wait
+            ON automation_background_task_joins (execution_id, wait_id, kind, wake_consumed);
+        CREATE TABLE IF NOT EXISTS automation_background_child_waits (
+            execution_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            call_id TEXT NOT NULL,
+            wake_consumed INTEGER NOT NULL DEFAULT 0,
+            retry_at INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (execution_id, branch_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_child_wait_events (
+            execution_id TEXT NOT NULL,
+            call_id TEXT NOT NULL,
+            wait_id TEXT NOT NULL,
+            consumed_at INTEGER NOT NULL,
+            PRIMARY KEY (execution_id, call_id, wait_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_child_resumes (
+            execution_id TEXT NOT NULL,
+            call_id TEXT NOT NULL,
+            peer_id TEXT NOT NULL,
+            issuer_host_id TEXT NOT NULL,
+            child_execution_id TEXT NOT NULL,
+            input_json TEXT NOT NULL,
+            issued_at INTEGER NOT NULL,
+            receipt_json TEXT,
+            retry_at INTEGER NOT NULL,
+            probes INTEGER NOT NULL DEFAULT 0,
+            probe_token TEXT,
+            last_error TEXT,
+            PRIMARY KEY (execution_id, call_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_background_child_resumes_due ON automation_background_child_resumes (retry_at);
+        CREATE VIEW IF NOT EXISTS automation_background_child_operations
+            (execution_id,call_id,peer_id,issuer_host_id,receipt_json,issued_at,action) AS
+            SELECT execution_id,call_id,peer_id,issuer_host_id,receipt_json,issued_at,'submit'
+                FROM automation_background_children
+            UNION ALL
+            SELECT execution_id,call_id,peer_id,issuer_host_id,receipt_json,issued_at,'resume'
+                FROM automation_background_child_resumes;
+        CREATE TABLE IF NOT EXISTS automation_background_cloud_launches (
+            execution_id TEXT NOT NULL,
+            call_id TEXT NOT NULL,
+            task_id TEXT NOT NULL UNIQUE,
+            arguments_hash TEXT NOT NULL,
+            owner TEXT NOT NULL,
+            repository TEXT NOT NULL,
+            runner TEXT NOT NULL,
+            issued_at INTEGER NOT NULL,
+            result_json TEXT,
+            PRIMARY KEY (execution_id, call_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_cloud_launch_failures (
+            execution_id TEXT NOT NULL,
+            call_id TEXT NOT NULL,
+            error TEXT NOT NULL,
+            recorded_at INTEGER NOT NULL,
+            PRIMARY KEY (execution_id,call_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_cloud_completions (
+            execution_id TEXT NOT NULL,
+            call_id TEXT NOT NULL,
+            owner TEXT NOT NULL,
+            repository TEXT NOT NULL,
+            task_id TEXT NOT NULL,
+            run_id INTEGER NOT NULL CHECK(run_id > 0),
+            conclusion TEXT NOT NULL CHECK(length(conclusion) BETWEEN 1 AND 64),
+            status_json TEXT NOT NULL CHECK(json_valid(status_json) AND length(CAST(status_json AS BLOB)) <= 8192
+                AND json_type(status_json,'$.state') IS 'text' AND json_extract(status_json,'$.state')='completed'
+                AND json_type(status_json,'$.taskId') IS 'text' AND json_extract(status_json,'$.taskId')=task_id
+                AND json_type(status_json,'$.runId') IS 'integer' AND json_extract(status_json,'$.runId')=run_id
+                AND json_type(status_json,'$.conclusion') IS 'text' AND json_extract(status_json,'$.conclusion')=conclusion),
+            observed_at INTEGER NOT NULL,
+            PRIMARY KEY(execution_id,call_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_cloud_recoveries (
+            execution_id TEXT PRIMARY KEY,
+            call_id TEXT NOT NULL,
+            wait_id TEXT NOT NULL UNIQUE,
+            retry_at INTEGER NOT NULL,
+            probes INTEGER NOT NULL DEFAULT 0,
+            last_error TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_background_cloud_recoveries_due ON automation_background_cloud_recoveries (retry_at);
+        CREATE TABLE IF NOT EXISTS automation_background_cloud_cancellations (
+            execution_id TEXT NOT NULL,
+            call_id TEXT NOT NULL,
+            requested_at INTEGER NOT NULL,
+            retry_at INTEGER NOT NULL,
+            probes INTEGER NOT NULL DEFAULT 0,
+            probe_token TEXT NOT NULL DEFAULT '',
+            last_error TEXT,
+            run_id INTEGER,
+            observed_state TEXT,
+            conclusion TEXT,
+            accepted_at INTEGER,
+            terminal_at INTEGER,
+            PRIMARY KEY (execution_id,call_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_background_cloud_cancellations_due ON automation_background_cloud_cancellations (retry_at) WHERE terminal_at IS NULL;
+        CREATE TABLE IF NOT EXISTS automation_background_compactions (
+            execution_id TEXT NOT NULL,
+            source_revision INTEGER NOT NULL,
+            checkpoint_revision INTEGER NOT NULL,
+            source_context_json TEXT NOT NULL,
+            source_hash TEXT NOT NULL,
+            context_hash TEXT NOT NULL,
+            summary_json TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (execution_id, source_revision)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_device_channels (
+            request_id TEXT PRIMARY KEY,
+            initiating_host_id TEXT NOT NULL,
+            verifier BLOB NOT NULL CHECK (LENGTH(verifier) = 32)
+        );
+        CREATE TABLE IF NOT EXISTS automation_mobile_connector_writes (
+            operation_id TEXT PRIMARY KEY,
+            device_host_id TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            request_json TEXT NOT NULL,
+            destination_json TEXT NOT NULL,
+            state TEXT NOT NULL CHECK (state IN ('running', 'succeeded', 'unknown')),
+            result_json TEXT,
+            error TEXT,
+            started_at INTEGER NOT NULL,
+            finished_at INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS automation_mobile_branch_plans (
+            request_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            entry_id TEXT NOT NULL,
+            plan_json TEXT NOT NULL,
+            acknowledged INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (request_id, branch_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_mobile_branch_action_owners (
+            operation_id TEXT PRIMARY KEY NOT NULL,
+            request_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            entry_id TEXT NOT NULL,
+            action_index INTEGER NOT NULL CHECK (action_index BETWEEN 0 AND 7)
+        );
+        INSERT OR IGNORE INTO automation_mobile_branch_action_owners (operation_id,request_id,branch_id,entry_id,action_index)
+            SELECT json_extract(a.value, '$.input.operationId'),p.request_id,p.branch_id,p.entry_id,CAST(a.key AS INTEGER)
+            FROM automation_mobile_branch_plans p, json_each(p.plan_json, '$.actions') a;
+        CREATE TABLE IF NOT EXISTS automation_mobile_branch_grants (
+            request_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            plan_hash TEXT NOT NULL,
+            revision INTEGER NOT NULL CHECK (revision > 0),
+            decision TEXT NOT NULL CHECK (decision IN ('approved','revoked')),
+            approved_at INTEGER,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (request_id, branch_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_mobile_branch_reads (
+            request_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            context_hash TEXT NOT NULL,
+            revision INTEGER NOT NULL CHECK (revision > 0),
+            decision TEXT NOT NULL CHECK (decision IN ('approved','revoked')),
+            selections_json TEXT NOT NULL,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (request_id, branch_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_device_actions (
+            execution_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            plan_json TEXT NOT NULL,
+            receipt_json TEXT,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (execution_id, branch_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_mobile_branch_planning (
+            request_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            attempts INTEGER NOT NULL CHECK (attempts BETWEEN 1 AND 3),
+            PRIMARY KEY (request_id, branch_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_mobile_branch_reviews (
+            request_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            recovery INTEGER NOT NULL DEFAULT 0 CHECK (recovery >= 0),
+            labels_json TEXT NOT NULL DEFAULT '[]',
+            last_error TEXT,
+            failed_attempt INTEGER,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (request_id, branch_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_device_wakes (
+            execution_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            PRIMARY KEY (execution_id, branch_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_device_planning_scopes (
+            execution_id TEXT NOT NULL, branch_id TEXT NOT NULL, scope_key TEXT NOT NULL,
+            scope_json TEXT NOT NULL, PRIMARY KEY(execution_id,branch_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_device_planning_calls (
+            execution_id TEXT NOT NULL, call_id TEXT NOT NULL, branch_id TEXT NOT NULL,
+            scope_key TEXT NOT NULL, kind TEXT NOT NULL, request_json TEXT NOT NULL,
+            result_json TEXT, created_at INTEGER NOT NULL, PRIMARY KEY(execution_id,call_id)
+        );
+        CREATE TABLE IF NOT EXISTS automation_background_device_planning_wakes (
+            execution_id TEXT PRIMARY KEY
+        );
+        CREATE TABLE IF NOT EXISTS automation_mobile_device_planning_receipts (
+            request_id TEXT NOT NULL, branch_id TEXT NOT NULL, call_id TEXT NOT NULL,
+            scope_key TEXT NOT NULL, result_json TEXT NOT NULL,
+            PRIMARY KEY(request_id,branch_id,call_id)
+        );
         CREATE INDEX IF NOT EXISTS idx_automation_cron_runs_task
             ON automation_cron_runs (task_id, started_at DESC);
         CREATE INDEX IF NOT EXISTS idx_automation_cron_runs_state
@@ -95,6 +513,26 @@ pub fn ensure_schema(conn: &Connection) -> Result<(), String> {
         ",
     )
     .map_err(|e| format!("初始化 automation 表失败：{e}"))?;
+    conn.execute_batch(include_str!("foreground_attention.sql"))
+        .map_err(|e| format!("Initialize foreground attention failed: {e}"))?;
+    conn.execute_batch(include_str!("proactive.sql"))
+        .map_err(|e| format!("Initialize proactive rules: {e}"))?;
+    conn.execute_batch(include_str!("goals.sql"))
+        .map_err(|e| format!("Initialize goals: {e}"))?;
+    conn.execute_batch(include_str!("budget.sql"))
+        .map_err(|e| format!("Initialize execution budget: {e}"))?;
+    conn.execute_batch(include_str!("child_artifacts.sql"))
+        .map_err(|e| format!("Initialize child artifact provenance: {e}"))?;
+    conn.execute_batch(include_str!("cloud_artifacts.sql"))
+        .map_err(|e|format!("Initialize owned cloud artifact provenance: {e}"))?;
+    conn.execute_batch(include_str!("artifact_parts.sql"))
+        .map_err(|e| format!("Initialize bounded artifact pieces: {e}"))?;
+    conn.execute_batch(include_str!("videos.sql"))
+        .map_err(|e| format!("Initialize owned video jobs: {e}"))?;
+    conn.execute_batch(include_str!("result_delivery.sql"))
+        .map_err(|e| format!("Initialize scoped OS result delivery: {e}"))?;
+    conn.execute("INSERT OR IGNORE INTO automation_meta (key, value) VALUES ('goal_store_id.v1', ?1)",
+        params![uuid::Uuid::new_v4().to_string()]).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -494,13 +932,16 @@ pub fn read_runs(
 }
 
 /// Deletes finished runs beyond the per-task retention window plus anything
-/// older than the global age cap. Called inside the same transaction as the
-/// insert that grows the table.
+/// older than the global age cap. Delegated results remain available to an
+/// offline initiating client; they need explicit inbox acknowledgement/retention.
+/// Called inside the same transaction as the insert that grows the table.
 pub fn prune_runs(conn: &Connection, task_id: &str) -> Result<(), String> {
     conn.execute(
         &format!(
             "DELETE FROM automation_cron_runs
-             WHERE task_id = ?1 AND state IN ('done', 'expired') AND execution_id NOT IN (
+             WHERE task_id = ?1 AND state IN ('done', 'expired')
+             AND NOT EXISTS (SELECT 1 FROM automation_background_tasks b WHERE b.execution_id = automation_cron_runs.execution_id)
+             AND execution_id NOT IN (
                  SELECT execution_id FROM automation_cron_runs
                  WHERE task_id = ?1 AND state IN ('done', 'expired')
                  ORDER BY started_at DESC, execution_id DESC
@@ -512,7 +953,8 @@ pub fn prune_runs(conn: &Connection, task_id: &str) -> Result<(), String> {
     .map_err(|e| format!("修剪 automation_cron_runs 失败：{e}"))?;
     conn.execute(
         "DELETE FROM automation_cron_runs
-         WHERE state IN ('done', 'expired') AND started_at < ?1",
+         WHERE state IN ('done', 'expired') AND started_at < ?1
+         AND NOT EXISTS (SELECT 1 FROM automation_background_tasks b WHERE b.execution_id = automation_cron_runs.execution_id)",
         params![now_ms() - RUN_RETENTION_MAX_AGE_MS],
     )
     .map_err(|e| format!("按时限修剪 automation_cron_runs 失败：{e}"))?;

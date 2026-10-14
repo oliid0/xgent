@@ -43,6 +43,68 @@ struct NativePermissionRequest {
 }
 
 impl<R: Runtime> MobileAssistant<R> {
+    pub fn discover_workstations(&self) -> crate::Result<crate::NearbyWorkstations> {
+        self.0.run_mobile_plugin("discoverWorkstations", ()).map_err(Into::into)
+    }
+    #[cfg(any(target_os="android",target_os="ios"))]
+    pub fn configure_result_delivery(&self, request: crate::ResultDeliveryConfiguration) -> crate::Result<bool> {
+        self.0.run_mobile_plugin("configureResultDelivery", request).map_err(Into::into)
+    }
+    #[cfg(any(target_os="ios",target_os="android"))]
+    pub fn configure_event_delivery(&self,request:crate::EventDeliveryConfiguration)->crate::Result<bool>{
+        self.0.run_mobile_plugin("configureEventDelivery",request).map_err(Into::into)
+    }
+    #[cfg(any(target_os="ios",target_os="android"))]
+    pub fn configure_health_events(&self, request: crate::HealthEventConfiguration) -> crate::Result<Vec<String>> {
+        self.0.run_mobile_plugin("configureHealthEvents",request).map_err(Into::into)
+    }
+    #[cfg(any(target_os="ios",target_os="android"))]
+    pub fn pending_health_events(&self) -> crate::Result<Vec<crate::HealthChangeEvent>> {
+        self.0.run_mobile_plugin("pendingHealthEvents",()).map_err(Into::into)
+    }
+    #[cfg(any(target_os="ios",target_os="android"))]
+    pub fn acknowledge_health_events(&self, request: crate::HealthEventAcknowledgement) -> crate::Result<()> {
+        self.0.run_mobile_plugin("acknowledgeHealthEvents",request).map_err(Into::into)
+    }
+    pub fn list_home_inventory(&self, request: crate::HomeInventoryRequest) -> crate::Result<crate::HomeInventoryResult> {
+        self.0.run_mobile_plugin("listHomeInventory", request).map_err(Into::into)
+    }
+    #[cfg(target_os="ios")]
+    pub fn configure_home_events(&self, request:crate::HomeEventConfiguration)->crate::Result<Vec<String>> {
+        self.0.run_mobile_plugin("configureHomeEvents",request).map_err(Into::into)
+    }
+    #[cfg(target_os="ios")]
+    pub fn home_event_sources(&self)->crate::Result<Vec<crate::HomeEventSource>> {
+        self.0.run_mobile_plugin("homeEventSources",()).map_err(Into::into)
+    }
+    #[cfg(target_os="ios")]
+    pub fn pending_home_events(&self)->crate::Result<Vec<crate::HomeChangeEvent>> {
+        self.0.run_mobile_plugin("pendingHomeEvents",()).map_err(Into::into)
+    }
+    #[cfg(target_os="ios")]
+    pub fn acknowledge_home_events(&self,request:crate::HealthEventAcknowledgement)->crate::Result<()> {
+        self.0.run_mobile_plugin("acknowledgeHomeEvents",request).map_err(Into::into)
+    }
+    #[cfg(target_os="ios")]
+    pub fn resolve_home_power_destination(&self, request: crate::HomePowerRequest) -> crate::Result<crate::HomePowerDestination> {
+        self.0.run_mobile_plugin("resolveHomePowerDestination",request).map_err(Into::into)
+    }
+    #[cfg(target_os="ios")]
+    pub fn set_home_power(&self, request: crate::HomePowerRequest) -> crate::Result<crate::MobileActionResult> {
+        self.0.run_mobile_plugin("setHomePower",request).map_err(Into::into)
+    }
+    #[cfg(target_os="android")]
+    pub fn available_health_event_metrics(&self) -> crate::Result<Vec<String>> {
+        self.0.run_mobile_plugin("availableHealthEventMetrics",()).map_err(Into::into)
+    }
+    // Internal Rust service only; no arbitrary-content public plugin command.
+    pub fn post_result_notification(&self, request: crate::ResultNotificationRequest) -> crate::Result<crate::ResultNotificationReceipt> {
+        self.0.run_mobile_plugin("postResultNotification", request).map_err(Into::into)
+    }
+
+    pub fn remove_result_notification(&self, request: crate::ResultNotificationRequest) -> crate::Result<()> {
+        self.0.run_mobile_plugin("removeResultNotification", request).map_err(Into::into)
+    }
     pub fn bluetooth_gatt(&self, request: crate::BluetoothGattRequest) -> crate::Result<crate::BluetoothGattResult> {
         self.0.run_mobile_plugin("bluetoothGatt", request).map_err(Into::into)
     }
@@ -57,6 +119,12 @@ impl<R: Runtime> MobileAssistant<R> {
     }
     pub fn request_health_metric_permission(&self, request: crate::HealthMetricRequest) -> crate::Result<MobilePermissionStates> {
         self.0.run_mobile_plugin("requestHealthMetricPermission", request).map_err(Into::into)
+    }
+
+    // Task scope revalidation only. Never requests or broadens OS permission;
+    // deliberately absent from the public JS plugin command list.
+    pub fn check_health_metric_permission(&self, request: crate::HealthMetricRequest) -> crate::Result<MobilePermissionStates> {
+        self.0.run_mobile_plugin("checkHealthMetricPermission", request).map_err(Into::into)
     }
 
     pub fn read_health_samples(&self, request: crate::HealthSamplesRequest) -> crate::Result<crate::HealthSamplesResult> {
@@ -157,6 +225,14 @@ impl<R: Runtime> MobileAssistant<R> {
         self.0
             .run_mobile_plugin("listCalendarEvents", request)
             .map_err(Into::into)
+    }
+
+    pub fn list_contacts(&self, request: crate::ContactListRequest) -> crate::Result<crate::ContactListResult> {
+        self.0.run_mobile_plugin("listContacts", request).map_err(Into::into)
+    }
+
+    pub fn list_calendars(&self, request: crate::CalendarListRequest) -> crate::Result<crate::CalendarListResult> {
+        self.0.run_mobile_plugin("listCalendars", request).map_err(Into::into)
     }
 
     pub fn list_reminders(

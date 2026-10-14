@@ -69,6 +69,9 @@ function createDefaultMocks() {
       Any(options = {}) {
         return { ...options };
       },
+      Unknown(options = {}) {
+        return { ...options };
+      },
       Record(key, value, options = {}) {
         return { type: "object", propertyNames: key, additionalProperties: value, ...options };
       },
@@ -257,6 +260,8 @@ export function createTsModuleLoader(options = {}) {
       const events = mocks.get("@tauri-apps/api/event") ?? {};
       const paths = mocks.get("@tauri-apps/api/path") ?? {};
       return {
+        invokeNative: core.invoke,
+        listenNative: events.listen ?? (async () => () => {}),
         invoke:
           core.invoke ??
           (() => {

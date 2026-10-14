@@ -15,6 +15,7 @@ import { useLocale } from "../../../i18n";
 import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { LiveTranscriptStore } from "../../../lib/chat/conversation/liveTranscriptStore";
 import type { ChatHistoryRecord } from "../../../lib/chat/history/chatHistory";
+import type { PreviewedFile } from "../../../lib/chat/messages/previewedFiles";
 import type { ScrollFollowHandle } from "../../../lib/chat-scroll/useScrollFollow";
 import type { AppSettings } from "../../../lib/settings";
 import {
@@ -31,7 +32,27 @@ const resolveNoEarlierHistory = () => Promise.resolve();
 const ignoreResend = () => undefined;
 const ignoreSettings = () => undefined;
 
+export function createSplitFileLinkHandler(ports: {
+  onOpenFileLink?: (link: ChatFileLink) => unknown;
+  onOpenPreviewedFile?: (file: PreviewedFile) => unknown;
+  onOpenWorkspaceFile: (path: string) => unknown;
+}) {
+  if (ports.onOpenFileLink) return ports.onOpenFileLink;
+  return async (link: ChatFileLink) => {
+    if (link.backgroundArtifact || Object.hasOwn(link, "fileSource")) {
+      if (!ports.onOpenPreviewedFile) throw new Error("Original file source is unavailable");
+      await ports.onOpenPreviewedFile({
+        path: link.path,
+        toolCallId: "",
+        fileSource: link.fileSource ?? null,
+        backgroundArtifact: link.backgroundArtifact,
+      });
+    } else await ports.onOpenWorkspaceFile(link.path);
+  };
+}
+
 export type SplitConversationPaneProps = {
+  onOpenPreviewedFile?: (file: PreviewedFile) => void;
   settings: AppSettings;
   width: number | string;
   conversationId: string;
@@ -56,6 +77,16 @@ export function SplitConversationPane(props: SplitConversationPaneProps) {
   const followRef = useRef<ScrollFollowHandle | null>(null);
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
+  const openFileLink = useCallback(
+    async (link: ChatFileLink) => {
+      try {
+        await createSplitFileLinkHandler(props)(link);
+      } catch (error) {
+        setSendError(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [props.onOpenFileLink, props.onOpenPreviewedFile, props.onOpenWorkspaceFile],
+  );
   const [submitting, setSubmitting] = useState(false);
   const approvalSubscribe = useCallback(
     (listener: () => void) => subscribeToolApprovalsForConversation(props.conversationId, listener),
@@ -235,7 +266,7 @@ export function SplitConversationPane(props: SplitConversationPaneProps) {
           liveTranscriptStore={props.liveTranscriptStore}
           isCompactionRunning={false}
           isReadOnly
-          onOpenFileLink={props.onOpenFileLink}
+          onOpenFileLink={openFileLink}
           onResendFromEdit={ignoreResend}
           onOpenSettings={ignoreSettings}
         />

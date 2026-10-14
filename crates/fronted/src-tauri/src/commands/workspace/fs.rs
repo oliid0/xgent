@@ -3318,6 +3318,228 @@ pub struct WriteBinaryResponse {
     pub file_id: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BinarySnapshot {
+    pub content_base64: String,
+    pub content_hash: String,
+    pub bytes: u64,
+}
+
+fn read_bounded_binary(target: &Path) -> Result<Vec<u8>, FsError> {
+    const MAX_BYTES: usize = 8 * 1024 * 1024;
+    let metadata = fs::metadata(target)?;
+    if !metadata.is_file() || metadata.len() > MAX_BYTES as u64 {
+        return Err(FsError::Other("Input must be a regular file of at most 8 MiB".to_string()));
+    }
+    let file = fs::File::open(target)?;
+    if !file.metadata()?.is_file() { return Err(FsError::Other("Input is not a regular file".to_string())); }
+    let mut bytes = Vec::new();
+    file.take((MAX_BYTES + 1) as u64).read_to_end(&mut bytes)?;
+    if bytes.len() > MAX_BYTES { return Err(FsError::Other("Input exceeds 8 MiB".to_string())); }
+    Ok(bytes)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn fs_snapshot_binary(workdir: String, path: String) -> Result<BinarySnapshot, FsCommandError> {
+    run_blocking_fs("fs_snapshot_binary", move || {
+        if skill_path_remainder(&path).is_some() {
+            return Err(FsCommandError::other("Background input must be a workspace file"));
+        }
+        let scoped = resolve_scoped_fs_path(&workdir, &path)?;
+        let target = resolve_existing_file_target(&scoped.root, &scoped.relative_path)?;
+        let bytes = read_bounded_binary(&target)?;
+        Ok(BinarySnapshot { content_base64: BASE64_STANDARD.encode(&bytes), content_hash: hash_bytes(&bytes), bytes: bytes.len() as u64 })
+    }).await
+}
+
+/// Local preparation from the accepted immutable DB snapshot. Existing bytes
+/// can be reused only if identical; never replace a changed or partial copy.
+pub(crate) fn create_background_input_copy(workdir: &str, path: &str, bytes: &[u8], expected_hash: &str) -> Result<(), String> {
+    let prepare = || -> Result<(), FsError> {
+        if bytes.len() > 8 * 1024 * 1024 || hash_bytes(bytes) != expected_hash {
+            return Err(FsError::Other("Input copy failed size/hash verification".to_string()));
+        }
+        let scoped = resolve_scoped_fs_path(workdir, path)?;
+        let raw = scoped.root.join(&scoped.relative_path);
+        let parent = ensure_parent_dir(&scoped.root, &raw)?;
+        let target = parent.join(raw.file_name().ok_or_else(|| FsError::Other("Invalid input destination".to_string()))?);
+        match fs::symlink_metadata(&target) {
+            Ok(metadata) => {
+                if !metadata.is_file() || metadata.file_type().is_symlink() {
+                    return Err(FsError::Other("Input copy is not a regular file".to_string()));
+                }
+                let existing = read_bounded_binary(&target)?;
+                if existing.len() != bytes.len() || hash_bytes(&existing) != expected_hash {
+                    return Err(FsError::Other("Input copy changed; refusing to overwrite it".to_string()));
+                }
+                return Ok(());
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(FsError::Io(error)),
+        }
+        let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&target)?;
+        if let Err(error) = file.write_all(bytes).and_then(|_| file.sync_all()) {
+            drop(file);
+            let _ = fs::remove_file(&target);
+            return Err(FsError::Io(error));
+        }
+        Ok(())
+    };
+    prepare().map_err(|error| error.to_string())
+}
+
+/// Import a verified immutable task artifact without replacing an existing file.
+fn streamed_file_identity(file:&fs::File,path:&Path) -> Result<String,String> {
+    #[cfg(unix)]
+    {Ok(file_identity(&file.metadata().map_err(|e|e.to_string())?,path))}
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawHandle;
+        use windows_sys::Win32::Storage::FileSystem::{GetFileInformationByHandle,BY_HANDLE_FILE_INFORMATION};
+        let _=path;let mut info:BY_HANDLE_FILE_INFORMATION=unsafe {std::mem::zeroed()};
+        if unsafe {GetFileInformationByHandle(file.as_raw_handle() as _,&mut info)}==0 {return Err("Artifact file handle identity is unavailable".into());}
+        Ok(format!("{}:{}",info.dwVolumeSerialNumber,(u64::from(info.nFileIndexHigh)<<32)|u64::from(info.nFileIndexLow)))
+    }
+}
+
+pub(crate) fn create_streamed_artifact_copy(workdir:&str,path:&str,source:&mut impl Read,
+    expected_bytes:u64,expected_hash:&str) -> Result<WriteBinaryResponse,String> {
+    use sha2::{Digest,Sha256};
+    if expected_bytes>512*1024*1024 || Path::new(path).is_absolute() || path.starts_with(SKILL_PATH_SCHEME) {
+        return Err("Artifact destination/length is outside its client scope".into());
+    }
+    let scoped=resolve_scoped_fs_path(workdir,path).map_err(|e|e.to_string())?;
+    let raw=scoped.root.join(&scoped.relative_path);let parent=ensure_parent_dir(&scoped.root,&raw).map_err(|e|e.to_string())?;
+    let target=parent.join(raw.file_name().ok_or("Artifact path must name a file")?);
+    let parent_identity=file_identity(&fs::metadata(&parent).map_err(|e|e.to_string())?,&parent);
+    if parent_identity.starts_with("path:") {return Err("Artifact directory identity is unavailable".into());}
+    let mut temporary=tempfile::NamedTempFile::new_in(&parent).map_err(|e|e.to_string())?;
+    let identity=streamed_file_identity(temporary.as_file(),temporary.path())?;
+    let copied=(|| {
+        let mut hash=Sha256::new();let mut total=0u64;let mut buffer=[0u8;65536];
+        loop {let count=source.read(&mut buffer).map_err(|e|e.to_string())?;if count==0 {break;}total+=count as u64;
+            if total>expected_bytes {return Err("Artifact copy exceeds its original manifest".to_string());}
+            temporary.as_file_mut().write_all(&buffer[..count]).map_err(|e|e.to_string())?;hash.update(&buffer[..count]);}
+        if total!=expected_bytes || format!("{:x}",hash.finalize())!=expected_hash {return Err("Artifact copy failed whole-file integrity verification".into());}
+        temporary.as_file().sync_all().map_err(|e|e.to_string())?;
+        let fresh_parent=ensure_parent_dir(&scoped.root,&raw).map_err(|e|e.to_string())?;
+        if fresh_parent!=parent || file_identity(&fs::metadata(&fresh_parent).map_err(|e|e.to_string())?,&fresh_parent)!=parent_identity
+            || !fs::metadata(temporary.path()).is_ok_and(|metadata|file_identity(&metadata,temporary.path())==identity) {
+            return Err("Artifact destination directory or temporary file changed during copy".into());
+        }
+        Ok(total)
+    })();
+    let total=match copied {Ok(total)=>total,Err(error)=>{
+        if !fs::metadata(temporary.path()).is_ok_and(|metadata|file_identity(&metadata,temporary.path())==identity) {
+            let (file,path)=temporary.into_parts();std::mem::forget(path);drop(file);
+        }
+        return Err(error);
+    }};
+    // Publish only completely verified bytes, without replacing an existing
+    // user file or exposing a partial destination after a process crash.
+    let file=temporary.persist_noclobber(&target).map_err(|error|error.error.to_string())?;
+    let canonical=fs::canonicalize(&target).map_err(|e|e.to_string())?;
+        if !canonical.starts_with(&scoped.root) {return Err("Artifact destination left its original root".into());}
+        let metadata=fs::metadata(&canonical).map_err(|e|e.to_string())?;
+        if file_identity(&metadata,&canonical)!=identity || metadata.len()!=total {return Err("Artifact destination changed during its copy".into());}
+    let response=WriteBinaryResponse {path:scoped.logical_path,bytes_written:total as usize,mtime_ms:metadata_mtime_ms(&metadata),
+        content_hash:expected_hash.into(),file_id:Some(identity.clone())};
+    drop(file);
+    Ok(response)
+}
+
+/// Reopen only a complete, unchanged local copy of the original artifact.
+/// Streaming verification supports media without allocating its bytes in IPC.
+pub(crate) fn verified_artifact_copy(workdir:&str,path:&str,expected_bytes:u64,expected_hash:&str)->Result<Option<WriteBinaryResponse>,String>{
+    use sha2::{Digest,Sha256};
+    if expected_bytes>512*1024*1024 || Path::new(path).is_absolute() || path.starts_with(SKILL_PATH_SCHEME){return Err("Invalid original artifact cache scope".into())}
+    let scoped=resolve_scoped_fs_path(workdir,path).map_err(|e|e.to_string())?;
+    match fs::symlink_metadata(scoped.root.join(&scoped.relative_path)){
+        Err(error) if error.kind()==io::ErrorKind::NotFound=>return Ok(None),
+        Err(error)=>return Err(error.to_string()),
+        Ok(metadata) if !metadata.is_file()=>return Err("Artifact cache is not a regular file".into()),
+        _=>{}
+    }
+    let target=resolve_existing_file_target(&scoped.root,&scoped.relative_path).map_err(|e|e.to_string())?;
+    let mut file=fs::File::open(&target).map_err(|e|e.to_string())?;
+    let before=file.metadata().map_err(|e|e.to_string())?;
+    if !before.is_file() || before.len()!=expected_bytes{return Err("Saved artifact differs from its original length".into())}
+    let identity=streamed_file_identity(&file,&target)?;
+    let mut hash=Sha256::new();let mut total=0u64;let mut buffer=[0u8;65536];
+    loop{let count=file.read(&mut buffer).map_err(|e|e.to_string())?;if count==0{break}total+=count as u64;
+        if total>expected_bytes{return Err("Saved artifact changed during verification".into())}hash.update(&buffer[..count]);}
+    if total!=expected_bytes || format!("{:x}",hash.finalize())!=expected_hash{return Err("Saved artifact failed integrity verification; existing file retained".into())}
+    let fresh=resolve_existing_file_target(&scoped.root,&scoped.relative_path).map_err(|e|e.to_string())?;
+    let metadata=fs::metadata(&fresh).map_err(|e|e.to_string())?;
+    if fresh!=target || file_identity(&metadata,&fresh)!=identity || metadata.len()!=total
+        || metadata_mtime_ms(&metadata)!=metadata_mtime_ms(&before){return Err("Saved artifact identity changed during verification".into())}
+    Ok(Some(WriteBinaryResponse{path:scoped.logical_path,bytes_written:total as usize,mtime_ms:metadata_mtime_ms(&metadata),content_hash:expected_hash.into(),file_id:Some(identity)}))
+}
+
+#[cfg(test)]
+mod received_artifact_cache_tests {
+    use super::*;
+    #[test]
+    fn cached_copy_is_available_offline_only_when_actual_complete_bytes_match(){
+        let root=tempfile::tempdir().unwrap();let workdir=root.path().to_string_lossy().into_owned();
+        let path="background-results/request/artifact/product.docx";
+        let bytes=b"Actual received Office bytes";let hash=hash_bytes(bytes);
+        assert!(verified_artifact_copy(&workdir,path,bytes.len() as u64,&hash).unwrap().is_none());
+        create_streamed_artifact_copy(&workdir,path,&mut Cursor::new(bytes),bytes.len() as u64,&hash).unwrap();
+        let saved=verified_artifact_copy(&workdir,path,bytes.len() as u64,&hash).unwrap().unwrap();
+        assert_eq!(saved.path,path);assert_eq!(saved.content_hash,hash);assert_eq!(saved.bytes_written,bytes.len());
+        fs::write(root.path().join(path),vec![b'x';bytes.len()]).unwrap();
+        assert!(verified_artifact_copy(&workdir,path,bytes.len() as u64,&hash).is_err());
+        assert_eq!(fs::read(root.path().join(path)).unwrap(),vec![b'x';bytes.len()],"Do not overwrite a changed local file");
+    }
+    #[test]
+    fn cached_artifact_cannot_leave_its_workspace_or_claim_different_size(){
+        let root=tempfile::tempdir().unwrap();let workdir=root.path().to_string_lossy().into_owned();
+        assert!(verified_artifact_copy(&workdir,"../outside",1,&"0".repeat(64)).is_err());
+        assert!(verified_artifact_copy(&workdir,"large",513*1024*1024,&"0".repeat(64)).is_err());
+        fs::write(root.path().join("file"),b"actual").unwrap();
+        assert!(verified_artifact_copy(&workdir,"file",1,&hash_bytes(b"actual")).is_err());
+    }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn fs_create_binary(
+    workdir: String, path: String, content_base64: String, expected_content_hash: String,
+) -> Result<WriteBinaryResponse, FsCommandError> {
+    run_blocking_fs("fs_create_binary", move || {
+        const MAX_BYTES: usize = 8 * 1024 * 1024;
+        if Path::new(&path).is_absolute() || path.starts_with(SKILL_PATH_SCHEME) {
+            return Err(FsError::Other("Artifact destination must be relative to the client workspace".to_string()).into());
+        }
+        if content_base64.len() > MAX_BYTES * 4 / 3 + 4 {
+            return Err(FsError::Other("Task artifact exceeds 8 MiB".to_string()).into());
+        }
+        let bytes = BASE64_STANDARD.decode(content_base64.as_bytes())
+            .map_err(|e| FsError::Other(format!("Invalid artifact base64: {e}")))?;
+        if bytes.len() > MAX_BYTES || hash_bytes(&bytes) != expected_content_hash {
+            return Err(FsError::Other("Task artifact failed size/hash verification".to_string()).into());
+        }
+        let scoped = resolve_scoped_fs_path(&workdir, &path)?;
+        let raw_target = scoped.root.join(&scoped.relative_path);
+        let parent = ensure_parent_dir(&scoped.root, &raw_target)?;
+        let name = raw_target.file_name().ok_or_else(|| FsError::Other("Artifact path must name a file".to_string()))?;
+        let target = parent.join(name);
+        let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&target).map_err(FsError::Io)?;
+        if let Err(error) = file.write_all(&bytes).and_then(|_| file.sync_all()) {
+            drop(file);
+            let _ = fs::remove_file(&target);
+            return Err(FsError::Io(error).into());
+        }
+        drop(file);
+        let canonical = fs::canonicalize(&target).map_err(FsError::Io)?;
+        let metadata = fs::metadata(&canonical).map_err(FsError::Io)?;
+        Ok(WriteBinaryResponse { path: scoped.logical_path, bytes_written: bytes.len(),
+            mtime_ms: metadata_mtime_ms(&metadata), content_hash: hash_bytes(&bytes),
+            file_id: Some(file_identity(&metadata, &canonical)) })
+    }).await
+}
+
 #[tauri::command(rename_all = "snake_case")]
 pub async fn fs_write_binary(
     workdir: String,
@@ -5244,6 +5466,34 @@ mod tests {
 
     fn init_fake_git_repo(workdir: &Path) {
         fs::create_dir_all(workdir.join(".git")).expect("create fake .git");
+    }
+
+    #[test]
+    fn background_input_copy_reuses_identical_bytes_and_preserves_changed_files() {
+        let workdir = unique_test_workdir("background-input");
+        fs::create_dir_all(&workdir).unwrap();
+        let relative = ".xgent-background-inputs/task/spec.pdf";
+        let bytes = [0, 255, 18, 128];
+        let root = workdir.to_str().unwrap();
+        create_background_input_copy(root, relative, &bytes, &hash_bytes(&bytes)).unwrap();
+        create_background_input_copy(root, relative, &bytes, &hash_bytes(&bytes)).unwrap();
+        assert_eq!(read_bounded_binary(&workdir.join(relative)).unwrap(), bytes);
+        fs::write(workdir.join(relative), b"changed").unwrap();
+        assert!(create_background_input_copy(root, relative, &bytes, &hash_bytes(&bytes)).is_err());
+        assert_eq!(fs::read(workdir.join(relative)).unwrap(), b"changed");
+        fs::remove_dir_all(workdir).unwrap();
+    }
+
+    #[test]
+    fn input_copy_rejects_wrong_hash_and_workspace_escape_before_creating_files() {
+        let workdir = unique_test_workdir("background-input-invalid");
+        fs::create_dir_all(&workdir).unwrap();
+        let root = workdir.to_str().unwrap();
+        assert!(create_background_input_copy(root, "not-created/input.pdf", b"input", "wrong").is_err());
+        assert!(!workdir.join("not-created").exists());
+        assert!(create_background_input_copy(root, "../escape.pdf", b"input", &hash_bytes(b"input")).is_err());
+        assert!(read_bounded_binary(&workdir).is_err());
+        fs::remove_dir_all(workdir).unwrap();
     }
 
     #[test]

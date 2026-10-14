@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tauri_plugin_opener::OpenerExt;
 
 use crate::services::cloud_execution::{
-    CloudExecutionService, CloudTaskArtifactResult, CloudTaskFailureReport, CloudTaskLocator,
+    CloudExecutionService, CloudTaskArtifactResult, CloudTaskExtractResult, CloudTaskFailureReport, CloudTaskLocator,
     CloudTaskStartInput, CloudTaskStartResult, CloudTaskStatus,
 };
 use crate::services::cloud_secret_vault::{CloudSecretVault, CloudSecretVaultStatus};
@@ -78,13 +78,24 @@ pub async fn cloud_task_failure_log(
 pub async fn cloud_task_download_artifact(
     locator: CloudTaskLocator,
     destination_dir: Option<String>,
+    include_partial: Option<bool>,
     service: tauri::State<'_, Arc<CloudExecutionService>>,
     vault: tauri::State<'_, Arc<CloudSecretVault>>,
 ) -> Result<CloudTaskArtifactResult, String> {
     let token = vault.github_token()?;
     service
-        .download_artifact(&token, &locator, destination_dir.as_deref())
+        .download_artifact(&token, &locator, destination_dir.as_deref(), include_partial.unwrap_or(false))
         .await
+}
+
+#[tauri::command]
+pub async fn cloud_task_extract_artifact(
+    locator: CloudTaskLocator, destination_dir: Option<String>, include_partial: Option<bool>,
+    service: tauri::State<'_, Arc<CloudExecutionService>>, vault: tauri::State<'_, Arc<CloudSecretVault>>,
+) -> Result<CloudTaskExtractResult, String> {
+    let token = vault.github_token()?;
+    let host_id = vault.worker_host_identity()?;
+    service.extract_artifact(&token, &locator, destination_dir.as_deref(), include_partial.unwrap_or(false), &host_id).await
 }
 
 #[tauri::command]

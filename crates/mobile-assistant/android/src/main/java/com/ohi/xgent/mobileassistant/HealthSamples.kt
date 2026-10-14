@@ -78,7 +78,7 @@ internal suspend fun readHealthMetricSamples(client: HealthConnectClient, args: 
     check(client.permissionController.getGrantedPermissions().contains(permission)) {
         "Health Connect permission for ${args.metric} is required"
     }
-    return when (args.metric) {
+    val result = when (args.metric) {
         "heart_rate" -> readMetricPage<HeartRateRecord>(client, args, "bpm") { record ->
             record.samples.asSequence()
                 .filter { it.time.toEpochMilli() >= args.startMs && it.time.toEpochMilli() < args.endMs }
@@ -100,4 +100,8 @@ internal suspend fun readHealthMetricSamples(client: HealthConnectClient, args: 
         }
         else -> throw IllegalArgumentException("Unsupported health metric")
     }
+    check(client.permissionController.getGrantedPermissions().contains(permission)) {
+        "Health Connect permission changed while reading ${args.metric}"
+    }
+    return result
 }

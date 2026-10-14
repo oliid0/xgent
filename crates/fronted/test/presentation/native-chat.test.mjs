@@ -774,6 +774,7 @@ test("native iPhone opens More as a sheet menu and keeps compact sidebar routes"
       onOpenSkillsHub: () => opened.push("skills"),
       onOpenMcpHub: () => opened.push("mcp"),
       onOpenBackgroundTasks: () => opened.push("scheduled"),
+      onOpenGoals: () => opened.push("goals"),
       onOpenRemote: () => opened.push("remote"),
       onNewConversation: () => opened.push("new-chat"),
     },
@@ -809,8 +810,8 @@ test("native iPhone opens More as a sheet menu and keeps compact sidebar routes"
   const layout = sidebar.nodes[0];
   const list = layout.children.find((node) => node.id === "sidebar-list");
   assert.deepEqual(
-    list.children.slice(0, 6).map((node) => node.id),
-    ["files", "skills", "scheduled", "remote", "mcp", "create-project"],
+    list.children.slice(0, 7).map((node) => node.id),
+    ["files", "skills", "scheduled", "goals", "remote", "mcp", "create-project"],
   );
   assert.equal(list.children.some((node) => node.id === "trajectory"), false);
   assert.equal(layout.children.some((node) => node.id === "sidebar-title"), true);
@@ -836,7 +837,7 @@ test("native iPhone opens More as a sheet menu and keeps compact sidebar routes"
       .children.some((node) => node.id === "project:project"), true,
   );
   h.render();
-  for (const action of ["files", "skills", "scheduled", "remote", "mcp", "new-chat", "settings"]) {
+  for (const action of ["files", "skills", "scheduled", "goals", "remote", "mcp", "new-chat", "settings"]) {
     assert.equal((await h.dispatch(action, null, "sidebar")).ok, true);
   }
   assert.deepEqual(opened, [
@@ -844,6 +845,7 @@ test("native iPhone opens More as a sheet menu and keeps compact sidebar routes"
     "library",
     "skills",
     "scheduled",
+    "goals",
     "remote",
     "mcp",
     "new-chat",
@@ -1092,11 +1094,11 @@ test("native context details retain overflow percentages while limiting the ring
 
 test("native sidebar retains the shared Soul presets, selected state, creation and desktop tool shortcuts", async () => {
   for (const mobile of [false, true]) {
-    const selected = [], created = [], terminals = [];
+    const selected = [], created = [], terminals = [], goals = [];
     const soul = { activeId: "default", saving: false, loading: false,
       presets: [{ id: "default", metadata: { name: "XGent" } }, { id: "writer", metadata: { name: "Writer" } }],
       async select(id) { selected.push(id); soul.activeId = id; } };
-    const h = harness({ onCreateSoul: () => created.push(true), onOpenTerminal: () => terminals.push(true) }, { mobile, soul });
+    const h = harness({ onCreateSoul: () => created.push(true), onOpenTerminal: () => terminals.push(true), onOpenGoals: () => goals.push(true) }, { mobile, soul });
     try {
       await h.dispatch("sidebar"); h.render();
       const menu = () => {
@@ -1116,6 +1118,8 @@ test("native sidebar retains the shared Soul presets, selected state, creation a
         assert.equal(picker.label, "Writer");
         assert.equal((await h.dispatch("sidebar-soul-terminal", null, "sidebar")).ok, true);
         assert.deepEqual(terminals, [true]);
+        assert.equal((await h.dispatch("sidebar-soul-goals", null, "sidebar")).ok, true);
+        assert.deepEqual(goals, [true]);
       } else assert.equal(picker.children.some(node => node.id === "sidebar-soul-terminal"), false);
       soul.presets = soul.presets.filter(preset => preset.id !== "writer"); h.render();
       assert.equal((await h.dispatch(writer.action, null, "sidebar")).ok, false);
@@ -1341,7 +1345,8 @@ test("native chat and activity show the exact full-file diff for a fuzzy multi E
 
 test("native chat keeps a shell-created PreviewFile output openable after the tool finishes", async () => {
   const opened = [];
-  const h = harness({ onOpenWorkspaceFile: (path) => opened.push(path) }, { mobile: true });
+  const fileSource = { version: 1, hostId: "11111111-1111-4111-8111-111111111111", workdir: "/original-device" };
+  const h = harness({ onOpenWorkspaceFile: () => assert.fail("Global workspace used for owned result"), onOpenPreviewedFile: file => opened.push(file) }, { mobile: true });
   h.props.historyItems = [{
     kind: "assistant", key: "shell-output", segmentIndex: 0, timestamp: 1,
     isFromCompactedSegment: false,
@@ -1351,7 +1356,7 @@ test("native chat keeps a shell-created PreviewFile output openable after the to
         toolResult: {
           role: "toolResult", toolCallId: "preview-1", toolName: "PreviewFile",
           content: [{ type: "text", text: "Opened slides.pptx" }],
-          details: { kind: "mobile_file_preview", path: "slides.pptx" },
+          details: { kind: "mobile_file_preview", path: "slides.pptx", fileSource },
           isError: false, timestamp: 1,
         },
       },
@@ -1360,9 +1365,13 @@ test("native chat keeps a shell-created PreviewFile output openable after the to
   const transcript = h.render().nodes[0].children.find((node) => node.id === "transcript");
   const result = transcript.children.find((node) => node.id === "shell-output");
   const fileAction = result.children.find((node) => node.id === "shell-output:previewed-file:preview-1");
-  assert.equal(fileAction.label, "slides.pptx");
+  assert.equal(fileAction.label, "slides.pptx · 11111111");
+  assert.ok(fileAction.accessibilityLabel.includes(fileSource.workdir));
   assert.equal((await h.dispatch(fileAction.action)).ok, true);
-  assert.deepEqual(opened, ["slides.pptx"]);
+  assert.deepEqual(opened, [{ path: "slides.pptx", toolCallId: "preview-1", fileSource }]);
+  h.props.onOpenPreviewedFile = undefined;
+  h.render();
+  assert.equal((await h.dispatch(fileAction.action)).ok, false);
   h.unmount();
 });
 

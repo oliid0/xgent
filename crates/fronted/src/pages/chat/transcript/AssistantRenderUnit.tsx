@@ -8,8 +8,15 @@ import { isWorkspacePreviewPath } from "../../../components/workspace-editor/wor
 import type { ChatFileLink } from "../../../lib/chat/chatFileLinks";
 import type { HistoryMessageRef } from "../../../lib/chat/conversation/conversationState";
 import type { RetryAttemptRecord } from "../../../lib/chat/conversation/liveTranscriptStore";
+import {
+  backgroundChatArtifactKey,
+  collectBackgroundChatArtifacts,
+} from "../../../lib/chat/messages/backgroundArtifacts";
 import { collectChangedFiles } from "../../../lib/chat/messages/changedFiles";
-import { collectCloudArtifacts } from "../../../lib/chat/messages/cloudArtifacts";
+import {
+  collectCloudArtifacts,
+  collectCloudExtractedFiles,
+} from "../../../lib/chat/messages/cloudArtifacts";
 import { collectPreviewedFiles } from "../../../lib/chat/messages/previewedFiles";
 import type { PendingUploadedFile } from "../../../lib/chat/messages/uploadedFiles";
 import { AssistantBubbleUnit } from "../components/AssistantBubble";
@@ -49,17 +56,30 @@ const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
   );
   const cloudArtifacts = useMemo(() => collectCloudArtifacts(unit.rounds), [unit.rounds]);
   const previewedFiles = useMemo(
-    () => collectPreviewedFiles(unit.rounds, changedFiles),
+    () => [
+      ...collectPreviewedFiles(unit.rounds, changedFiles),
+      ...collectCloudExtractedFiles(unit.rounds),
+      ...collectBackgroundChatArtifacts(unit.rounds).map((ref) => ({
+        path: ref.artifact.relativePath,
+        toolCallId: backgroundChatArtifactKey(ref),
+        fileSource: null,
+        backgroundArtifact: ref,
+      })),
+    ],
     [changedFiles, unit.rounds],
   );
   const resultPaths = [
     ...(changedFiles?.files.filter((file) => !file.deleted).map((file) => file.path) ?? []),
-    ...previewedFiles.map((file) => file.path),
   ];
   const hasCards =
     Boolean(changedFiles) ||
     cloudArtifacts.length > 0 ||
-    (Boolean(props.workdir) && resultPaths.some(isWorkspacePreviewPath));
+    (Boolean(props.workdir) && resultPaths.some(isWorkspacePreviewPath)) ||
+    previewedFiles.some(
+      (file) =>
+        ("backgroundArtifact" in file && !!file.backgroundArtifact) ||
+        isWorkspacePreviewPath(file.path),
+    );
 
   return (
     <ChatMessage
@@ -70,9 +90,10 @@ const AssistantFooterUnit = memo(function AssistantFooterUnit(props: {
     >
       {hasCards ? (
         <VStack gap={2} width="100%">
-          {resultPaths.length > 0 && props.workdir ? (
+          {(resultPaths.length > 0 && props.workdir) || previewedFiles.length > 0 ? (
             <GeneratedFilePreviewCard
               paths={resultPaths}
+              previewedFiles={previewedFiles}
               workdir={props.workdir}
               onOpenFileLink={onOpenFileLink}
             />

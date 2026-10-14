@@ -7,6 +7,7 @@ export const LAN_PC_RELAY_EVENT = "xgent:lan-pc-event";
 export type LanPcCommandHostConfig = {
   enabled: boolean;
   baseUrl: string;
+  peerId?: string;
   localWorkdir?: string;
   remoteWorkdir?: string;
   remoteHomeDir?: string;
@@ -16,6 +17,7 @@ export type LanPcCommandHostConfig = {
 type NormalizedLanPcCommandHostConfig = {
   enabled: boolean;
   baseUrl: string;
+  peerId?: string;
   localWorkdir: string;
   remoteWorkdir: string;
   remoteHomeDir: string;
@@ -53,9 +55,16 @@ const DELEGATED_EVENTS = new Set([
   "workspace:activity",
 ]);
 
-let commandHostConfig = DISABLED_CONFIG;
-const mcpServerOnPc = new Map<string, boolean>();
-const mcpRunOnPc = new Map<string, boolean>();
+type CommandHostState = {
+  config: NormalizedLanPcCommandHostConfig;
+  servers: Map<string, boolean>;
+  runs: Map<string, boolean>;
+};
+const globalCommandHost: CommandHostState = {
+  config: DISABLED_CONFIG,
+  servers: new Map(),
+  runs: new Map(),
+};
 
 function normalizePath(value: string) {
   return value.trim().replace(/[\\/]+$/, "");
@@ -75,6 +84,7 @@ function normalizeConfig(config?: LanPcCommandHostConfig): NormalizedLanPcComman
   return {
     enabled: true,
     baseUrl: config.baseUrl.trim().replace(/\/+$/, ""),
+    ...(config.peerId ? { peerId: config.peerId } : {}),
     localWorkdir: normalizePath(config.localWorkdir ?? ""),
     remoteWorkdir: normalizePath(config.remoteWorkdir ?? ""),
     remoteHomeDir: normalizePath(config.remoteHomeDir ?? ""),
@@ -91,35 +101,42 @@ function normalizeConfig(config?: LanPcCommandHostConfig): NormalizedLanPcComman
  * desktop capability instead of embedding LAN checks in individual tools.
  */
 export function configureLanPcCommandHost(config?: LanPcCommandHostConfig) {
-  commandHostConfig = normalizeConfig(config);
-  mcpServerOnPc.clear();
-  mcpRunOnPc.clear();
+  globalCommandHost.config = normalizeConfig(config);
+  globalCommandHost.servers.clear();
+  globalCommandHost.runs.clear();
 }
 
-export function registerMcpServerRoutes(servers: Array<{ id: string; transport?: string }>) {
-  mcpServerOnPc.clear();
+export function registerMcpServerRoutes(
+  servers: Array<{ id: string; transport?: string }>,
+  state = globalCommandHost,
+) {
+  state.servers.clear();
   for (const server of servers) {
-    registerMcpServerRoute(server);
+    registerMcpServerRoute(server, state);
   }
 }
 
-export function registerMcpServerRoute(server: { id: string; transport?: string }) {
-  mcpServerOnPc.set(server.id, !server.transport || server.transport === "stdio");
+export function registerMcpServerRoute(
+  server: { id: string; transport?: string },
+  state = globalCommandHost,
+) {
+  state.servers.set(server.id, !server.transport || server.transport === "stdio");
 }
 
-export function registerMcpRunRoute(runId: string, delegated: boolean) {
-  if (runId) mcpRunOnPc.set(runId, delegated);
+export function registerMcpRunRoute(runId: string, delegated: boolean, state = globalCommandHost) {
+  if (runId) state.runs.set(runId, delegated);
 }
 
-export function clearMcpRunRoute(runId: string) {
-  mcpRunOnPc.delete(runId);
+export function clearMcpRunRoute(runId: string, state = globalCommandHost) {
+  state.runs.delete(runId);
 }
 
-export function getLanPcCommandHostConfig() {
-  return { ...commandHostConfig };
+export function getLanPcCommandHostConfig(state = globalCommandHost) {
+  return { ...state.config };
 }
 
-export function isLanPcCommandHostReady() {
+export function isLanPcCommandHostReady(state = globalCommandHost) {
+  const commandHostConfig = state.config;
   return (
     commandHostConfig.enabled &&
     Boolean(commandHostConfig.baseUrl) &&
@@ -127,11 +144,19 @@ export function isLanPcCommandHostReady() {
   );
 }
 
-export function shouldDelegateCommandToLanPc(command: string, args?: RuntimeInvokeArgs) {
+export function shouldDelegateCommandToLanPc(
+  command: string,
+  args?: RuntimeInvokeArgs,
+  state = globalCommandHost,
+) {
+  const commandHostConfig = state.config;
   if (!commandHostConfig.enabled || !commandHostConfig.remoteWorkdir) return false;
   const normalized = command.trim();
   if (!normalized || normalized.startsWith("lan_pc_") || normalized.startsWith("local_access_")) {
     return false;
+  }
+  if (normalized === "runtime_cancel" && typeof args?.run_id === "string") {
+    return state.runs.get(args.run_id) === true;
   }
   if (
     normalized === "shell_cancel" &&
@@ -161,10 +186,10 @@ export function shouldDelegateCommandToLanPc(command: string, args?: RuntimeInvo
       return server.transport === undefined || server.transport === "stdio";
     }
     if (normalized === "mcp_cancel_tool" && typeof args?.run_id === "string") {
-      return mcpRunOnPc.get(args.run_id) === true;
+      return state.runs.get(args.run_id) === true;
     }
     if (typeof args?.server_id === "string") {
-      return mcpServerOnPc.get(args.server_id) === true;
+      return state.servers.get(args.server_id) === true;
     }
     return false;
   }
@@ -183,8 +208,8 @@ export function shouldDelegateCommandToLanPc(command: string, args?: RuntimeInvo
   return DELEGATED_COMMAND_PREFIXES.some((prefix) => normalized.startsWith(prefix));
 }
 
-export function shouldDelegateEventToLanPc(event: string) {
-  return commandHostConfig.enabled && DELEGATED_EVENTS.has(event.trim());
+export function shouldDelegateEventToLanPc(event: string, state = globalCommandHost) {
+  return state.config.enabled && DELEGATED_EVENTS.has(event.trim());
 }
 
 function pathStartsWith(path: string, root: string) {
@@ -203,10 +228,10 @@ function joinRemotePath(root: string, suffix: string) {
   return `${root}${separator}${suffix.replace(/^[\\/]+/, "").replace(/[\\/]+/g, separator)}`;
 }
 
-function mapWorkdir(value: unknown) {
+function mapWorkdir(value: unknown, state: CommandHostState) {
   if (typeof value !== "string") return value;
   const path = normalizePath(value);
-  const { localWorkdir, remoteWorkdir } = commandHostConfig;
+  const { localWorkdir, remoteWorkdir } = state.config;
   if (!path || !remoteWorkdir) return value;
   if (pathStartsWith(path, remoteWorkdir)) return path;
   if (!localWorkdir || !pathStartsWith(path, localWorkdir)) {
@@ -219,21 +244,51 @@ function mapWorkdir(value: unknown) {
 export function prepareLanPcInvokeArgs(
   args?: RuntimeInvokeArgs,
   command?: string,
+  state = globalCommandHost,
 ): RuntimeInvokeArgs {
   const next: RuntimeInvokeArgs = { ...(args ?? {}) };
   for (const key of ["workdir", "cwd", "project_path_key"]) {
     if (Object.hasOwn(next, key)) {
-      next[key] = mapWorkdir(next[key]);
+      next[key] = mapWorkdir(next[key], state);
     }
   }
   if (command?.startsWith("mcp_")) {
     const mapServer = (value: unknown) => {
       if (!value || typeof value !== "object" || Array.isArray(value)) return value;
       const server = value as Record<string, unknown>;
-      return typeof server.cwd === "string" ? { ...server, cwd: mapWorkdir(server.cwd) } : value;
+      return typeof server.cwd === "string"
+        ? { ...server, cwd: mapWorkdir(server.cwd, state) }
+        : value;
     };
     if (Object.hasOwn(next, "server")) next.server = mapServer(next.server);
     if (Array.isArray(next.servers)) next.servers = next.servers.map(mapServer);
   }
   return next;
+}
+
+/** Per-run routing and cancellation ownership; no shared mutable target switch. */
+export function captureLanPcCommandRouter(
+  config: LanPcCommandHostConfig = getLanPcCommandHostConfig(),
+) {
+  const state: CommandHostState = {
+    config: normalizeConfig(config),
+    servers: new Map(globalCommandHost.servers),
+    runs: new Map(),
+  };
+  return {
+    getLanPcCommandHostConfig: () => getLanPcCommandHostConfig(state),
+    isLanPcCommandHostReady: () => isLanPcCommandHostReady(state),
+    shouldDelegateCommandToLanPc: (command: string, args?: RuntimeInvokeArgs) =>
+      shouldDelegateCommandToLanPc(command, args, state),
+    shouldDelegateEventToLanPc: (event: string) => shouldDelegateEventToLanPc(event, state),
+    prepareLanPcInvokeArgs: (args?: RuntimeInvokeArgs, command?: string) =>
+      prepareLanPcInvokeArgs(args, command, state),
+    registerMcpServerRoutes: (servers: Array<{ id: string; transport?: string }>) =>
+      registerMcpServerRoutes(servers, state),
+    registerMcpServerRoute: (server: { id: string; transport?: string }) =>
+      registerMcpServerRoute(server, state),
+    registerMcpRunRoute: (runId: string, delegated: boolean) =>
+      registerMcpRunRoute(runId, delegated, state),
+    clearMcpRunRoute: (runId: string) => clearMcpRunRoute(runId, state),
+  };
 }

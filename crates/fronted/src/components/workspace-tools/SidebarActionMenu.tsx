@@ -21,6 +21,7 @@ type SidebarActionMenuProps = {
   workspaceToolsAvailable: boolean;
   onSelect: (target: WorkspaceToolTarget, shell?: string) => void;
   onOpenSettings: () => void;
+  onOpenGoals?: () => void;
   onCreateSoul: () => void;
   trajectoryAvailable?: boolean;
   withinSidebar?: boolean;
@@ -58,6 +59,15 @@ export function SidebarActionMenu(props: SidebarActionMenuProps) {
       onClick: props.onCreateSoul,
     },
     { type: "divider" },
+    {
+      label: t("goals.title"),
+      icon: <Icon icon={Check} size="sm" color="inherit" />,
+      isDisabled: !props.onOpenGoals,
+      onClick: () => {
+        setSoulMenuOpen(false);
+        props.onOpenGoals?.();
+      },
+    },
     {
       label: t("sidebar.terminal"),
       icon: <Icon icon={Terminal} size="sm" color="inherit" />,

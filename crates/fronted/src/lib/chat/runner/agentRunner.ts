@@ -41,6 +41,8 @@ import {
 } from "../../providers/nativeWebSearch";
 import type { PreparedProxyRequest } from "../../providers/proxy";
 import { sanitizeAssistantMessage } from "../../providers/runtime/messageUtils";
+import { modelCooldowns } from "../../providers/runtime/modelCooldown";
+import { toModelValue } from "../../providers/runtime/modelValue";
 import {
   failoverBreakerKey,
   type ModelFailoverRuntimeConfig,
@@ -376,6 +378,15 @@ export function buildToolsSuffix(
       "- Start a managed server only when the user's task explicitly requires a running multi-file application or server behavior that a single-file preview cannot provide.",
     ].join("\n"),
   );
+
+  if (has("BackgroundTask") && has("WorkerDevices")) {
+    sections.push([
+      "## Persistent autonomous work",
+      "- For compound tasks or work that should survive this client's disconnect, use BackgroundTask's persistent queue. Include every requested outcome, constraint, deliverable and schedule in the accepted prompt. The runtime supplies this model-facing conversation snapshot as historical data; transfer actual document files with files, never guessed remote paths.",
+      "- Inspect WorkerDevices and declare observed capability/platform requirements to choose a suitable executor. Prefer this device when it has the environment and capacity; a Mac with Xcode may handle iOS work, while an unprepared phone or PC cannot. Only actually available executors and tools may be used; cloud execution is a separate tool, not an implicit BackgroundTask destination.",
+      "- An acceptance receipt means queued work, not completion. Retain the original host/request identity after an uncertain response; inspect BackgroundInbox and actual outcomes. Continue independent work while missing information or permissions waits for a real response. A calendar entry or recurring fitness reminder requires a real connector/scheduler operation, never a promise in chat.",
+    ].join("\n"));
+  }
 
   if (has("Agent")) {
     sections.push(
@@ -1002,6 +1013,8 @@ export async function runAssistantWithTools(params: {
               },
               emitToolStatus: (status) => params.onToolStatus?.(status),
             });
+          await subagentScheduler.executionBudget?.consume("toolCalls");
+          throwIfRunnerCancelled(linkedSignal.signal);
           toolResult = toMessageToolResult(
             await (effectiveToolCall.name === "Bash"
               ? subagentScheduler.runBash(execute, linkedSignal.signal)
@@ -1570,6 +1583,14 @@ export async function runAssistantWithTools(params: {
           : undefined;
         let streamOptions: StreamOptionsEx = {
           ...(options ?? {}),
+          beforeModelRequest: () => {
+            const admission = options?.beforeModelRequest?.();
+            if (admission)
+              return admission.then(() =>
+                subagentScheduler.executionBudget?.consume("modelRequests"),
+              );
+            return subagentScheduler.executionBudget?.consume("modelRequests");
+          },
           apiKey: options?.apiKey ?? target.runtime.apiKey,
           headers: withHostedSearchProbeHeader(
             {
@@ -1693,6 +1714,25 @@ export async function runAssistantWithTools(params: {
           }),
         );
 
+        if (
+          target.runtime.providerConfigId?.trim() &&
+          [
+            "anthropic-messages",
+            "openai-completions",
+            "openai-responses",
+            "deepseek-responses",
+          ].includes(targetModel.api)
+        ) {
+          // Pi's onResponse runs only after an accepted SDK response. Capture
+          // rejected HTTP responses at the supported fetch boundary instead.
+          streamOptions = {
+            ...streamOptions,
+            fetch: modelCooldowns.captureFetch(
+              toModelValue(target.runtime.providerConfigId, targetModel.id),
+              streamOptions.fetch ?? globalThis.fetch,
+            ),
+          };
+        }
         return streamSimpleByApi(targetModel, effectiveContext, streamOptions);
       };
 

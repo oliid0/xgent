@@ -90,10 +90,17 @@ impl AutomationScheduler {
         }
     }
 
-    pub fn start(self: Arc<Self>) {
+    pub fn start(self: Arc<Self>) -> Result<(), String> {
+        // Complete process-start recovery before any WebView can claim work.
+        // Running this in the spawned loop could expire a freshly claimed lease.
+        let count = self.store.recover_interrupted_prompt_runs()?;
+        if count > 0 {
+            eprintln!("automation: reconciled {count} prompt run(s) interrupted by restart");
+        }
         tauri::async_runtime::spawn(async move {
             self.run_loop().await;
         });
+        Ok(())
     }
 
     pub fn request_reload(&self) {
@@ -102,22 +109,6 @@ impl AutomationScheduler {
     }
 
     async fn run_loop(self: Arc<Self>) {
-        {
-            let store = Arc::clone(&self.store);
-            let recovered = tauri::async_runtime::spawn_blocking(move || {
-                store.recover_interrupted_prompt_runs()
-            })
-            .await;
-            match recovered {
-                Ok(Ok(count)) if count > 0 => {
-                    eprintln!("automation: expired {count} prompt run(s) interrupted by restart");
-                }
-                Ok(Err(error)) => eprintln!("automation prompt run recovery failed: {error}"),
-                Err(error) => eprintln!("automation prompt run recovery join failed: {error}"),
-                _ => {}
-            }
-        }
-
         if let Err(error) = self.ensure_scheduler().await {
             eprintln!("启动 automation scheduler 失败：{error}");
             return;
@@ -138,7 +129,9 @@ impl AutomationScheduler {
                 _ = sweep.tick() => {
                     let store = Arc::clone(&self.store);
                     let result = tauri::async_runtime::spawn_blocking(move || {
-                        store.sweep_expired_prompt_runs()
+                        store.flush_prompt_completion_outbox()?;
+                        store.sweep_expired_prompt_runs()?;
+                        store.dispatch_proactive_rules()
                     })
                     .await;
                     match result {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invokeFs } from "../../lib/tools/fsBackend";
+import type { PreviewCommandPort } from "../../lib/tools/previewExecution";
 
 export type WorkspaceFileApplication = { id: string; label: string };
 
@@ -31,15 +32,20 @@ export function workspaceFileApplications(value: unknown): WorkspaceFileApplicat
 export function useWorkspaceFileApplications({
   workdir,
   path,
+  commandPort,
   enabled = true,
   onError,
 }: {
   workdir: string;
   path: string;
+  commandPort?: PreviewCommandPort;
   enabled?: boolean;
   onError: (message: string) => void;
 }) {
-  const owner = useMemo(() => ({ workdir, path, enabled }), [workdir, path, enabled]);
+  const owner = useMemo(
+    () => ({ workdir, path, enabled, commandPort }),
+    [workdir, path, enabled, commandPort],
+  );
   const ownerRef = useRef(owner);
   ownerRef.current = owner;
   const onErrorRef = useRef(onError);
@@ -82,10 +88,14 @@ export function useWorkspaceFileApplications({
     setLoading(true);
     try {
       const applications = workspaceFileApplications(
-        await invokeFs<unknown>("fs_file_applications", {
-          workdir: owner.workdir,
-          path: owner.path,
-        }),
+        await invokeFs<unknown>(
+          "fs_file_applications",
+          {
+            workdir: owner.workdir,
+            path: owner.path,
+          },
+          owner.commandPort?.invoke,
+        ),
       );
       if (!isCurrent() || scan.current !== request) return false;
       applicationsRef.current = applications;
@@ -116,11 +126,15 @@ export function useWorkspaceFileApplications({
       setOpening(true);
       onErrorRef.current("");
       try {
-        await invokeFs("fs_open_workspace_path", {
-          workdir: owner.workdir,
-          path: owner.path,
-          mode,
-        });
+        await invokeFs(
+          "fs_open_workspace_path",
+          {
+            workdir: owner.workdir,
+            path: owner.path,
+            mode,
+          },
+          owner.commandPort?.invoke,
+        );
         return isCurrent();
       } catch (error) {
         if (isCurrent()) onErrorRef.current(String(error));

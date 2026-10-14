@@ -93,6 +93,7 @@ import { invokeFs } from "../../../lib/tools/fsBackend";
 import type { WorkspaceActivityClient } from "../../../lib/workspace-activity/types";
 import { ChatModelSelector } from "./ChatModelSelector";
 import { ComposerGitRepositoryControl } from "./ComposerGitRepositoryControl";
+import { IntelligentSchedulingControl } from "./IntelligentSchedulingControl";
 
 export type ContextUsageTokensSource = {
   subscribe: (listener: () => void) => () => void;
@@ -680,6 +681,12 @@ export const ChatComposerBar = memo(function ChatComposerBar(props: {
         />
       </List>
       <VStack gap={2} width="100%">
+        <IntelligentSchedulingControl
+          controls={chatRuntimeControls}
+          disabled={controlsDisabled}
+          agentMode={isAgentMode}
+          onChange={onChatRuntimeControlsChange}
+        />
         <Switch
           label={
             chatRuntimeControls.planModeEnabled ? t("chat.planMode.on") : t("chat.planMode.off")

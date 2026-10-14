@@ -1,9 +1,9 @@
 import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
+import { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Icon } from "@astryxdesign/core/Icon";
-import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, Section, VStack } from "@astryxdesign/core/Layout";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
@@ -12,12 +12,11 @@ import { invoke } from "@xgent/runtime";
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
+  CalendarClock,
   Clock3,
   Eye,
-  Globe,
-  MessageSquare,
+  MoreHorizontal,
   Pencil,
-  Terminal,
   Trash2,
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
@@ -36,16 +35,12 @@ import { NativeSurface } from "../../presentation/NativeSurface";
 import { createNativePresentationTheme } from "../../presentation/nativeTheme";
 import type { PresentationNode } from "../../presentation/types";
 import { isApplePresentationRuntime } from "../../runtime/applePresentation";
+import { BackgroundInboxSection } from "./BackgroundInboxSection";
 import { type CronTaskFormData, CronTaskModal } from "./CronTaskModal";
 import { CronTaskViewModal } from "./CronTaskViewModal";
+import { ProactiveRulesSection } from "./ProactiveRulesSection";
 import { AgentActivationSwitch, ConfirmDeletePopover } from "./shared";
 import type { SettingsSectionProps } from "./types";
-
-const TASK_TYPE_ICON: Record<CronTaskType, typeof Terminal> = {
-  bash: Terminal,
-  http: Globe,
-  prompt: MessageSquare,
-};
 
 const TASK_TYPE_LABEL: Record<CronTaskType, string> = {
   bash: "settings.cronTypeBash",
@@ -82,6 +77,8 @@ export function CronSection(
   );
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [proactiveOpen, setProactiveOpen] = useState(false);
   const { cron } = useAutomation();
   const tasks = cron.tasks;
   const modelOptions = useMemo(
@@ -136,6 +133,10 @@ export function CronSection(
     return applyCronOps([{ op: "update", id: task.id, patch: { enabled: !task.enabled } }]);
   }
 
+  if (inboxOpen) return <BackgroundInboxSection {...props} onBack={() => setInboxOpen(false)} />;
+  if (proactiveOpen)
+    return <ProactiveRulesSection {...props} onBack={() => setProactiveOpen(false)} />;
+
   if (detail.open && detail.mode === "view") {
     return (
       <CronTaskViewModal
@@ -181,22 +182,14 @@ export function CronSection(
       run: () => props.onBack?.(),
     });
     const nodes: PresentationNode[] = [
+      c.action("background-inbox", t("backgroundInbox.title"), () => setInboxOpen(true)),
+      c.action("proactive", t("proactive.title"), () => setProactiveOpen(true)),
       c.action("add", t("settings.cronAdd"), () => setDetail({ open: true, mode: "add" })),
       ...(tasks.length
         ? []
-        : [{ id: "empty", kind: "Text" as const, text: t("settings.cronEmptyDesc") }]),
+        : [{ id: "empty", kind: "Text" as const, text: t("settings.cronEmpty") }]),
       ...tasks.map((task) => ({
         ...c.group(task.id, task.name, [
-          ...(task.description
-            ? [
-                {
-                  id: `${task.id}:description`,
-                  kind: "Text" as const,
-                  text: task.description,
-                  secondary: true,
-                },
-              ]
-            : []),
           { id: `${task.id}:type`, kind: "Badge", label: t(TASK_TYPE_LABEL[task.type]) },
           { id: `${task.id}:schedule`, kind: "Badge", label: task.cron },
           {
@@ -219,24 +212,32 @@ export function CronSection(
             !isCronTaskExhausted(task),
           ),
           {
-            ...c.action(`${task.id}:edit`, t("settings.cronModalEdit"), () =>
-              setDetail({ open: true, mode: "edit", task }),
-            ),
-            kind: "IconButton",
-            icon: "pencil",
-          },
-          {
-            ...c.action(`${task.id}:view`, t("settings.cronViewTitle"), () =>
-              setDetail({ open: true, mode: "view", taskId: task.id }),
-            ),
-            kind: "IconButton",
-            icon: "eye",
-          },
-          {
-            ...c.action(`${task.id}:delete`, t("settings.cronDelete"), () => setDeleteId(task.id)),
-            kind: "IconButton",
-            icon: "trash",
-            destructive: true,
+            id: `${task.id}:actions`,
+            kind: "Menu",
+            variant: "compact",
+            label: task.name,
+            icon: "ellipsis",
+            children: [
+              {
+                ...c.action(`${task.id}:view`, t("settings.cronViewTitle"), () =>
+                  setDetail({ open: true, mode: "view", taskId: task.id }),
+                ),
+                icon: "eye",
+              },
+              {
+                ...c.action(`${task.id}:edit`, t("settings.cronModalEdit"), () =>
+                  setDetail({ open: true, mode: "edit", task }),
+                ),
+                icon: "pencil",
+              },
+              {
+                ...c.action(`${task.id}:delete`, t("settings.cronDelete"), () =>
+                  setDeleteId(task.id),
+                ),
+                icon: "trash",
+                destructive: true,
+              },
+            ],
           },
           ...(task.lastError
             ? [
@@ -252,7 +253,7 @@ export function CronSection(
         ]),
         kind: "VStack" as const,
         variant: "automation-row",
-        icon: task.type === "bash" ? "terminal" : task.type === "http" ? "network" : "bubble.left",
+        icon: "calendar.badge.clock",
       })),
       ...(actionError ? [{ id: "error", kind: "Text" as const, text: actionError }] : []),
     ];
@@ -301,7 +302,9 @@ export function CronSection(
   }
 
   return (
-    <VStack width="100%" gap={4}>
+    <VStack width="100%" gap={4} className="autonomy-settings autonomy-cron">
+      <Button label={t("backgroundInbox.title")} onClick={() => setInboxOpen(true)} />
+      <Button label={t("proactive.title")} onClick={() => setProactiveOpen(true)} />
       {tasks.length > 0 ? (
         <Section variant="transparent" padding={0}>
           <HStack width="100%" gap={2} vAlign="center" hAlign="end" wrap="wrap">
@@ -330,7 +333,6 @@ export function CronSection(
           isCompact
           icon={<Icon icon={Clock3} size="lg" color="secondary" />}
           title={t("settings.cronEmpty")}
-          description={t("settings.cronEmptyDesc")}
           actions={
             <Button
               label={t("settings.cronAdd")}
@@ -353,20 +355,16 @@ export function CronSection(
               <ListItem
                 key={task.id}
                 label={task.name}
+                onClick={() => setDetail({ open: true, mode: "view", taskId: task.id })}
                 startContent={
-                  <Icon
-                    icon={TASK_TYPE_ICON[task.type]}
-                    size="md"
-                    color={task.enabled && !exhausted ? "primary" : "disabled"}
-                  />
+                  <span
+                    className={`schedule-icon${task.enabled && !exhausted ? "" : " schedule-icon-paused"}`}
+                  >
+                    <CalendarClock />
+                  </span>
                 }
                 description={
                   <VStack gap={1}>
-                    {task.description ? (
-                      <Text type="supporting" color="secondary" wordBreak="break-word">
-                        {task.description}
-                      </Text>
-                    ) : null}
                     <HStack gap={2} wrap="wrap" vAlign="center">
                       <Text type="supporting" color="secondary">
                         {t(TASK_TYPE_LABEL[task.type])}
@@ -385,34 +383,42 @@ export function CronSection(
                 }
                 endContent={
                   <HStack gap={1} vAlign="center">
-                    <IconButton
-                      label={t("settings.cronView")}
-                      tooltip={t("settings.cronView")}
-                      icon={<Icon icon={Eye} size="sm" color="inherit" />}
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDetail({ open: true, mode: "view", taskId: task.id })}
-                    />
-                    <IconButton
-                      label={t("settings.cronEdit")}
-                      tooltip={t("settings.cronEdit")}
-                      icon={<Icon icon={Pencil} size="sm" color="inherit" />}
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDetail({ open: true, mode: "edit", task })}
-                    />
                     <ConfirmDeletePopover
                       name={task.name}
                       onConfirm={() => runOps(() => applyCronOps([{ op: "delete", id: task.id }]))}
                     >
                       {(open) => (
-                        <IconButton
-                          label={t("settings.cronDelete")}
-                          tooltip={t("settings.cronDelete")}
-                          icon={<Icon icon={Trash2} size="sm" color="inherit" />}
-                          variant="ghost"
-                          size="sm"
-                          onClick={open}
+                        <DropdownMenu
+                          presentation="adaptive"
+                          alignment="end"
+                          hasChevron={false}
+                          button={{
+                            label: task.name,
+                            icon: <MoreHorizontal />,
+                            isIconOnly: true,
+                            variant: "ghost",
+                            size: "lg",
+                          }}
+                          items={[
+                            {
+                              label: t("settings.cronView"),
+                              icon: <Eye />,
+                              onClick: () =>
+                                setDetail({ open: true, mode: "view", taskId: task.id }),
+                            },
+                            {
+                              label: t("settings.cronEdit"),
+                              icon: <Pencil />,
+                              onClick: () => setDetail({ open: true, mode: "edit", task }),
+                            },
+                            { type: "divider" },
+                            {
+                              label: t("settings.cronDelete"),
+                              icon: <Trash2 />,
+                              variant: "destructive",
+                              onClick: open,
+                            },
+                          ]}
                         />
                       )}
                     </ConfirmDeletePopover>

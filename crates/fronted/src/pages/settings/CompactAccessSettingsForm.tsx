@@ -31,6 +31,7 @@ import {
 import type { AppSettings } from "../../lib/settings";
 import { SecretTextInput } from "./SecretTextInput";
 import { SettingsRow, SettingsRowGroup, SettingsStatus, SettingsValueSelector } from "./shared";
+import { TailscaleSetupSection } from "./TailscaleSetupSection";
 
 export type AccessSettingsActions = {
   saveToken: () => Promise<void>;
@@ -70,6 +71,7 @@ type Props = {
   normalizeAddress: () => void;
   actions: AccessSettingsActions;
   copyEndpoint: ReactNode;
+  githubAuthorization?: ReactNode;
 };
 
 /** Compact fields and service actions use the same controller as the wide form. */
@@ -119,6 +121,11 @@ export function CompactAccessSettingsForm(props: Props) {
 
   return (
     <VStack className="compact-access-form" width="100%" gap={4}>
+      <SettingsRowGroup title="Tailscale">
+        <ListItem
+          label={<TailscaleSetupSection enabled={!browser} mobile={nativeMobile} compact />}
+        />
+      </SettingsRowGroup>
       {browser ? (
         <Banner status="warning" title={t("settings.accessNativeOnly")} collapsible={false} />
       ) : null}
@@ -421,6 +428,9 @@ export function CompactAccessSettingsForm(props: Props) {
         )}
       </SettingsRowGroup>
       <Text type="supporting" color="secondary" wordBreak="break-word">
+        {t("settings.accessCloudRepositoryHint")}
+      </Text>
+      <Text type="supporting" color="secondary" wordBreak="break-word">
         {t("settings.accessCloudEnvironmentHint")}
       </Text>
       <SettingsRowGroup title={t("settings.accessSecureVault")}>
@@ -461,6 +471,7 @@ export function CompactAccessSettingsForm(props: Props) {
           />
         ) : null}
       </SettingsRowGroup>
+      {props.githubAuthorization}
       {actionGrid(
         <>
           {button(

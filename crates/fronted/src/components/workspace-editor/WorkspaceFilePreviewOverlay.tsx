@@ -26,7 +26,12 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useLocale } from "../../i18n";
 import { cn } from "../../lib/shared/utils";
 import { writeClipboardText } from "../../lib/system/clipboardText";
-import { invokeFs } from "../../lib/tools/fsBackend";
+import {
+  bindPreviewExecution,
+  invokePreviewFs,
+  type PreviewCommandPort,
+  type PreviewExecution,
+} from "../../lib/tools/previewExecution";
 import { type FileTypeIconComponent, getFileTypeIcon } from "../chat/fileTypeIcons";
 import {
   Check,
@@ -89,7 +94,7 @@ import {
   type SpreadsheetTable,
   writeSpreadsheetEdits,
 } from "./workspaceSpreadsheet";
-export type WorkspaceFilePreviewOpenRequest = {
+export type WorkspaceFilePreviewOpenRequest = PreviewExecution & {
   id: number;
   ownerId?: string;
   projectPathKey: string;
@@ -440,6 +445,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       request: WorkspaceFilePreviewOpenRequest,
       transitionDirection: ImagePreviewTransitionDirection = 0,
     ) => {
+      request = bindPreviewExecution(request);
       const sequence = loadSequenceRef.current + 1;
       loadSequenceRef.current = sequence;
       requestRef.current = request;
@@ -465,12 +471,16 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       }
       try {
         await previewPendingWrites.get(previewDraftKey(request));
-        if (!mountedRef.current || loadSequenceRef.current !== sequence) return;
-        const response = await invokeFs<ReadWorkspacePreviewResponse>("fs_read_workspace_image", {
-          workdir: request.workdir,
-          path: request.path,
-        });
-        if (loadSequenceRef.current !== sequence) return;
+        if (!mountedRef.current || !openRef.current || loadSequenceRef.current !== sequence) return;
+        const response = await invokePreviewFs<ReadWorkspacePreviewResponse>(
+          request,
+          "fs_read_workspace_image",
+          {
+            workdir: request.workdir,
+            path: request.path,
+          },
+        );
+        if (!mountedRef.current || !openRef.current || loadSequenceRef.current !== sequence) return;
         const bytes = base64ToBytes(response.data);
         const kind = resolvePreviewKind(response.path || request.path, response.mimeType);
         const text =
@@ -509,13 +519,13 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
           }
         }
       } catch (loadError) {
-        if (loadSequenceRef.current !== sequence) return;
+        if (!mountedRef.current || !openRef.current || loadSequenceRef.current !== sequence) return;
         if (!keepCurrentImagePreview) {
           replacePreview(null);
         }
         setError(toMessage(loadError, t("workspaceFilePreview.openFailed")));
       } finally {
-        if (loadSequenceRef.current === sequence) {
+        if (mountedRef.current && openRef.current && loadSequenceRef.current === sequence) {
           setLoading(false);
         }
       }
@@ -524,12 +534,13 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
   );
 
   useEffect(() => {
-    if (!openRequest) {
-      setActiveRequest(null);
+    if (!isOpen || !openRequest) {
+      loadSequenceRef.current++;
+      requestRef.current = null;
       return;
     }
     void loadPreview(openRequest, 0);
-  }, [loadPreview, openRequest]);
+  }, [isOpen, loadPreview, openRequest]);
 
   const spreadsheet = useMemo(
     () => buildSpreadsheetTable(preview, activeSheetName, t("workspaceFilePreview.renderFailed")),
@@ -764,11 +775,11 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     try {
       const document =
         snapshot.kind === "document" && snapshot.path.toLowerCase().endsWith(".docx");
-      const response = await invokeFs<{
+      const response = await invokePreviewFs<{
         mtimeMs: number;
         contentHash: string;
         bytesWritten: number;
-      }>(document ? "fs_write_docx_text" : "fs_write_text", {
+      }>(request, document ? "fs_write_docx_text" : "fs_write_text", {
         workdir: request.workdir,
         path: snapshot.path,
         content: written,
@@ -793,7 +804,8 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
       let mimeType = snapshot.mimeType;
       if (document) {
         try {
-          const refreshed = await invokeFs<ReadWorkspacePreviewResponse>(
+          const refreshed = await invokePreviewFs<ReadWorkspacePreviewResponse>(
+            request,
             "fs_read_workspace_image",
             {
               workdir: request.workdir,
@@ -887,11 +899,11 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     setError(null);
     try {
       const output = await writeSpreadsheetEdits(snapshot.bytes, written);
-      const response = await invokeFs<{
+      const response = await invokePreviewFs<{
         mtimeMs: number;
         contentHash: string;
         bytesWritten: number;
-      }>("fs_write_binary", {
+      }>(request, "fs_write_binary", {
         workdir: request.workdir,
         path: snapshot.path,
         content_base64: bytesToBase64(output),
@@ -978,11 +990,11 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     setError(null);
     try {
       const output = await writePresentationText(snapshot.bytes, written);
-      const response = await invokeFs<{
+      const response = await invokePreviewFs<{
         mtimeMs: number;
         contentHash: string;
         bytesWritten: number;
-      }>("fs_write_binary", {
+      }>(request, "fs_write_binary", {
         workdir: request.workdir,
         path: snapshot.path,
         content_base64: bytesToBase64(output),
@@ -1064,11 +1076,11 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
     setError(null);
     try {
       const output = await writePdfHighlights(snapshot.bytes, written);
-      const response = await invokeFs<{
+      const response = await invokePreviewFs<{
         mtimeMs: number;
         contentHash: string;
         bytesWritten: number;
-      }>("fs_write_binary", {
+      }>(request, "fs_write_binary", {
         workdir: request.workdir,
         path: snapshot.path,
         content_base64: bytesToBase64(output),
@@ -1187,11 +1199,11 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
         format,
         normalizeImageRotation(written.angle - written.saved),
       );
-      const response = await invokeFs<{
+      const response = await invokePreviewFs<{
         mtimeMs: number;
         contentHash: string;
         bytesWritten: number;
-      }>("fs_write_binary", {
+      }>(request, "fs_write_binary", {
         workdir: request.workdir,
         path: snapshot.path,
         content_base64: bytesToBase64(output),
@@ -1409,6 +1421,8 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                     ) : null}
                     {canOpenExternal && activePreviewRequest ? (
                       <OpenWithMenu
+                        enabled={isOpen && !loading}
+                        commandPort={activePreviewRequest.commandPort}
                         workdir={activePreviewRequest.workdir}
                         path={activePath || activePreviewRequest.path}
                         onError={setError}
@@ -1570,6 +1584,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
                   </VStack>
                 ) : preview ? (
                   <PreviewBody
+                    commandPort={activePreviewRequest?.commandPort}
                     preview={preview}
                     workdir={activePreviewRequest?.workdir ?? ""}
                     activePath={activePath}
@@ -1689,6 +1704,7 @@ export function WorkspaceFilePreviewOverlay(props: WorkspaceFilePreviewOverlayPr
 
 function PreviewBody(props: {
   preview: LoadedPreview;
+  commandPort?: PreviewCommandPort;
   workdir: string;
   activePath: string;
   imagePaths: string[];
@@ -1808,6 +1824,7 @@ function PreviewBody(props: {
     return (
       <AstryxStack direction="vertical" className="h-full overflow-auto bg-background px-6 py-5">
         <WorkspaceMarkdownPreview
+          commandPort={props.commandPort}
           workdir={workdir}
           markdownPath={preview.path || activePath}
           content={preview.text ?? ""}

@@ -30,6 +30,7 @@ import {
   Wifi,
 } from "../../components/icons";
 import { useLocale } from "../../i18n";
+import { useWorkerPeers } from "../../lib/automation/useWorkerPeers";
 import { browserSessionController } from "../../lib/browser/browserSessionController";
 import {
   type CloudSecretVaultStatus,
@@ -40,9 +41,13 @@ import {
 } from "../../lib/localAccess";
 import type { AppSettings } from "../../lib/settings";
 import { writeClipboardText } from "../../lib/system/clipboardText";
+import { AgentStartupSection } from "./AgentStartupSection";
 import { type AccessSettingsActions, CompactAccessSettingsForm } from "./CompactAccessSettingsForm";
+import { GitHubAuthorizationSection } from "./GitHubAuthorizationSection";
 import { SettingsStatus } from "./shared";
+import { TailscaleSetupSection } from "./TailscaleSetupSection";
 import type { SettingsSectionProps } from "./types";
+import { WorkerPeersSection } from "./WorkerPeersSection";
 
 const EMPTY_LOCAL_STATUS: LocalAccessStatus = {
   enabled: false,
@@ -130,7 +135,9 @@ export function AccessSection({
         ? "iPhone"
         : /Android/i.test(navigator.userAgent)
           ? "Android"
-          : "Mobile";
+          : nativeMobile
+            ? "Mobile"
+            : "Desktop";
     return `Xgent ${platform}`;
   });
   const [githubToken, setGithubToken] = useState("");
@@ -208,11 +215,13 @@ export function AccessSection({
       const authoritativeUrl = normalizeComparableLanUrl(next.baseUrl);
       if (next.paired && authoritativeUrl) {
         updateAccess(setSettings, { lanControlUrl: `${authoritativeUrl}/` });
-      }
+      } else if (!next.paired) updateAccess(setSettings, { preferLanPcExecution: false });
     } catch (error) {
       if (current() && revision === operation.lanRevision) throw error;
     }
   }, [browser, captureCurrent, nativeMobile, operation, setSettings]);
+
+  const workers = useWorkerPeers(!browser, refreshLanPcStatus);
 
   useEffect(() => {
     if (browser) return;
@@ -345,6 +354,8 @@ export function AccessSection({
           updateAccess(setSettings, {
             lanControlUrl: next.baseUrl ? normalizeLanControlUrl(next.baseUrl) : url,
           });
+          if (next.workerRegistrationError) setActionError(next.workerRegistrationError);
+          void workers.refresh().catch(() => {});
         }
       }),
     disconnect: () =>
@@ -355,6 +366,7 @@ export function AccessSection({
           operation.lanRevision++;
           setLanPcStatus(next);
           updateAccess(setSettings, { preferLanPcExecution: false });
+          void workers.refresh().catch(() => {});
         }
       }),
     refreshLan: () => runAction("lan-refresh", refreshLanPcStatus),
@@ -392,49 +404,86 @@ export function AccessSection({
       }),
   };
 
+  const workerPanel = (
+    <WorkerPeersSection
+      workers={workers}
+      disabled={browser || busyAction !== ""}
+      selectDiscovered={
+        browser
+          ? undefined
+          : (hostId, url) => {
+              if (!workers.hasDiscoveredEndpoint(hostId, url)) return;
+              updateAccess(setSettings, { lanControlUrl: url });
+              setLanPairingCode("");
+            }
+      }
+      pairing={
+        nativeMobile
+          ? undefined
+          : {
+              address: settings.access.lanControlUrl,
+              code: lanPairingCode,
+              name: lanDeviceName,
+              busy: busyAction === "lan-pair",
+              setAddress: (lanControlUrl) => updateAccess(setSettings, { lanControlUrl }),
+              setCode: setLanPairingCode,
+              setName: setLanDeviceName,
+              pair: actions.pair,
+            }
+      }
+    />
+  );
+
   if (compact) {
     return (
-      <CompactAccessSettingsForm
-        access={settings.access}
-        nativeMobile={nativeMobile}
-        browser={browser}
-        localStatus={localStatus}
-        vaultStatus={vaultStatus}
-        lanPcStatus={lanPcStatus}
-        lanPairingCode={lanPairingCode}
-        lanDeviceName={lanDeviceName}
-        githubToken={githubToken}
-        busyAction={busyAction}
-        actionError={actionError}
-        endpoint={endpoint}
-        localStatusLabel={localStatusLabel}
-        localStatusPhase={localStatusPhase}
-        setLanPairingCode={setLanPairingCode}
-        setLanDeviceName={setLanDeviceName}
-        setGithubToken={setGithubToken}
-        patchAccess={(patch) => updateAccess(setSettings, patch)}
-        setCapabilityBlocked={(capability, blocked) =>
-          setLocalCapabilityBlocked(setSettings, capability, blocked)
-        }
-        normalizeAddress={() => {
-          const value = settings.access.lanControlUrl.trim();
-          if (!value) return;
-          try {
-            updateAccess(setSettings, { lanControlUrl: normalizeLanControlUrl(value) });
-          } catch {
-            /* Keep the invalid draft visible for correction. */
+      <VStack width="100%" gap={3}>
+        <CompactAccessSettingsForm
+          access={settings.access}
+          nativeMobile={nativeMobile}
+          browser={browser}
+          localStatus={localStatus}
+          vaultStatus={vaultStatus}
+          lanPcStatus={lanPcStatus}
+          lanPairingCode={lanPairingCode}
+          lanDeviceName={lanDeviceName}
+          githubToken={githubToken}
+          busyAction={busyAction}
+          actionError={actionError}
+          endpoint={endpoint}
+          localStatusLabel={localStatusLabel}
+          localStatusPhase={localStatusPhase}
+          setLanPairingCode={setLanPairingCode}
+          setLanDeviceName={setLanDeviceName}
+          setGithubToken={setGithubToken}
+          patchAccess={(patch) => updateAccess(setSettings, patch)}
+          setCapabilityBlocked={(capability, blocked) =>
+            setLocalCapabilityBlocked(setSettings, capability, blocked)
           }
-        }}
-        actions={actions}
-        copyEndpoint={
-          <CopyButton value={endpoint} label={t("workspaceEditor.context.copy")} compact />
-        }
-      />
+          normalizeAddress={() => {
+            const value = settings.access.lanControlUrl.trim();
+            if (!value) return;
+            try {
+              updateAccess(setSettings, { lanControlUrl: normalizeLanControlUrl(value) });
+            } catch {
+              /* Keep the invalid draft visible for correction. */
+            }
+          }}
+          actions={actions}
+          copyEndpoint={
+            <CopyButton value={endpoint} label={t("workspaceEditor.context.copy")} compact />
+          }
+          githubAuthorization={
+            <GitHubAuthorizationSection enabled={!browser} onConnected={refreshVaultStatus} />
+          }
+        />
+        {workerPanel}
+      </VStack>
     );
   }
 
   const cloudDetails = (
     <VStack gap={3}>
+      <GitHubAuthorizationSection enabled={!browser} onConnected={refreshVaultStatus} />
       <Grid columns={{ minWidth: 240, max: 2, repeat: "fit" }} gap={3} width="100%">
         <TextInput
           label={t("settings.accessGithubOwner")}
@@ -451,9 +500,6 @@ export function AccessSection({
           placeholder="agent-temp"
         />
       </Grid>
-      <Text type="supporting" color="secondary">
-        {t("settings.accessCloudEnvironmentHint")}
-      </Text>
       <Section variant="muted" padding={3}>
         <VStack gap={3}>
           <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
@@ -505,9 +551,6 @@ export function AccessSection({
               {t("settings.accessTokenOwner").replace("{username}", vaultStatus.githubUsername)}
             </Text>
           ) : null}
-          <Text type="supporting" color="secondary">
-            {t("settings.accessVaultHint")}
-          </Text>
         </VStack>
       </Section>
     </VStack>
@@ -515,6 +558,13 @@ export function AccessSection({
 
   return (
     <VStack width="100%" gap={3}>
+      {!browser && !nativeMobile ? <AgentStartupSection /> : null}
+      <Section variant="section" padding={3}>
+        <VStack gap={3}>
+          <Heading level={4}>Tailscale</Heading>
+          <TailscaleSetupSection enabled={!browser} mobile={nativeMobile} />
+        </VStack>
+      </Section>
       {browser ? (
         <Banner status="warning" title={t("settings.accessNativeOnly")} collapsible={false} />
       ) : null}
@@ -527,9 +577,6 @@ export function AccessSection({
                 <Icon icon={Wifi} size="md" color="secondary" />
                 <VStack gap={0.5}>
                   <Heading level={4}>{t("settings.accessLanControl")}</Heading>
-                  <Text type="supporting" color="secondary">
-                    {t("settings.accessLanControlHint")}
-                  </Text>
                 </VStack>
               </HStack>
               <SettingsStatus
@@ -619,7 +666,6 @@ export function AccessSection({
             </HStack>
             <Switch
               label={t("settings.accessPreferLanPc")}
-              description={t("settings.accessPreferLanPcHint")}
               value={settings.access.preferLanPcExecution}
               labelIcon={MonitorSmartphone}
               labelPosition="start"
@@ -639,9 +685,6 @@ export function AccessSection({
               isDisabled={!settings.access.lanControlUrl.trim() || busyAction !== ""}
               onClick={() => void actions.openComputer()}
             />
-            <Text type="supporting" color="secondary">
-              {t("settings.accessLanPairingHint")}
-            </Text>
           </VStack>
         </Section>
       ) : (
@@ -652,9 +695,6 @@ export function AccessSection({
                 <Icon icon={MonitorSmartphone} size="md" color="secondary" />
                 <VStack gap={0.5}>
                   <Heading level={4}>{t("settings.accessWebUi")}</Heading>
-                  <Text type="supporting" color="secondary">
-                    {t("settings.accessWebUiHint")}
-                  </Text>
                 </VStack>
               </HStack>
               <HStack gap={2} vAlign="center">
@@ -731,7 +771,6 @@ export function AccessSection({
             <List density="compact" hasDividers>
               <ListItem
                 label={t("settings.accessBlockTerminal")}
-                description={t("settings.accessBlockTerminalHint")}
                 startContent={<Icon icon={Terminal} size="sm" color="secondary" />}
                 endContent={
                   <Switch
@@ -745,7 +784,6 @@ export function AccessSection({
               />
               <ListItem
                 label={t("settings.accessBlockBrowserAutomation")}
-                description={t("settings.accessBlockBrowserAutomationHint")}
                 startContent={<Icon icon={Globe} size="sm" color="secondary" />}
                 endContent={
                   <Switch
@@ -761,7 +799,6 @@ export function AccessSection({
               />
               <ListItem
                 label={t("settings.accessBlockSsh")}
-                description={t("settings.accessBlockSshHint")}
                 startContent={<Icon icon={Server} size="sm" color="secondary" />}
                 endContent={
                   <Switch
@@ -775,7 +812,6 @@ export function AccessSection({
               />
               <ListItem
                 label={t("settings.accessBlockGit")}
-                description={t("settings.accessBlockGitHint")}
                 startContent={<Icon icon={GitBranch} size="sm" color="secondary" />}
                 endContent={
                   <Switch
@@ -789,7 +825,6 @@ export function AccessSection({
               />
               <ListItem
                 label={t("settings.accessBlockFileWrite")}
-                description={t("settings.accessBlockFileWriteHint")}
                 startContent={<Icon icon={Shield} size="sm" color="secondary" />}
                 endContent={
                   <Switch
@@ -862,6 +897,7 @@ export function AccessSection({
         </Section>
       )}
 
+      {workerPanel}
       <Section variant="section" padding={3}>
         <VStack gap={3}>
           <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
@@ -869,9 +905,6 @@ export function AccessSection({
               <Icon icon={Cloud} size="md" color="secondary" />
               <VStack gap={0.5}>
                 <Heading level={4}>{t("settings.accessCloudExecution")}</Heading>
-                <Text type="supporting" color="secondary">
-                  {t("settings.accessCloudExecutionHint")}
-                </Text>
               </VStack>
             </HStack>
             <Switch

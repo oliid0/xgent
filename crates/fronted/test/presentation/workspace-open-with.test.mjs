@@ -10,7 +10,8 @@ function harness() {
     react: hooks.react,
     "@astryxdesign/core/DropdownMenu": { DropdownMenu: "DropdownMenu" },
     "../../i18n": { useLocale: () => ({ t: translate }) },
-    "../../lib/tools/fsBackend": { invokeFs: async (command, args) => {
+    "../../lib/tools/fsBackend": { invokeFs: async (command, args, invoker) => {
+      if (invoker) return invoker(command, args);
       calls.push([command, args]); return options.invoke ? options.invoke(command, args) : [];
     } },
   } });
@@ -21,6 +22,34 @@ function harness() {
   return { options, calls, errors, props, render, unmount: hooks.unmount,
     async flush() { await new Promise(setImmediate); return render(); } };
 }
+
+test("open-with changing same-path device rejects retired scans and actions", async () => {
+  const h = harness(), scan = Promise.withResolvers(), calls = [];
+  try {
+    h.props.commandPort = { invoke: command => { calls.push(["a", command]); return scan.promise; } };
+    const old = h.render(); old.props.onOpenChange(true);
+    h.props.commandPort = { async invoke(command) { calls.push(["b", command]); return []; } };
+    h.render();
+    scan.resolve([{ id: "a-app", label: "A application" }]); await h.flush();
+    assert.equal(h.render().props.items.some(item => item.id === "a-app"), false);
+    await old.props.items.find(item => item.label === "workspaceFiles.defaultApp").onClick();
+    assert.deepEqual(calls, [["a", "fs_file_applications"]]);
+    await h.render().props.items.find(item => item.label === "workspaceFiles.defaultApp").onClick();
+    assert.deepEqual(calls.at(-1), ["b", "fs_open_workspace_path"]);
+  } finally { scan.resolve([]); h.unmount(); }
+});
+
+test("loading or closed preview keeps the open-with control disabled and cannot issue commands", async () => {
+  const h = harness();
+  try {
+    h.props.enabled = false;
+    const menu = h.render();
+    assert.equal(menu.props.button.isDisabled, true);
+    menu.props.onOpenChange(true);
+    await menu.props.items.find(item => item.label === "workspaceFiles.defaultApp").onClick();
+    assert.deepEqual(h.calls, []);
+  } finally { h.unmount(); }
+});
 
 test("open-with prevents duplicate scans and opens, retaining the correct command and localized labels", async () => {
   const h = harness(), scan = Promise.withResolvers(), opening = Promise.withResolvers();

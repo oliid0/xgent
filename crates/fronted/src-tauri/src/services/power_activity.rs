@@ -32,29 +32,26 @@ impl PowerActivityManager {
         activity_id: impl Into<String>,
         reason: impl Into<String>,
         ttl_ms: Option<u64>,
-    ) {
+    ) -> Result<(),String> {
         let activity_id = activity_id.into().trim().to_string();
         if activity_id.is_empty() {
-            return;
+            return Err("Power activity needs a nonempty identity".into());
         }
 
         let reason = reason.into().trim().to_string();
         let mut should_spawn_watchdog = false;
         {
-            let mut state = match self.state.lock() {
-                Ok(state) => state,
-                Err(_) => return,
-            };
+            let mut state = self.state.lock().map_err(|_|"Power activity lock unavailable".to_string())?;
 
             prune_expired_requests(&mut state);
             state.requests.insert(
-                activity_id,
+                activity_id.clone(),
                 PowerActivityRequest {
                     reason,
                     expires_at: Instant::now() + normalize_ttl(ttl_ms),
                 },
             );
-            sync_keep_awake(&mut state);
+            if let Err(error)=sync_keep_awake(&mut state) {state.requests.remove(&activity_id);return Err(error);}
             if state.keep_awake.is_some() && !state.watchdog_running {
                 state.watchdog_running = true;
                 should_spawn_watchdog = true;
@@ -64,8 +61,12 @@ impl PowerActivityManager {
         if should_spawn_watchdog && !spawn_watchdog(Arc::clone(&self.state)) {
             if let Ok(mut state) = self.state.lock() {
                 state.watchdog_running = false;
+                state.requests.remove(&activity_id);
+                let _=sync_keep_awake(&mut state);
             }
+            return Err("Power activity watchdog could not start".into());
         }
+        Ok(())
     }
 
     pub fn end(&self, activity_id: impl AsRef<str>) {
@@ -80,7 +81,7 @@ impl PowerActivityManager {
         };
 
         state.requests.remove(activity_id);
-        sync_keep_awake(&mut state);
+        if let Err(error)=sync_keep_awake(&mut state) {eprintln!("Power activity release failed: {error}");}
     }
 
     pub fn clear_all(&self) {
@@ -89,7 +90,7 @@ impl PowerActivityManager {
             Err(_) => return,
         };
         state.requests.clear();
-        sync_keep_awake(&mut state);
+        if let Err(error)=sync_keep_awake(&mut state) {eprintln!("Power activity cleanup failed: {error}");}
     }
 
     #[cfg(test)]
@@ -138,7 +139,7 @@ fn spawn_watchdog(state: Arc<Mutex<PowerActivityState>>) -> bool {
             let should_continue = match state.lock() {
                 Ok(mut state) => {
                     prune_expired_requests(&mut state);
-                    sync_keep_awake(&mut state);
+                    if let Err(error)=sync_keep_awake(&mut state) {eprintln!("Power activity refresh failed: {error}");}
                     if state.requests.is_empty() {
                         state.watchdog_running = false;
                         false
@@ -156,24 +157,26 @@ fn spawn_watchdog(state: Arc<Mutex<PowerActivityState>>) -> bool {
         .unwrap_or(false)
 }
 
-fn sync_keep_awake(state: &mut PowerActivityState) {
+fn sync_keep_awake(state: &mut PowerActivityState) -> Result<(),String> {
     if state.requests.is_empty() {
         if let Some(mut handle) = state.keep_awake.take() {
             handle.stop();
         }
-        return;
+        return Ok(());
     }
 
-    if state.keep_awake.is_some() {
-        return;
+    if state.keep_awake.as_mut().is_some_and(KeepAwakeHandle::alive) {
+        return Ok(());
     }
+    if let Some(mut handle)=state.keep_awake.take() {handle.stop();}
 
     match KeepAwakeHandle::start() {
         Ok(handle) => {
             state.keep_awake = Some(handle);
+            Ok(())
         }
         Err(error) => {
-            eprintln!("start power activity keep-awake failed: {error}");
+            Err(error)
         }
     }
 }
@@ -189,7 +192,13 @@ struct KeepAwakeHandle {
     thread: Option<JoinHandle<()>>,
 }
 
-#[cfg(any(test, not(any(target_os = "macos", windows))))]
+#[cfg(all(target_os="linux",not(test)))]
+struct KeepAwakeHandle {
+    connection:gio::DBusConnection,
+    fd:Option<std::os::fd::OwnedFd>,
+}
+
+#[cfg(any(test, not(any(target_os = "macos", target_os="linux", windows))))]
 struct KeepAwakeHandle;
 
 #[cfg(all(target_os = "macos", not(test)))]
@@ -214,19 +223,45 @@ impl KeepAwakeHandle {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
+    fn alive(&mut self)->bool {matches!(self.child.try_wait(),Ok(None))}
 }
 
-#[cfg(any(test, not(any(target_os = "macos", windows))))]
+#[cfg(all(target_os="linux",not(test)))]
+impl KeepAwakeHandle {
+    fn start()->Result<Self,String>{
+        use gio::prelude::*;
+        use gio::glib::variant::ToVariant;
+        use std::os::fd::FromRawFd;
+        let connection=gio::bus_get_sync(gio::BusType::System,gio::Cancellable::NONE).map_err(|error|format!("System power bus unavailable: {error}"))?;
+        connection.set_exit_on_close(false);
+        let parameters=("sleep:idle","Xgent","Original task work in progress","block").to_variant();
+        let (reply,fds)=connection.call_with_unix_fd_list_sync(Some("org.freedesktop.login1"),"/org/freedesktop/login1","org.freedesktop.login1.Manager","Inhibit",Some(&parameters),None,gio::DBusCallFlags::NONE,5000,None::<&gio::UnixFDList>,gio::Cancellable::NONE)
+            .map_err(|error|format!("System sleep inhibitor unavailable: {error}"))?;
+        let (index,)=reply.get::<(gio::glib::variant::Handle,)>().ok_or("System sleep inhibitor returned an invalid handle")?;
+        let raw=fds.get(index.0).map_err(|error|error.to_string())?;
+        if raw<0 {return Err("System sleep inhibitor returned an invalid descriptor".into());}
+        // g_unix_fd_list_get duplicates the FD; its caller owns this copy.
+        // Dropping it (including process death) releases our actual lock.
+        let fd=unsafe {std::os::fd::OwnedFd::from_raw_fd(raw)};
+        Ok(Self{connection,fd:Some(fd)})
+    }
+    fn stop(&mut self){self.fd.take();}
+    fn alive(&mut self)->bool {self.fd.is_some() && !self.connection.is_closed()}
+}
+
+#[cfg(any(test, not(any(target_os = "macos", target_os="linux", windows))))]
 impl KeepAwakeHandle {
     fn start() -> Result<Self, String> {
         Ok(Self)
     }
 
     fn stop(&mut self) {}
+    fn alive(&mut self)->bool {true}
 }
 
 #[cfg(all(windows, not(test)))]
 impl KeepAwakeHandle {
+    fn alive(&mut self)->bool {self.thread.as_ref().is_some_and(|handle|!handle.is_finished())}
     fn start() -> Result<Self, String> {
         let (ready_tx, ready_rx) = mpsc::channel::<Result<(), String>>();
         let (stop_tx, stop_rx) = mpsc::channel::<()>();
@@ -308,8 +343,8 @@ mod tests {
     fn tracks_request_lifecycle() {
         let activity = PowerActivityManager::default();
 
-        activity.begin("req-a", "conversation", None);
-        activity.begin("req-b", "cron", None);
+        activity.begin("req-a", "conversation", None).unwrap();
+        activity.begin("req-b", "cron", None).unwrap();
 
         assert_eq!(
             activity.snapshot(),
@@ -331,7 +366,7 @@ mod tests {
     fn ignores_empty_activity_id() {
         let activity = PowerActivityManager::default();
 
-        activity.begin("", "noop", None);
+        assert!(activity.begin("", "noop", None).is_err());
         activity.end("");
 
         assert!(activity.snapshot().is_empty());

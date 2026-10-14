@@ -24,7 +24,9 @@ export function buildSubagentSystemPrompt(params: {
       ? `${params.agentIndex + 1} of ${params.agentTotal}`
       : "standalone";
   const identityPrompt = params.identity.identityPrompt.trim();
-  const templatePrompt = params.template?.prompt.trim();
+  const templatePrompt = params.template?.persistInstructions
+    ? undefined
+    : params.template?.prompt.trim();
 
   const identityBlock = [
     `You are ${name}, a named delegated Xgent subagent.`,
