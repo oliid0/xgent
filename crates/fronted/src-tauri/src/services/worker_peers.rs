@@ -7,6 +7,7 @@ use serde_json::Value;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 use sha2::{Digest, Sha256};
+use futures_util::FutureExt;
 use super::{cloud_secret_vault::CloudSecretVault, lan_pc_client::LanPcClient};
 
 mod chat;
@@ -635,8 +636,13 @@ impl WorkerPeerRegistry {
         -> (Result<(StoredEndpoint, Arc<LanPcClient>, WorkerHostInfo), String>, Vec<WorkerEndpointStatus>) {
         // Read-only probes run concurrently under the same eight-second bound.
         // A slower working LAN still wins over a faster Tailnet response.
-        let results = futures_util::future::join_all(clients.iter().map(|(endpoint, client)|
-            Self::probe_endpoint(&stored.peer_id, endpoint, client))).await;
+        let probes: Vec<_> = clients.iter().map(|(endpoint, client)| {
+            let peer_id = stored.peer_id.clone();
+            let endpoint = endpoint.clone();
+            let client = Arc::clone(client);
+            async move { Self::probe_endpoint(&peer_id, &endpoint, &client).await }.boxed()
+        }).collect();
+        let results = futures_util::future::join_all(probes).await;
         let mut selected = None;
         let mut invalid_identity = None;
         let mut statuses = Vec::new();
@@ -748,7 +754,7 @@ impl WorkerPeerRegistry {
             .map_err(|e| e.to_string())?;
         let input = super::automation::AutomationStore::normalize_background_task_input(input)?;
         let id = input.request_id.clone();
-        let input_hash = format!("{:x}", Sha256::digest(serde_json::to_vec(&input).map_err(|e| e.to_string())?));
+        let input_hash = hex::encode(Sha256::digest(serde_json::to_vec(&input).map_err(|e| e.to_string())?));
         let mut requests = self.requests.lock().await;
         if let Some(binding) = requests.get(&id) {
             if binding.peer_id != peer_id || binding.input_hash != input_hash {

@@ -3421,7 +3421,7 @@ pub(crate) fn create_streamed_artifact_copy(workdir:&str,path:&str,source:&mut i
         loop {let count=source.read(&mut buffer).map_err(|e|e.to_string())?;if count==0 {break;}total+=count as u64;
             if total>expected_bytes {return Err("Artifact copy exceeds its original manifest".to_string());}
             temporary.as_file_mut().write_all(&buffer[..count]).map_err(|e|e.to_string())?;hash.update(&buffer[..count]);}
-        if total!=expected_bytes || format!("{:x}",hash.finalize())!=expected_hash {return Err("Artifact copy failed whole-file integrity verification".into());}
+        if total!=expected_bytes || hex::encode(hash.finalize())!=expected_hash {return Err("Artifact copy failed whole-file integrity verification".into());}
         temporary.as_file().sync_all().map_err(|e|e.to_string())?;
         let fresh_parent=ensure_parent_dir(&scoped.root,&raw).map_err(|e|e.to_string())?;
         if fresh_parent!=parent || file_identity(&fs::metadata(&fresh_parent).map_err(|e|e.to_string())?,&fresh_parent)!=parent_identity
@@ -3469,7 +3469,7 @@ pub(crate) fn verified_artifact_copy(workdir:&str,path:&str,expected_bytes:u64,e
     let mut hash=Sha256::new();let mut total=0u64;let mut buffer=[0u8;65536];
     loop{let count=file.read(&mut buffer).map_err(|e|e.to_string())?;if count==0{break}total+=count as u64;
         if total>expected_bytes{return Err("Saved artifact changed during verification".into())}hash.update(&buffer[..count]);}
-    if total!=expected_bytes || format!("{:x}",hash.finalize())!=expected_hash{return Err("Saved artifact failed integrity verification; existing file retained".into())}
+    if total!=expected_bytes || hex::encode(hash.finalize())!=expected_hash{return Err("Saved artifact failed integrity verification; existing file retained".into())}
     let fresh=resolve_existing_file_target(&scoped.root,&scoped.relative_path).map_err(|e|e.to_string())?;
     let metadata=fs::metadata(&fresh).map_err(|e|e.to_string())?;
     if fresh!=target || file_identity(&metadata,&fresh)!=identity || metadata.len()!=total

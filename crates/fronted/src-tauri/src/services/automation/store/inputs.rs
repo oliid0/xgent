@@ -11,7 +11,7 @@ impl BackgroundInputFile {
         }
         let bytes = STANDARD.decode(&self.content_base64).map_err(|_| "Invalid background input base64".to_string())?;
         if bytes.len() > MAX_INPUT_BYTES || self.bytes != bytes.len() as u64
-            || self.content_hash != format!("{:x}", Sha256::digest(&bytes)) {
+            || self.content_hash != hex::encode(Sha256::digest(&bytes)) {
             return Err("Background input failed size/hash verification".to_string());
         }
         Ok(bytes)

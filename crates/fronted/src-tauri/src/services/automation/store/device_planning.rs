@@ -140,7 +140,7 @@ impl AutomationStore {
         }
         let bytes=serde_json::to_vec(&ordered_json(scope)).map_err(|e|e.to_string())?;
         if bytes.len()>64*1024 {return Err("Native planning scopes exceed their bound".into());}
-        Ok(format!("{:x}",Sha256::digest(bytes)))
+        Ok(hex::encode(Sha256::digest(bytes)))
     }
 
     pub(crate) fn device_planning_wake(conn:&Connection,id:&str)->Result<bool,String>{
@@ -230,7 +230,7 @@ impl AutomationStore {
                 let (key,raw):(String,Option<String>)=tx.query_row("SELECT scope_key,result_json FROM automation_background_device_planning_calls WHERE execution_id=?1 AND branch_id=?2 AND call_id=?3",params![id,branch,selected],|row|Ok((row.get(0)?,row.get(1)?))).map_err(|e|e.to_string())?;
                 if scope.as_ref().is_none_or(|(current,_)|current!=&key){return Err("Read scope changed; old planning data cannot be released".into());}
                 if let Some(raw)=raw {
-                let hash=format!("{:x}",Sha256::digest(raw.as_bytes()));
+                let hash=hex::encode(Sha256::digest(raw.as_bytes()));
                 let offset=args.get("offset").map(|value|value.as_u64().ok_or("Invalid planning chunk offset")).transpose()?.unwrap_or(0);
                 let offset=usize::try_from(offset).map_err(|_|"Invalid planning chunk offset")?;
                 if offset>raw.len() || !raw.is_char_boundary(offset) || (offset>0 && args["snapshot_hash"]!=hash){return Err("Planning chunk requires its original snapshot hash and UTF-8 offset".into());}

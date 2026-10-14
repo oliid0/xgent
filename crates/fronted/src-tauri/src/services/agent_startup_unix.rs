@@ -13,10 +13,10 @@ struct Descriptor { path: PathBuf, label: String, marker: String, text: String }
 fn descriptor(app: &tauri::AppHandle) -> Result<Descriptor, String> {
     let data = app.path().app_data_dir().map_err(|e|e.to_string())?;
     let identity = format!("{}\0{}",app.config().identifier,data.display());
-    let hash = format!("{:x}",Sha256::digest(identity.as_bytes()));
+    let hash = hex::encode(Sha256::digest(identity.as_bytes()));
     let executable = std::env::current_exe().map_err(|e|e.to_string())?;
     #[cfg(target_os="linux")]
-    let executable = app.env().appimage.unwrap_or(executable);
+    let executable = app.env().appimage.map(PathBuf::from).unwrap_or(executable);
     #[cfg(target_os="macos")]
     let executable = executable.canonicalize().map_err(|e|e.to_string())?;
     let executable = executable.to_str().ok_or("Agent executable path is not Unicode")?;

@@ -81,7 +81,7 @@ pub(crate) fn extract(archive: &Path, base: &Path, task: &str, artifact: u64) ->
             }
             if bytes!=expected {return Err("Expanded artifact file size is inconsistent".into());}
             file.sync_all().map_err(|e|e.to_string())?;
-            files.push(CloudExtractedFile { path: format!("{prefix}/{name}"), bytes, content_hash: format!("{:x}",hash.finalize()) });
+            files.push(CloudExtractedFile { path: format!("{prefix}/{name}"), bytes, content_hash: hex::encode(hash.finalize()) });
         }
         if serde_json::to_vec(&files).map_err(|e| e.to_string())?.len() > 96 * 1024 { return Err("Artifact file manifest exceeds durable receipt bounds".into()); }
         fs::rename(&staging, &published).map_err(|e| format!("Publish extracted cloud artifact failed: {e}"))?;
@@ -119,7 +119,7 @@ mod tests {
         create(&[("product.html", b"<h1>Product</h1>"), ("docs/plan.txt", b"actual plan")]);
         let (published, files) = extract(&archive, &output, "task-actual", 42).unwrap();
         assert_eq!(files.len(), 2); assert_eq!(fs::read(published.join("docs/plan.txt")).unwrap(), b"actual plan");
-        assert_eq!(files[0].content_hash, format!("{:x}", Sha256::digest(b"<h1>Product</h1>")));
+        assert_eq!(files[0].content_hash, hex::encode(Sha256::digest(b"<h1>Product</h1>")));
         assert_eq!(fs::read_dir(&output).unwrap().count(), 1);
         create(&[("report.txt", b"one"), ("REPORT.txt", b"two")]);
         assert!(extract(&archive, &output, "task-actual", 43).is_err());

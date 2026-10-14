@@ -52,7 +52,7 @@ fn current_scope(conn:&Connection,rule:&str,event:&str)->Result<Option<EventHeal
     let material=serde_json::to_vec(&serde_json::json!({"domain":"xgent.event-health-read.v1","ruleId":rule,"eventId":event,
         "owner":owner,"config":raw,"binding":frozen,"metric":metric,"startMs":start,"endMs":occurred,"approval":approval})).map_err(|e|e.to_string())?;
     Ok(Some(EventHealthReadScope{version:1,rule_id:rule.into(),event_id:event.into(),metric,start_ms:start,end_ms:occurred,
-        binding_hash:format!("{:x}",Sha256::digest(material))}))
+        binding_hash:hex::encode(Sha256::digest(material))}))
 }
 
 fn observation(conn:&Connection,scope:&EventHealthReadScope)->Result<Option<Value>,String>{

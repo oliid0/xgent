@@ -16,7 +16,7 @@ pub struct BackgroundChildResumeProbe {
 // it against its own execution/call instead of accepting an arbitrary nonce.
 pub(super) fn response_identity(id: &str, call: &str) -> String {
     let identity = serde_json::json!([id,call]).to_string();
-    let hash = format!("{:x}",Sha256::digest(format!("xgent-background:{identity}").as_bytes()));
+    let hash = hex::encode(Sha256::digest(format!("xgent-background:{identity}").as_bytes()));
     format!("{}-{}-8{}-a{}-{}",&hash[..8],&hash[8..12],&hash[13..16],&hash[17..20],&hash[20..32])
 }
 

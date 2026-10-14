@@ -158,12 +158,12 @@ dependencies = [
 
 [[package]]
 name = "argon2"
-version = "0.6.0-rc.8"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7af50940b73bf4e16c15c448a2b121c63f2d68e3e54b6a8731673cb4aa0cdff5"
+checksum = "134c52ddac6d63c576bef8168db10c83c49c26444ecbc68060fef078925a901c"
 dependencies = [
  "base64ct",
- "blake2 0.11.0-rc.6",
+ "blake2 0.11.0",
  "cpufeatures 0.3.0",
  "password-hash",
 ]
@@ -541,7 +541,7 @@ dependencies = [
  "bitflags 2.13.0",
  "cexpr",
  "clang-sys",
- "itertools",
+ "itertools 0.12.1",
  "lazy_static",
  "lazycell",
  "log",
@@ -565,7 +565,7 @@ dependencies = [
  "bitflags 2.13.0",
  "cexpr",
  "clang-sys",
- "itertools",
+ "itertools 0.12.1",
  "proc-macro2",
  "quote",
  "regex",
@@ -615,9 +615,9 @@ dependencies = [
 
 [[package]]
 name = "blake2"
-version = "0.11.0-rc.6"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "061f1a09225e328e1ffbb378d2d49923c0ca5fee19fb5ac1cc9c1e9d52b93690"
+checksum = "5b5d4d889834ee8ecfc0f8426ad30faf7cdcb10f741a8e6d7224d95325479f6f"
 dependencies = [
  "digest 0.11.3",
 ]
@@ -1323,6 +1323,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
 dependencies = [
  "generic-array 0.14.7",
+ "rand_core 0.6.4",
  "typenum",
 ]
 
@@ -1345,6 +1346,35 @@ checksum = "3633a51a39c69ebbaa4feaa694bd83d241e4093901c84a0963b19d9bb3f0cf8f"
 dependencies = [
  "crypto-bigint 0.7.5",
  "rand_core 0.10.1",
+]
+
+[[package]]
+name = "crypto_box"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16182b4f39a82ec8a6851155cc4c0cda3065bb1db33651726a29e1951de0f009"
+dependencies = [
+ "aead 0.5.2",
+ "crypto_secretbox",
+ "curve25519-dalek 4.1.3",
+ "salsa20 0.10.2",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "crypto_secretbox"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9d6cf87adf719ddf43a805e92c6870a531aedda35ff640442cbaf8674e141e1"
+dependencies = [
+ "aead 0.5.2",
+ "cipher 0.4.4",
+ "generic-array 0.14.7",
+ "poly1305 0.8.0",
+ "salsa20 0.10.2",
+ "subtle",
+ "zeroize",
 ]
 
 [[package]]
@@ -1565,6 +1595,15 @@ dependencies = [
 
 [[package]]
 name = "defmt"
+version = "0.3.100"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0963443817029b2024136fc4dd07a5107eb8f977eaf18fcd1fdeb11306b64ad"
+dependencies = [
+ "defmt 1.1.1",
+]
+
+[[package]]
+name = "defmt"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2953bfe4f93bbd20cc71198842756f77d161884c99ebbabc41d80231ded88d1"
@@ -1612,6 +1651,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7c1832837b905bbfb5101e07cc24c8deddf52f93225eee6ead5f4d63d53ddcb"
 dependencies = [
  "const-oid 0.9.6",
+ "pem-rfc7468 0.7.0",
  "zeroize",
 ]
 
@@ -1622,7 +1662,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71fd89660b2dc699704064e59e9dba0147b903e85319429e131620d022be411b"
 dependencies = [
  "const-oid 0.10.2",
- "pem-rfc7468",
+ "pem-rfc7468 1.0.0",
  "zeroize",
 ]
 
@@ -1870,6 +1910,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
+name = "downcast-rs"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "117240f60069e65410b3ae1bb213295bd828f707b5bec6596a1afc8793ce0cbc"
+
+[[package]]
 name = "dpi"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2019,6 +2065,8 @@ version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
 dependencies = [
+ "pkcs8 0.10.2",
+ "serde",
  "signature 2.2.0",
 ]
 
@@ -2030,6 +2078,20 @@ checksum = "29fcf32e6c73d1079f83ab4d782de2d81620346a5f38c6237a86a22f8368980a"
 dependencies = [
  "pkcs8 0.11.0",
  "signature 3.0.0",
+]
+
+[[package]]
+name = "ed25519-dalek"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70e796c081cee67dc755e1a36a0a172b897fab85fc3f6bc48307991f64e4eca9"
+dependencies = [
+ "curve25519-dalek 4.1.3",
+ "ed25519 2.2.3",
+ "serde",
+ "sha2 0.10.9",
+ "subtle",
+ "zeroize",
 ]
 
 [[package]]
@@ -2056,7 +2118,10 @@ checksum = "775765289f7c6336c18d3d66127527820dd45ffd9eb3b6b8ee4708590e6c20f5"
 dependencies = [
  "curve25519-dalek 4.1.3",
  "ed25519 2.2.3",
+ "hashbrown 0.16.1",
+ "pkcs8 0.10.2",
  "rand_core 0.6.4",
+ "serde",
  "sha2 0.10.9",
  "subtle",
  "zeroize",
@@ -2101,7 +2166,7 @@ dependencies = [
  "group 0.14.0",
  "hkdf 0.13.0",
  "hybrid-array",
- "pem-rfc7468",
+ "pem-rfc7468 1.0.0",
  "pkcs8 0.11.0",
  "rand_core 0.10.1",
  "sec1 0.8.1",
@@ -2233,6 +2298,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "etherparse"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b119b9796ff800751a220394b8b3613f26dd30c48f254f6837e64c464872d1c7"
+dependencies = [
+ "arrayvec",
+]
+
+[[package]]
 name = "event-listener"
 version = "5.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2270,6 +2344,9 @@ name = "fastrand"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
+dependencies = [
+ "getrandom 0.3.4",
+]
 
 [[package]]
 name = "fdeflate"
@@ -2366,6 +2443,18 @@ version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da0e4dd2a88388a1f4ccc7c9ce104604dab68d9f408dc34cd45823d5a9069095"
 dependencies = [
+ "spin",
+]
+
+[[package]]
+name = "flume"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e139bc46ca777eb5efaf62df0ab8cc5fd400866427e56c68b22e414e53bd3be"
+dependencies = [
+ "fastrand",
+ "futures-core",
+ "futures-sink",
  "spin",
 ]
 
@@ -2657,6 +2746,561 @@ dependencies = [
 ]
 
 [[package]]
+name = "geiserx_tailscale"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "axum",
+ "geiserx_ts_control",
+ "geiserx_ts_keys",
+ "geiserx_ts_metrics",
+ "geiserx_ts_netstack_smoltcp",
+ "geiserx_ts_packet",
+ "geiserx_ts_runtime",
+ "geiserx_ts_tka",
+ "ipnet",
+ "rand 0.10.2",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "geiserx_ts_array256"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "geiserx_ts_bitset",
+ "heapless",
+ "smallvec",
+ "static_assertions",
+]
+
+[[package]]
+name = "geiserx_ts_bart"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "cfg-if",
+ "geiserx_ts_array256",
+ "geiserx_ts_bitset",
+ "heapless",
+ "ipnet",
+ "static_assertions",
+]
+
+[[package]]
+name = "geiserx_ts_bart_packetfilter"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "geiserx_ts_array256",
+ "geiserx_ts_bart",
+ "geiserx_ts_bitset",
+ "geiserx_ts_dynbitset",
+ "geiserx_ts_packetfilter",
+ "hashbrown 0.17.1",
+ "smallvec",
+]
+
+[[package]]
+name = "geiserx_ts_bitset"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "cfg-if",
+ "static_assertions",
+]
+
+[[package]]
+name = "geiserx_ts_capabilityversion"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "geiserx_ts_control"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "bytes",
+ "chrono",
+ "futures-util",
+ "geiserx_ts_bitset",
+ "geiserx_ts_capabilityversion",
+ "geiserx_ts_control_noise",
+ "geiserx_ts_control_serde",
+ "geiserx_ts_derp",
+ "geiserx_ts_dynbitset",
+ "geiserx_ts_http_util",
+ "geiserx_ts_keys",
+ "geiserx_ts_nodecapability",
+ "geiserx_ts_packet",
+ "geiserx_ts_packetfilter",
+ "geiserx_ts_packetfilter_state",
+ "geiserx_ts_tls_util",
+ "gethostname",
+ "ipnet",
+ "lazy_static",
+ "libc",
+ "pin-project-lite",
+ "rand 0.10.2",
+ "ring",
+ "rustls-pemfile",
+ "ruzstd",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-rustls",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+ "url",
+ "zerocopy",
+]
+
+[[package]]
+name = "geiserx_ts_control_noise"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "base64 0.22.1",
+ "bytes",
+ "chacha20poly1305",
+ "futures-util",
+ "geiserx_ts_capabilityversion",
+ "geiserx_ts_hexdump",
+ "geiserx_ts_keys",
+ "noise-protocol",
+ "noise-rust-crypto",
+ "pin-project-lite",
+ "static_assertions",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "zerocopy",
+ "zeroize",
+]
+
+[[package]]
+name = "geiserx_ts_control_serde"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "geiserx_ts_capabilityversion",
+ "geiserx_ts_keys",
+ "geiserx_ts_nodecapability",
+ "geiserx_ts_packetfilter_serde",
+ "ipnet",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "serde_with",
+ "url",
+]
+
+[[package]]
+name = "geiserx_ts_dataplane"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "etherparse",
+ "geiserx_ts_bart",
+ "geiserx_ts_metrics",
+ "geiserx_ts_overlay_router",
+ "geiserx_ts_packet",
+ "geiserx_ts_packetfilter",
+ "geiserx_ts_time",
+ "geiserx_ts_transport",
+ "geiserx_ts_tunnel",
+ "geiserx_ts_underlay_router",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "geiserx_ts_derp"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "bytes",
+ "crypto_box",
+ "futures",
+ "geiserx_ts_hexdump",
+ "geiserx_ts_http_util",
+ "geiserx_ts_keys",
+ "geiserx_ts_packet",
+ "geiserx_ts_tls_util",
+ "geiserx_ts_transport",
+ "hex",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "url",
+ "yoke",
+ "zerocopy",
+]
+
+[[package]]
+name = "geiserx_ts_disco_protocol"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "aead 0.5.2",
+ "crypto_box",
+ "geiserx_ts_keys",
+ "num-derive",
+ "num-traits",
+ "thiserror 2.0.18",
+ "zerocopy",
+]
+
+[[package]]
+name = "geiserx_ts_dns_wire"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+
+[[package]]
+name = "geiserx_ts_dynbitset"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "geiserx_ts_bitset",
+ "smallvec",
+]
+
+[[package]]
+name = "geiserx_ts_forwarder"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "bytes",
+ "geiserx_ts_netstack_smoltcp",
+ "ipnet",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "geiserx_ts_hexdump"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "heapless",
+]
+
+[[package]]
+name = "geiserx_ts_http_util"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "bytes",
+ "futures",
+ "geiserx_ts_tls_util",
+ "http",
+ "http-body-util",
+ "httparse",
+ "hyper",
+ "hyper-util",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "geiserx_ts_keys"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "crypto_box",
+ "ed25519-dalek 2.2.0",
+ "getrandom 0.4.3",
+ "serde",
+ "thiserror 2.0.18",
+ "x25519-dalek 3.0.0-rc.1",
+ "zerocopy",
+ "zeroize",
+]
+
+[[package]]
+name = "geiserx_ts_magicsock"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "geiserx_ts_capabilityversion",
+ "geiserx_ts_disco_protocol",
+ "geiserx_ts_keys",
+ "geiserx_ts_metrics",
+ "geiserx_ts_packet",
+ "geiserx_ts_transport",
+ "if-addrs 0.15.0",
+ "rand 0.10.2",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "zerocopy",
+]
+
+[[package]]
+name = "geiserx_ts_metrics"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "portable-atomic",
+]
+
+[[package]]
+name = "geiserx_ts_netcheck"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "geiserx_ts_control",
+ "geiserx_ts_derp",
+ "geiserx_ts_http_util",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "geiserx_ts_netstack_smoltcp"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "bytes",
+ "futures-util",
+ "geiserx_ts_netstack_smoltcp_core",
+ "geiserx_ts_netstack_smoltcp_socket",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "geiserx_ts_netstack_smoltcp_core"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "bytes",
+ "flume 0.12.0",
+ "heapless",
+ "smoltcp",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
+name = "geiserx_ts_netstack_smoltcp_socket"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "bytes",
+ "geiserx_ts_netstack_smoltcp_core",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "geiserx_ts_nodecapability"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "cfg-if",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "geiserx_ts_overlay_router"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "geiserx_ts_bart",
+ "geiserx_ts_packet",
+ "geiserx_ts_transport",
+ "itertools 0.14.0",
+ "tracing",
+]
+
+[[package]]
+name = "geiserx_ts_packet"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "bytes",
+ "crypto_box",
+ "geiserx_ts_hexdump",
+]
+
+[[package]]
+name = "geiserx_ts_packetfilter"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "hashbrown 0.17.1",
+ "ipnet",
+ "static_assertions",
+ "tracing",
+]
+
+[[package]]
+name = "geiserx_ts_packetfilter_serde"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "geiserx_ts_nodecapability",
+ "geiserx_ts_peercapability",
+ "ipnet",
+ "nom 8.0.0",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "geiserx_ts_packetfilter_state"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "geiserx_ts_packetfilter",
+ "geiserx_ts_packetfilter_serde",
+ "ipnet",
+]
+
+[[package]]
+name = "geiserx_ts_peercapability"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "serde",
+ "url",
+]
+
+[[package]]
+name = "geiserx_ts_runtime"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "futures",
+ "geiserx_ts_bart",
+ "geiserx_ts_bart_packetfilter",
+ "geiserx_ts_capabilityversion",
+ "geiserx_ts_control",
+ "geiserx_ts_dataplane",
+ "geiserx_ts_derp",
+ "geiserx_ts_dns_wire",
+ "geiserx_ts_forwarder",
+ "geiserx_ts_keys",
+ "geiserx_ts_magicsock",
+ "geiserx_ts_netcheck",
+ "geiserx_ts_netstack_smoltcp",
+ "geiserx_ts_overlay_router",
+ "geiserx_ts_packet",
+ "geiserx_ts_packetfilter",
+ "geiserx_ts_packetfilter_state",
+ "geiserx_ts_tka",
+ "geiserx_ts_transport",
+ "geiserx_ts_tunnel",
+ "httparse",
+ "ipnet",
+ "kameo",
+ "kameo_actors",
+ "libc",
+ "rand 0.10.2",
+ "smallvec",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "geiserx_ts_time"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+
+[[package]]
+name = "geiserx_ts_tka"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "argon2",
+ "blake2 0.10.6",
+ "ed25519-dalek 2.2.0",
+ "ed25519-zebra",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "geiserx_ts_tls_util"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "ring",
+ "rustls-pemfile",
+ "subtle",
+ "tokio",
+ "tokio-rustls",
+ "tracing",
+ "url",
+ "webpki-roots 1.0.8",
+]
+
+[[package]]
+name = "geiserx_ts_transport"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "geiserx_ts_packet",
+]
+
+[[package]]
+name = "geiserx_ts_tunnel"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "aead 0.5.2",
+ "blake2 0.10.6",
+ "chacha20poly1305",
+ "geiserx_ts_keys",
+ "geiserx_ts_packet",
+ "geiserx_ts_time",
+ "hkdf 0.12.4",
+ "itertools 0.14.0",
+ "rand 0.10.2",
+ "tracing",
+ "x25519-dalek 3.0.0-rc.1",
+ "zerocopy",
+ "zeroize",
+]
+
+[[package]]
+name = "geiserx_ts_underlay_router"
+version = "0.57.4"
+source = "git+https://github.com/GeiserX/tailscale-rs?rev=eabd2cf2b810d18881c9cf305000d6f42aacbd19#eabd2cf2b810d18881c9cf305000d6f42aacbd19"
+dependencies = [
+ "geiserx_ts_packet",
+ "geiserx_ts_transport",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2708,9 +3352,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "r-efi 5.3.0",
  "wasip2",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -3014,6 +3660,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hash32"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d60b12902ba28e2730cd37e95b8c9223af2808df9e902d4df49588d1470606"
+dependencies = [
+ "byteorder",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3042,6 +3697,8 @@ version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
+ "allocator-api2",
+ "equivalent",
  "foldhash",
 ]
 
@@ -3052,6 +3709,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32069d97bb81e38fa67eab65e3393bf804bb85969f2bc06bf13f64aef5aba248"
 dependencies = [
  "hashbrown 0.17.1",
+]
+
+[[package]]
+name = "heapless"
+version = "0.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25ba4bd83f9415b58b4ed8dc5714c76e626a105be4646c02630ad730ad3b5aa4"
+dependencies = [
+ "hash32",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -3412,6 +4079,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "if-addrs"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0a05c691e1fae256cf7013d99dad472dc52d5543322761f83ec8d47eab40d2b"
+dependencies = [
+ "libc",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "ignore"
 version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3562,7 +4239,7 @@ dependencies = [
  "sha2 0.10.9",
  "tiny-keccak",
  "unicode-normalization",
- "x25519-dalek",
+ "x25519-dalek 2.0.1",
  "zeroize",
 ]
 
@@ -3589,6 +4266,9 @@ name = "ipnet"
 version = "2.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "is-docker"
@@ -3620,6 +4300,15 @@ name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
 dependencies = [
  "either",
 ]
@@ -3659,7 +4348,7 @@ version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "961d16382652bfdd8c6f68b223b26a8c93e0d475c672f414411db31c6c5c900e"
 dependencies = [
- "defmt",
+ "defmt 1.1.1",
  "jiff-static",
  "jiff-tzdb-platform",
  "log",
@@ -3823,6 +4512,46 @@ dependencies = [
  "elliptic-curve 0.13.8",
  "once_cell",
  "sha2 0.10.9",
+]
+
+[[package]]
+name = "kameo"
+version = "0.19.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c4af7638c67029fd6821d02813c3913c803784648725d4df4082c9b91d7cbb1"
+dependencies = [
+ "downcast-rs 2.0.2",
+ "dyn-clone",
+ "futures",
+ "kameo_macros",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "kameo_actors"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57101cc01d16e87fad2cb0d6332a84bbdd3468c28d52d6929ec43d340e2e6713"
+dependencies = [
+ "futures",
+ "glob",
+ "kameo",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
+name = "kameo_macros"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a13c324e2d8c8e126e63e66087448b4267e263e6cb8770c56d10a9d0d279d9e2"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -4185,6 +4914,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
+name = "managed"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ca88d725a0a943b096803bd34e73a4437208b6077654cc4ecb2947a5f91618d"
+
+[[package]]
 name = "markup5ever"
 version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4224,8 +4959,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f43e377ae111ceb4630fc8239cf7af8c894193f02bb23976177a475007977417"
 dependencies = [
  "fastrand",
- "flume",
- "if-addrs",
+ "flume 0.11.1",
+ "if-addrs 0.14.0",
  "mio",
  "socket-pktinfo",
  "socket2",
@@ -4433,6 +5168,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "418abd1b6d34fbf6cae440dc874771b0525a604428704c76e48b29a5e67b8003"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "noise-protocol"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f226274a278d3d465c891db37e9a300e754f5344a33a62a2a8cd1cdadffb93a"
+dependencies = [
+ "arrayvec",
+]
+
+[[package]]
+name = "noise-rust-crypto"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4c6159f60beb3bbbcdc266bc789bfc6c37fdad7d7ca7152d3e049ef5af633f0"
+dependencies = [
+ "aes-gcm 0.10.3",
+ "blake2 0.10.6",
+ "chacha20poly1305",
+ "noise-protocol",
+ "sha2 0.10.9",
+ "x25519-dalek 2.0.1",
+ "zeroize",
 ]
 
 [[package]]
@@ -5337,6 +6096,15 @@ dependencies = [
 
 [[package]]
 name = "pem-rfc7468"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88b39c9bfcfc231068454382784bb460aae594343fb030d46e9f50a645418412"
+dependencies = [
+ "base64ct",
+]
+
+[[package]]
+name = "pem-rfc7468"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6305423e0e7738146434843d1694d621cce767262b2a86910beab705e4493d9"
@@ -5655,7 +6423,7 @@ checksum = "b4a596a2b3d2752d94f51fac2d4a96737b8705dddd311a32b9af47211f08671e"
 dependencies = [
  "anyhow",
  "bitflags 1.3.2",
- "downcast-rs",
+ "downcast-rs 1.2.1",
  "filedescriptor",
  "lazy_static",
  "libc",
@@ -6335,7 +7103,7 @@ dependencies = [
  "der 0.8.0",
  "digest 0.11.3",
  "ecdsa 0.17.0",
- "ed25519-dalek",
+ "ed25519-dalek 3.0.0-rc.1",
  "elliptic-curve 0.14.1",
  "enum_dispatch",
  "flate2",
@@ -6527,6 +7295,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls-pemfile"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dce314e5fee3f39953d46bb63bb8a46d40c2f8fb7cc5a3b6cab2bde9721d6e50"
+dependencies = [
+ "rustls-pki-types",
+]
+
+[[package]]
 name = "rustls-pki-types"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6580,6 +7357,15 @@ name = "rustversion"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
+
+[[package]]
+name = "ruzstd"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7c1c839d570d835527c9a5e4db7cb2198683a988cb9d7293fc8674e6bd58fc8"
+dependencies = [
+ "twox-hash",
+]
 
 [[package]]
 name = "ryu"
@@ -6735,6 +7521,15 @@ dependencies = [
  "der 0.8.0",
  "hybrid-array",
  "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "secrecy"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
+dependencies = [
  "zeroize",
 ]
 
@@ -7155,6 +7950,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
 
 [[package]]
+name = "smoltcp"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f73d40463bba65efc9adc6370b56df76d563cc46e2482bba58351b4afb7535e"
+dependencies = [
+ "bitflags 1.3.2",
+ "byteorder",
+ "cfg-if",
+ "defmt 0.3.100",
+ "heapless",
+ "managed",
+]
+
+[[package]]
 name = "snap"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7230,6 +8039,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "spin"
+version = "0.9.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
+dependencies = [
+ "lock_api",
+]
+
+[[package]]
 name = "spki"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7290,7 +8108,7 @@ dependencies = [
  "crypto-bigint 0.7.5",
  "ctutils",
  "digest 0.11.3",
- "pem-rfc7468",
+ "pem-rfc7468 1.0.0",
  "zeroize",
 ]
 
@@ -7303,7 +8121,7 @@ dependencies = [
  "argon2",
  "bcrypt-pbkdf",
  "ctutils",
- "ed25519-dalek",
+ "ed25519-dalek 3.0.0-rc.1",
  "hex",
  "hmac 0.13.0",
  "p256",
@@ -7321,19 +8139,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "spin"
-version = "0.9.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
-dependencies = [
- "lock_api",
-]
-
-[[package]]
 name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
+
+[[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "string_cache"
@@ -8082,7 +8897,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.4",
  "windows-sys 0.61.2",
@@ -8215,6 +9030,7 @@ dependencies = [
  "signal-hook-registry",
  "socket2",
  "tokio-macros",
+ "tracing",
  "windows-sys 0.61.2",
 ]
 
@@ -8264,6 +9080,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -8305,6 +9122,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "pin-project-lite",
+ "slab",
  "tokio",
 ]
 
@@ -8574,6 +9392,12 @@ dependencies = [
  "sha1 0.10.6",
  "thiserror 2.0.18",
 ]
+
+[[package]]
+name = "twox-hash"
+version = "2.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "86a801b3cea342a06d468c8710662aa29e5e05e4f5c0d62f00bbb7f2ad7941c2"
 
 [[package]]
 name = "typed-path"
@@ -8958,7 +9782,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2857dd20b54e916ec7253b3d6b4d5c4d7d4ca2c33c2e11c6c76a99bd8744755d"
 dependencies = [
  "cc",
- "downcast-rs",
+ "downcast-rs 1.2.1",
  "rustix 1.1.4",
  "scoped-tls",
  "smallvec",
@@ -9033,7 +9857,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0dde9c29be0f723a573977de51ee455bf3dfa03652730a74f9dd3b337e374d75"
 dependencies = [
  "bitflags 2.13.0",
- "downcast-rs",
+ "downcast-rs 1.2.1",
  "rustix 1.1.4",
  "wayland-backend",
  "wayland-scanner",
@@ -9914,6 +10738,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "x25519-dalek"
+version = "3.0.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eee64e8620caa64914d669b1f68f858aaff54e2d0f9ad3b30a613b58a1baa83e"
+dependencies = [
+ "curve25519-dalek 5.0.0-rc.1",
+ "getrandom 0.4.3",
+ "rand_core 0.10.1",
+ "zeroize",
+]
+
+[[package]]
 name = "xattr"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9978,12 +10814,13 @@ dependencies = [
  "encoding_rs",
  "flate2",
  "futures-util",
- "git2",
+ "geiserx_tailscale",
  "gio",
+ "git2",
  "globset",
  "hmac 0.12.1",
  "hmac 0.13.0",
- "if-addrs",
+ "if-addrs 0.14.0",
  "ignore",
  "jni 0.21.1",
  "leveldb-core",
@@ -10011,13 +10848,13 @@ dependencies = [
  "sha2 0.11.0",
  "tauri",
  "tauri-build",
+ "tauri-plugin-autostart",
  "tauri-plugin-browser-automation",
  "tauri-plugin-global-shortcut",
  "tauri-plugin-mcp-bridge",
  "tauri-plugin-mobile-assistant",
  "tauri-plugin-mobile-execution",
  "tauri-plugin-opener",
- "tauri-plugin-autostart",
  "tauri-plugin-single-instance",
  "tauri-plugin-stronghold",
  "tauri-plugin-updater",

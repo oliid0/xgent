@@ -179,7 +179,8 @@ extension XgentNodeView {
             nativeHeading
         case .button:
             if node.variant == "generated-file" {
-                XgentGeneratedArtifactRow(node: node, document: document, model: model, palette: palette)
+                XgentGeneratedArtifactRow(node: node, document: document, model: model,
+                                          palette: presentationTheme.palette(for: colorScheme))
             } else if node.variant == "workspace-source-action" {
                 XgentWorkspaceSourceAction(node: node, document: document, model: model)
             } else if node.variant == "workspace-editor-bulk-action" {

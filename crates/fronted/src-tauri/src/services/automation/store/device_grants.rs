@@ -6,7 +6,7 @@ use serde_json::json;
 
 fn hash(plan: &DeviceBranchPlan) -> Result<String,String> {
     let value = serde_json::to_value(plan).map_err(|e|e.to_string())?;
-    Ok(format!("{:x}",Sha256::digest(serde_json::to_vec(&value).map_err(|e|e.to_string())?)))
+    Ok(hex::encode(Sha256::digest(serde_json::to_vec(&value).map_err(|e|e.to_string())?)))
 }
 
 impl AutomationStore {

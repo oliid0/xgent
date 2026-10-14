@@ -45,13 +45,13 @@ pub(crate) async fn receive_file(store:Arc<AutomationStore>,registry:&WorkerPeer
             || chunk.offset!=offset || chunk.content_base64.len()>349528 {return Err("Artifact stream left its original manifest/cursor".into());}
         let bytes=STANDARD.decode(&chunk.content_base64).map_err(|e|e.to_string())?;
         let next=offset+bytes.len() as u64;
-        if bytes.len()!=length || chunk.chunk_hash!=format!("{:x}",Sha256::digest(&bytes))
+        if bytes.len()!=length || chunk.chunk_hash!=hex::encode(Sha256::digest(&bytes))
             || chunk.next_offset!=if next<expected.bytes {Some(next)} else {None} {
             return Err("Artifact chunk failed range/hash/progress verification".into());
         }
         file.write_all(&bytes).map_err(|e|e.to_string())?;hash.update(&bytes);offset=next;
     }
-    if format!("{:x}",hash.finalize())!=expected.content_hash {return Err("Artifact stream failed whole-file hash verification".into());}
+    if hex::encode(hash.finalize())!=expected.content_hash {return Err("Artifact stream failed whole-file hash verification".into());}
     file.seek(SeekFrom::Start(0)).map_err(|e|e.to_string())?;Ok(file)
 }
 

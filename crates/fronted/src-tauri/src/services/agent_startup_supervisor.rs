@@ -45,7 +45,7 @@ fn invoke(app: &tauri::AppHandle, mode: &str) -> Result<Registration, String> {
 
     let root = app.path().app_data_dir().map_err(|e|e.to_string())?;
     let identity = format!("{}\0{}", app.config().identifier, root.display());
-    let hash = format!("{:x}", Sha256::digest(identity.as_bytes()));
+    let hash = hex::encode(Sha256::digest(identity.as_bytes()));
     let name = format!("Xgent.Agent.{}", &hash[..32]);
     let executable = std::env::current_exe().map_err(|e|e.to_string())?;
     let executable = executable.to_str().ok_or("Agent executable path is not Unicode")?;

@@ -17,7 +17,7 @@ impl AutomationStore {
             return Err("Invalid compaction source revision".to_string());
         }
         let context_json = super::journal::background_context_json(&input.context)?;
-        let context_hash = format!("{:x}", Sha256::digest(context_json.as_bytes()));
+        let context_hash = hex::encode(Sha256::digest(context_json.as_bytes()));
         let summary_json = serde_json::to_string(&input.summary).map_err(|e| e.to_string())?;
         if summary_json.len() > MAX_SUMMARY_BYTES
             || input.summary.get("api").and_then(Value::as_str) != Some("xgent-compaction")
@@ -44,7 +44,7 @@ impl AutomationStore {
             if hash != context_hash || summary != summary_json {
                 return Err("Compaction revision is already bound to a different context or summary".to_string());
             }
-            if current != next || format!("{:x}", Sha256::digest(source.as_bytes())) != context_hash {
+            if current != next || hex::encode(Sha256::digest(source.as_bytes())) != context_hash {
                 return Err("Compaction was archived but the current checkpoint has advanced; do not restore an older context".to_string());
             }
             return Ok(next);
@@ -66,7 +66,7 @@ impl AutomationStore {
         if count >= MAX_COMPACTIONS || bytes + source.len() as i64 + summary_json.len() as i64 > MAX_ARCHIVE_BYTES {
             return Err("Background context archive quota exceeded; old evidence was retained".to_string());
         }
-        let source_hash = format!("{:x}", Sha256::digest(source.as_bytes()));
+        let source_hash = hex::encode(Sha256::digest(source.as_bytes()));
         let now = db::now_ms();
         tx.execute(
             "INSERT INTO automation_background_compactions (execution_id, source_revision, checkpoint_revision, source_context_json, source_hash, context_hash, summary_json, created_at)
@@ -106,7 +106,7 @@ impl AutomationStore {
             let source = self.load_background_source_context(execution_id, lease)?
                 .ok_or_else(|| "This task has no accepted source conversation".to_string())?;
             let raw = serde_json::to_string(&source).map_err(|e| e.to_string())?;
-            return Self::context_archive_chunk(&raw, format!("{:x}", Sha256::digest(raw.as_bytes())), 0, offset);
+            return Self::context_archive_chunk(&raw, hex::encode(Sha256::digest(raw.as_bytes())), 0, offset);
         }
         if source_revision > i64::MAX as u64 { return Err("Invalid archive revision".to_string()); }
         let conn = self.lock_conn()?;

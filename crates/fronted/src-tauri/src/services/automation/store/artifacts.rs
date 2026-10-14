@@ -53,7 +53,7 @@ impl AutomationStore {
             loop {let count=stream.read(&mut buffer).map_err(|e|e.to_string())?;if count==0 {break;}total+=count as u64;
                 if total>meta.len() {return Err("Artifact size changed before its snapshot".into());}hash.update(&buffer[..count]);}
             if total!=meta.len() {return Err("Artifact size changed before its snapshot".into());}
-            let digest=format!("{:x}",hash.finalize());
+            let digest=hex::encode(hash.finalize());
             if expected_hash.is_some_and(|expected|expected!=digest) {return Err("Artifact changed after the tool write".into());}
             stream.seek(SeekFrom::Start(0)).map_err(|e|e.to_string())?;
             let mut conn=self.lock_conn()?;
@@ -72,7 +72,7 @@ impl AutomationStore {
         let mut content = Vec::new();
         file.take((MAX_ARTIFACT_BYTES + 1) as u64).read_to_end(&mut content).map_err(|e| e.to_string())?;
         if content.len() > MAX_ARTIFACT_BYTES { return Err("Artifact exceeds 8 MiB".to_string()); }
-        let content_hash = format!("{:x}", Sha256::digest(&content));
+        let content_hash = hex::encode(Sha256::digest(&content));
         if expected_hash.is_some_and(|hash| hash != content_hash) {
             return Err("Artifact changed after the tool write; refusing to publish different bytes".to_string());
         }
@@ -141,7 +141,7 @@ impl AutomationStore {
         ).optional().map_err(|e| e.to_string())?.ok_or_else(|| "Artifact not found for this task".to_string())?;
         if artifact.bytes>MAX_ARTIFACT_BYTES as u64 {return Err("Large artifacts require the bounded chunk protocol".into());}
         if content.len() > MAX_ARTIFACT_BYTES || artifact.bytes != content.len() as u64
-            || artifact.content_hash != format!("{:x}", Sha256::digest(&content)) {
+            || artifact.content_hash != hex::encode(Sha256::digest(&content)) {
             return Err("Stored artifact failed integrity verification".to_string());
         }
         Ok(BackgroundArtifactContent { artifact, content_base64: STANDARD.encode(content) })

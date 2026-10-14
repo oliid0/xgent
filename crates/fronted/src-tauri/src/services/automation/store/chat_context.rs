@@ -5,7 +5,7 @@ use sha2::{Digest,Sha256};
 
 fn chat_request_id(scope:&str)->Result<String,String>{
     let identity=serde_json::to_string(&(scope,"default-chat-intake")).map_err(|e|e.to_string())?;
-    let hash=format!("{:x}",Sha256::digest(format!("xgent-background:{identity}").as_bytes()));
+    let hash=hex::encode(Sha256::digest(format!("xgent-background:{identity}").as_bytes()));
     Ok(format!("{}-{}-8{}-a{}-{}",&hash[..8],&hash[8..12],&hash[13..16],&hash[17..20],&hash[20..32]))
 }
 

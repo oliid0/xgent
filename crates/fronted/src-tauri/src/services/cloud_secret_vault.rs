@@ -60,7 +60,7 @@ fn github_digest(token: Option<&[u8]>, username: Option<&[u8]>) -> String {
         digest.update((value.len() as u64).to_be_bytes());
         digest.update(value);
     }
-    format!("{:x}", digest.finalize())
+    hex::encode(digest.finalize())
 }
 
 impl CloudSecretVault {

@@ -80,7 +80,7 @@ impl AutomationStore {
         let (task_id,owner,repository,hash,raw,run_id) = original.ok_or_else(|| "Original cloud cancellation occurrence changed".to_string())?;
         let args: Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
         if args["action"] != "start" || args.get("owner").is_some() || args.get("repository").is_some()
-            || hash != format!("{:x}",Sha256::digest(raw.as_bytes()))
+            || hash != hex::encode(Sha256::digest(raw.as_bytes()))
             || owner != settings["access"]["githubOwner"].as_str().unwrap_or_default().trim()
             || repository != crate::services::cloud_execution::normalize_repository_name(settings["access"]["githubRepository"].as_str().unwrap_or_default())? {
             return Err("Original cloud cancellation reservation/configuration changed".into());

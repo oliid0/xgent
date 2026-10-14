@@ -52,7 +52,7 @@ fn read_target(client:&reqwest::blocking::Client,store:&AutomationStore,target:&
         // only between independently paired sessions of this same host.
         let url=format!("{}/api/local-access/task-result/{}",endpoint.base_url,target.request_id);
         let nonce=uuid::Uuid::new_v4().to_string();
-        let key=format!("{:x}",Sha256::digest(endpoint.token.as_bytes()));
+        let key=hex::encode(Sha256::digest(endpoint.token.as_bytes()));
         let proof=result_read_proof(&key,&target.source_host_id,host,&endpoint.session_id,&target.request_id,&nonce)?;
         let response=match client.get(url).header("origin",&endpoint.base_url)
             .header("x-xgent-receiver",host).header("x-xgent-session",&endpoint.session_id)
@@ -145,7 +145,7 @@ mod tests {
         let base=format!("http://{}",listener.local_addr().unwrap());
         let route=ResultDeliveryEndpoint {base_url:base.clone(),session_id:uuid::Uuid::new_v4().to_string(),
             token:format!("{}{}",uuid::Uuid::new_v4().simple(),uuid::Uuid::new_v4().simple()),expires_at:super::super::automation::db::now_ms()+60_000};
-        let session=route.session_id.clone();let key=format!("{:x}",Sha256::digest(route.token.as_bytes()));
+        let session=route.session_id.clone();let key=hex::encode(Sha256::digest(route.token.as_bytes()));
         let receiver=receiver.to_owned();let source=source.to_owned();let request=request.to_owned();
         let worker=std::thread::spawn(move|| {
             let start=Instant::now();

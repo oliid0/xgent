@@ -13,7 +13,9 @@
 
 - CI 38584005371、打包 38584053181 针对 02486c7c，publish=false／sign=false／smoke=true，v0.1.0-autonomy.1，没有正式 Release。
 - 真实日志证实统一解析阻断：GeiserX SDK eabd2cf2 要求 argon2 ^0.6，SSH lock 为 0.6.0-rc.8。CI／Android／Linux／Windows／macOS Apple Silicon 日志均同因，尚未进入应用 Rust 编译；其余 Apple 作业持续观察。旧“锁文件非已证实必败”结论被新日志替代。
-- 核对官方 argon2 stable／RC、ssh-key／russh manifests 和 Cargo update 文档。CI 增加定向 cargo update -p argon2 --precise 0.6.0，在 runner 解析，由已有 artifact 保存真实锁文件；不手编依赖图、不盲目升级 SSH API。待 resolver 确认其他约束后领取并提交真实 Cargo.lock，全平台复验。
+- d2eb8bc5 已推送，CI 38585347036 的定向 argon2 更新成功，Rust 已进入编译；等待 artifact 领取真实 Cargo.lock，不手编依赖图，未升级 SSH API。核对官方 manifests／Cargo update 文档，锁更新由 runner 执行。
+- Apple 原生编译另证实 PresentationDesktopContent.swift:182 跨文件读取 private palette。已改用现有 presentationTheme.palette(for: colorScheme)，相同环境／颜色，无样式或组件更改；相关原生契约回归即将复验，Swift 编译由下一轮 CI 验证。
+- CI 实际原生编译报告 lib 158／含测试 173 错误。领取并核对 runner Cargo.lock ZIP digest b11bf964a49e05a10c6378575effaaf02149aec4ca31de7296b34eb1011cca3a，唯一成员 Cargo.lock 原样导入。按已发布 crate 源码启用 rusqlite fallible_uint、reqwest form／query，新增 hex 0.4.3，替换 31 文件的 53 处实际 SHA-256 十六进制调用，保持算法／字节／大小写；修正 AppImage OsString→PathBuf、CronApplyResponse.cron.tasks、测试连接可见范围及 receipt 借用。投递／peer 探测使用 owned Send boxed futures，保留 2／2／4 并发及 LAN 优先。418 项后端非 Cargo、17 项原生界面及原生协议通过；即将提交推送并全平台复验，未宣称 Rust 编译通过。
 - xcresult 四处导出要求 Info.plist，保留原 Apple smoke 门槛；旧 provider/cancel 布局修复仍需新 smoke 验证。
 
 ## 最新验证

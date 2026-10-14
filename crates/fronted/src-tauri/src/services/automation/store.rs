@@ -248,7 +248,7 @@ impl AutomationStore {
         Err("cron task 状态已被并发修改，请重试".to_string())
     }
 
-    fn lock_conn(&self) -> Result<std::sync::MutexGuard<'_, Connection>, String> {
+    pub(super) fn lock_conn(&self) -> Result<std::sync::MutexGuard<'_, Connection>, String> {
         self.conn
             .lock()
             .map_err(|_| "automation store lock poisoned".to_string())

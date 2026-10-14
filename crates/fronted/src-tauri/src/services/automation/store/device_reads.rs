@@ -10,7 +10,7 @@ fn owner(conn: &Connection, entry: &str, branch: &str) -> Result<(BackgroundResu
         .ok_or_else(||"Unknown original-device read branch".to_string())?;
     let binding = json!({"requestId":watch.request_id,"sourceHostId":watch.source_host_id,"deviceHostId":device,
         "source":source,"prompt":submission.input.prompt,"sourceContext":submission.input.source_context});
-    let hash = format!("{:x}",Sha256::digest(serde_json::to_vec(&binding).map_err(|e|e.to_string())?));
+    let hash = hex::encode(Sha256::digest(serde_json::to_vec(&binding).map_err(|e|e.to_string())?));
     Ok((watch,submission,device,hash))
 }
 

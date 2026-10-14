@@ -199,7 +199,7 @@ fn binary_background_input(name: &str, bytes: &[u8]) -> BackgroundInputFile {
     use base64::Engine;
     use sha2::{Digest, Sha256};
     BackgroundInputFile { name: name.into(), content_base64: base64::engine::general_purpose::STANDARD.encode(bytes),
-        content_hash: format!("{:x}", Sha256::digest(bytes)), bytes: bytes.len() as u64 }
+        content_hash: hex::encode(Sha256::digest(bytes)), bytes: bytes.len() as u64 }
 }
 
 #[test]
@@ -982,7 +982,7 @@ fn background_compaction_archives_exact_context_and_reads_utf8_without_rewinding
     assert_eq!(store.compact_background_context(input.clone(), |_, _| Ok(())).unwrap(), 2);
     let page = store.list_background_compactions(&task.run.id, 0, store.debug_background_lease(&task.run.id).as_ref()).unwrap();
     assert_eq!(page.compactions.len(), 1);
-    assert_eq!(page.compactions[0].source_hash, format!("{:x}", Sha256::digest(raw.as_bytes())));
+    assert_eq!(page.compactions[0].source_hash, hex::encode(Sha256::digest(raw.as_bytes())));
     assert_eq!(page.compactions[0].source_bytes, raw.len() as u64);
     let mut recovered = String::new();
     let mut offset = 0;

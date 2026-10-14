@@ -511,22 +511,24 @@ pub(crate) async fn sync_background_results(
     store: Arc<AutomationStore>,
     registry: Arc<crate::services::worker_peers::WorkerPeerRegistry>,
 ) -> Result<crate::services::automation::BackgroundInboxSync, String> {
-    use futures_util::{stream, StreamExt};
+    use futures_util::{stream, StreamExt, FutureExt};
     let requests = registry.result_requests().await;
     let prepare = Arc::clone(&store);
     let (host, watches, responses, submissions) = tauri::async_runtime::spawn_blocking(move || {
         prepare.register_result_requests(&requests)?;
         Ok::<_, String>((prepare.background_worker_identity()?, prepare.claim_result_watches()?, prepare.claim_received_responses(None)?, prepare.claim_background_submissions(None)?))
     }).await.map_err(|e| e.to_string())??;
-    let submissions: Vec<Result<bool, String>> = stream::iter(submissions).map(|pending| {
+    let submission_jobs: Vec<_> = submissions.into_iter().map(|pending| {
         let app = app.clone(); let store = Arc::clone(&store); let registry = Arc::clone(&registry);
-        async move { super::submission::deliver(app, store, registry, pending).await.map(|_| false) }
-    }).buffer_unordered(2).collect().await;
-    let responses: Vec<Result<bool, String>> = stream::iter(responses).map(|response| {
+        async move { super::submission::deliver(app, store, registry, pending).await.map(|_| false) }.boxed()
+    }).collect();
+    let submissions: Vec<Result<bool, String>> = stream::iter(submission_jobs).buffer_unordered(2).collect().await;
+    let response_jobs: Vec<_> = responses.into_iter().map(|response| {
         let app = app.clone(); let store = Arc::clone(&store); let registry = Arc::clone(&registry);
-        async move { deliver_received_response(app, store, registry, response).await.map(|_| false) }
-    }).buffer_unordered(2).collect().await;
-    let mut results: Vec<Result<bool, String>> = stream::iter(watches).map(|watch| {
+        async move { deliver_received_response(app, store, registry, response).await.map(|_| false) }.boxed()
+    }).collect();
+    let responses: Vec<Result<bool, String>> = stream::iter(response_jobs).buffer_unordered(2).collect().await;
+    let watch_jobs: Vec<_> = watches.into_iter().map(|watch| {
         let store = Arc::clone(&store);
         let registry = Arc::clone(&registry);
         let local = watch.source_host_id == host;
@@ -539,8 +541,9 @@ pub(crate) async fn sync_background_results(
                 registry.invoke(&watch.source_host_id, "automation_background_get", serde_json::json!({"request_id": watch.request_id})).await?
             };
             tauri::async_runtime::spawn_blocking(move || store.receive_background_result(&watch, snapshot)).await.map_err(|e| e.to_string())?
-        }
-    }).buffer_unordered(4).collect().await;
+        }.boxed()
+    }).collect();
+    let mut results: Vec<Result<bool, String>> = stream::iter(watch_jobs).buffer_unordered(4).collect().await;
     results.extend(responses);
     results.extend(submissions);
     Ok(crate::services::automation::BackgroundInboxSync {
@@ -722,7 +725,7 @@ pub(crate) async fn read_received_artifact(entry_id: String, artifact_id: String
         .ok_or_else(|| "Artifact content exceeds its bound".to_string())?;
     let bytes = STANDARD.decode(encoded).map_err(|e| e.to_string())?;
     if bytes.len() > 8 * 1024 * 1024 || expected["bytes"].as_u64() != Some(bytes.len() as u64)
-        || expected["contentHash"].as_str() != Some(format!("{:x}", Sha256::digest(&bytes)).as_str()) {
+        || expected["contentHash"].as_str() != Some(hex::encode(Sha256::digest(&bytes)).as_str()) {
         return Err("Artifact bytes failed received-manifest integrity verification".into());
     }
     Ok(actual)

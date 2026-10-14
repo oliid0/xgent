@@ -57,7 +57,7 @@ impl AutomationStore {
         // Read data remains in its bounded native queue. Evidence exposes only
         // provenance/limits; the controller must read actual chunks before conclusions.
         let summary=serde_json::json!({"kind":"original_device_health_observation","callId":call,"scopeKey":key,
-            "sourceHostId":routing.initiating_host_id,"snapshotHash":format!("{:x}",Sha256::digest(raw.as_bytes())),
+            "sourceHostId":routing.initiating_host_id,"snapshotHash":hex::encode(Sha256::digest(raw.as_bytes())),
             "metric":contract.metric,"source":health.source,"startMs":health.start_ms,"endMs":health.end_ms,
             "sampleCount":health.samples.len(),"truncated":health.truncated,"accessLimited":health.access_limited,
             "instruction":"Read OriginalDeviceTask read_result for this original call before interpreting actual samples. This proves only the bounded authorized SDK read; empty/limited data is not normal health, a write, notification, diagnosis or new permission."});

@@ -51,7 +51,7 @@ mod tests {
         let mut goals=store.goal_snapshot().unwrap();
         goals=store.goal_apply(serde_json::from_value(json!({"revision":goals.revision,"requestId":"create-fitness","storeId":goals.store_id,"operation":{"op":"create","id":"fitness","config":{"title":"Fitness","description":"Keep the actual habit","category":"health","parentId":null,"steps":[{"id":"exercise","title":"Review actual exercise","done":false}]}}})).unwrap()).unwrap();
         store.goal_apply(serde_json::from_value(json!({"revision":goals.revision,"requestId":"link-fitness","storeId":goals.store_id,"operation":{"op":"link_task","id":"fitness","task_id":"timer","follow_up":true}})).unwrap()).unwrap();
-        (store,cron.tasks.into_iter().find(|task|task.id=="timer").unwrap())
+        (store,cron.cron.tasks.into_iter().find(|task|task.id=="timer").unwrap())
     }
 
     #[test]

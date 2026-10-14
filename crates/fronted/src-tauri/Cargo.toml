@@ -27,7 +27,7 @@ tauri-plugin-mobile-assistant = { path = "../../mobile-assistant" }
 tauri-plugin-mobile-execution = { path = "../../mobile-execution" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
-reqwest = { version = "0.13.4", features = ["blocking", "json", "stream", "socks"] }
+reqwest = { version = "0.13.4", features = ["blocking", "json", "stream", "socks", "form", "query"] }
 percent-encoding = "2.3.2"
 axum = { version = "0.8.9", features = ["ws"] }
 tokio = { version = "1.52.3", features = ["fs", "macros", "net", "sync", "time", "io-util", "process"] }
@@ -43,12 +43,13 @@ walkdir = "2.5.0"
 dirs = "6.0.0"
 toml = "0.9.11"
 ignore = "0.4.27"
-rusqlite = { version = "0.40.1", features = ["bundled"] }
+rusqlite = { version = "0.40.1", features = ["bundled", "fallible_uint"] }
 chrono = "0.4.45"
 tokio-cron-scheduler = "0.15.1"
 rustls = { version = "0.23.41", default-features = false, features = ["ring", "std"] }
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 sha2 = "0.11.0"
+hex = "0.4.3"
 # Shared native device-channel verification uses the already locked digest 0.11 HMAC.
 background-hmac = { package = "hmac", version = "0.13.0" }
 tempfile = "3.27.0"

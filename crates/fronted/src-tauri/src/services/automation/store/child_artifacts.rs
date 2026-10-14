@@ -85,7 +85,7 @@ impl AutomationStore {
             != serde_json::to_value(&source.artifact).map_err(|e|e.to_string())? {return Err("Child artifact response differs from observed metadata".into());}
         let content=STANDARD.decode(&data.content_base64).map_err(|_|"Invalid child artifact encoding")?;
         if content.len() as u64!=source.artifact.bytes || content.len()>8*1024*1024
-            || format!("{:x}",Sha256::digest(&content))!=source.artifact.content_hash {
+            || hex::encode(Sha256::digest(&content))!=source.artifact.content_hash {
             return Err("Child artifact bytes failed length/SHA-256 verification".into());
         }
         let mut conn=self.lock_conn()?;
@@ -168,7 +168,7 @@ mod tests {
             context:json!({"systemPrompt":"Original task","messages":[{"role":"user","content":"Produce report"}]})}).unwrap();
         let bytes=b"Actual retained report";
         let artifact=BackgroundArtifact {id:Uuid::new_v4().to_string(),relative_path:"report.txt".into(),
-            content_hash:format!("{:x}",Sha256::digest(bytes)),bytes:bytes.len() as u64};
+            content_hash:hex::encode(Sha256::digest(bytes)),bytes:bytes.len() as u64};
         let request=Uuid::new_v4().to_string();let execution=Uuid::new_v4().to_string();let peer=Uuid::new_v4().to_string();
         let snapshot=json!({"hostId":peer,"requestId":request,"run":{"id":execution},"artifacts":[artifact]});
         store.lock_conn().unwrap().execute("INSERT INTO automation_background_children (execution_id,call_id,child_request_id,peer_id,issuer_host_id,input_json,issued_at,retry_at,receipt_json,observed_json,observed_execution_id)
@@ -227,7 +227,7 @@ mod tests {
             let conn=store.lock_conn().unwrap();
             for index in 0..32 {
                 conn.execute("INSERT INTO automation_background_artifacts VALUES (?1,?2,?3,?4,0,?5,1)",
-                    params![Uuid::new_v4().to_string(),parent.run.id,format!("existing-{index}.txt"),format!("{:x}",Sha256::digest(b"")),b"".as_slice()]).unwrap();
+                    params![Uuid::new_v4().to_string(),parent.run.id,format!("existing-{index}.txt"),hex::encode(Sha256::digest(b"")),b"".as_slice()]).unwrap();
             }
         }
         assert!(store.import_background_child_artifact(&parent.run.id,"import","child",&source,&lease,response.clone(),load).unwrap_err().contains("quota"));

@@ -820,7 +820,7 @@ impl CloudExecutionService {
             file.flush()
                 .await
                 .map_err(|error| format!("flush cloud task artifact failed: {error}"))?;
-            let actual_digest=format!("{:x}",archive_hash.finalize());
+            let actual_digest=hex::encode(archive_hash.finalize());
             if expected_digest.as_deref().is_some_and(|expected|expected!=actual_digest) {return Err("Cloud archive failed GitHub SHA-256 digest verification".to_string());}
             file.sync_all().await.map_err(|error|format!("Sync cloud task artifact failed: {error}"))?;
             drop(file);
@@ -1420,7 +1420,7 @@ async fn verified_cached_archive(path:&Path,expected:&str)->Option<u64>{
         if bytes>MAX_ARTIFACT_BYTES {return None;}
         hash.update(&buffer[..size]);
     }
-    if bytes!=metadata.len() || format!("{:x}",hash.finalize())!=expected {return None;}
+    if bytes!=metadata.len() || hex::encode(hash.finalize())!=expected {return None;}
     Some(bytes)
 }
 

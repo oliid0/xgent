@@ -30,7 +30,7 @@ pub(super) fn validated_child_summaries(value: Option<&Value>) -> Result<Vec<Bac
 }
 
 fn child_snapshot_chunk(raw: &str, offset: usize, expected_hash: Option<&str>) -> Result<Value,String> {
-    let hash = format!("{:x}",Sha256::digest(raw.as_bytes()));
+    let hash = hex::encode(Sha256::digest(raw.as_bytes()));
     if offset>raw.len() || !raw.is_char_boundary(offset) { return Err("Child offset must be an actual UTF-8 byte boundary".into()); }
     if (offset>0 && expected_hash.is_none()) || expected_hash.is_some_and(|expected|expected!=hash) {
         return Err("Child snapshot changed or is unbound; reread from offset zero".into());

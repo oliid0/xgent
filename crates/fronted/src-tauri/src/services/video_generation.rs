@@ -85,7 +85,7 @@ async fn content(client:&Client,mut headers:HeaderMap,job:&str)->Result<(File,u6
     let size=if extended {if prefix.len()<24 {return Err("Truncated extended MP4 header".into());}u64::from_be_bytes(prefix[8..16].try_into().map_err(|_|"Invalid MP4 header")?)} else {size};
     if size<(if extended {24} else {16}) || size>bytes {return Err("Truncated MP4 file-type box".into());}
     file.sync_all().map_err(|e|e.to_string())?;file.seek(SeekFrom::Start(0)).map_err(|e|e.to_string())?;
-    Ok((file,bytes,format!("{:x}",hash.finalize())))
+    Ok((file,bytes,hex::encode(hash.finalize())))
 }
 
 async fn observe(app:tauri::AppHandle,store:Arc<AutomationStore>,id:String,call:String)->Result<(),String> {

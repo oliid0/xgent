@@ -229,7 +229,7 @@ mod tests {
         plan(&store, &id, &lease, vec![branch("slides", vec![BackgroundCriterion::Artifact { path: "report.pptx".into() }])]);
         let proof = BackgroundBranchEvidence { artifact_ids: vec!["artifact".into()], call_ids: vec![], answer: None };
         let bytes = b"Text renamed as a deck";
-        let hash = format!("{:x}", Sha256::digest(bytes));
+        let hash = hex::encode(Sha256::digest(bytes));
         store.lock_conn().unwrap().execute("INSERT INTO automation_background_artifacts VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params!["artifact", "another-task", "report.pptx", hash, bytes.len() as i64, bytes.as_slice(), 1]).unwrap();
         assert!(record(&store, &id, &lease, "slides", proof.clone()).unwrap_err().contains("belong"));
@@ -461,16 +461,16 @@ impl AutomationStore {
         }))).map_err(|e| e.to_string())?;
         let mut receipts = rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
         for receipt in &mut receipts {
-            let call=receipt["callId"].as_str().unwrap_or_default();
-            if let Some(completed)=super::cloud_waiting::cloud_operation_completed(&conn,execution_id,call)? {
+            let call=receipt["callId"].as_str().unwrap_or_default().to_owned();
+            if let Some(completed)=super::cloud_waiting::cloud_operation_completed(&conn,execution_id,&call)? {
                 receipt["cloudCompleted"]=serde_json::json!(completed);
             }
-            if let Some(observed)=super::cloud_launch::confirmed_late_cloud_start_receipt(&conn,execution_id,call)? {
+            if let Some(observed)=super::cloud_launch::confirmed_late_cloud_start_receipt(&conn,execution_id,&call)? {
                 receipt["reconciledCloudStart"]=observed;
             }
-            if let Some(observed)=super::children::confirmed_child_start_receipt(&conn,execution_id,call)? {
+            if let Some(observed)=super::children::confirmed_child_start_receipt(&conn,execution_id,&call)? {
                 receipt["reconciledChildAcceptance"]=observed;
-                receipt["childCompleted"]=serde_json::json!(child_operation_completed(&conn,execution_id,call)?==Some(true));
+                receipt["childCompleted"]=serde_json::json!(child_operation_completed(&conn,execution_id,&call)?==Some(true));
             }
         }
         let next_cursor = if receipts.len() > 10 { receipts.truncate(10); receipts.last().and_then(|receipt| receipt["sequence"].as_i64()) } else { None };

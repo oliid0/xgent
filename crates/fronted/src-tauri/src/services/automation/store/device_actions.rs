@@ -2,7 +2,7 @@ use super::*;
 use sha2::{Digest, Sha256};
 
 pub(crate) fn device_action_id(device: &str, request: &str, branch: &str, index: usize) -> String {
-    format!("{:x}", Sha256::digest(format!("xgent.device-branch-action.v1\0{device}\0{request}\0{branch}\0{index}").as_bytes()))
+    hex::encode(Sha256::digest(format!("xgent.device-branch-action.v1\0{device}\0{request}\0{branch}\0{index}").as_bytes()))
 }
 
 fn equal<T: serde::Serialize>(left: &T, right: &T) -> Result<bool, String> {

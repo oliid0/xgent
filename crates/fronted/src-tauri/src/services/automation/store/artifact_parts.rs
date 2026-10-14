@@ -21,7 +21,7 @@ pub(super) fn write_snapshot(conn: &Connection, execution: &str, path: &str,
     if bytes<=8*1024*1024 {
         let mut data=vec![0;bytes as usize];reader.read_exact(&mut data).map_err(|e|e.to_string())?;
         if reader.read(&mut [0u8;1]).map_err(|e|e.to_string())?!=0 {return Err("Artifact size changed while reading".into());}
-        let content_hash=format!("{:x}",Sha256::digest(&data));
+        let content_hash=hex::encode(Sha256::digest(&data));
         if expected_hash.is_some_and(|expected|expected!=content_hash) {return Err("Artifact changed after its original hash observation".into());}
         conn.execute("UPDATE automation_background_artifacts SET content=?2,content_hash=?3 WHERE artifact_id=?1",params![id,data,content_hash]).map_err(|e|e.to_string())?;
         return Ok(BackgroundArtifact {id,relative_path:path.into(),content_hash,bytes});
@@ -31,11 +31,11 @@ pub(super) fn write_snapshot(conn: &Connection, execution: &str, path: &str,
         let size=remaining.min(PART_BYTES as u64) as usize;let mut data=vec![0;size];
         reader.read_exact(&mut data).map_err(|e|e.to_string())?;hash.update(&data);
         conn.execute("INSERT INTO automation_artifact_parts (artifact_id,part_index,content,content_hash) VALUES (?1,?2,?3,?4)",
-            params![id,index,data,format!("{:x}",Sha256::digest(&data))]).map_err(|e|e.to_string())?;
+            params![id,index,data,hex::encode(Sha256::digest(&data))]).map_err(|e|e.to_string())?;
         index+=1;remaining-=size as u64;
     }
     if reader.read(&mut [0u8;1]).map_err(|e|e.to_string())?!=0 {return Err("Artifact size changed while reading".into());}
-    let content_hash=format!("{:x}",hash.finalize());
+    let content_hash=hex::encode(hash.finalize());
     if expected_hash.is_some_and(|expected|expected!=content_hash) {return Err("Artifact changed after its original hash observation".into());}
     conn.execute("UPDATE automation_background_artifacts SET content_hash=?2 WHERE artifact_id=?1",
         params![id,content_hash]).map_err(|e|e.to_string())?;
@@ -69,14 +69,14 @@ impl<'a> ArtifactReader<'a> {
                 params![self.artifact.id],|row|Ok((row.get(0)?,row.get(1)?)))
         }.map_err(Error::other)?;
         let wanted=if self.chunked {self.artifact.bytes.saturating_sub(index*PART_BYTES as u64).min(PART_BYTES as u64)} else {self.artifact.bytes};
-        if data.len() as u64!=wanted || hash!=format!("{:x}",Sha256::digest(&data)) {return Err(Error::other("Artifact piece failed integrity verification"));}
+        if data.len() as u64!=wanted || hash!=hex::encode(Sha256::digest(&data)) {return Err(Error::other("Artifact piece failed integrity verification"));}
         self.cache=data;self.cached=Some(index);Ok(())
     }
     pub(crate) fn verify_hash(&mut self) -> Result<(),String> {
         self.seek(SeekFrom::Start(0)).map_err(|e|e.to_string())?;
         let mut hash=Sha256::new();let mut buffer=[0u8;65536];
         loop {let count=self.read(&mut buffer).map_err(|e|e.to_string())?;if count==0 {break;}hash.update(&buffer[..count]);}
-        if format!("{:x}",hash.finalize())!=self.artifact.content_hash {return Err("Artifact failed whole-file integrity verification".into());}
+        if hex::encode(hash.finalize())!=self.artifact.content_hash {return Err("Artifact failed whole-file integrity verification".into());}
         self.seek(SeekFrom::Start(0)).map_err(|e|e.to_string())?;Ok(())
     }
 }
@@ -108,7 +108,7 @@ impl AutomationStore {
         let mut data=vec![0;(artifact.bytes-offset).min(length as u64) as usize];
         reader.read_exact(&mut data).map_err(|e|e.to_string())?;
         let end=offset+data.len() as u64;
-        Ok(BackgroundArtifactChunk {artifact,offset,chunk_hash:format!("{:x}",Sha256::digest(&data)),
+        Ok(BackgroundArtifactChunk {artifact,offset,chunk_hash:hex::encode(Sha256::digest(&data)),
             content_base64:STANDARD.encode(data),next_offset:if end<reader.artifact.bytes {Some(end)} else {None}})
     }
 }

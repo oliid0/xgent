@@ -20,7 +20,7 @@ pub(super) fn confirmed_late_cloud_start_receipt(conn:&Connection,id:&str,call:&
     let Some(arguments)=arguments else {return Ok(None);};
     let parsed:Value=serde_json::from_str(&arguments).map_err(|e|e.to_string())?;
     if parsed["action"]!="start" || parsed.get("owner").is_some() || parsed.get("repository").is_some() {return Ok(None);}
-    let hash=format!("{:x}",Sha256::digest(arguments.as_bytes()));
+    let hash=hex::encode(Sha256::digest(arguments.as_bytes()));
     let raw:Option<String>=conn.query_row(
         "SELECT c.result_json FROM automation_background_cloud_launches c
          JOIN automation_background_operations o ON o.execution_id = c.execution_id AND o.call_id = c.call_id
@@ -74,7 +74,7 @@ impl AutomationStore {
         if arguments["action"]!="start" || arguments.get("owner").is_some() || arguments.get("repository").is_some() {
             return Err("New cloud launch arguments cannot replace its configured namespace".into());
         }
-        let hash=format!("{:x}",Sha256::digest(raw.as_bytes()));
+        let hash=hex::encode(Sha256::digest(raw.as_bytes()));
         let mut input:CloudTaskStartInput=serde_json::from_value(arguments).map_err(|e|format!("Invalid original cloud inputs: {e}"))?;
         input.owner=settings["access"]["githubOwner"].as_str().unwrap_or_default().trim().into();
         input.repository=crate::services::cloud_execution::normalize_repository_name(settings["access"]["githubRepository"].as_str().unwrap_or_default())?;

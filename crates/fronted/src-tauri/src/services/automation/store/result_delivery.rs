@@ -65,7 +65,7 @@ impl ResultDeliveryTarget {
                 return Err("Invalid original result endpoint or scoped credential".into());
             }
         }
-        Ok(format!("{:x}",Sha256::digest(serde_json::to_vec(self).map_err(|e|e.to_string())?)))
+        Ok(hex::encode(Sha256::digest(serde_json::to_vec(self).map_err(|e|e.to_string())?)))
     }
 }
 
@@ -87,7 +87,7 @@ impl AutomationStore {
         let existing: bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM automation_result_read_grants WHERE device_id=?1 AND request_id=?2 AND receiver_host_id=?3)",params![device,request,receiver],|row|row.get(0)).map_err(|e|e.to_string())?;
         let count: u64=tx.query_row("SELECT COUNT(*) FROM automation_result_read_grants",[],|row|row.get(0)).map_err(|e|e.to_string())?;
         if !existing && count>=32768 { return Err("Scoped result grant capacity reached".into()); }
-        let hash=format!("{:x}",Sha256::digest(capability.as_bytes()));
+        let hash=hex::encode(Sha256::digest(capability.as_bytes()));
         tx.execute("INSERT INTO automation_result_read_grants (device_id,request_id,receiver_host_id,token_hash,expires_at) VALUES (?1,?2,?3,?4,?5) ON CONFLICT(device_id,request_id,receiver_host_id) DO UPDATE SET token_hash=excluded.token_hash,expires_at=excluded.expires_at",params![device,request,receiver,hash,expires]).map_err(|e|e.to_string())?;
         tx.commit().map_err(|e|e.to_string())?;
         Ok(serde_json::json!({"version":1,"requestId":request,"sourceHostId":host,"receiverHostId":receiver,"sessionId":device,"expiresAt":expires}))

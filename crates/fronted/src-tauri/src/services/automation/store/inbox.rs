@@ -253,7 +253,7 @@ impl AutomationStore {
             // in the payload, but notify only actual observation transitions.
             notification["children"] = Value::Array(children.iter().map(|child|serde_json::json!({"callId":child.call_id,"requestId":child.request_id,"peerId":child.peer_id,"accepted":child.accepted,"state":child.state,"success":child.success,"terminalConfirmed":child.terminal_confirmed,"cancelRequested":child.cancel_requested,"cancelAcknowledged":child.cancel_acknowledged})).collect());
         }
-        let digest = format!("{:x}", Sha256::digest(serde_json::to_vec(&notification).map_err(|e| e.to_string())?));
+        let digest = hex::encode(Sha256::digest(serde_json::to_vec(&notification).map_err(|e| e.to_string())?));
         let mut conn = self.lock_conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|e| e.to_string())?;
         if stopped() { return Err("OS result receive was stopped".into()); }
@@ -307,7 +307,7 @@ impl AutomationStore {
         let mut end = (offset + 16 * 1024).min(raw.len());
         while !raw.is_char_boundary(end) { end -= 1; }
         Ok(BackgroundInboxChunk { entry_id: id.into(), offset, total_bytes: raw.len(), text: raw[offset..end].into(),
-            next_offset: if end < raw.len() { Some(end) } else { None }, snapshot_hash: format!("{:x}", Sha256::digest(raw.as_bytes())),
+            next_offset: if end < raw.len() { Some(end) } else { None }, snapshot_hash: hex::encode(Sha256::digest(raw.as_bytes())),
         })
     }
 
